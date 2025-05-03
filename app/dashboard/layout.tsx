@@ -2,6 +2,7 @@
 
 import { useUser } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import type React from "react"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
 import { DashboardSidebar } from "@/components/dashboard/sidebar"
@@ -12,9 +13,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
 
   // Start with sidebar collapsed
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Listen for sidebar collapse state changes
   useEffect(() => {
@@ -31,16 +34,24 @@ export default function DashboardLayout({
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
 
-  // Redirect if not signed in
+  // Handle authentication check
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      window.location.href = "/sign-in"
+    if (isLoaded) {
+      if (!isSignedIn) {
+        router.push("/sign-in")
+      } else {
+        setIsLoading(false)
+      }
     }
-  }, [isLoaded, isSignedIn])
+  }, [isLoaded, isSignedIn, router])
 
-  // Show loading or nothing while checking auth
-  if (!isLoaded || !isSignedIn) {
-    return null
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-primary text-xl">Loading...</div>
+      </div>
+    )
   }
 
   return (

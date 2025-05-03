@@ -1,6 +1,13 @@
+"use client"
+
 import { SignIn } from "@clerk/nextjs"
+import { useSearchParams } from "next/navigation"
 
 export default function Page() {
+  // Get the redirect URL from the query parameters
+  const searchParams = useSearchParams()
+  const redirectUrl = searchParams?.get("redirect_url") || "/dashboard"
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-black">
       <SignIn
@@ -21,7 +28,7 @@ export default function Page() {
             otpCodeFieldInput: "bg-black/50 border-primary/30 text-white",
           },
         }}
-        redirectUrl="/dashboard"
+        redirectUrl={redirectUrl}
       />
     </div>
   )

@@ -1,46 +1,34 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { ToastProvider } from "@/components/ui/toast-context"
-import { ChatWidget } from "@/components/chat/chat-widget"
 import { ClerkProvider } from "@clerk/nextjs"
+import { ThemeProvider } from "@/components/theme-provider"
 
-const inter = Inter({ subsets: ["latin"] })
-
-export const metadata: Metadata = {
-  title: "IdeaToStartup - Dashboard",
-  description: "Transform your ideas into successful startups",
-  generator: "Next.js",
-  icons: {
-    icon: "https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Favicons/favicon-32x32-Snr2foWGkL5oziUnbiblGmgamGwuLp.png",
-  },
+export const metadata = {
+  title: "Idea to Startup",
+  description: "Turn your idea into a startup with AI-powered guidance",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning className="dark">
-      <head>
-        <link
-          rel="icon"
-          href="https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Favicons/favicon-32x32-Snr2foWGkL5oziUnbiblGmgamGwuLp.png"
-          type="image/png"
-          sizes="32x32"
-        />
-      </head>
-      <body className={inter.className}>
-        <ClerkProvider>
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-            <ToastProvider>{children}</ToastProvider>
-            <ChatWidget />
+    <ClerkProvider>
+      <html lang="en">
+        <head>
+          <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+          <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+          <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+        </head>
+        <body>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+            {children}
           </ThemeProvider>
-        </ClerkProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
