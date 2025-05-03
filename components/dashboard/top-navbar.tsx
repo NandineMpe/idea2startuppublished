@@ -1,22 +1,17 @@
 "use client"
 
-import { ArrowUpRight, Bell, Grid, HelpCircle, Search, User } from "lucide-react"
+import { ArrowUpRight, Bell, Grid, HelpCircle, Search } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { UserButton, useUser } from "@clerk/nextjs"
 
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/announcement"
 
 export function TopNavbar() {
+  const { isSignedIn, user } = useUser()
+
   return (
     <div className="flex h-16 items-center justify-between border-b border-primary/10 bg-black px-6">
       <div className="flex items-center gap-2">
@@ -76,34 +71,30 @@ export function TopNavbar() {
           </Button>
         </Link>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {isSignedIn ? (
+          <UserButton
+            afterSignOutUrl="/"
+            appearance={{
+              elements: {
+                userButtonAvatarBox: "border border-primary/30",
+                userButtonPopoverCard: "bg-black/90 backdrop-blur-md border border-primary/20",
+                userButtonPopoverActionButton: "text-white hover:bg-primary/10",
+                userButtonPopoverActionButtonText: "text-white",
+                userButtonPopoverFooter: "border-t border-primary/20",
+              },
+            }}
+          />
+        ) : (
+          <Link href="/sign-in">
             <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full overflow-hidden border border-primary/20 hover:border-primary/50"
+              variant="outline"
+              size="sm"
+              className="border-primary/20 bg-black hover:bg-primary/10 hover:border-primary/50 rounded-full"
             >
-              <User className="h-5 w-5 text-primary" />
+              <span className="text-white">My Dashboard</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="glass border-primary/20 w-56">
-            <DropdownMenuLabel className="text-white">My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-primary/20" />
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-primary/20" />
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </Link>
+        )}
       </div>
     </div>
   )

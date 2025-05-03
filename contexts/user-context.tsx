@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { getUserData, saveUserData, type UserData } from "@/lib/kv"
+import { useUser as useClerkUser } from "@clerk/nextjs"
 
 interface UserContextType {
   userData: UserData | null
@@ -15,7 +16,11 @@ const UserContext = createContext<UserContextType>({
   updateUserData: async () => {},
 })
 
-export const useUser = () => useContext(UserContext)
+export function useUser() {
+  const { user, isLoaded, isSignedIn } = useClerkUser()
+
+  return useContext(UserContext)
+}
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [userData, setUserData] = useState<UserData | null>(null)

@@ -1,5 +1,6 @@
 "use client"
 
+import { useUser } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
 import type React from "react"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
@@ -10,6 +11,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  const { isSignedIn, isLoaded } = useUser()
+
   // Start with sidebar collapsed
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
@@ -27,6 +30,18 @@ export default function DashboardLayout({
     window.addEventListener("mousemove", handleMouseMove)
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
+
+  // Redirect if not signed in
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      window.location.href = "/sign-in"
+    }
+  }, [isLoaded, isSignedIn])
+
+  // Show loading or nothing while checking auth
+  if (!isLoaded || !isSignedIn) {
+    return null
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

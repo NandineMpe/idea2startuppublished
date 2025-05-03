@@ -68,7 +68,8 @@
     "@ai-sdk/anthropic": "latest",
     "dotted-map": "latest",
     "@vercel/kv": "latest",
-    "uuid": "latest"
+    "uuid": "latest",
+    "@clerk/nextjs": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

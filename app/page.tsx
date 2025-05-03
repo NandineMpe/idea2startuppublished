@@ -8,12 +8,14 @@ import Link from "next/link"
 import Hotspot from "@/components/hotspot"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import Preloader from "@/components/preloader"
+import { useUser } from "@clerk/nextjs"
 
 export default function Home() {
   const [isHovered, setIsHovered] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const aboutSectionRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { isSignedIn } = useUser()
 
   // Founder information for hotspots with non-linear positioning
   const founders = [
@@ -134,7 +136,7 @@ And it sure as hell doesn't change the world.`,
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 1.5 }}
         >
-          <Link href="/dashboard">
+          <Link href={isSignedIn ? "/dashboard" : "/sign-in"}>
             <Button className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium">
               My Dashboard
             </Button>
@@ -193,7 +195,7 @@ And it sure as hell doesn't change the world.`,
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1 }}
               >
-                <Link href="/dashboard">
+                <Link href={isSignedIn ? "/dashboard" : "/sign-up"}>
                   <Button
                     className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
                       isHovered ? "pl-10 pr-14" : "px-12"

@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/ui/toast-context"
 import { ChatWidget } from "@/components/chat/chat-widget"
+import { ClerkProvider } from "@clerk/nextjs"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -33,10 +34,12 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <ToastProvider>{children}</ToastProvider>
-          <ChatWidget />
-        </ThemeProvider>
+        <ClerkProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+            <ToastProvider>{children}</ToastProvider>
+            <ChatWidget />
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   )
