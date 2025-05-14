@@ -1,77 +1,192 @@
-import { OpenAIStream, StreamingTextResponse } from "ai"
-import { OpenAI } from "openai"
+import { NextResponse } from "next/server"
+import { DeepseekStream, StreamingTextResponse } from "@/lib/deepseek-stream"
 
-// Create an OpenAI API client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-export const runtime = "nodejs"
+export const runtime = "edge"
 
 export async function POST(req: Request) {
   try {
-    const { slideType, businessData } = await req.json()
+    const { slideType, slideData } = await req.json()
 
-    // Define system prompts based on slide type
-    const systemPrompts: Record<string, string> = {
-      problem:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Problem' slide of a pitch deck. Focus on clearly articulating the problem, its scope, and why it matters. Use concise language that resonates with investors.",
-      solution:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Solution' slide of a pitch deck. Clearly explain how the product/service solves the problem, highlight key features and benefits, and emphasize the unique value proposition.",
-      market:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Market' slide of a pitch deck. Include market size (TAM, SAM, SOM), growth trends, and market dynamics. Use specific numbers and data points when possible.",
-      business:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Business Model' slide of a pitch deck. Explain how the business makes money, pricing strategy, sales channels, and customer acquisition approach.",
-      competition:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Competition' slide of a pitch deck. Identify key competitors, highlight your competitive advantages, and explain your unique positioning in the market.",
-      traction:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Traction' slide of a pitch deck. Showcase growth metrics, key milestones achieved, customer testimonials, and any validation points that demonstrate momentum.",
-      team: "You are an expert pitch deck consultant. Create compelling content for the 'Team' slide of a pitch deck. Highlight key team members, their relevant experience, and why this team is uniquely positioned to execute on this opportunity.",
-      financials:
-        "You are an expert pitch deck consultant. Create compelling content for the 'Financials' slide of a pitch deck. Include revenue projections, key metrics, funding requirements, and use of funds. Be realistic but ambitious.",
-      ask: "You are an expert pitch deck consultant. Create compelling content for the 'Ask' slide of a pitch deck. Clearly state what you're asking for (investment amount), how the funds will be used, and the expected outcomes/milestones that will be achieved.",
+    // Validate required fields
+    if (!slideType || !slideData) {
+      return NextResponse.json(
+        {
+          error: "Slide type and data are required",
+        },
+        { status: 400 },
+      )
+    }
+
+    // Check if API key is available
+    if (!process.env.DEEPSEEK_API_KEY) {
+      return NextResponse.json(
+        {
+          error: "DEEPSEEK_API_KEY environment variable is not set",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Define the slide types and their prompts
+    const slidePrompts: Record<string, string> = {
+      problem: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the PROBLEM slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Clearly articulating the problem
+      - Explaining why this problem matters
+      - Quantifying the impact of the problem when possible
+      - Making the problem relatable and urgent
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      solution: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the SOLUTION slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Clearly explaining how your solution works
+      - Highlighting your unique approach or technology
+      - Explaining why your solution is better than alternatives
+      - Connecting your solution directly to the problem you identified
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      market: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the MARKET slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Defining your Total Addressable Market (TAM), Serviceable Available Market (SAM), and Serviceable Obtainable Market (SOM)
+      - Including relevant market size figures and growth rates
+      - Identifying key market trends that support your business
+      - Explaining why this market is attractive
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      "business-model": `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the BUSINESS MODEL slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Clearly explaining how you make money
+      - Outlining your pricing strategy
+      - Describing your sales and distribution channels
+      - Highlighting unit economics and margins if possible
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      traction: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the TRACTION slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Highlighting key metrics and growth
+      - Mentioning notable customers or partnerships
+      - Describing milestones achieved
+      - Showing momentum and progress
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      team: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the TEAM slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Highlighting relevant experience and expertise
+      - Explaining why this team is uniquely positioned to solve this problem
+      - Mentioning notable achievements or credentials
+      - Identifying any key advisors or board members
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
+
+      ask: `You are an expert pitch deck consultant helping founders create compelling pitch decks. 
+      Generate content for the ASK slide of a pitch deck based on the information provided.
+      
+      Focus on:
+      - Clearly stating how much funding you're seeking
+      - Explaining how the funds will be used
+      - Outlining key milestones the funding will help you achieve
+      - Including a timeline if relevant
+      
+      Format your response as plain text that can be directly used in a pitch deck slide.
+      Keep your response concise but impactful - around 150-200 words.
+      Use a professional, confident tone that would appeal to investors.`,
     }
 
     // Get the appropriate system prompt
     const systemPrompt =
-      systemPrompts[slideType] ||
+      slidePrompts[slideType] ||
       "You are an expert pitch deck consultant. Create compelling content for a pitch deck slide."
 
-    // Use a valid model name - gpt-4o is the latest and most capable model
-    const model = "gpt-4o"
+    // Format the user message based on the slide data
+    let userMessage = "Please generate content for my pitch deck slide based on this information:\n\n"
 
-    console.log(`Using model: ${model} for pitch slide generation`)
-
-    const response = await openai.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: `Create content for the ${slideType} slide of my pitch deck. Here's information about my business: ${JSON.stringify(businessData)}`,
-        },
-      ],
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 500,
+    // Add all the slide data fields to the message
+    Object.entries(slideData).forEach(([key, value]) => {
+      if (value && typeof value === "string" && value.trim() !== "") {
+        userMessage += `${key}: ${value}\n`
+      }
     })
 
-    // Create a stream from the OpenAI response
-    const stream = OpenAIStream(response)
+    console.log(`Using Deepseek for pitch slide generation: ${slideType}`)
 
-    // Return a StreamingTextResponse, which will stream the response to the client
+    // Call Deepseek API
+    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: true,
+      }),
+    })
+
+    // Check if the response is OK
+    if (!response.ok) {
+      let errorMessage
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error?.message || "Unknown error"
+      } catch (error) {
+        errorMessage = `Failed to fetch from Deepseek API: ${response.statusText}`
+      }
+      return NextResponse.json(
+        {
+          error: errorMessage,
+        },
+        { status: response.status },
+      )
+    }
+
+    // Convert the response into a friendly text-stream
+    const stream = DeepseekStream(response)
+
+    // Respond with the stream
     return new StreamingTextResponse(stream)
   } catch (error) {
     console.error("Error in pitch slide generation:", error)
-    return new Response(
-      JSON.stringify({
+    return NextResponse.json(
+      {
         error: "Failed to generate pitch slide content",
-        details: error instanceof Error ? error.message : String(error),
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     )
   }
 }

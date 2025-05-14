@@ -1,15 +1,24 @@
-export interface AnalysisSection {
-  title: string
-  content: string
-}
-
-export interface AnalysisResponse {
-  sections: AnalysisSection[]
-}
-
-export interface BusinessIdeaInput {
-  ideaDescription: string
-  proposedSolution?: string
-  intendedUsers?: string
-  geographicFocus?: string
+export interface BusinessIdeaAnalysis {
+  summary: string
+  strengths: string[]
+  weaknesses: string[]
+  opportunities: string[]
+  threats: string[]
+  marketPotential: {
+    score: number
+    explanation: string
+  }
+  feasibility: {
+    score: number
+    explanation: string
+  }
+  innovation: {
+    score: number
+    explanation: string
+  }
+  recommendation: string
+  nextSteps: string[]
+  potentialRevenues: string[]
+  estimatedCosts: string[]
+  targetAudience: string[]
 }

@@ -1,58 +1,64 @@
-import { createParser } from "eventsource-parser"
+import { createParser, type ParsedEvent, type ReconnectInterval } from "eventsource-parser"
 
-export function DeepseekStream(res: Response) {
+export interface DeepseekChatCompletionChunk {
+  id: string
+  object: string
+  created: number
+  model: string
+  choices: {
+    index: number
+    delta: {
+      content?: string
+      role?: string
+    }
+    finish_reason: null | string
+  }[]
+}
+
+export async function DeepseekStream(res: Response) {
   const encoder = new TextEncoder()
   const decoder = new TextDecoder()
-  let controller: ReadableStreamController<Uint8Array>
-  const parser = createParser((event) => {
-    if (event.type === "event" && event.data !== "[DONE]") {
-      try {
-        const data = JSON.parse(event.data)
-        const text = data.choices[0]?.delta?.content || ""
-        const queue = encoder.encode(text)
-        controller.enqueue(queue)
-      } catch (e) {
-        controller.error(e)
-      }
-    } else if (event.type === "event" && event.data === "[DONE]") {
-      controller.close()
-    }
-  })
 
   const stream = new ReadableStream({
-    start(ctrl) {
-      controller = ctrl
-      // Feed the response body to the parser
-      function onParse(chunk: Uint8Array) {
+    async start(controller) {
+      // callback
+      function onParse(event: ParsedEvent | ReconnectInterval) {
+        if (event.type === "event") {
+          const data = event.data
+          // https://beta.openai.com/docs/api-reference/completions/create#completions/create-stream
+          if (data === "[DONE]") {
+            controller.close()
+            return
+          }
+          try {
+            const json = JSON.parse(data) as DeepseekChatCompletionChunk
+            const text = json.choices[0]?.delta?.content || ""
+            const queue = encoder.encode(text)
+            controller.enqueue(queue)
+          } catch (e) {
+            // maybe parse error
+            controller.error(e)
+          }
+        }
+      }
+
+      // stream response (SSE) from Deepseek may be fragmented into multiple chunks
+      // this ensures we properly read chunks and invoke an event for each SSE event stream
+      const parser = createParser(onParse)
+      // https://web.dev/streams/#asynchronous-iteration
+      for await (const chunk of res.body as any) {
         parser.feed(decoder.decode(chunk))
       }
-
-      // Handle the response stream
-      const reader = res.body?.getReader()
-      if (!reader) {
-        controller.close()
-        return
-      }
-
-      function push() {
-        reader
-          .read()
-          .then(({ done, value }) => {
-            if (done) {
-              controller.close()
-              return
-            }
-            onParse(value)
-            push()
-          })
-          .catch((err) => {
-            controller.error(err)
-          })
-      }
-
-      push()
     },
   })
 
   return stream
+}
+
+export function StreamingTextResponse(res: ReadableStream) {
+  return new Response(res, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  })
 }
