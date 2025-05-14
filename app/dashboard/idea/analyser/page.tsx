@@ -1,316 +1,262 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Loader2,
-  Lightbulb,
-  BarChart3,
-  Target,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle2,
-  Users,
-  MapPin,
-} from "lucide-react"
-import { CollapsibleSection } from "@/components/visualizations/collapsible-section"
-import { getBusinessIdea, saveBusinessIdea } from "@/app/actions/user-data"
-import { useSectionTracker } from "@/hooks/use-section-tracker"
+import { useToast } from "@/hooks/use-toast"
+import { Loader2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
-interface AnalysisSection {
+interface Section {
   title: string
   content: string
-  score?: number
 }
 
-interface AnalysisResponse {
-  sections: AnalysisSection[]
+interface Analysis {
+  sections: Section[]
 }
 
-interface BusinessIdeaForm {
-  problem: string
-  solution: string
-  audience?: string
-  location?: string
-}
-
-export default function BusinessIdeaAnalysisPage() {
-  const [formData, setFormData] = useState<BusinessIdeaForm>({
-    problem: "",
-    solution: "",
-    audience: "",
-    location: "",
-  })
+export default function IdeaAnalyser() {
+  const [ideaDescription, setIdeaDescription] = useState("")
+  const [proposedSolution, setProposedSolution] = useState("")
+  const [intendedUsers, setIntendedUsers] = useState("")
+  const [geographicFocus, setGeographicFocus] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null)
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const [useMockApi, setUseMockApi] = useState(false)
+  const { toast } = useToast()
 
-  // Track this section visit
-  const { completeSection } = useSectionTracker("business-idea-analyzer", { markInProgress: true })
-
-  // Load saved business idea data when component mounts
-  useEffect(() => {
-    const loadBusinessIdea = async () => {
-      try {
-        setIsLoading(true)
-        const savedIdea = await getBusinessIdea()
-
-        if (savedIdea) {
-          setFormData({
-            problem: savedIdea.problem || "",
-            solution: savedIdea.solution || "",
-            audience: savedIdea.audience || "",
-            location: savedIdea.location || "",
-          })
-
-          if (savedIdea.analysis) {
-            setAnalysis(savedIdea.analysis)
-          }
-        }
-      } catch (error) {
-        console.error("Error loading business idea:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadBusinessIdea()
-  }, [])
-
-  // Debounced save function
-  useEffect(() => {
-    const saveTimeout = setTimeout(async () => {
-      if (formData.problem || formData.solution || formData.audience || formData.location) {
-        setIsSaving(true)
-        try {
-          await saveBusinessIdea({
-            ...formData,
-            analysis: analysis,
-          })
-        } catch (error) {
-          console.error("Error auto-saving business idea:", error)
-        } finally {
-          setIsSaving(false)
-        }
-      }
-    }, 1000) // 1 second debounce
-
-    return () => clearTimeout(saveTimeout)
-  }, [formData, analysis])
-
-  const handleInputChange =
-    (field: keyof BusinessIdeaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const updatedFormData = { ...formData, [field]: e.target.value }
-      setFormData(updatedFormData)
-    }
+  // Function to format content with paragraphs
+  const formatContent = (content: string) => {
+    const paragraphs = content.split("\n\n")
+    return paragraphs.map((paragraph, index) => (
+      <p key={index} className={`mb-${index < paragraphs.length - 1 ? "4" : "0"}`}>
+        {paragraph}
+      </p>
+    ))
+  }
 
   const handleAnalyze = async () => {
-    // Validate required fields
-    if (!formData.problem.trim()) {
-      setError("Please describe the problem you're looking to solve")
+    if (!ideaDescription.trim()) {
+      toast({
+        title: "Error",
+        description: "Please describe your business idea",
+        variant: "destructive",
+      })
       return
     }
 
-    if (!formData.solution.trim()) {
-      setError("Please describe your proposed solution")
-      return
-    }
+    setIsAnalyzing(true)
+    setError(null)
+    setAnalysis(null)
 
     try {
-      setIsAnalyzing(true)
-      setError(null)
+      // Use a timeout to prevent hanging requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
 
-      // Format the business idea from the form fields
-      const businessIdea = `
-Problem: ${formData.problem}
-Solution: ${formData.solution}
-${formData.audience ? `Target Audience: ${formData.audience}` : ""}
-${formData.location ? `Location/Market: ${formData.location}` : ""}
-      `.trim()
+      // Determine which API endpoint to use
+      const apiEndpoint = useMockApi ? "/api/mock-idea-analysis" : "/api/openai-idea-analysis"
 
-      const response = await fetch("/api/analyze-business-idea", {
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ businessIdea }),
+        body: JSON.stringify({
+          ideaDescription,
+          proposedSolution,
+          intendedUsers,
+          geographicFocus,
+        }),
+        signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
+
+      // Check if the response is ok
       if (!response.ok) {
-        throw new Error("Failed to analyze business idea")
+        // If the OpenAI API fails and we're not already using the mock API, try the mock API
+        if (!useMockApi) {
+          console.log("OpenAI API failed, falling back to mock API")
+          setUseMockApi(true)
+
+          // Try again with the mock API
+          const mockResponse = await fetch("/api/mock-idea-analysis", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ideaDescription,
+              proposedSolution,
+              intendedUsers,
+              geographicFocus,
+            }),
+          })
+
+          if (!mockResponse.ok) {
+            const responseText = await mockResponse.text()
+            console.error("Mock API error response:", responseText)
+            throw new Error(
+              `Both APIs failed. Mock API returned ${mockResponse.status}: ${responseText.substring(0, 100)}...`,
+            )
+          }
+
+          const data = await mockResponse.json()
+
+          if (data.error) {
+            throw new Error(data.error)
+          }
+
+          setAnalysis(data.analysis)
+          toast({
+            title: "Analysis Complete (Using Mock Data)",
+            description: "Your business idea has been analyzed using our offline analysis engine.",
+          })
+          setIsAnalyzing(false)
+          return
+        }
+
+        // If we're already using the mock API and it failed, show the error
+        const responseText = await response.text()
+        console.error("Error response:", responseText)
+        throw new Error(`Server returned ${response.status}: ${responseText.substring(0, 100)}...`)
       }
 
-      const data = await response.json()
+      // Try to parse the JSON response
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        // If JSON parsing fails, get the raw text
+        const responseText = await response.text()
+        console.error("Invalid JSON response:", responseText)
+        throw new Error(`Server returned invalid JSON. Response: ${responseText.substring(0, 100)}...`)
+      }
+
+      // Check if there's an error in the response
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
       setAnalysis(data.analysis)
-
-      // Save the analysis result
-      await saveBusinessIdea({
-        problem: formData.problem,
-        solution: formData.solution,
-        audience: formData.audience,
-        location: formData.location,
-        analysis: data.analysis,
+      toast({
+        title: "Analysis Complete",
+        description: useMockApi
+          ? "Your business idea has been analyzed using our offline analysis engine."
+          : "Your business idea has been analyzed successfully.",
       })
-
-      // Mark this section as completed
-      await completeSection()
     } catch (err) {
-      console.error("Error analyzing business idea:", err)
-      setError("Failed to analyze your business idea. Please try again.")
+      console.error("Error analyzing idea:", err)
+      setError(err instanceof Error ? err.message : "An unknown error occurred")
+      toast({
+        title: "Analysis Failed",
+        description: err instanceof Error ? err.message : "An unknown error occurred",
+        variant: "destructive",
+      })
     } finally {
       setIsAnalyzing(false)
     }
   }
 
-  const getSectionIcon = (title: string) => {
-    if (title.includes("PROBLEM") || title.includes("HYPOTHESIS")) return <Lightbulb className="h-5 w-5" />
-    if (title.includes("MARKET") || title.includes("DEMAND")) return <BarChart3 className="h-5 w-5" />
-    if (title.includes("BENEFITS") || title.includes("GAPS") || title.includes("PROPOSITION"))
-      return <Target className="h-5 w-5" />
-    if (title.includes("MONETIZATION") || title.includes("LOGIC") || title.includes("BUSINESS MODEL"))
-      return <DollarSign className="h-5 w-5" />
-    if (title.includes("RISK") || title.includes("BARRIER")) return <AlertTriangle className="h-5 w-5" />
-    if (title.includes("RECOMMENDATIONS") || title.includes("OPPORTUNITY")) return <CheckCircle2 className="h-5 w-5" />
-    return <Lightbulb className="h-5 w-5" />
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-        <p className="text-white">Loading your business idea...</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-white">Business Idea Analyzer</h1>
-        <p className="text-white/60">Get a comprehensive analysis of your business idea from multiple perspectives</p>
-        {isSaving && <p className="text-xs text-primary/70">Saving your changes...</p>}
-      </div>
-
-      <Card className="glass-card border-primary/10">
+    <div className="container mx-auto py-6 space-y-8">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Describe Your Business Idea</CardTitle>
-          <CardDescription className="text-white/60">
-            Fill out the form below to analyze your business idea
-          </CardDescription>
+          <CardTitle>Business Idea Analyzer</CardTitle>
+          <CardDescription>Describe your business idea and get a comprehensive analysis</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="problem" className="text-white">
-              What is the problem you are looking to solve? <span className="text-red-400">*</span>
-            </Label>
+            <Label htmlFor="ideaDescription">What idea are you thinking about?</Label>
             <Textarea
-              id="problem"
-              placeholder="Describe the problem in detail..."
-              className="min-h-[100px] bg-black/50 border-gray-800 focus:border-primary text-white"
-              value={formData.problem}
-              onChange={handleInputChange("problem")}
+              id="ideaDescription"
+              placeholder="Describe your business idea in detail..."
+              value={ideaDescription}
+              onChange={(e) => setIdeaDescription(e.target.value)}
+              rows={4}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="solution" className="text-white">
-              What solution do you propose? <span className="text-red-400">*</span>
-            </Label>
+            <Label htmlFor="proposedSolution">What solution are you thinking of?</Label>
             <Textarea
-              id="solution"
-              placeholder="Describe your solution in detail..."
-              className="min-h-[100px] bg-black/50 border-gray-800 focus:border-primary text-white"
-              value={formData.solution}
-              onChange={handleInputChange("solution")}
+              id="proposedSolution"
+              placeholder="Describe your proposed solution..."
+              value={proposedSolution}
+              onChange={(e) => setProposedSolution(e.target.value)}
+              rows={3}
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="audience" className="text-white flex items-center gap-2">
-                <Users className="h-4 w-4" /> Who are you building this for?{" "}
-                <span className="text-white/60 text-sm">(Optional)</span>
-              </Label>
-              <Input
-                id="audience"
-                placeholder="Target audience, customer segments..."
-                className="bg-black/50 border-gray-800 focus:border-primary text-white"
-                value={formData.audience}
-                onChange={handleInputChange("audience")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location" className="text-white flex items-center gap-2">
-                <MapPin className="h-4 w-4" /> Where are you building this for?{" "}
-                <span className="text-white/60 text-sm">(Optional)</span>
-              </Label>
-              <Input
-                id="location"
-                placeholder="Geographic region, market..."
-                className="bg-black/50 border-gray-800 focus:border-primary text-white"
-                value={formData.location}
-                onChange={handleInputChange("location")}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="intendedUsers">Who is it for?</Label>
+            <Textarea
+              id="intendedUsers"
+              placeholder="Describe your target users or customers..."
+              value={intendedUsers}
+              onChange={(e) => setIntendedUsers(e.target.value)}
+              rows={2}
+            />
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-
-          <div className="flex justify-end">
-            <Button
-              className="bg-primary hover:bg-primary/90 text-black"
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || !formData.problem.trim() || !formData.solution.trim()}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                "Analyze Idea"
-              )}
-            </Button>
+          <div className="space-y-2">
+            <Label htmlFor="geographicFocus">Where is it for?</Label>
+            <Textarea
+              id="geographicFocus"
+              placeholder="Describe the geographic focus or market..."
+              value={geographicFocus}
+              onChange={(e) => setGeographicFocus(e.target.value)}
+              rows={2}
+            />
           </div>
+
+          <div className="flex items-center space-x-2 pt-4">
+            <Switch id="use-mock-api" checked={useMockApi} onCheckedChange={setUseMockApi} />
+            <Label htmlFor="use-mock-api" className="cursor-pointer">
+              Use offline analysis (faster but less detailed)
+            </Label>
+          </div>
+
+          <Button onClick={handleAnalyze} disabled={isAnalyzing || !ideaDescription.trim()} className="w-full">
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Analyzing (this may take a few minutes)...
+              </>
+            ) : (
+              "Analyze Business Idea"
+            )}
+          </Button>
         </CardContent>
       </Card>
 
-      {isAnalyzing && (
-        <Card className="glass-card border-primary/10 p-6">
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-12 w-12 text-primary animate-spin mb-4" />
-            <h3 className="text-xl font-medium text-white mb-2">Analyzing Your Business Idea</h3>
-            <p className="text-white/60 text-center max-w-md">
-              Our AI is thoroughly evaluating your business idea from multiple perspectives. This may take a minute...
-            </p>
-          </div>
+      {error && (
+        <Card className="border-red-300">
+          <CardHeader>
+            <CardTitle className="text-red-500">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error}</p>
+            <p className="mt-4">Please try again or enable offline analysis if the issue persists.</p>
+          </CardContent>
         </Card>
       )}
 
-      {analysis && !isAnalyzing && (
+      {analysis && analysis.sections && analysis.sections.length > 0 && (
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-white">Analysis Results</h2>
+          <h2 className="text-2xl font-bold">Business Idea Analysis</h2>
+
           {analysis.sections.map((section, index) => (
-            <Card key={index} className="glass-card border-primary/10">
-              <CollapsibleSection
-                title={
-                  <div className="flex items-center gap-2">
-                    {getSectionIcon(section.title)}
-                    <span>{section.title}</span>
-                  </div>
-                }
-                defaultOpen={index === 0}
-              >
-                <div className="whitespace-pre-line text-white/80">{section.content}</div>
-              </CollapsibleSection>
+            <Card key={index} className="overflow-hidden">
+              <CardHeader className="bg-slate-50">
+                <CardTitle>{section.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">{formatContent(section.content)}</CardContent>
             </Card>
           ))}
         </div>

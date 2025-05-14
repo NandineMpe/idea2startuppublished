@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, Copy, CheckCircle2, RefreshCw, Download, DollarSign, Users, MessageSquare, Zap } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -230,14 +231,14 @@ function InvestorElevatorPitch() {
 
             {generatedPitch ? (
               <div className="mt-6 space-y-4">
-                <div className="rounded-lg bg-black/50 border-gray-800 border p-4">
-                  <h3 className="mb-2 text-lg font-semibold text-primary">Investor Pitch</h3>
+                <div className="rounded-lg bg-black/5 p-4 dark:bg-white/5">
+                  <h3 className="mb-2 text-lg font-semibold text-green-600">Investor Pitch</h3>
                   <div className="whitespace-pre-line text-sm">{generatedPitch.elevatorPitch}</div>
                 </div>
 
                 {generatedPitch.summary && (
-                  <div className="rounded-lg bg-black/50 border-gray-800 border p-4">
-                    <h3 className="mb-2 text-lg font-semibold text-primary">Summary</h3>
+                  <div className="rounded-lg bg-black/5 p-4 dark:bg-white/5">
+                    <h3 className="mb-2 text-lg font-semibold text-green-600">Summary</h3>
                     <ul className="space-y-2 text-sm">
                       {generatedPitch.summary.problem && (
                         <li>
@@ -274,14 +275,11 @@ function InvestorElevatorPitch() {
                 )}
 
                 {generatedPitch.punchlines && generatedPitch.punchlines.length > 0 && (
-                  <div className="rounded-lg bg-black/50 border-gray-800 border p-4">
-                    <h3 className="mb-2 text-lg font-semibold text-primary">Punchlines</h3>
-                    <ul className="space-y-3">
+                  <div className="rounded-lg bg-black/5 p-4 dark:bg-white/5">
+                    <h3 className="mb-2 text-lg font-semibold text-green-600">Punchlines</h3>
+                    <ul className="list-disc space-y-1 pl-5 text-sm">
                       {generatedPitch.punchlines.map((punchline, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-primary font-bold">•</span>
-                          <span className="italic">{punchline}</span>
-                        </li>
+                        <li key={index}>{punchline}</li>
                       ))}
                     </ul>
                   </div>
@@ -326,13 +324,9 @@ function CustomerElevatorPitch() {
   const [businessIdea, setBusinessIdea] = useState("")
   const [selectedProject, setSelectedProject] = useState("")
   const [generatedPitch, setGeneratedPitch] = useState<{
-    headline: string
-    painPoint: string
-    solution: string
-    outcome: string
-    socialProof: string
-    cta: string
-    hooks: string[]
+    customerPitch: string
+    keyPhrases: string[]
+    suggestedCTA: string
   } | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -384,22 +378,7 @@ function CustomerElevatorPitch() {
   const handleCopy = () => {
     if (!generatedPitch) return
 
-    // Combine all parts of the pitch into a single string for copying
-    const fullPitch = `
-${generatedPitch.headline}
-
-${generatedPitch.painPoint}
-
-${generatedPitch.solution}
-
-${generatedPitch.outcome}
-
-${generatedPitch.socialProof}
-
-${generatedPitch.cta}
-`.trim()
-
-    navigator.clipboard.writeText(fullPitch)
+    navigator.clipboard.writeText(generatedPitch.customerPitch)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -501,37 +480,30 @@ ${generatedPitch.cta}
 
             {generatedPitch ? (
               <div className="space-y-6">
-                {generatedPitch.headline && (
-                  <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
-                    <h3 className="text-xl font-bold mb-2 text-primary">{generatedPitch.headline}</h3>
-                    {generatedPitch.painPoint && <p className="text-base mb-4">{generatedPitch.painPoint}</p>}
-                    {generatedPitch.solution && <p className="text-base mb-4">{generatedPitch.solution}</p>}
-                    {generatedPitch.outcome && <p className="text-base mb-4">{generatedPitch.outcome}</p>}
-                    {generatedPitch.socialProof && (
-                      <p className="text-base mb-4 text-gray-300">{generatedPitch.socialProof}</p>
-                    )}
-                    {generatedPitch.cta && (
-                      <div className="flex items-center gap-2 bg-primary/10 p-3 rounded-md border border-primary/30 mt-4">
-                        <Zap className="h-5 w-5 text-primary" />
-                        <p className="font-medium">{generatedPitch.cta}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-3 text-primary">Customer Pitch</h3>
+                  <p className="text-lg leading-relaxed whitespace-pre-line">{generatedPitch.customerPitch}</p>
+                </div>
 
-                {generatedPitch.hooks && generatedPitch.hooks.length > 0 && (
-                  <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-3 text-primary">Alternative Headlines</h3>
-                    <ul className="space-y-3">
-                      {generatedPitch.hooks.map((hook, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-primary font-bold">•</span>
-                          <span className="italic">{hook}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-3 text-primary">Headline Hooks</h3>
+                  <ul className="space-y-3">
+                    {generatedPitch.keyPhrases.map((phrase, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <span className="italic">{phrase}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-3 text-primary">Suggested Call to Action</h3>
+                  <div className="flex items-center gap-2 bg-primary/10 p-3 rounded-md border border-primary/30">
+                    <Zap className="h-5 w-5 text-primary" />
+                    <p className="font-medium">{generatedPitch.suggestedCTA}</p>
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               <div className="bg-black/50 border border-gray-800 rounded-lg p-6 min-h-[300px] flex items-center justify-center text-gray-500">
@@ -569,18 +541,17 @@ ${generatedPitch.cta}
 }
 
 function NetworkingElevatorPitch() {
-  const [businessIdea, setBusinessIdea] = useState("")
-  const [personalBackground, setPersonalBackground] = useState("")
-  const [goals, setGoals] = useState("")
+  const [formData, setFormData] = useState({
+    name: "",
+    background: "",
+    businessIdea: "",
+    problem: "",
+    targetAudience: "",
+    mission: "",
+    progress: "",
+  })
   const [generatedPitch, setGeneratedPitch] = useState<{
     networkingPitch: string
-    sections?: {
-      hook: string
-      problem: string
-      solution: string
-      personal: string
-      invitation: string
-    }
     conversationStarters: string[]
     followUpQuestion: string
   } | null>(null)
@@ -588,36 +559,21 @@ function NetworkingElevatorPitch() {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Sample projects - in a real app, these would come from your database
-  const sampleProjects = [
-    { id: "project1", name: "AI-Powered Content Creation Platform" },
-    { id: "project2", name: "Sustainable Fashion Marketplace" },
-    { id: "project3", name: "Remote Team Collaboration Tool" },
-    { id: "project4", name: "Health & Wellness Subscription Service" },
-    { id: "project5", name: "Smart Home Energy Management System" },
-  ]
-
-  const [selectedProject, setSelectedProject] = useState("")
+  const handleInputChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
 
   const handleGeneratePitch = async () => {
     try {
       setIsGenerating(true)
       setError(null)
 
-      // Prepare the request payload
-      const payload = {
-        businessIdea:
-          businessIdea.trim() || (selectedProject ? sampleProjects.find((p) => p.id === selectedProject)?.name : ""),
-        personalBackground: personalBackground.trim(),
-        goals: goals.trim(),
-      }
-
       const response = await fetch("/api/generate-networking-pitch", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formData),
       })
 
       if (!response.ok) {
@@ -643,16 +599,19 @@ function NetworkingElevatorPitch() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleNetworkingReset = () => {
-    setBusinessIdea("")
-    setPersonalBackground("")
-    setGoals("")
-    setSelectedProject("")
+  const handleReset = () => {
+    setFormData({
+      name: "",
+      background: "",
+      businessIdea: "",
+      problem: "",
+      targetAudience: "",
+      mission: "",
+      progress: "",
+    })
     setGeneratedPitch(null)
     setError(null)
   }
-
-  const isFormValid = businessIdea.trim().length > 0 || selectedProject.length > 0
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -667,63 +626,84 @@ function NetworkingElevatorPitch() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Select an existing project (optional)</label>
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger className="bg-black/50 border-gray-800 focus:border-primary text-white">
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-900 border-gray-800 text-white">
-                  <SelectItem value="none">None</SelectItem>
-                  {sampleProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id} className="hover:bg-primary/20 hover:text-primary">
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Describe your business idea <span className="text-primary">*</span>
-              </label>
-              <Textarea
-                placeholder="Briefly describe your startup or product in simple terms"
-                className="min-h-[80px] bg-black/50 border-gray-800 focus:border-primary text-white"
-                value={businessIdea}
-                onChange={(e) => setBusinessIdea(e.target.value)}
+              <label className="text-sm font-medium">Your name</label>
+              <Input
+                placeholder="e.g., Alex Chen"
+                className="bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Your background (optional)</label>
-              <Textarea
-                placeholder="Share a bit about your background, experience, or why you started this"
-                className="min-h-[80px] bg-black/50 border-gray-800 focus:border-primary text-white"
-                value={personalBackground}
-                onChange={(e) => setPersonalBackground(e.target.value)}
+              <Input
+                placeholder="e.g., Marketing, Software Engineering, Finance"
+                className="bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.background}
+                onChange={(e) => handleInputChange("background", e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Networking goals (optional)</label>
+              <label className="text-sm font-medium">What's your business idea?</label>
               <Textarea
-                placeholder="What are you hoping to achieve with this pitch? Finding partners, customers, investors?"
+                placeholder="Describe your startup or product in simple terms"
                 className="min-h-[80px] bg-black/50 border-gray-800 focus:border-primary text-white"
-                value={goals}
-                onChange={(e) => setGoals(e.target.value)}
+                value={formData.businessIdea}
+                onChange={(e) => handleInputChange("businessIdea", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">What problem are you solving?</label>
+              <Textarea
+                placeholder="Describe the frustration or challenge that led you to start this"
+                className="min-h-[80px] bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.problem}
+                onChange={(e) => handleInputChange("problem", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Who is your target audience? (optional)</label>
+              <Input
+                placeholder="e.g., Small business owners, Remote workers, Parents"
+                className="bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.targetAudience}
+                onChange={(e) => handleInputChange("targetAudience", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">What's your mission or vision? (optional)</label>
+              <Textarea
+                placeholder="What's the bigger purpose behind what you're building?"
+                className="min-h-[80px] bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.mission}
+                onChange={(e) => handleInputChange("mission", e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current progress or traction (optional)</label>
+              <Input
+                placeholder="e.g., Just started, Early customers, Growing steadily"
+                className="bg-black/50 border-gray-800 focus:border-primary text-white"
+                value={formData.progress}
+                onChange={(e) => handleInputChange("progress", e.target.value)}
               />
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" className="border-gray-800" onClick={handleNetworkingReset}>
+            <Button variant="outline" className="border-gray-800" onClick={handleReset}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Reset
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90 text-black"
               onClick={handleGeneratePitch}
-              disabled={isGenerating || !isFormValid}
+              disabled={isGenerating || !formData.name || !formData.businessIdea || !formData.problem}
             >
               {isGenerating ? (
                 <>
@@ -762,44 +742,6 @@ function NetworkingElevatorPitch() {
                   <h3 className="text-lg font-semibold mb-3 text-primary">Your Pitch</h3>
                   <p className="text-lg leading-relaxed whitespace-pre-line">{generatedPitch.networkingPitch}</p>
                 </div>
-
-                {generatedPitch.sections && (
-                  <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold mb-3 text-primary">Pitch Structure</h3>
-                    <div className="space-y-3">
-                      {generatedPitch.sections.hook && (
-                        <div>
-                          <h4 className="font-medium text-primary">Hook</h4>
-                          <p className="text-sm">{generatedPitch.sections.hook}</p>
-                        </div>
-                      )}
-                      {generatedPitch.sections.problem && (
-                        <div>
-                          <h4 className="font-medium text-primary">Problem</h4>
-                          <p className="text-sm">{generatedPitch.sections.problem}</p>
-                        </div>
-                      )}
-                      {generatedPitch.sections.solution && (
-                        <div>
-                          <h4 className="font-medium text-primary">Solution</h4>
-                          <p className="text-sm">{generatedPitch.sections.solution}</p>
-                        </div>
-                      )}
-                      {generatedPitch.sections.personal && (
-                        <div>
-                          <h4 className="font-medium text-primary">Personal Connection</h4>
-                          <p className="text-sm">{generatedPitch.sections.personal}</p>
-                        </div>
-                      )}
-                      {generatedPitch.sections.invitation && (
-                        <div>
-                          <h4 className="font-medium text-primary">Invitation</h4>
-                          <p className="text-sm">{generatedPitch.sections.invitation}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <div className="bg-black/50 border border-gray-800 rounded-lg p-6">
                   <h3 className="text-lg font-semibold mb-3 text-primary">Conversation Starters</h3>

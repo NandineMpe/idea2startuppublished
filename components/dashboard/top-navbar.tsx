@@ -1,17 +1,22 @@
 "use client"
 
-import { ArrowUpRight, Bell, Grid, HelpCircle, Search } from "lucide-react"
+import { Bell, Grid, HelpCircle, Search, User, Construction, ArrowUpRightIcon } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { UserButton, useUser } from "@clerk/nextjs"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/announcement"
 
 export function TopNavbar() {
-  const { isSignedIn, user } = useUser()
-
   return (
     <div className="flex h-16 items-center justify-between border-b border-primary/10 bg-black px-6">
       <div className="flex items-center gap-2">
@@ -30,14 +35,14 @@ export function TopNavbar() {
       </div>
 
       <div className="flex-1 mx-4 flex justify-center items-center">
-        <Announcement
-          themed
-          className="bg-gradient-to-r from-emerald-900/90 to-emerald-700/90 text-emerald-100 border-emerald-600/30 cursor-pointer hover:from-emerald-800 hover:to-emerald-600 transition-all duration-300 shadow-lg shadow-emerald-900/20"
-        >
-          <AnnouncementTag className="bg-black/20 text-emerald-100">Important</AnnouncementTag>
+        <Announcement themed className="bg-yellow-900/20 text-yellow-500 border-yellow-500/30 animate-pulse">
+          <AnnouncementTag className="bg-yellow-500/20 text-yellow-400">
+            <Construction className="h-3 w-3 mr-1 inline" />
+            Alert
+          </AnnouncementTag>
           <AnnouncementTitle>
-            This Site is Under Serious Construction
-            <ArrowUpRight size={16} className="shrink-0 opacity-70" />
+            This app is under insane construction!
+            <ArrowUpRightIcon size={16} className="shrink-0 opacity-70" />
           </AnnouncementTitle>
         </Announcement>
       </div>
@@ -71,30 +76,34 @@ export function TopNavbar() {
           </Button>
         </Link>
 
-        {isSignedIn ? (
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                userButtonAvatarBox: "border border-primary/30",
-                userButtonPopoverCard: "bg-black/90 backdrop-blur-md border border-primary/20",
-                userButtonPopoverActionButton: "text-white hover:bg-primary/10",
-                userButtonPopoverActionButtonText: "text-white",
-                userButtonPopoverFooter: "border-t border-primary/20",
-              },
-            }}
-          />
-        ) : (
-          <Link href="/sign-in">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
-              size="sm"
-              className="border-primary/20 bg-black hover:bg-primary/10 hover:border-primary/50 rounded-full"
+              variant="ghost"
+              size="icon"
+              className="rounded-full overflow-hidden border border-primary/20 hover:border-primary/50"
             >
-              <span className="text-white">My Dashboard</span>
+              <User className="h-5 w-5 text-primary" />
             </Button>
-          </Link>
-        )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="glass border-primary/20 w-56">
+            <DropdownMenuLabel className="text-white">My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-primary/20" />
+            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
+              Billing
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-primary/20" />
+            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

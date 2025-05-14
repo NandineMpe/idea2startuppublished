@@ -4,18 +4,6 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 
-// Add this custom keyframe animation
-const pulseAnimation = {
-  "0%, 100%": {
-    transform: "scale(1)",
-    opacity: 0.3,
-  },
-  "50%": {
-    transform: "scale(1.5)",
-    opacity: 0.15,
-  },
-}
-
 interface FounderInfo {
   id: number
   name: string
@@ -57,15 +45,9 @@ export default function Hotspot({ position, founder }: HotspotProps) {
       {/* Hotspot button */}
       <motion.button
         className={`relative h-5 w-5 rounded-full ${founder.isJuno ? "bg-cyan-500" : "bg-[#27ae60]"}`}
-        style={{
-          opacity: founder.opacity,
-          boxShadow: `0 0 10px ${founder.isJuno ? "rgba(34, 211, 238, 0.5)" : "rgba(39, 174, 96, 0.5)"}`,
-        }}
+        style={{ opacity: founder.opacity }}
         onClick={toggleHotspot}
-        whileHover={{
-          scale: 1.3,
-          boxShadow: `0 0 15px ${founder.isJuno ? "rgba(34, 211, 238, 0.7)" : "rgba(39, 174, 96, 0.7)"}`,
-        }}
+        whileHover={{ scale: 1.2 }}
         whileTap={{ scale: 0.9 }}
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
@@ -76,9 +58,7 @@ export default function Hotspot({ position, founder }: HotspotProps) {
           delay: 1 + founder.id * 0.1,
         }}
       >
-        {/* Replace the existing pulse span with this more intense version */}
-        <span className="absolute -inset-2 animate-ping rounded-full bg-[#27ae60] opacity-30"></span>
-        <span className="absolute -inset-1 animate-pulse rounded-full bg-[#27ae60] opacity-40"></span>
+        <span className="absolute -inset-1 animate-ping rounded-full bg-[#27ae60] opacity-20"></span>
       </motion.button>
 
       {/* Founder info popup */}
