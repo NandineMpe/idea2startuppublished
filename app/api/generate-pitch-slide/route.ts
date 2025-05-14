@@ -37,45 +37,27 @@ export async function POST(req: Request) {
       systemPrompts[slideType] ||
       "You are an expert pitch deck consultant. Create compelling content for a pitch deck slide."
 
-    // Prepare models to try in order of preference
-    const modelsToTry = ["gpt-4.1-2025-04-14", "gpt-4o", "gpt-4-turbo", "gpt-4"]
+    // Use a valid model name - gpt-4o is the latest and most capable model
+    const model = "gpt-4o"
 
-    let response
-    let modelUsed
+    console.log(`Using model: ${model} for pitch slide generation`)
 
-    // Try each model in order until one works
-    for (const model of modelsToTry) {
-      try {
-        console.log(`Attempting to use model: ${model}`)
-        response = await openai.chat.completions.create({
-          model,
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
-              role: "user",
-              content: `Create content for the ${slideType} slide of my pitch deck. Here's information about my business: ${JSON.stringify(businessData)}`,
-            },
-          ],
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 500,
-        })
-
-        modelUsed = model
-        console.log(`Successfully using model: ${model}`)
-        break
-      } catch (error) {
-        console.error(`Error with model ${model}:`, error)
-        if (model === modelsToTry[modelsToTry.length - 1]) {
-          // If this is the last model to try, rethrow the error
-          throw error
-        }
-        // Otherwise continue to the next model
-      }
-    }
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: `Create content for the ${slideType} slide of my pitch deck. Here's information about my business: ${JSON.stringify(businessData)}`,
+        },
+      ],
+      stream: true,
+      temperature: 0.7,
+      max_tokens: 500,
+    })
 
     // Create a stream from the OpenAI response
     const stream = OpenAIStream(response)
