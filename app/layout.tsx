@@ -2,9 +2,11 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/ui/toast-context"
-import { Analytics } from "@vercel/analytics/react"
+import { ChatWidget } from "@/components/chat/chat-widget"
+import { AnalyticsTracker } from "@/components/analytics-tracker"
 import { Suspense } from "react"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -34,12 +36,15 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <ToastProvider>
-            <Suspense>{children}</Suspense>
-          </ToastProvider>
-        </ThemeProvider>
-        <Analytics />
+        <ClerkProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+            <ToastProvider>
+              <AnalyticsTracker />
+              <Suspense>{children}</Suspense>
+            </ToastProvider>
+            <ChatWidget />
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   )

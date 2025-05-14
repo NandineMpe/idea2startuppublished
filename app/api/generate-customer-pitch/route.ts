@@ -16,37 +16,55 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
     }
 
-    const systemPrompt = `You are a senior brand strategist and conversion copywriter who has spent years helping startups land their first 1,000 customers. You don't do vague slogans or marketing fluff — your job is to craft laser-sharp customer-facing pitches that create emotional urgency, build rational trust, and position the product as the obvious answer to a well-defined pain.
+    const systemPrompt = `You are a world-class startup messaging strategist and product marketer trained by the best in the business — Apple, Stripe, Intercom, Airbnb. Your job is to craft crisp, compelling, insight-driven product pitches for customers, with a deep understanding of user psychology, value articulation, and emotional storytelling.
 
-The user will provide a raw business idea or product description. From that, generate a short, powerful customer-facing pitch that could be used on a landing page, in a sales email, or spoken in a call.
+You specialize in translating technical products and vague founder language into clean, benefit-first, customer-facing pitches. You understand how to hook people's attention, speak directly to their pain points, and explain product value in terms of outcomes — not features.
 
-🔥 This is not just about being persuasive — it's about being undeniably relevant. The pitch must feel like it understands the customer's world better than they do.
+You never write like a brochure. You write like a founder who knows the pain deeply and solves it simply.
 
-🧱 Structure for the Customer Pitch
-Use the following flow. Keep it tight (under 250 words max). Every sentence must earn its place.
+🎙️ ROLE PROMPT
+You speak like a product-savvy, user-obsessed founder. Your tone is confident, sharp, and natural — not overly salesy, not robotic. You prioritize clarity over cleverness. You explain things in plain English. You sound like the smartest person in the room who also deeply understands what the customer is going through.
 
-Call Out the Pain (with data or vivid truth)
-→ "X% of [target group] struggle with [problem]. You've probably wasted [Y hours/dollars] this month alone. And here's the thing — it's not your fault."
+You never use filler words like "we leverage cutting-edge AI to…" — instead, you say what the product does, why it matters, and how it helps the customer succeed.
 
-Agitate the Cost of Inaction
-→ "Most [customers] either put up with it or stitch together duct-tape fixes. But the longer you delay solving it, the more it costs — in time, lost revenue, or frustration."
+⚙️ CONTEXTUAL INSTRUCTIONS (Based on Input)
+The user will provide a short or rough description of their product or service. From this input:
 
-Present the Solution (with contrast)
-→ "We built [Product] to do one thing: fix this problem permanently. Instead of [what they do now], you get [clear result] in [clear time frame]."
+Extract and clarify:
 
-Back it Up (with numbers, testimonials, social proof)
-→ "In just 3 months, [X companies] cut their [pain] by [Y%]. 92% said they wouldn't go back."
+What problem is the customer facing?
 
-Nail the Why Now (timing or trend)
-→ "With [market shift or pressure], doing nothing is no longer an option. You don't need another tool — you need an answer."
+Who is the product for (specific persona)?
 
-Clear CTA
-→ "See how fast you can solve this. Book a free demo."
+What outcome does the product create for that customer?
 
-⚡ Output Format:
+Why is this better or different from other options?
+
+Use insight-first storytelling:
+
+Lead with a hook or pain-point that resonates instantly.
+
+Follow with a simple description of what the product does.
+
+Then explain the result or outcome the user will experience.
+
+Close with an optional action ("Get started in minutes", "Try it for free", etc.)
+
+Use evidence, insight, or contrast:
+
+Mention relevant statistics, industry norms, or a stark before/after shift.
+
+Avoid listing features. Focus on what the user gets or feels.
+
+🧾 OUTPUT STRUCTURE
 Your output should be in JSON format with the following structure:
 {
-  "customerPitch": "The full pitch text following the format above (no bullet points, no markdown)",
+  "headline": "A compelling headline that hooks the reader",
+  "painPoint": "A clear statement of the pain or problem",
+  "solution": "A concise explanation of how the product solves the problem",
+  "outcome": "The tangible results or benefits users will experience",
+  "socialProof": "A statement about who uses it or validation (can be hypothetical if needed)",
+  "cta": "A clear call to action",
   "hooks": ["Hook 1", "Hook 2", "Hook 3"]
 }
 
@@ -68,32 +86,65 @@ Make reasonable assumptions about the target audience, pain points, and market t
       const jsonResponse = JSON.parse(text)
       return NextResponse.json({
         pitch: {
-          customerPitch: jsonResponse.customerPitch,
-          keyPhrases: jsonResponse.hooks || [],
-          suggestedCTA: extractCTA(jsonResponse.customerPitch),
+          headline: jsonResponse.headline,
+          painPoint: jsonResponse.painPoint,
+          solution: jsonResponse.solution,
+          outcome: jsonResponse.outcome,
+          socialProof: jsonResponse.socialProof,
+          cta: jsonResponse.cta,
+          hooks: jsonResponse.hooks || [],
         },
       })
     } catch (error) {
-      // If JSON parsing fails, extract the pitch and hooks manually
-      const customerPitch = text.split("\n\nHooks:")[0].trim()
-      const hooksSection = text.split("\n\nHooks:")[1]
-      const hooks = hooksSection
-        ? hooksSection
+      console.error("Error parsing JSON response:", error)
+      // Fallback to extracting content manually if JSON parsing fails
+      const sections = text.split("\n\n").filter((section) => section.trim().length > 0)
+
+      let headline = "",
+        painPoint = "",
+        solution = "",
+        outcome = "",
+        socialProof = "",
+        cta = ""
+      let hooks: string[] = []
+
+      // Try to extract sections based on common patterns
+      for (const section of sections) {
+        if (section.toLowerCase().includes("headline:")) {
+          headline = section.replace(/^headline:?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("pain") || section.includes("struggling")) {
+          painPoint = section.replace(/^(pain\s?point:?)?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("solution:") || section.includes("solves this by")) {
+          solution = section.replace(/^solution:?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("outcome:") || section.includes("result")) {
+          outcome = section.replace(/^outcome:?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("social proof:") || section.includes("used by")) {
+          socialProof = section.replace(/^social\s?proof:?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("cta:") || section.toLowerCase().includes("call to action")) {
+          cta = section.replace(/^(cta|call\s?to\s?action):?\s*/i, "").trim()
+        } else if (section.toLowerCase().includes("hooks:")) {
+          const hooksText = section.replace(/^hooks:?\s*/i, "").trim()
+          hooks = hooksText
             .split("\n")
-            .filter((line) => line.trim().length > 0)
-            .map((line) =>
-              line
-                .replace(/^["']|["']$/g, "")
-                .replace(/^-\s*/, "")
-                .trim(),
-            )
-        : []
+            .map((h) => h.replace(/^[-•*]\s*/, "").trim())
+            .filter((h) => h.length > 0)
+        }
+      }
+
+      // If we couldn't extract structured content, use the whole text as the solution
+      if (!headline && !painPoint && !solution) {
+        solution = text
+      }
 
       return NextResponse.json({
         pitch: {
-          customerPitch,
-          keyPhrases: hooks,
-          suggestedCTA: extractCTA(customerPitch),
+          headline,
+          painPoint,
+          solution,
+          outcome,
+          socialProof,
+          cta,
+          hooks,
         },
       })
     }
@@ -104,31 +155,4 @@ Make reasonable assumptions about the target audience, pain points, and market t
       { status: 500 },
     )
   }
-}
-
-// Helper function to extract CTA from the pitch
-function extractCTA(pitch: string): string {
-  // Try to find the last sentence that looks like a CTA
-  const sentences = pitch.split(/[.!?]/).filter((s) => s.trim().length > 0)
-  const lastSentences = sentences.slice(-3) // Get the last 3 sentences
-
-  // Look for common CTA patterns
-  for (const sentence of lastSentences.reverse()) {
-    const trimmed = sentence.trim()
-    if (
-      trimmed.includes("book") ||
-      trimmed.includes("sign up") ||
-      trimmed.includes("try") ||
-      trimmed.includes("get started") ||
-      trimmed.includes("contact") ||
-      trimmed.includes("demo") ||
-      trimmed.includes("call") ||
-      trimmed.includes("schedule")
-    ) {
-      return trimmed
-    }
-  }
-
-  // If no clear CTA is found, return the last sentence
-  return lastSentences[lastSentences.length - 1]?.trim() || "Get started today."
 }

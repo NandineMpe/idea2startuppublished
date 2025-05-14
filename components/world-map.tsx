@@ -1,281 +1,158 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useRef } from "react"
+import { motion } from "framer-motion"
+import DottedMap from "dotted-map"
+import Image from "next/image"
+import { useTheme } from "next-themes"
 
-interface Coordinate {
-  lat: number
-  lng: number
-  label?: string
-}
-
-interface Dot {
-  start: Coordinate
-  end: Coordinate
-}
-
-interface WorldMapProps {
-  dots: Dot[]
+interface MapProps {
+  dots?: Array<{
+    start: { lat: number; lng: number; label?: string }
+    end: { lat: number; lng: number; label?: string }
+  }>
   lineColor?: string
 }
 
-export function WorldMap({ dots, lineColor = "#32CD32" }: WorldMapProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+export function WorldMap({ dots = [], lineColor = "#32CD32" }: MapProps) {
+  const svgRef = useRef<SVGSVGElement>(null)
+  const map = new DottedMap({ height: 100, grid: "diagonal" })
 
-  // Convert lat/lng to x/y coordinates on the map
-  const latLngToXY = (lat: number, lng: number, width: number, height: number) => {
-    // Simple equirectangular projection
-    const x = ((lng + 180) / 360) * width
-    const y = ((90 - lat) / 180) * height
+  const { theme } = useTheme()
+
+  const svgMap = map.getSVG({
+    radius: 0.22,
+    color: theme === "dark" ? "#FFFFFF40" : "#00000040",
+    shape: "circle",
+    backgroundColor: theme === "dark" ? "#121212" : "white",
+  })
+
+  const projectPoint = (lat: number, lng: number) => {
+    const x = (lng + 180) * (800 / 360)
+    const y = (90 - lat) * (400 / 180)
     return { x, y }
   }
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    // Set canvas dimensions
-    const width = canvas.width
-    const height = canvas.height
-
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height)
-
-    // Draw world map (simplified)
-    ctx.fillStyle = "rgba(0, 0, 0, 0.2)"
-    ctx.fillRect(0, 0, width, height)
-
-    // Draw continents (simplified)
-    ctx.fillStyle = "rgba(50, 50, 50, 0.5)"
-
-    // North America (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.05, height * 0.2)
-    ctx.lineTo(width * 0.25, height * 0.2)
-    ctx.lineTo(width * 0.3, height * 0.5)
-    ctx.lineTo(width * 0.15, height * 0.7)
-    ctx.lineTo(width * 0.05, height * 0.5)
-    ctx.closePath()
-    ctx.fill()
-
-    // South America (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.2, height * 0.7)
-    ctx.lineTo(width * 0.25, height * 0.9)
-    ctx.lineTo(width * 0.15, height * 0.95)
-    ctx.lineTo(width * 0.1, height * 0.8)
-    ctx.closePath()
-    ctx.fill()
-
-    // Europe (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.4, height * 0.2)
-    ctx.lineTo(width * 0.5, height * 0.15)
-    ctx.lineTo(width * 0.55, height * 0.3)
-    ctx.lineTo(width * 0.45, height * 0.4)
-    ctx.closePath()
-    ctx.fill()
-
-    // Africa (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.45, height * 0.4)
-    ctx.lineTo(width * 0.55, height * 0.4)
-    ctx.lineTo(width * 0.6, height * 0.7)
-    ctx.lineTo(width * 0.5, height * 0.8)
-    ctx.lineTo(width * 0.4, height * 0.7)
-    ctx.closePath()
-    ctx.fill()
-
-    // Asia (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.55, height * 0.2)
-    ctx.lineTo(width * 0.85, height * 0.2)
-    ctx.lineTo(width * 0.9, height * 0.5)
-    ctx.lineTo(width * 0.7, height * 0.7)
-    ctx.lineTo(width * 0.6, height * 0.6)
-    ctx.closePath()
-    ctx.fill()
-
-    // Australia (simplified)
-    ctx.beginPath()
-    ctx.moveTo(width * 0.75, height * 0.7)
-    ctx.lineTo(width * 0.85, height * 0.7)
-    ctx.lineTo(width * 0.9, height * 0.85)
-    ctx.lineTo(width * 0.8, height * 0.9)
-    ctx.lineTo(width * 0.75, height * 0.8)
-    ctx.closePath()
-    ctx.fill()
-
-    // Helper function to calculate the position of the animated dot on a bezier curve
-    const calculateBezierPoint = (
-      t: number,
-      p0: { x: number; y: number },
-      p1: { x: number; y: number },
-      p2: { x: number; y: number },
-      p3: { x: number; y: number },
-    ) => {
-      const x =
-        Math.pow(1 - t, 3) * p0.x +
-        3 * Math.pow(1 - t, 2) * t * p1.x +
-        3 * (1 - t) * Math.pow(t, 2) * p2.x +
-        Math.pow(t, 3) * p3.x
-
-      const y =
-        Math.pow(1 - t, 3) * p0.y +
-        3 * Math.pow(1 - t, 2) * t * p1.y +
-        3 * (1 - t) * Math.pow(t, 2) * p2.y +
-        Math.pow(t, 3) * p3.y
-
-      return { x, y }
-    }
-
-    // Animation loop for moving dots
-    let animationFrame: number
-    let t = 0
-
-    const animate = () => {
-      t = (t + 0.005) % 1
-
-      // Clear previous dots
-      ctx.clearRect(0, 0, width, height)
-
-      // Redraw map
-      ctx.fillStyle = "rgba(0, 0, 0, 0.2)"
-      ctx.fillRect(0, 0, width, height)
-
-      // Redraw continents
-      ctx.fillStyle = "rgba(50, 50, 50, 0.5)"
-
-      // North America
-      ctx.beginPath()
-      ctx.moveTo(width * 0.05, height * 0.2)
-      ctx.lineTo(width * 0.25, height * 0.2)
-      ctx.lineTo(width * 0.3, height * 0.5)
-      ctx.lineTo(width * 0.15, height * 0.7)
-      ctx.lineTo(width * 0.05, height * 0.5)
-      ctx.closePath()
-      ctx.fill()
-
-      // South America
-      ctx.beginPath()
-      ctx.moveTo(width * 0.2, height * 0.7)
-      ctx.lineTo(width * 0.25, height * 0.9)
-      ctx.lineTo(width * 0.15, height * 0.95)
-      ctx.lineTo(width * 0.1, height * 0.8)
-      ctx.closePath()
-      ctx.fill()
-
-      // Europe
-      ctx.beginPath()
-      ctx.moveTo(width * 0.4, height * 0.2)
-      ctx.lineTo(width * 0.5, height * 0.15)
-      ctx.lineTo(width * 0.55, height * 0.3)
-      ctx.lineTo(width * 0.45, height * 0.4)
-      ctx.closePath()
-      ctx.fill()
-
-      // Africa
-      ctx.beginPath()
-      ctx.moveTo(width * 0.45, height * 0.4)
-      ctx.lineTo(width * 0.55, height * 0.4)
-      ctx.lineTo(width * 0.6, height * 0.7)
-      ctx.lineTo(width * 0.5, height * 0.8)
-      ctx.lineTo(width * 0.4, height * 0.7)
-      ctx.closePath()
-      ctx.fill()
-
-      // Asia
-      ctx.beginPath()
-      ctx.moveTo(width * 0.55, height * 0.2)
-      ctx.lineTo(width * 0.85, height * 0.2)
-      ctx.lineTo(width * 0.9, height * 0.5)
-      ctx.lineTo(width * 0.7, height * 0.7)
-      ctx.lineTo(width * 0.6, height * 0.6)
-      ctx.closePath()
-      ctx.fill()
-
-      // Australia
-      ctx.beginPath()
-      ctx.moveTo(width * 0.75, height * 0.7)
-      ctx.lineTo(width * 0.85, height * 0.7)
-      ctx.lineTo(width * 0.9, height * 0.85)
-      ctx.lineTo(width * 0.8, height * 0.9)
-      ctx.lineTo(width * 0.75, height * 0.8)
-      ctx.closePath()
-      ctx.fill()
-
-      // Redraw connection lines and animated dots
-      dots.forEach((dot) => {
-        const start = latLngToXY(dot.start.lat, dot.start.lng, width, height)
-        const end = latLngToXY(dot.end.lat, dot.end.lng, width, height)
-
-        // Draw curved line
-        ctx.beginPath()
-        ctx.strokeStyle = lineColor
-        ctx.lineWidth = 1.5
-
-        const cp1x = start.x + (end.x - start.x) / 3
-        const cp1y = start.y - Math.abs(end.x - start.x) / 5
-        const cp2x = start.x + ((end.x - start.x) * 2) / 3
-        const cp2y = end.y - Math.abs(end.x - start.x) / 5
-
-        ctx.moveTo(start.x, start.y)
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y)
-        ctx.stroke()
-
-        // Draw animated dot using the helper function
-        const pos = calculateBezierPoint(
-          t,
-          { x: start.x, y: start.y },
-          { x: cp1x, y: cp1y },
-          { x: cp2x, y: cp2y },
-          { x: end.x, y: end.y },
-        )
-
-        ctx.fillStyle = lineColor
-        ctx.beginPath()
-        ctx.arc(pos.x, pos.y, 3, 0, Math.PI * 2)
-        ctx.fill()
-
-        // Draw start and end points
-        ctx.beginPath()
-        ctx.arc(start.x, start.y, 4, 0, Math.PI * 2)
-        ctx.fill()
-
-        ctx.beginPath()
-        ctx.arc(end.x, end.y, 4, 0, Math.PI * 2)
-        ctx.fill()
-
-        // Draw labels if provided
-        if (dot.start.label) {
-          ctx.fillStyle = "white"
-          ctx.font = "10px Arial"
-          ctx.fillText(dot.start.label, start.x + 8, start.y)
-        }
-
-        if (dot.end.label) {
-          ctx.fillStyle = "white"
-          ctx.font = "10px Arial"
-          ctx.fillText(dot.end.label, end.x + 8, end.y)
-        }
-      })
-
-      animationFrame = requestAnimationFrame(animate)
-    }
-
-    animate()
-
-    // Cleanup animation on unmount
-    return () => {
-      cancelAnimationFrame(animationFrame)
-    }
-  }, [dots, lineColor])
+  const createCurvedPath = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    const midX = (start.x + end.x) / 2
+    const midY = Math.min(start.y, end.y) - 50
+    return `M ${start.x} ${start.y} Q ${midX} ${midY} ${end.x} ${end.y}`
+  }
 
   return (
-    <div className="relative w-full h-[300px] rounded-lg overflow-hidden bg-black/30">
-      <canvas ref={canvasRef} width={800} height={400} className="w-full h-full object-cover" />
+    <div className="w-full aspect-[2/1] dark:bg-black bg-white rounded-lg relative font-sans overflow-hidden border border-gray-800/20 dark:border-gray-100/10">
+      <Image
+        src={`data:image/svg+xml;utf8,${encodeURIComponent(svgMap)}`}
+        className="h-full w-full [mask-image:linear-gradient(to_bottom,transparent,white_10%,white_90%,transparent)] pointer-events-none select-none"
+        alt="world map"
+        height="495"
+        width="1056"
+        draggable={false}
+      />
+      <svg
+        ref={svgRef}
+        viewBox="0 0 800 400"
+        className="w-full h-full absolute inset-0 pointer-events-none select-none"
+      >
+        {dots.map((dot, i) => {
+          const startPoint = projectPoint(dot.start.lat, dot.start.lng)
+          const endPoint = projectPoint(dot.end.lat, dot.end.lng)
+          return (
+            <g key={`path-group-${i}`}>
+              <motion.path
+                d={createCurvedPath(startPoint, endPoint)}
+                fill="none"
+                stroke="url(#path-gradient)"
+                strokeWidth="1.5"
+                initial={{
+                  pathLength: 0,
+                }}
+                animate={{
+                  pathLength: 1,
+                }}
+                transition={{
+                  duration: 1.5,
+                  delay: 0.3 * i,
+                  ease: "easeOut",
+                }}
+                key={`start-upper-${i}`}
+              ></motion.path>
+            </g>
+          )
+        })}
+
+        <defs>
+          <linearGradient id="path-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="white" stopOpacity="0" />
+            <stop offset="5%" stopColor={lineColor} stopOpacity="1" />
+            <stop offset="95%" stopColor={lineColor} stopOpacity="1" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {dots.map((dot, i) => (
+          <g key={`points-group-${i}`}>
+            <g key={`start-${i}`}>
+              <circle
+                cx={projectPoint(dot.start.lat, dot.start.lng).x}
+                cy={projectPoint(dot.start.lat, dot.start.lng).y}
+                r="3"
+                fill={lineColor}
+              />
+              <circle
+                cx={projectPoint(dot.start.lat, dot.start.lng).x}
+                cy={projectPoint(dot.start.lat, dot.start.lng).y}
+                r="3"
+                fill={lineColor}
+                opacity="0.5"
+              >
+                <animate attributeName="r" from="3" to="10" dur="2s" begin="0s" repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.5" to="0" dur="2s" begin="0s" repeatCount="indefinite" />
+              </circle>
+              {dot.start.label && (
+                <text
+                  x={projectPoint(dot.start.lat, dot.start.lng).x + 10}
+                  y={projectPoint(dot.start.lat, dot.start.lng).y + 5}
+                  fontSize="10"
+                  fill={theme === "dark" ? "white" : "black"}
+                  opacity="0.8"
+                >
+                  {dot.start.label}
+                </text>
+              )}
+            </g>
+            <g key={`end-${i}`}>
+              <circle
+                cx={projectPoint(dot.end.lat, dot.end.lng).x}
+                cy={projectPoint(dot.end.lat, dot.end.lng).y}
+                r="3"
+                fill={lineColor}
+              />
+              <circle
+                cx={projectPoint(dot.end.lat, dot.end.lng).x}
+                cy={projectPoint(dot.end.lat, dot.end.lng).y}
+                r="3"
+                fill={lineColor}
+                opacity="0.5"
+              >
+                <animate attributeName="r" from="3" to="10" dur="2s" begin="0s" repeatCount="indefinite" />
+                <animate attributeName="opacity" from="0.5" to="0" dur="2s" begin="0s" repeatCount="indefinite" />
+              </circle>
+              {dot.end.label && (
+                <text
+                  x={projectPoint(dot.end.lat, dot.end.lng).x + 10}
+                  y={projectPoint(dot.end.lat, dot.end.lng).y + 5}
+                  fontSize="10"
+                  fill={theme === "dark" ? "white" : "black"}
+                  opacity="0.8"
+                >
+                  {dot.end.label}
+                </text>
+              )}
+            </g>
+          </g>
+        ))}
+      </svg>
     </div>
   )
 }

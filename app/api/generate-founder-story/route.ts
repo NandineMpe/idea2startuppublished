@@ -101,7 +101,7 @@ If business details like business name, business model, value proposition, targe
 
 If market analysis data is provided, use it to strengthen the story with relevant statistics and insights.
 
-End with a line that captures purpose and ambition, e.g. "That's why I started [company] ��� to make sure no one else has to go through what I did."
+End with a line that captures purpose and ambition, e.g. "That's why I started [company] — to make sure no one else has to go through what I did."
 
 Format the story with proper paragraph breaks using double newlines. Use plain text formatting - do not use markdown formatting like headings, bullet points, or other special characters.`,
           },

@@ -23,16 +23,6 @@ const models = [
     label: "Perplexity",
     apiRoute: "/api/chat/perplexity",
   },
-  {
-    value: "deepseek",
-    label: "DeepSeek Chat",
-    apiRoute: "/api/chat/deepseek",
-  },
-  {
-    value: "gemini",
-    label: "Google Gemini",
-    apiRoute: "/api/chat/gemini",
-  },
 ]
 
 export type ModelInfo = {
