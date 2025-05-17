@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { SaveButton } from "@/components/ui/save-button"
-import { saveUserSettings } from "@/app/actions/user-data"
 
 export default function SettingsPage() {
   const [name, setName] = useState("Alex Johnson")
@@ -126,16 +124,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex justify-end">
-                <SaveButton
-                  onSave={async () => {
-                    return await saveUserSettings({
-                      name,
-                      email,
-                    })
-                  }}
-                >
-                  Save Changes
-                </SaveButton>
+                <Button className="bg-primary hover:bg-primary/90 text-black font-medium">Save Changes</Button>
               </div>
             </CardContent>
           </Card>
@@ -187,20 +176,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex justify-end">
-                <SaveButton
-                  onSave={async () => {
-                    return await saveUserSettings({
-                      notifications: {
-                        email: emailNotifications,
-                        push: pushNotifications,
-                        marketing: marketingEmails,
-                      },
-                    })
-                  }}
-                  successText="Notification preferences saved"
-                >
-                  Save Preferences
-                </SaveButton>
+                <Button className="bg-primary hover:bg-primary/90 text-black font-medium">Save Preferences</Button>
               </div>
             </CardContent>
           </Card>
@@ -258,16 +234,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex justify-end">
-                <SaveButton
-                  onSave={async () => {
-                    return await saveUserSettings({
-                      theme,
-                    })
-                  }}
-                  successText="Appearance settings saved"
-                >
-                  Save Preferences
-                </SaveButton>
+                <Button className="bg-primary hover:bg-primary/90 text-black font-medium">Save Preferences</Button>
               </div>
             </CardContent>
           </Card>

@@ -44,16 +44,7 @@ export function useSidebar() {
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider")
   }
-
-  // Add the missing properties
-  return {
-    ...context,
-    state: context.expanded ? "expanded" : "collapsed",
-    isMobile: false, // We'll set this to false for simplicity
-    openMobile: false,
-    setOpenMobile: () => {},
-    toggleSidebar: () => context.setExpanded((prev) => !prev),
-  }
+  return context
 }
 
 const Sidebar = React.forwardRef<

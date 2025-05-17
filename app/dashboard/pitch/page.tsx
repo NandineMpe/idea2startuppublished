@@ -32,7 +32,7 @@ export default function PitchVaultPage() {
         <CardHeader className="pb-3">
           <CardTitle>Pitch Development Guide</CardTitle>
           <CardDescription>
-            Your pitch is your startup's story. It should be clear, compelling, and tailored to your audience.
+            Your pitch is your startup's story. It should be clear, compelling and tailored to your audience.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -77,32 +77,29 @@ export default function PitchVaultPage() {
         <TabsList className="grid w-full grid-cols-3 bg-black/50 border border-gray-800 rounded-lg h-auto p-1">
           <TabsTrigger
             value="elevator-pitch"
-            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
+            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all"
           >
             Elevator Pitch
           </TabsTrigger>
           <TabsTrigger
             value="full-pitch"
-            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
+            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all"
           >
             Full Pitch
           </TabsTrigger>
           <TabsTrigger
             value="pitch-examples"
-            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
+            className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all"
           >
             Pitch Examples
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="elevator-pitch" className="mt-6">
           <ElevatorPitch />
         </TabsContent>
-
         <TabsContent value="full-pitch" className="mt-6">
           <FullPitch />
         </TabsContent>
-
         <TabsContent value="pitch-examples" className="mt-6">
           <PitchExamples />
         </TabsContent>
