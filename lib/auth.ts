@@ -1,7 +1,10 @@
 import type { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { createUser, getUserByEmail, verifyPassword, createAccount, getAccountByProvider } from "./database"
+import { createClient } from "@supabase/supabase-js"
+import bcrypt from "bcryptjs"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -21,16 +24,24 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const user = await verifyPassword(credentials.email, credentials.password)
-          if (user) {
-            return {
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              image: user.image_url,
-            }
+          const { data: user, error } = await supabase.from("users").select("*").eq("email", credentials.email).single()
+
+          if (error || !user) {
+            return null
           }
-          return null
+
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password_hash)
+
+          if (!isPasswordValid) {
+            return null
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image_url,
+          }
         } catch (error) {
           console.error("Auth error:", error)
           return null
@@ -38,85 +49,60 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  pages: {
-    signIn: "/auth/signin",
-    signUp: "/auth/signup",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       if (account?.provider === "google") {
         try {
-          // Check if account already exists
-          const existingAccount = await getAccountByProvider("google", account.providerAccountId)
+          const { data: existingUser, error } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", user.email)
+            .single()
 
-          if (existingAccount) {
-            // User exists, allow sign in
-            user.id = existingAccount.users.id
-            return true
+          if (error && error.code !== "PGRST116") {
+            console.error("Database error:", error)
+            return false
           }
 
-          // Check if user exists with this email
-          let dbUser = await getUserByEmail(user.email!)
-
-          if (!dbUser) {
-            // Create new user
-            dbUser = await createUser({
+          if (!existingUser) {
+            const { error: insertError } = await supabase.from("users").insert({
               email: user.email!,
-              name: user.name!,
+              name: user.name || "",
               provider: "google",
-              provider_id: account.providerAccountId,
+              provider_id: user.id,
               image_url: user.image,
+              email_verified: true,
             })
+
+            if (insertError) {
+              console.error("Failed to create user:", insertError)
+              return false
+            }
           }
-
-          // Create account link
-          await createAccount({
-            user_id: dbUser.id,
-            provider: "google",
-            provider_account_id: account.providerAccountId,
-            access_token: account.access_token,
-            refresh_token: account.refresh_token,
-            expires_at: account.expires_at,
-            token_type: account.token_type,
-            scope: account.scope,
-            id_token: account.id_token,
-          })
-
-          user.id = dbUser.id
-          return true
         } catch (error) {
-          console.error("Google sign in error:", error)
+          console.error("Sign-in error:", error)
           return false
         }
       }
-
       return true
     },
-    async jwt({ token, user, account }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-      }
-      if (account?.provider) {
-        token.provider = account.provider
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string
-        session.user.provider = token.provider as string
 
-        // Fetch fresh user data from database
+        // Fetch fresh user data from Supabase
         try {
-          const dbUser = await getUserByEmail(session.user.email!)
+          const { data: dbUser } = await supabase.from("users").select("*").eq("email", session.user.email).single()
+
           if (dbUser) {
             session.user.name = dbUser.name
             session.user.image = dbUser.image_url
-            session.user.emailVerified = dbUser.email_verified
           }
         } catch (error) {
           console.error("Session callback error:", error)
@@ -125,10 +111,11 @@ export const authOptions: NextAuthOptions = {
       return session
     },
   },
-  events: {
-    async signOut({ token }) {
-      // Clean up any additional session data if needed
-      console.log("User signed out:", token?.email)
-    },
+  pages: {
+    signIn: "/auth/signin",
   },
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
 }

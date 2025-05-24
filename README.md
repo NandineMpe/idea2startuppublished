@@ -2,181 +2,177 @@
 
 A comprehensive platform for entrepreneurs to analyze business ideas, generate pitch decks, and manage their startup journey.
 
-## 🚀 Getting Started
+## 🚀 Features
 
-This project uses **pnpm** as the package manager for better performance and disk efficiency.
-
-### Prerequisites
-
-- Node.js 18+ 
-- pnpm 8+
-
-### Installation
-
-\`\`\`bash
-# Install pnpm globally if you haven't already
-npm install -g pnpm
-
-# Install dependencies
-pnpm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your actual values
-
-# Run the development server
-pnpm dev
-\`\`\`
-
-### Available Scripts
-
-\`\`\`bash
-# Development
-pnpm dev          # Start development server
-pnpm build        # Build for production
-pnpm start        # Start production server
-
-# Code Quality
-pnpm lint         # Run ESLint
-pnpm type-check   # Run TypeScript type checking
-
-# Utilities
-pnpm clean        # Clean build artifacts and node_modules
-\`\`\`
-
-### Package Management with pnpm
-
-\`\`\`bash
-# Add dependencies
-pnpm add <package-name>
-pnpm add -D <package-name>  # Dev dependencies
-
-# Remove dependencies
-pnpm remove <package-name>
-
-# Update dependencies
-pnpm update
-
-# Install from lockfile
-pnpm install --frozen-lockfile
-\`\`\`
-
-## 🗄️ Database Setup
-
-This project uses Supabase for authentication and data storage.
-
-1. Create a Supabase project
-2. Run the SQL migrations in the `/sql` directory
-3. Add your Supabase credentials to `.env.local`
-
-## 🔐 Authentication
-
-- Email/Password authentication
-- Google OAuth integration
-- Persistent sessions with Supabase
-- Protected routes with middleware
+- **Business Idea Analysis** - AI-powered analysis of your business concepts
+- **Pitch Deck Generation** - Create professional pitch decks automatically
+- **Market Insights** - Comprehensive market research and competitor analysis
+- **User Authentication** - Secure login with email/password and Google OAuth
+- **Database Integration** - Persistent user data with Supabase
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js 14
+- **Framework**: Next.js 14 with App Router
+- **Authentication**: NextAuth.js v4
 - **Database**: Supabase (PostgreSQL)
-- **Authentication**: NextAuth.js
-- **Styling**: Tailwind CSS
-- **UI Components**: Radix UI
+- **Styling**: Tailwind CSS + shadcn/ui
 - **Package Manager**: pnpm
-- **Language**: TypeScript
+- **AI Integration**: OpenAI, Deepseek, Google Gemini
+- **Deployment**: Vercel
 
-## 📁 Project Structure
+## 📦 Installation
 
+1. **Clone the repository**
+   \`\`\`bash
+   git clone <repository-url>
+   cd ideatostartup_dashboard
+   \`\`\`
+
+2. **Install dependencies with pnpm**
+   \`\`\`bash
+   # Install pnpm globally if you haven't already
+   npm install -g pnpm
+   
+   # Install project dependencies
+   pnpm install
+   \`\`\`
+
+3. **Set up environment variables**
+   \`\`\`bash
+   # Generate NextAuth secret
+   npx auth secret
+   
+   # This will automatically create/update your .env.local file with NEXTAUTH_SECRET
+   \`\`\`
+
+4. **Configure additional environment variables**
+   
+   Add these to your `.env.local` file:
+   \`\`\`env
+   # Supabase
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   
+   # Google OAuth
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   
+   # AI APIs
+   OPENAI_API_KEY=your_openai_api_key
+   DEEPSEEK_API_KEY=your_deepseek_api_key
+   GOOGLE_GEMINI_API_KEY=your_google_gemini_api_key
+   \`\`\`
+
+5. **Set up the database**
+   
+   The Supabase tables will be created automatically when you first run the application.
+
+6. **Start the development server**
+   \`\`\`bash
+   pnpm dev
+   \`\`\`
+
+## 🔧 Development Commands
+
+\`\`\`bash
+# Start development server
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
+
+# Run linting
+pnpm lint
+
+# Type checking
+pnpm type-check
+
+# Clean build artifacts
+pnpm clean
 \`\`\`
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── auth/              # Authentication pages
-│   └── dashboard/         # Protected dashboard pages
-├── components/            # Reusable components
-│   ├── ui/               # Base UI components
-│   └── dashboard/        # Dashboard-specific components
-├── lib/                  # Utility functions and configurations
-├── types/                # TypeScript type definitions
-└── sql/                  # Database migrations
+
+## 🔐 Authentication Setup
+
+### NextAuth Secret Generation
+\`\`\`bash
+# Generate a secure random secret for NextAuth
+npx auth secret
 \`\`\`
 
-## 🌟 Features
+This command will:
+- Generate a cryptographically secure random string
+- Automatically add it to your `.env.local` file as `NEXTAUTH_SECRET`
+- Ensure your authentication is properly secured
 
-- **Business Idea Analysis**: AI-powered analysis of business concepts
-- **Pitch Deck Generation**: Automated pitch deck creation
-- **Market Insights**: Comprehensive market analysis
-- **Competitor Analysis**: Detailed competitor research
-- **User Dashboard**: Personalized startup journey tracking
-- **Authentication**: Secure user management
-- **Responsive Design**: Mobile-first approach
+### Google OAuth Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API
+4. Create OAuth 2.0 credentials
+5. Add authorized redirect URIs:
+   - `http://localhost:3000/api/auth/callback/google` (development)
+   - `https://yourdomain.com/api/auth/callback/google` (production)
+
+## 🗄️ Database Schema
+
+The application uses Supabase with the following tables:
+
+- **users** - User profiles and authentication data
+- **user_sessions** - Session management
+- **accounts** - OAuth provider account linking
 
 ## 🚀 Deployment
 
-This project is optimized for deployment on Vercel:
+### Vercel Deployment
+1. **Connect your repository to Vercel**
+2. **Set environment variables in Vercel dashboard**
+3. **Deploy**
+   \`\`\`bash
+   vercel deploy
+   \`\`\`
 
-\`\`\`bash
-# Deploy to Vercel
-pnpm build
-vercel --prod
-\`\`\`
+### Environment Variables for Production
+Make sure to set all environment variables in your Vercel project settings:
+- `NEXTAUTH_SECRET` (generated with `npx auth secret`)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- All AI API keys
 
-## 📝 Environment Variables
+## 📱 Usage
 
-\`\`\`env
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key
-
-# Google OAuth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-
-# AI Services
-OPENAI_API_KEY=your-openai-api-key
-DEEPSEEK_API_KEY=your-deepseek-api-key
-\`\`\`
+1. **Sign Up/Sign In** - Create an account or sign in with Google
+2. **Analyze Ideas** - Use the business idea analyzer to evaluate concepts
+3. **Generate Pitches** - Create professional pitch decks
+4. **Explore Market** - Research market insights and competitors
+5. **Track Progress** - Monitor your startup journey
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+## 🆘 Support
+
+If you encounter any issues:
+1. Check the [documentation](./docs)
+2. Search existing [issues](./issues)
+3. Create a new issue with detailed information
+
+---
+
+Built with ❤️ for entrepreneurs and startup founders.
 \`\`\`
 
-Create a .env.example file:
-
-```plaintext file=".env.example"
-# NextAuth Configuration
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-nextauth-secret-key-here
-
-# Google OAuth
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-
-# AI Service APIs
-OPENAI_API_KEY=your-openai-api-key
-DEEPSEEK_API_KEY=your-deepseek-api-key
-GOOGLE_GEMINI_API_KEY=your-gemini-api-key
-PERPLEXITY_API_KEY=your-perplexity-api-key
-ANTHROPIC_API_KEY=your-anthropic-api-key
-
-# Database (if using external PostgreSQL)
-POSTGRES_URL=your-postgres-connection-string
+Let's also create a simple setup script to help with the initial configuration:
