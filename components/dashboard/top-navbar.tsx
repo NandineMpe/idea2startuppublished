@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signOut } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import { Search, Bell, Settings, LogOut, User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,21 +16,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 
-interface UserProfile {
-  id: string
-  email: string
-  name: string
-  provider: string
-  image_url?: string
-  email_verified: boolean
-  created_at: string
-}
-
-interface TopNavbarProps {
-  user?: UserProfile | any
-}
-
-export function TopNavbar({ user }: TopNavbarProps) {
+export function TopNavbar() {
+  const { data: session } = useSession()
+  const user = session?.user
   const [searchQuery, setSearchQuery] = useState("")
 
   const handleSignOut = async () => {
@@ -38,19 +26,13 @@ export function TopNavbar({ user }: TopNavbarProps) {
   }
 
   const getInitials = (name: string) => {
+    if (!name) return "U"
     return name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
-  }
-
-  const formatJoinDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-    })
   }
 
   return (
@@ -83,7 +65,7 @@ export function TopNavbar({ user }: TopNavbarProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={user?.image_url || user?.image} alt={user?.name} />
+                  <AvatarImage src={user?.image || "/placeholder.svg"} alt={user?.name || "User"} />
                   <AvatarFallback className="bg-blue-500 text-white">
                     {user?.name ? getInitials(user.name) : "U"}
                   </AvatarFallback>
@@ -94,8 +76,8 @@ export function TopNavbar({ user }: TopNavbarProps) {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-2">
                   <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium leading-none">{user?.name}</p>
-                    {user?.email_verified && (
+                    <p className="text-sm font-medium leading-none">{user?.name || "User"}</p>
+                    {user?.emailVerified && (
                       <Badge variant="secondary" className="text-xs">
                         <Shield className="h-3 w-3 mr-1" />
                         Verified
@@ -104,7 +86,6 @@ export function TopNavbar({ user }: TopNavbarProps) {
                   </div>
                   <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                   <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                    <span>Joined {user?.created_at ? formatJoinDate(user.created_at) : "Recently"}</span>
                     {user?.provider && (
                       <Badge variant="outline" className="text-xs">
                         {user.provider === "google" ? "Google" : "Email"}
