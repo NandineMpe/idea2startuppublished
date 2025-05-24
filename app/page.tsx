@@ -1,159 +1,237 @@
-import Link from "next/link"
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Preloader } from "@/components/preloader"
+import Image from "next/image"
+import Link from "next/link"
+import Hotspot from "@/components/hotspot"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import Preloader from "@/components/preloader"
 
-export default function HomePage() {
+export default function Home() {
+  const [isHovered, setIsHovered] = useState(false)
+  const [showAbout, setShowAbout] = useState(false)
+  const aboutSectionRef = useRef<HTMLDivElement>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Founder information for hotspots with non-linear positioning
+  const founders = [
+    // Juno hotspot - moved 10% to the left
+    {
+      id: 0,
+      position: { left: "75.47%", top: "39.84%" }, // Moved 10% to the left from 85.47%
+      name: "Juno",
+      project: "Your Startup Sidekick",
+      product: "Personal startup companion.",
+      description: `I'm Juno.
+Think of me as your personal startup sidekick. But I'm not here to cheerlead. I'm here to challenge your thinking, sharpen your direction, and help you build something that actually matters.
+
+Because average doesn't get funded.
+It doesn't get shipped.
+And it sure as hell doesn't change the world.`,
+      color: "cyan",
+      opacity: 1,
+      isJuno: true,
+    },
+    // Green dots - positions unchanged
+    {
+      id: 1,
+      position: { left: "14.38%", top: "39.84%" },
+      name: "Alex Chen",
+      project: "Healthcare Platform",
+      product: "A platform that helps doctors diagnose rare diseases faster using patient symptom history.",
+      description: `"I was struggling to explain why our platform mattered beyond the buzzwords. I fed our clinical concept into the Pitch Vault, and it rewrote our entire investor pitch—framing it as a way to reduce diagnostic delays by 47% in rare disease cases. That stat came from the Deep Consumer Insights module, which sourced NIH data I hadn't even thought to reference. Within 2 weeks, that version of the deck landed us our first angel meeting."`,
+      color: "emerald",
+      opacity: 0.5,
+    },
+    {
+      id: 2,
+      position: { left: "20.63%", top: "37.89%" },
+      name: "Maya Rodriguez",
+      project: "Sustainable Supply Chain Analytics",
+      product: "A B2B dashboard that helps manufacturing companies optimize for carbon emissions.",
+      description: `"We kept pitching ourselves as a 'sustainability tool,' and no one cared. But the Competitor Analysis tool revealed that players like Ecochain and Planetly were focusing heavily on ESG reporting—not real-time tracking. So we repositioned. We now lead with: 'We cut Scope 3 emissions by 22% in the first 90 days of use.' That line came straight from the Value Proposition Generator. It changed how customers and investors heard us."`,
+      color: "emerald",
+      opacity: 0.6,
+    },
+    {
+      id: 3,
+      position: { left: "26.88%", top: "41.80%" },
+      name: "Daniel Kim",
+      project: "On-Demand Lab Testing Platform",
+      product: "A consumer service for booking and managing lab tests from home.",
+      description: `"Our pricing model was off. We were charging $80 per test. After running a go-to-market plan with TAM/SAM/SOM, it showed that our SOM at $80 was just 6,000 customers nationwide. I reran it using a $35 loss-leader entry test model, and the SOM jumped to 42,000. That one pricing pivot is why we closed our first 3 enterprise clients—because now we had scale."`,
+      color: "emerald",
+      opacity: 0.7,
+    },
+    {
+      id: 4,
+      position: { left: "5.5%", top: "39.06%" },
+      name: "Leila Ahmed",
+      project: "Remote Team Culture Toolkit",
+      product: "Interactive tools for remote teams to build better culture asynchronously.",
+      description: `"My founder story was too soft. I thought my 'why' wasn't interesting. But the Founder Story Builder helped me draw a line from managing PTSD in remote teams at my last job to why this platform had to exist. That emotional hook—the 'aha moment'—was turned into a VC-ready narrative. I used it in my YC application and got a first-round interview."`,
+      color: "emerald",
+      opacity: 0.8,
+    },
+    {
+      id: 5,
+      position: { left: "9.5%", top: "41.02%" },
+      name: "James Okafor",
+      project: "Smart Microgrid Solutions",
+      product: "Modular energy infrastructure for rural African villages.",
+      description: `"I knew the need, but not the market. The Go-To-Market Planner pulled demand data reports to show that our SAM in Sub-Saharan Africa wasn't 10M people—it was 2.6M with the infrastructure to pay today. That changed our hardware distribution plan. Instead of 14 countries, we started in 3 with the highest mobile money adoption—and just landed a partnership with a telecom provider in Ghana."`,
+      color: "emerald",
+      opacity: 0.75,
+    },
+  ]
+
+  const scrollToAbout = () => {
+    setShowAbout(true)
+    setTimeout(() => {
+      aboutSectionRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, 100)
+  }
+
+  useEffect(() => {
+    // Fixed image preloading approach - removed destructuring that could cause errors
+    try {
+      const bgImage = new Image()
+      bgImage.src =
+        "https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Website%20backgrounds/upscalemedia-transformed-ojypcL68F0lDklQoXOOWH8FcZ92dro.png"
+
+      // Optional: Add load event listener
+      bgImage.onload = () => {
+        console.log("Background image loaded successfully")
+      }
+
+      bgImage.onerror = (error) => {
+        // Safely log the error without destructuring
+        console.error("Failed to load background image", error)
+      }
+    } catch (error) {
+      // Safely log the error without destructuring
+      console.error("Error in image preloading:", error)
+    }
+
+    // Set a minimum display time for the preloader (5 seconds)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <Preloader />
-      {/* Hero Section */}
-      <section className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4 py-24 text-center sm:px-6 md:px-8 lg:py-32">
-        <div className="absolute inset-0 z-0 bg-[url('/placeholder.svg?height=1080&width=1920&query=abstract%20digital%20network')] bg-cover bg-center opacity-20"></div>
-        <div className="relative z-10 mx-auto max-w-5xl">
-          <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">
-            Transform Your{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Ideas</span>{" "}
-            Into Successful{" "}
-            <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Startups</span>
-          </h1>
-          <p className="mb-10 text-xl text-gray-300 md:text-2xl">
-            AI-powered platform to analyze business ideas, generate pitch decks, and guide your entrepreneurial journey
-            from concept to launch.
-          </p>
-          <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
-            <Button asChild size="lg" className="bg-blue-600 px-8 py-6 text-lg hover:bg-blue-700">
-              <Link href="/auth/signin">Get Started</Link>
+    <div className="relative min-h-screen overflow-x-hidden bg-black">
+      {isLoading && <Preloader />}
+
+      {/* Dashboard Navigation */}
+      <div className="absolute top-0 right-0 z-40 p-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 1.5 }}
+        >
+          <Link href="/dashboard">
+            <Button className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium">
+              My Dashboard
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="border-gray-600 px-8 py-6 text-lg text-white hover:bg-gray-800"
-            >
-              <Link href="/auth/signup">Sign Up</Link>
-            </Button>
-          </div>
+          </Link>
+        </motion.div>
+      </div>
+
+      {/* Hero Section with Train */}
+      <section className="relative h-screen overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image
+            src="https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Website%20backgrounds/upscalemedia-transformed-ojypcL68F0lDklQoXOOWH8FcZ92dro.png"
+            alt="Startup Train with entrepreneur"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-black/30" />
         </div>
+
+        {/* Interactive Hotspots */}
+        <TooltipProvider>
+          {founders.map((founder) => (
+            <Hotspot key={founder.id} position={founder.position} founder={founder} />
+          ))}
+        </TooltipProvider>
+
+        {/* Main Content */}
+        <motion.div
+          className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+        >
+          <motion.div
+            className="max-w-4xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.5 }}
+          >
+            <h1 className="text-4xl md:text-6xl font-light text-white mb-6 tracking-tight leading-tight">
+              Hey, <span className="text-primary font-normal">Founder Extraordinaire</span>.
+              <br />
+              We've Been Expecting You.
+            </h1>
+
+            <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-12 font-light leading-relaxed">
+              Your idea is the ticket and it deserves to be in motion. Hop on and join other founders enroute to
+              building the future — with the right intelligence, at the right time.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 1 }}
+              >
+                <Link href="/dashboard">
+                  <Button
+                    className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
+                      isHovered ? "pl-10 pr-14" : "px-12"
+                    }`}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                  >
+                    <span className="relative z-10 flex items-center">
+                      {isHovered ? "Yes, Let's Go" : "Hop On?"}
+                      {isHovered && (
+                        <motion.span
+                          className="ml-2 text-primary"
+                          initial={{ x: -10, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          →
+                        </motion.span>
+                      )}
+                    </span>
+                  </Button>
+                </Link>
+              </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="absolute bottom-8 flex flex-col items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 1 }}
+          >
+            <p className="text-white/60 text-sm mb-3">
+              Click on the founders on the train, and Juno, to learn more about their stories.
+            </p>
+          </motion.div>
+        </motion.div>
       </section>
-
-      {/* Features Section */}
-      <section className="bg-gray-900 py-20">
-        <div className="container mx-auto px-4">
-          <h2 className="mb-12 text-center text-3xl font-bold text-white sm:text-4xl">
-            Powerful Tools for Entrepreneurs
-          </h2>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {/* Feature 1 */}
-            <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10">
-              <div className="mb-4 rounded-full bg-blue-500/10 p-3 text-blue-400 w-fit">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                </svg>
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-white">Business Idea Analysis</h3>
-              <p className="text-gray-400">
-                Get comprehensive analysis of your business idea with AI-powered insights on market potential,
-                competition, and viability.
-              </p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all hover:border-purple-500/50 hover:shadow-lg hover:shadow-purple-500/10">
-              <div className="mb-4 rounded-full bg-purple-500/10 p-3 text-purple-400 w-fit">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-white">Pitch Deck Generation</h3>
-              <p className="text-gray-400">
-                Create professional pitch decks automatically with AI that highlights your unique value proposition and
-                business model.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 transition-all hover:border-green-500/50 hover:shadow-lg hover:shadow-green-500/10">
-              <div className="mb-4 rounded-full bg-green-500/10 p-3 text-green-400 w-fit">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <path d="M12 16v-4"></path>
-                  <path d="M12 8h.01"></path>
-                </svg>
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-white">Founder's Knowledge</h3>
-              <p className="text-gray-400">
-                Access a wealth of knowledge on entrepreneurship, funding strategies, and startup best practices.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="mb-6 text-3xl font-bold text-white sm:text-4xl">Ready to Start Your Journey?</h2>
-          <p className="mx-auto mb-8 max-w-2xl text-xl text-blue-100">
-            Join thousands of entrepreneurs who are turning their ideas into successful startups.
-          </p>
-          <Button asChild size="lg" className="bg-white px-8 py-6 text-lg text-blue-900 hover:bg-gray-100">
-            <Link href="/auth/signup">Create Your Free Account</Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col items-center justify-between space-y-6 md:flex-row md:space-y-0">
-            <div className="text-2xl font-bold text-white">ideatostartup.io</div>
-            <div className="flex space-x-6">
-              <Link href="/terms" className="text-gray-400 hover:text-white">
-                Terms
-              </Link>
-              <Link href="/privacy" className="text-gray-400 hover:text-white">
-                Privacy
-              </Link>
-              <Link href="/contact" className="text-gray-400 hover:text-white">
-                Contact
-              </Link>
-            </div>
-            <div className="text-gray-400">© 2023 IdeaToStartup. All rights reserved.</div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
