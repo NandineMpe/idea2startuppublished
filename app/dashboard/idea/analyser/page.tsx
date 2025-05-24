@@ -18,11 +18,20 @@ interface Analysis {
   sections: Section[]
 }
 
+interface IdeaData {
+  ideaDescription: string
+  proposedSolution: string
+  intendedUsers: string
+  geographicFocus: string
+}
+
 export default function IdeaAnalyser() {
-  const [ideaDescription, setIdeaDescription] = useState("")
-  const [proposedSolution, setProposedSolution] = useState("")
-  const [intendedUsers, setIntendedUsers] = useState("")
-  const [geographicFocus, setGeographicFocus] = useState("")
+  const [formData, setFormData] = useState<IdeaData>({
+    ideaDescription: "",
+    proposedSolution: "",
+    intendedUsers: "",
+    geographicFocus: "",
+  })
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -39,8 +48,12 @@ export default function IdeaAnalyser() {
     ))
   }
 
+  const handleInputChange = (field: keyof IdeaData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
   const handleAnalyze = async () => {
-    if (!ideaDescription.trim()) {
+    if (!formData.ideaDescription.trim()) {
       toast({
         title: "Error",
         description: "Please describe your business idea",
@@ -66,12 +79,7 @@ export default function IdeaAnalyser() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ideaDescription,
-          proposedSolution,
-          intendedUsers,
-          geographicFocus,
-        }),
+        body: JSON.stringify(formData),
         signal: controller.signal,
       })
 
@@ -90,12 +98,7 @@ export default function IdeaAnalyser() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              ideaDescription,
-              proposedSolution,
-              intendedUsers,
-              geographicFocus,
-            }),
+            body: JSON.stringify(formData),
           })
 
           if (!mockResponse.ok) {
@@ -176,8 +179,8 @@ export default function IdeaAnalyser() {
             <Textarea
               id="ideaDescription"
               placeholder="Describe your business idea in detail..."
-              value={ideaDescription}
-              onChange={(e) => setIdeaDescription(e.target.value)}
+              value={formData.ideaDescription}
+              onChange={(e) => handleInputChange("ideaDescription", e.target.value)}
               rows={4}
             />
           </div>
@@ -187,8 +190,8 @@ export default function IdeaAnalyser() {
             <Textarea
               id="proposedSolution"
               placeholder="Describe your proposed solution..."
-              value={proposedSolution}
-              onChange={(e) => setProposedSolution(e.target.value)}
+              value={formData.proposedSolution}
+              onChange={(e) => handleInputChange("proposedSolution", e.target.value)}
               rows={3}
             />
           </div>
@@ -198,8 +201,8 @@ export default function IdeaAnalyser() {
             <Textarea
               id="intendedUsers"
               placeholder="Describe your target users or customers..."
-              value={intendedUsers}
-              onChange={(e) => setIntendedUsers(e.target.value)}
+              value={formData.intendedUsers}
+              onChange={(e) => handleInputChange("intendedUsers", e.target.value)}
               rows={2}
             />
           </div>
@@ -209,8 +212,8 @@ export default function IdeaAnalyser() {
             <Textarea
               id="geographicFocus"
               placeholder="Describe the geographic focus or market..."
-              value={geographicFocus}
-              onChange={(e) => setGeographicFocus(e.target.value)}
+              value={formData.geographicFocus}
+              onChange={(e) => handleInputChange("geographicFocus", e.target.value)}
               rows={2}
             />
           </div>
@@ -222,7 +225,7 @@ export default function IdeaAnalyser() {
             </Label>
           </div>
 
-          <Button onClick={handleAnalyze} disabled={isAnalyzing || !ideaDescription.trim()} className="w-full">
+          <Button onClick={handleAnalyze} disabled={isAnalyzing || !formData.ideaDescription.trim()} className="w-full">
             {isAnalyzing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

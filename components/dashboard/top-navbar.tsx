@@ -1,10 +1,9 @@
 "use client"
 
-import { Bell, Grid, HelpCircle, Search, User, Construction, ArrowUpRightIcon } from "lucide-react"
-import Link from "next/link"
-import Image from "next/image"
-
+import { useState } from "react"
+import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,98 +12,86 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Bell, Search, Settings, LogOut, User } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/announcement"
 
 export function TopNavbar() {
+  const { data: session } = useSession()
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/auth/signin" })
+  }
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
   return (
-    <div className="flex h-16 items-center justify-between border-b border-primary/10 bg-black px-6">
-      <div className="flex items-center gap-2">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="relative h-8 w-8">
-            <Image
-              src="https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/ideatostartup%20logo-T5tDhi08w5P7UbKugr2K20yDZbMe4h.png"
-              alt="IdeaToStartup Logo"
-              width={32}
-              height={32}
-              className="object-contain"
-            />
-          </div>
-          <span className="text-xl font-bold text-white">ideatostartup.io</span>
-        </Link>
+    <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-black px-6">
+      <div className="flex items-center space-x-4">
+        <h1 className="text-xl font-semibold text-white">IdeaToStartup</h1>
       </div>
 
-      <div className="flex-1 mx-4 flex justify-center items-center">
-        <Announcement themed className="bg-yellow-900/20 text-yellow-500 border-yellow-500/30 animate-pulse">
-          <AnnouncementTag className="bg-yellow-500/20 text-yellow-400">
-            <Construction className="h-3 w-3 mr-1 inline" />
-            Alert
-          </AnnouncementTag>
-          <AnnouncementTitle>
-            This app is under insane construction!
-            <ArrowUpRightIcon size={16} className="shrink-0 opacity-70" />
-          </AnnouncementTitle>
-        </Announcement>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary/70" />
+      <div className="flex items-center space-x-4">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             type="search"
             placeholder="Search..."
-            className="w-[300px] pl-10 pr-4 py-2 glass-input rounded-full focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 border-primary/10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64 pl-10 bg-gray-900 border-gray-700 text-white placeholder-gray-400"
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-primary/10 rounded-full">
+        {/* Notifications */}
+        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
           <Bell className="h-5 w-5" />
         </Button>
 
-        <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-primary/10 rounded-full">
-          <HelpCircle className="h-5 w-5" />
-        </Button>
-
-        <Link href="/dashboard">
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden md:flex items-center gap-2 border-primary/20 bg-black hover:bg-primary/10 hover:border-primary/50 rounded-full"
-          >
-            <Grid className="h-4 w-4 text-primary" />
-            <span className="text-white">My Dashboard</span>
-          </Button>
-        </Link>
-
+        {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full overflow-hidden border border-primary/20 hover:border-primary/50"
-            >
-              <User className="h-5 w-5 text-primary" />
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={session?.user?.image || ""} alt={session?.user?.name || ""} />
+                <AvatarFallback className="bg-blue-600 text-white">
+                  {session?.user?.name ? getUserInitials(session.user.name) : "U"}
+                </AvatarFallback>
+              </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="glass border-primary/20 w-56">
-            <DropdownMenuLabel className="text-white">My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-primary/20" />
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Profile
+          <DropdownMenuContent className="w-56 bg-gray-900 border-gray-700" align="end" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none text-white">{session?.user?.name || "User"}</p>
+                <p className="text-xs leading-none text-gray-400">{session?.user?.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-gray-700" />
+            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800">
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Settings
+            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-primary/20" />
-            <DropdownMenuItem className="text-white hover:text-primary focus:text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer">
-              Log out
+            <DropdownMenuSeparator className="bg-gray-700" />
+            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
+    </header>
   )
 }

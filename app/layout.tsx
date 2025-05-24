@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/ui/toast-context"
+import { AuthSessionProvider } from "@/components/providers/session-provider"
 import { Analytics } from "@vercel/analytics/react"
 import { Suspense } from "react"
 
@@ -34,11 +35,13 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <ToastProvider>
-            <Suspense>{children}</Suspense>
-          </ToastProvider>
-        </ThemeProvider>
+        <AuthSessionProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+            <ToastProvider>
+              <Suspense>{children}</Suspense>
+            </ToastProvider>
+          </ThemeProvider>
+        </AuthSessionProvider>
         <Analytics />
       </body>
     </html>
