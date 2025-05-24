@@ -26,8 +26,15 @@ export const authOptions: NextAuthOptions = {
             id: "1",
             email: credentials.email,
             name: "Demo User",
+            image: null,
           }
         }
+
+        // You can also check against your user database here
+        // Example: const user = await getUserByEmail(credentials.email)
+        // if (user && await bcrypt.compare(credentials.password, user.hashedPassword)) {
+        //   return { id: user.id, email: user.email, name: user.name }
+        // }
 
         return null
       },
@@ -41,15 +48,19 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
+      }
+      if (account?.provider === "google") {
+        token.provider = "google"
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string
+        session.user.provider = token.provider as string
       }
       return session
     },
