@@ -26,7 +26,7 @@ export default function Preloader() {
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900"
       initial={{ opacity: 1 }}
       animate={{
         opacity: progress === 100 ? 0 : 1,
@@ -34,8 +34,13 @@ export default function Preloader() {
       }}
       transition={{ duration: 0.8 }}
     >
-      <div className="relative w-24 h-24 mb-8">
-        {/* Simplified logo animation instead of using Image component */}
+      <div className="flex flex-col items-center">
+        <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
+        <p className="mt-4 text-lg text-white">Loading...</p>
+      </div>
+
+      {/* Simplified logo animation instead of using Image component */}
+      {/* <div className="relative w-24 h-24 mb-8">
         <div className="w-24 h-24 rounded-full border-4 border-primary flex items-center justify-center">
           <div className="w-12 h-12 bg-primary/20 rounded-full"></div>
         </div>
@@ -73,7 +78,7 @@ export default function Preloader() {
         transition={{ delay: 0.5 }}
       >
         Preparing your startup journey...
-      </motion.p>
+      </motion.p> */}
     </motion.div>
   )
 }

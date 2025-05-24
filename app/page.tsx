@@ -4,16 +4,19 @@ import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import Link from "next/link"
 import Hotspot from "@/components/hotspot"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import Preloader from "@/components/preloader"
+import { useAuth } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [isHovered, setIsHovered] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const aboutSectionRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const { isSignedIn } = useAuth()
+  const router = useRouter()
 
   // Founder information for hotspots with non-linear positioning
   const founders = [
@@ -94,6 +97,14 @@ And it sure as hell doesn't change the world.`,
     }, 100)
   }
 
+  const handleDashboardClick = () => {
+    if (isSignedIn) {
+      router.push("/dashboard")
+    } else {
+      router.push("/auth")
+    }
+  }
+
   useEffect(() => {
     // Fixed image preloading approach - removed destructuring that could cause errors
     try {
@@ -134,11 +145,12 @@ And it sure as hell doesn't change the world.`,
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 1.5 }}
         >
-          <Link href="/dashboard">
-            <Button className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium">
-              My Dashboard
-            </Button>
-          </Link>
+          <Button
+            onClick={handleDashboardClick}
+            className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
+          >
+            {isSignedIn ? "My Dashboard" : "Sign In"}
+          </Button>
         </motion.div>
       </div>
 
@@ -193,29 +205,28 @@ And it sure as hell doesn't change the world.`,
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1 }}
               >
-                <Link href="/dashboard">
-                  <Button
-                    className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
-                      isHovered ? "pl-10 pr-14" : "px-12"
-                    }`}
-                    onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
-                  >
-                    <span className="relative z-10 flex items-center">
-                      {isHovered ? "Yes, Let's Go" : "Hop On?"}
-                      {isHovered && (
-                        <motion.span
-                          className="ml-2 text-primary"
-                          initial={{ x: -10, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          →
-                        </motion.span>
-                      )}
-                    </span>
-                  </Button>
-                </Link>
+                <Button
+                  onClick={handleDashboardClick}
+                  className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
+                    isHovered ? "pl-10 pr-14" : "px-12"
+                  }`}
+                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseLeave={() => setIsHovered(false)}
+                >
+                  <span className="relative z-10 flex items-center">
+                    {isHovered ? "Yes, Let's Go" : "Hop On?"}
+                    {isHovered && (
+                      <motion.span
+                        className="ml-2 text-primary"
+                        initial={{ x: -10, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        →
+                      </motion.span>
+                    )}
+                  </span>
+                </Button>
               </motion.div>
             </div>
           </motion.div>
