@@ -1,19 +1,31 @@
-import { authMiddleware } from "@clerk/nextjs"
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
 
-export default authMiddleware({
-  // Public routes that don't require authentication
-  publicRoutes: [
-    "/",
-    "/auth/signin",
-    "/auth/signup",
-    "/api/webhook/clerk",
-    "/api/chat/deepseek(.*)",
-    "/api/chat/gemini(.*)",
-  ],
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/auth/signin(.*)",
+  "/auth/signup(.*)",
+  "/auth/error(.*)",
+  "/api/webhook/clerk",
+  "/api/chat/(.*)",
+])
 
-  // Routes that can be accessed without authentication
-  // but still have access to the auth state
-  ignoredRoutes: ["/api/webhook/clerk"],
+const isAuthRoute = createRouteMatcher(["/auth/signin(.*)", "/auth/signup(.*)"])
+
+export default clerkMiddleware((auth, req) => {
+  const { userId } = auth()
+
+  // If user is logged in and trying to access auth routes, redirect to dashboard
+  if (userId && isAuthRoute(req)) {
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+
+  // If user is not logged in and trying to access protected routes, redirect to sign in
+  if (!userId && !isPublicRoute(req)) {
+    return NextResponse.redirect(new URL("/auth/signin", req.url))
+  }
+
+  return NextResponse.next()
 })
 
 export const config = {

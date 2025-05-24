@@ -13,7 +13,6 @@
     "@ai-sdk/openai": "latest",
     "@auth/core": "latest",
     "@clerk/nextjs": "latest",
-    "@clerk/themes": "latest",
     "@emotion/is-prop-valid": "latest",
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "^3.9.1",
