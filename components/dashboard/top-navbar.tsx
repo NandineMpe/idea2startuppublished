@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signOut, useSession } from "next-auth/react"
+import { useUser, useClerk } from "@clerk/nextjs"
 import { Search, Bell, Settings, LogOut, User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,22 +17,28 @@ import {
 import { Badge } from "@/components/ui/badge"
 
 export function TopNavbar() {
-  const { data: session } = useSession()
-  const user = session?.user
+  const { user } = useUser()
+  const { signOut } = useClerk()
   const [searchQuery, setSearchQuery] = useState("")
 
-  const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/" })
+  const handleSignOut = () => {
+    signOut({ redirectUrl: "/" })
   }
 
   const getInitials = (name: string) => {
-    if (!name) return "U"
     return name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  const formatJoinDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    })
   }
 
   return (
@@ -65,9 +71,9 @@ export function TopNavbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar className="h-10 w-10">
-                  <AvatarImage src={user?.image || "/placeholder.svg"} alt={user?.name || "User"} />
+                  <AvatarImage src={user?.imageUrl || "/placeholder.svg"} alt={user?.fullName || ""} />
                   <AvatarFallback className="bg-blue-500 text-white">
-                    {user?.name ? getInitials(user.name) : "U"}
+                    {user?.fullName ? getInitials(user.fullName) : user?.firstName?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -76,19 +82,22 @@ export function TopNavbar() {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-2">
                   <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium leading-none">{user?.name || "User"}</p>
-                    {user?.emailVerified && (
+                    <p className="text-sm font-medium leading-none">{user?.fullName || user?.firstName || "User"}</p>
+                    {user?.primaryEmailAddress?.verification?.status === "verified" && (
                       <Badge variant="secondary" className="text-xs">
                         <Shield className="h-3 w-3 mr-1" />
                         Verified
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {user?.primaryEmailAddress?.emailAddress}
+                  </p>
                   <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                    {user?.provider && (
-                      <Badge variant="outline" className="text-xs">
-                        {user.provider === "google" ? "Google" : "Email"}
+                    <span>Joined {user?.createdAt ? formatJoinDate(new Date(user.createdAt)) : "Recently"}</span>
+                    {user?.externalAccounts?.[0]?.provider && (
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {user.externalAccounts[0].provider}
                       </Badge>
                     )}
                   </div>

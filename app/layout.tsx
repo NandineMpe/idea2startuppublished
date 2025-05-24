@@ -2,7 +2,9 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/components/providers/session-provider"
+import { ClerkProvider } from "@clerk/nextjs"
+import { dark } from "@clerk/themes"
+import { Announcement } from "@/components/ui/announcement"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,10 +28,27 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={inter.className}>
-        <AuthProvider>{children}</AuthProvider>
-      </body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        baseTheme: dark,
+        variables: {
+          colorPrimary: "#3b82f6",
+          colorBackground: "#1f2937",
+          colorInputBackground: "#374151",
+          colorInputText: "#f3f4f6",
+        },
+        elements: {
+          formButtonPrimary: "bg-blue-600 hover:bg-blue-700",
+          card: "bg-gray-800/50 backdrop-blur-sm border-gray-700",
+        },
+      }}
+    >
+      <html lang="en" className="dark">
+        <body className={inter.className}>
+          <Announcement />
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

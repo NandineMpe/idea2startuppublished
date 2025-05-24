@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Preloader } from "@/components/preloader"
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
+      <Preloader />
       {/* Hero Section */}
       <section className="relative flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-black px-4 py-24 text-center sm:px-6 md:px-8 lg:py-32">
         <div className="absolute inset-0 z-0 bg-[url('/placeholder.svg?height=1080&width=1920&query=abstract%20digital%20network')] bg-cover bg-center opacity-20"></div>
