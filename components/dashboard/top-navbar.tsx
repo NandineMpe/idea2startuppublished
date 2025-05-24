@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useSession, signOut } from "next-auth/react"
+import { signOut } from "next-auth/react"
+import { Search, Bell, Settings, LogOut, User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -12,18 +14,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Bell, Search, Settings, LogOut, User } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 
-export function TopNavbar() {
-  const { data: session } = useSession()
+interface UserProfile {
+  id: string
+  email: string
+  name: string
+  provider: string
+  image_url?: string
+  email_verified: boolean
+  created_at: string
+}
+
+interface TopNavbarProps {
+  user?: UserProfile | any
+}
+
+export function TopNavbar({ user }: TopNavbarProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: "/auth/signin" })
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: "/" })
   }
 
-  const getUserInitials = (name: string) => {
+  const getInitials = (name: string) => {
     return name
       .split(" ")
       .map((n) => n[0])
@@ -32,65 +46,90 @@ export function TopNavbar() {
       .slice(0, 2)
   }
 
-  return (
-    <header className="flex h-16 items-center justify-between border-b border-gray-800 bg-black px-6">
-      <div className="flex items-center space-x-4">
-        <h1 className="text-xl font-semibold text-white">IdeaToStartup</h1>
-      </div>
+  const formatJoinDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    })
+  }
 
-      <div className="flex items-center space-x-4">
+  return (
+    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-6 py-4">
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            type="search"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-64 pl-10 bg-gray-900 border-gray-700 text-white placeholder-gray-400"
-          />
+        <div className="flex items-center flex-1 max-w-md">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              type="text"
+              placeholder="Search ideas, insights, or features..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+            />
+          </div>
         </div>
 
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
-          <Bell className="h-5 w-5" />
-        </Button>
+        {/* Right side */}
+        <div className="flex items-center space-x-4">
+          {/* Notifications */}
+          <Button variant="ghost" size="sm" className="relative">
+            <Bell className="h-5 w-5" />
+            <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+          </Button>
 
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={session?.user?.image || ""} alt={session?.user?.name || ""} />
-                <AvatarFallback className="bg-blue-600 text-white">
-                  {session?.user?.name ? getUserInitials(session.user.name) : "U"}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-gray-900 border-gray-700" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none text-white">{session?.user?.name || "User"}</p>
-                <p className="text-xs leading-none text-gray-400">{session?.user?.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-gray-700" />
-            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800">
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-gray-700" />
-            <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          {/* User Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={user?.image_url || user?.image} alt={user?.name} />
+                  <AvatarFallback className="bg-blue-500 text-white">
+                    {user?.name ? getInitials(user.name) : "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium leading-none">{user?.name}</p>
+                    {user?.email_verified && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Shield className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                    <span>Joined {user?.created_at ? formatJoinDate(user.created_at) : "Recently"}</span>
+                    {user?.provider && (
+                      <Badge variant="outline" className="text-xs">
+                        {user.provider === "google" ? "Google" : "Email"}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   )

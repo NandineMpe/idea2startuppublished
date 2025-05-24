@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
+import { Preloader } from "@/components/preloader"
 
 export default function DashboardLayout({
   children,
@@ -16,23 +17,19 @@ export default function DashboardLayout({
   const router = useRouter()
 
   useEffect(() => {
-    if (status === "loading") return // Still loading
+    if (status === "loading") return
 
-    if (!session) {
+    if (status === "unauthenticated") {
       router.push("/auth/signin")
       return
     }
-  }, [session, status, router])
+  }, [status, router])
 
   if (status === "loading") {
-    return (
-      <div className="flex h-screen items-center justify-center bg-black">
-        <div className="text-white">Loading...</div>
-      </div>
-    )
+    return <Preloader />
   }
 
-  if (!session) {
+  if (status === "unauthenticated") {
     return null
   }
 

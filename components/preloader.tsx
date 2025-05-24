@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 
-export default function Preloader() {
+export function Preloader() {
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
