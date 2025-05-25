@@ -1,15 +1,23 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 
-const isPublicRoute = createRouteMatcher(["/", "/auth(.*)", "/sso-callback", "/api/webhook/clerk", "/api/test"])
+// Update public routes to include sso-callback
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/auth(.*)",
+  "/sso-callback",
+  "/api/webhook/clerk",
+  "/api/test",
+  "/api/chat/(.*)",
+])
 
-const isAuthRoute = createRouteMatcher(["/auth(.*)", "/sso-callback"])
+const isAuthRoute = createRouteMatcher(["/auth(.*)"])
 
 export default clerkMiddleware((auth, req) => {
   const { userId } = auth()
 
   // If user is logged in and trying to access auth routes, redirect to dashboard
-  if (userId && isAuthRoute(req) && !req.url.includes("sso-callback")) {
+  if (userId && isAuthRoute(req)) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 

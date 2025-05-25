@@ -45,6 +45,7 @@ export default function AuthPage() {
       if (result.status === "complete") {
         await setSignInActive({ session: result.createdSessionId })
         router.push("/dashboard")
+        router.refresh() // Force a refresh to ensure auth state is updated
       }
     } catch (err: any) {
       console.error("Sign in error:", err)
@@ -74,6 +75,7 @@ export default function AuthPage() {
       if (result.status === "complete") {
         await setSignUpActive({ session: result.createdSessionId })
         router.push("/dashboard")
+        router.refresh() // Force a refresh to ensure auth state is updated
       } else if (result.status === "missing_requirements") {
         // Handle email verification if needed
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
