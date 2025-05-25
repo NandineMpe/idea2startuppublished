@@ -94,6 +94,7 @@ And it sure as hell doesn't change the world.`,
     if (isSignedIn) {
       router.push("/dashboard")
     } else {
+      // Redirect to Clerk's catch-all sign-in route
       router.push("/auth/signin")
     }
   }
