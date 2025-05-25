@@ -36,12 +36,14 @@ export default function RootLayout({
           />
         </head>
         <body className={inter.className}>
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-            <ToastProvider>
-              <Suspense>{children}</Suspense>
-            </ToastProvider>
-          </ThemeProvider>
-          <Analytics />
+          <ClerkProvider>
+            <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+              <ToastProvider>
+                <Suspense>{children}</Suspense>
+              </ToastProvider>
+            </ThemeProvider>
+            <Analytics />
+          </ClerkProvider>
         </body>
       </html>
     </ClerkProvider>

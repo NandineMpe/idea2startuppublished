@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
@@ -12,10 +12,8 @@ import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [isHovered, setIsHovered] = useState(false)
-  const [showAbout, setShowAbout] = useState(false)
-  const aboutSectionRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { isSignedIn } = useAuth()
+  const { isSignedIn, isLoaded } = useAuth()
   const router = useRouter()
 
   // Founder information for hotspots with non-linear positioning
@@ -90,39 +88,31 @@ And it sure as hell doesn't change the world.`,
     },
   ]
 
-  const scrollToAbout = () => {
-    setShowAbout(true)
-    setTimeout(() => {
-      aboutSectionRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, 100)
-  }
-
   const handleDashboardClick = () => {
+    if (!isLoaded) return // Wait for auth to load
+
     if (isSignedIn) {
       router.push("/dashboard")
     } else {
-      router.push("/auth")
+      router.push("/auth/signin")
     }
   }
 
   useEffect(() => {
-    // Fixed image preloading approach - removed destructuring that could cause errors
+    // Fixed image preloading approach
     try {
       const bgImage = new Image()
       bgImage.src =
         "https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Website%20backgrounds/upscalemedia-transformed-ojypcL68F0lDklQoXOOWH8FcZ92dro.png"
 
-      // Optional: Add load event listener
       bgImage.onload = () => {
         console.log("Background image loaded successfully")
       }
 
       bgImage.onerror = (error) => {
-        // Safely log the error without destructuring
         console.error("Failed to load background image", error)
       }
     } catch (error) {
-      // Safely log the error without destructuring
       console.error("Error in image preloading:", error)
     }
 
@@ -147,9 +137,10 @@ And it sure as hell doesn't change the world.`,
         >
           <Button
             onClick={handleDashboardClick}
+            disabled={!isLoaded}
             className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
           >
-            {isSignedIn ? "My Dashboard" : "Sign In"}
+            {!isLoaded ? "Loading..." : isSignedIn ? "My Dashboard" : "Sign In"}
           </Button>
         </motion.div>
       </div>
@@ -207,6 +198,7 @@ And it sure as hell doesn't change the world.`,
               >
                 <Button
                   onClick={handleDashboardClick}
+                  disabled={!isLoaded}
                   className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
                     isHovered ? "pl-10 pr-14" : "px-12"
                   }`}
@@ -214,7 +206,7 @@ And it sure as hell doesn't change the world.`,
                   onMouseLeave={() => setIsHovered(false)}
                 >
                   <span className="relative z-10 flex items-center">
-                    {isHovered ? "Yes, Let's Go" : "Hop On?"}
+                    {!isLoaded ? "Loading..." : isHovered ? "Yes, Let's Go" : "Hop On?"}
                     {isHovered && (
                       <motion.span
                         className="ml-2 text-primary"
