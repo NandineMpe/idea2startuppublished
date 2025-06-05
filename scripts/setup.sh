@@ -12,9 +12,7 @@ fi
 echo "📦 Installing dependencies..."
 pnpm install
 
-# Generate NextAuth secret
-echo "🔐 Generating NextAuth secret..."
-npx auth secret
+echo "🔐 Remember to add your Clerk credentials to .env.local"
 
 echo "✅ Setup complete!"
 echo ""

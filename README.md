@@ -7,13 +7,13 @@ A comprehensive platform for entrepreneurs to analyze business ideas, generate p
 - **Business Idea Analysis** - AI-powered analysis of your business concepts
 - **Pitch Deck Generation** - Create professional pitch decks automatically
 - **Market Insights** - Comprehensive market research and competitor analysis
-- **User Authentication** - Secure login with email/password and Google OAuth
+- **User Authentication** - Secure login powered by Clerk with email/password and Google OAuth
 - **Database Integration** - Persistent user data with Supabase
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 14 with App Router
-- **Authentication**: NextAuth.js v4
+- **Authentication**: Clerk
 - **Database**: Supabase (PostgreSQL)
 - **Styling**: Tailwind CSS + shadcn/ui
 - **Package Manager**: pnpm
@@ -38,12 +38,12 @@ A comprehensive platform for entrepreneurs to analyze business ideas, generate p
    \`\`\`
 
 3. **Set up environment variables**
-   \`\`\`bash
-   # Generate NextAuth secret
-   npx auth secret
-   
-   # This will automatically create/update your .env.local file with NEXTAUTH_SECRET
-   \`\`\`
+   Create a `.env.local` file and add your Clerk credentials:
+   ```env
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+   CLERK_SECRET_KEY=your_clerk_secret_key
+   CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
+   ```
 
 4. **Configure additional environment variables**
    
@@ -96,25 +96,16 @@ pnpm clean
 
 ## 🔐 Authentication Setup
 
-### NextAuth Secret Generation
-\`\`\`bash
-# Generate a secure random secret for NextAuth
-npx auth secret
-\`\`\`
+Clerk handles authentication for this project. Ensure you have created an application in the Clerk dashboard and configured the following variables:
 
-This command will:
-- Generate a cryptographically secure random string
-- Automatically add it to your `.env.local` file as `NEXTAUTH_SECRET`
-- Ensure your authentication is properly secured
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
+```
 
-### Google OAuth Setup
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URIs:
-   - `http://localhost:3000/api/auth/callback/google` (development)
-   - `https://yourdomain.com/api/auth/callback/google` (production)
+Refer to the [Clerk documentation](https://clerk.com/docs) for setting up OAuth providers like Google.
+
 
 ## 🗄️ Database Schema
 
@@ -136,7 +127,9 @@ The application uses Supabase with the following tables:
 
 ### Environment Variables for Production
 Make sure to set all environment variables in your Vercel project settings:
-- `NEXTAUTH_SECRET` (generated with `npx auth secret`)
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `CLERK_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `GOOGLE_CLIENT_ID`
