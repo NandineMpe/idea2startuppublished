@@ -1,6 +1,5 @@
 import type React from "react"
-import { auth } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+import { auth, redirectToSignIn } from "@clerk/nextjs/server"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
 
@@ -12,7 +11,7 @@ export default async function DashboardLayout({
   const { userId } = auth()
 
   if (!userId) {
-    redirect("/auth/signin")
+    return redirectToSignIn()
   }
 
   return (

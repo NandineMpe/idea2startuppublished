@@ -56,7 +56,7 @@ export default function AuthErrorPage() {
             <Link href="/">Back to Home</Link>
           </Button>
           <Button asChild className="bg-blue-600 hover:bg-blue-700">
-            <Link href="/auth/signin">Try Again</Link>
+            <Link href="/sign-in">Try Again</Link>
           </Button>
         </CardFooter>
       </Card>

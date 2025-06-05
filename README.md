@@ -106,6 +106,8 @@ CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
 
 Refer to the [Clerk documentation](https://clerk.com/docs) for setting up OAuth providers like Google.
 
+The app exposes `/sign-in` and `/sign-up` routes that render Clerk's authentication components. Use these pages when signing in or creating an account.
+
 
 ## 🗄️ Database Schema
 
