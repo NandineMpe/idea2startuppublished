@@ -31,8 +31,8 @@ A comprehensive platform for entrepreneurs to analyze business ideas, generate p
 2. **Install dependencies with pnpm**
    \`\`\`bash
    # Install pnpm globally if you haven't already
-   npm install -g pnpm
-   
+   curl -fsSL https://get.pnpm.io/install.sh | sh -
+
    # Install project dependencies
    pnpm install
    \`\`\`

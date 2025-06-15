@@ -5,7 +5,7 @@ echo "🚀 Setting up IdeaToStartup Dashboard..."
 # Check if pnpm is installed
 if ! command -v pnpm &> /dev/null; then
     echo "📦 Installing pnpm..."
-    npm install -g pnpm
+    curl -fsSL https://get.pnpm.io/install.sh | sh -
 fi
 
 # Install dependencies
