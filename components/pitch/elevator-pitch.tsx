@@ -13,49 +13,49 @@ export function ElevatorPitch() {
   const [activeTab, setActiveTab] = useState("investor")
 
   return (
-    <div className="space-y-6">
-      <Card className="glass-card border-primary/10">
-        <CardHeader>
-          <CardTitle>Choose Your Audience</CardTitle>
-          <CardDescription>
-            Tailor your elevator pitch to the specific audience you're targeting for maximum impact.
+    <div className="space-y-8 p-4">
+      <Card className="glass-card border-white/5 bg-white/[0.02] overflow-hidden rounded-[2rem] shadow-2xl">
+        <CardHeader className="p-8 pb-4">
+          <CardTitle className="text-3xl font-bold tracking-tight text-white mb-2">Target Audience</CardTitle>
+          <CardDescription className="text-white/40 text-base">
+            Optimize your narrative architecture for the specific stakeholders you're engaging.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8 pt-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-black/50 rounded-lg h-auto p-1 border border-gray-800">
+            <TabsList className="grid w-full grid-cols-3 bg-white/5 border border-white/10 rounded-2xl h-auto p-1.5 mb-8">
               <TabsTrigger
                 value="investor"
-                className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md flex items-center gap-2"
+                className="py-4 data-[state=active]:bg-primary data-[state=active]:text-black rounded-xl flex items-center justify-center gap-3 transition-all duration-300 font-bold"
               >
-                <DollarSign className="h-4 w-4" />
-                Investor Pitch
+                <DollarSign className="h-5 w-5" />
+                Capital
               </TabsTrigger>
               <TabsTrigger
                 value="customer"
-                className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md flex items-center gap-2"
+                className="py-4 data-[state=active]:bg-primary data-[state=active]:text-black rounded-xl flex items-center justify-center gap-3 transition-all duration-300 font-bold"
               >
-                <Users className="h-4 w-4" />
-                Customer Pitch
+                <Users className="h-5 w-5" />
+                Growth
               </TabsTrigger>
               <TabsTrigger
                 value="networking"
-                className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md flex items-center gap-2"
+                className="py-4 data-[state=active]:bg-primary data-[state=active]:text-black rounded-xl flex items-center justify-center gap-3 transition-all duration-300 font-bold"
               >
-                <MessageSquare className="h-4 w-4" />
-                Networking Pitch
+                <MessageSquare className="h-5 w-5" />
+                Velocity
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="investor" className="mt-6">
+            <TabsContent value="investor" className="mt-0 ring-0 outline-none">
               <InvestorElevatorPitch />
             </TabsContent>
 
-            <TabsContent value="customer" className="mt-6">
+            <TabsContent value="customer" className="mt-0 ring-0 outline-none">
               <CustomerElevatorPitch />
             </TabsContent>
 
-            <TabsContent value="networking" className="mt-6">
+            <TabsContent value="networking" className="mt-0 ring-0 outline-none">
               <NetworkingElevatorPitch />
             </TabsContent>
           </Tabs>

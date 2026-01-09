@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -55,37 +56,40 @@ export function FullPitch() {
 
   return (
     <div className="space-y-6">
-      <Card className="glass-card border-primary/10">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <CardTitle>Full Pitch Builder</CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-white/60">{progress}% complete</span>
-              <div className="w-32 h-2 bg-black/50 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }}></div>
+      <Card className="glass-card border-white/5 bg-white/[0.02] overflow-hidden rounded-[2.5rem] shadow-2xl">
+        <CardHeader className="p-8 pb-3">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <CardTitle className="text-3xl font-bold tracking-tight text-white">Narrative Architect</CardTitle>
+            <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-2xl border border-white/10">
+              <span className="text-xs font-bold uppercase tracking-widest text-primary">{progress}% Calibrated</span>
+              <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  className="h-full bg-primary"
+                />
               </div>
             </div>
           </div>
-          <CardDescription>
-            Build a comprehensive pitch by completing each section. Your progress is saved automatically.
+          <CardDescription className="text-white/40 text-lg">
+            Construct a multi-dimensional venture story. Each module strengthens your institutional foundation.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8">
           <Tabs value={activeSection} onValueChange={setActiveSection} className="w-full">
-            <div className="flex overflow-x-auto pb-2 mb-6 scrollbar-hide">
-              <TabsList className="bg-transparent p-0 h-auto flex space-x-2">
+            <div className="flex overflow-x-auto pb-4 mb-8 scrollbar-hide">
+              <TabsList className="bg-transparent p-0 h-auto flex space-x-3">
                 {sections.map((section) => (
                   <TabsTrigger
                     key={section.id}
                     value={section.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
-                      activeSection === section.id
-                        ? "bg-primary/10 text-primary border-primary"
-                        : "bg-black/50 border-gray-800 text-white/60 hover:text-white"
-                    }`}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl border transition-all duration-300 font-bold tracking-tight ${activeSection === section.id
+                      ? "bg-primary text-black border-primary shadow-[0_0_15px_rgba(39,174,96,0.3)]"
+                      : "bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10"
+                      }`}
                   >
                     {completedSections.includes(section.id) ? (
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <CheckCircle2 className="h-4 w-4" />
                     ) : (
                       section.icon
                     )}

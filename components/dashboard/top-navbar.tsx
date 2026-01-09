@@ -42,80 +42,88 @@ export function TopNavbar() {
   }
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <header className="bg-black/40 backdrop-blur-md border-b border-white/5 sticky top-0 z-40 transition-all duration-300">
       <div className="flex items-center justify-between px-6 py-4">
         {/* Search */}
-        <div className="flex items-center flex-1 max-w-md">
+        <div className="flex items-center flex-1 max-w-md group">
           <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 group-focus-within:text-primary transition-colors h-4 w-4" />
             <Input
               type="text"
-              placeholder="Search ideas, insights, or features..."
+              placeholder="Track your progress..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-primary/50 focus:ring-primary/20 transition-all duration-300 rounded-full h-10 w-full"
             />
           </div>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-6">
           {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative">
+          <Button variant="ghost" size="sm" className="relative text-white/70 hover:text-primary hover:bg-white/5 transition-all duration-300">
             <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+            <span className="absolute top-2 right-2 h-2 w-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(39,174,96,0.6)]"></span>
           </Button>
 
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                <Avatar className="h-10 w-10">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-white/10 hover:border-primary/50 transition-all duration-300 p-0">
+                <Avatar className="h-full w-full">
                   <AvatarImage src={user?.imageUrl || "/placeholder.svg"} alt={user?.fullName || ""} />
-                  <AvatarFallback className="bg-blue-500 text-white">
+                  <AvatarFallback className="bg-primary text-black font-bold">
                     {user?.fullName ? getInitials(user.fullName) : user?.firstName?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-80" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium leading-none">{user?.fullName || user?.firstName || "User"}</p>
-                    {user?.primaryEmailAddress?.verification?.status === "verified" && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
+            <DropdownMenuContent className="w-80 bg-black/90 backdrop-blur-xl border border-white/10 text-white shadow-2xl" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal p-4">
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-10 w-10 border border-primary/20">
+                      <AvatarImage src={user?.imageUrl || "/placeholder.svg"} />
+                      <AvatarFallback className="bg-primary text-black">
+                        {user?.fullName ? getInitials(user.fullName) : "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <p className="text-sm font-semibold text-white">{user?.fullName || user?.firstName || "User"}</p>
+                      <p className="text-xs text-white/50">{user?.primaryEmailAddress?.emailAddress}</p>
+                    </div>
                   </div>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user?.primaryEmailAddress?.emailAddress}
-                  </p>
-                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                    <span>Joined {user?.createdAt ? formatJoinDate(new Date(user.createdAt)) : "Recently"}</span>
+
+                  {user?.primaryEmailAddress?.verification?.status === "verified" && (
+                    <Badge variant="secondary" className="bg-primary/20 text-primary border-none text-[10px] w-fit">
+                      <Shield className="h-3 w-3 mr-1" />
+                      Verified Founder
+                    </Badge>
+                  )}
+
+                  <div className="flex items-center space-x-2 text-[10px] text-white/40 pt-1">
+                    <span>Member since {user?.createdAt ? formatJoinDate(new Date(user.createdAt)) : "Recently"}</span>
                     {user?.externalAccounts?.[0]?.provider && (
-                      <Badge variant="outline" className="text-xs capitalize">
+                      <Badge variant="outline" className="text-[10px] capitalize border-white/10 text-white/40">
                         {user.externalAccounts[0].provider}
                       </Badge>
                     )}
                   </div>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuItem className="p-3 focus:bg-white/5 cursor-pointer">
+                <User className="mr-3 h-4 w-4 text-primary" />
+                <span className="text-sm">Founder Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+              <DropdownMenuItem className="p-3 focus:bg-white/5 cursor-pointer">
+                <Settings className="mr-3 h-4 w-4 text-primary" />
+                <span className="text-sm">Account Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-red-600 dark:text-red-400">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Sign out</span>
+              <DropdownMenuSeparator className="bg-white/5" />
+              <DropdownMenuItem onClick={handleSignOut} className="p-3 focus:bg-red-500/10 text-red-400 cursor-pointer">
+                <LogOut className="mr-3 h-4 w-4" />
+                <span className="text-sm font-medium">Safe Sign Out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

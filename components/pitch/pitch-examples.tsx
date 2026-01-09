@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -169,188 +170,169 @@ export function PitchExamples() {
   })
 
   return (
-    <div className="space-y-6">
-      <Card className="glass-card border-primary/10">
-        <CardHeader className="pb-3">
-          <CardTitle>Successful Pitch Deck Examples</CardTitle>
-          <CardDescription>Learn from real pitch decks that helped startups raise millions in funding.</CardDescription>
+    <div className="space-y-8 p-4">
+      <Card className="glass-card border-white/5 bg-white/[0.02] overflow-hidden rounded-[2.5rem] shadow-2xl">
+        <CardHeader className="p-8 pb-4">
+          <CardTitle className="text-3xl font-bold tracking-tight text-white mb-2">Venture Hall of Fame</CardTitle>
+          <CardDescription className="text-white/40 text-base">
+            Deconstruct the narratives that defined modern industry. Patterns of success, encoded in slides.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+        <CardContent className="p-8 pt-0">
+          <div className="flex flex-col lg:flex-row gap-4 mb-8">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/20 group-focus-within:text-primary transition-colors" />
               <Input
-                placeholder="Search by name, industry, or tag..."
-                className="pl-9 bg-black/50 border-gray-800"
+                placeholder="Search the archives..."
+                className="pl-12 bg-white/5 border-white/10 rounded-2xl h-14 text-lg focus:border-primary/50 transition-all placeholder:text-white/10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="border-gray-800 gap-2">
-                <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filter</span>
+            <div className="flex gap-3">
+              <Button variant="outline" className="border-white/10 rounded-2xl h-14 px-6 hover:bg-white/5 gap-2">
+                <Filter className="h-5 w-5" />
+                Filter
               </Button>
               <div className="relative">
                 <Button
                   variant="outline"
-                  className="border-gray-800 gap-2"
+                  className="border-white/10 rounded-2xl h-14 px-6 hover:bg-white/5 gap-2"
                   onClick={() => setShowSortMenu(!showSortMenu)}
                 >
-                  <ArrowUpDown className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sort</span>
+                  <ArrowUpDown className="h-5 w-5" />
+                  Sort
                 </Button>
-                {showSortMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-black/90 border border-gray-800 rounded-md shadow-lg z-10">
-                    <div className="py-1">
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
-                        onClick={() => {
-                          setSortBy("featured")
-                          setShowSortMenu(false)
-                        }}
-                      >
-                        Featured
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
-                        onClick={() => {
-                          setSortBy("rating")
-                          setShowSortMenu(false)
-                        }}
-                      >
-                        Highest Rated
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
-                        onClick={() => {
-                          setSortBy("recent")
-                          setShowSortMenu(false)
-                        }}
-                      >
-                        Most Recent
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800"
-                        onClick={() => {
-                          setSortBy("name")
-                          setShowSortMenu(false)
-                        }}
-                      >
-                        Alphabetical
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <AnimatePresence>
+                  {showSortMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 mt-3 w-56 bg-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden"
+                    >
+                      <div className="p-2">
+                        {["featured", "rating", "recent", "name"].map((option) => (
+                          <button
+                            key={option}
+                            className="w-full text-left px-4 py-3 text-sm rounded-xl hover:bg-white/5 transition-colors capitalize text-white/70 hover:text-white"
+                            onClick={() => {
+                              setSortBy(option)
+                              setShowSortMenu(false)
+                            }}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-black/50 rounded-lg h-auto p-1">
-              <TabsTrigger
-                value="all"
-                className="py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
-              >
-                All Decks
-              </TabsTrigger>
-              <TabsTrigger
-                value="featured"
-                className="py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
-              >
-                Featured
-              </TabsTrigger>
-              <TabsTrigger
-                value="seed"
-                className="py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
-              >
-                Seed Stage
-              </TabsTrigger>
-              <TabsTrigger
-                value="series"
-                className="py-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
-              >
-                Series A+
-              </TabsTrigger>
+            <TabsList className="flex bg-white/5 border border-white/10 rounded-2xl h-auto p-1.5 mb-8 w-fit">
+              {["all", "featured", "seed", "series"].map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="py-3 px-6 data-[state=active]:bg-primary data-[state=active]:text-black rounded-xl transition-all duration-300 font-bold capitalize"
+                >
+                  {tab === "all" ? "All Narratives" : tab === "series" ? "Series A+" : tab}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value={activeTab} className="mt-6">
-              {sortedDecks.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {sortedDecks.map((deck) => (
-                    <Card
-                      key={deck.id}
-                      className="glass-card border-primary/10 overflow-hidden hover:border-primary transition-all duration-200 cursor-pointer"
-                      onClick={() => setSelectedDeck(deck.id)}
-                    >
-                      <div className="relative h-48 overflow-hidden bg-black/50">
-                        <img
-                          src={deck.thumbnail || "/placeholder.svg"}
-                          alt={`${deck.name} Pitch Deck`}
-                          className="w-full h-full object-cover"
-                        />
-                        {deck.featured && (
-                          <div className="absolute top-2 right-2 bg-primary text-black text-xs font-medium px-2 py-1 rounded-full">
-                            Featured
-                          </div>
-                        )}
-                      </div>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold text-lg">{deck.name}</h3>
-                          <div className="flex items-center">
-                            <Star className="h-3 w-3 text-primary fill-primary" />
-                            <span className="text-xs ml-1">{deck.rating}</span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-white/60 mb-3 line-clamp-2">{deck.description}</p>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          <div className="flex items-center text-xs bg-black/50 px-2 py-1 rounded-full">
-                            <DollarSign className="h-3 w-3 mr-1" />
-                            {deck.amount}
-                          </div>
-                          <div className="flex items-center text-xs bg-black/50 px-2 py-1 rounded-full">
-                            <Calendar className="h-3 w-3 mr-1" />
-                            {deck.year}
-                          </div>
-                          <div className="flex items-center text-xs bg-black/50 px-2 py-1 rounded-full">
-                            <Tag className="h-3 w-3 mr-1" />
-                            {deck.stage}
+            <TabsContent value={activeTab} className="mt-0 ring-0 outline-none">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab + searchTerm + sortBy}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+                >
+                  {sortedDecks.length > 0 ? (
+                    sortedDecks.map((deck) => (
+                      <motion.div
+                        key={deck.id}
+                        whileHover={{ y: -10 }}
+                        className="glass-card border-white/10 overflow-hidden rounded-3xl group cursor-pointer bg-white/[0.02] hover:border-primary/30 transition-all duration-500"
+                        onClick={() => setSelectedDeck(deck.id)}
+                      >
+                        <div className="relative h-56 overflow-hidden">
+                          <img
+                            src={deck.thumbnail || "/placeholder.svg"}
+                            alt={`${deck.name} Pitch Deck`}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />
+                          {deck.featured && (
+                            <div className="absolute top-4 right-4 bg-primary text-black text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-lg">
+                              Legendary
+                            </div>
+                          )}
+                          <div className="absolute bottom-4 left-4">
+                            <div className="text-xs font-bold text-primary uppercase tracking-widest mb-1">{deck.industry}</div>
+                            <h3 className="text-xl font-bold text-white tracking-tight">{deck.name}</h3>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <div className="text-xs text-white/60">{deck.industry}</div>
-                          <Button variant="ghost" size="sm" className="h-8 px-2">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-white/60">
-                  <p>No pitch decks found matching your search criteria.</p>
-                </div>
-              )}
+                        <CardContent className="p-6">
+                          <p className="text-sm text-white/40 mb-6 line-clamp-2 leading-relaxed">{deck.description}</p>
+                          <div className="flex flex-wrap gap-3 mb-6">
+                            <div className="flex items-center text-[10px] font-bold uppercase tracking-widest bg-white/5 border border-white/5 px-3 py-1.5 rounded-full text-white/60">
+                              <DollarSign className="h-3 w-3 mr-1 text-primary" />
+                              {deck.amount}
+                            </div>
+                            <div className="flex items-center text-[10px] font-bold uppercase tracking-widest bg-white/5 border border-white/5 px-3 py-1.5 rounded-full text-white/60">
+                              <Calendar className="h-3 w-3 mr-1 text-primary" />
+                              {deck.year}
+                            </div>
+                            <div className="flex items-center text-[10px] font-bold uppercase tracking-widest bg-white/5 border border-white/5 px-3 py-1.5 rounded-full text-white/60">
+                              <Tag className="h-3 w-3 mr-1 text-primary" />
+                              {deck.stage}
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3 w-3 text-primary fill-primary" />
+                              <span className="text-xs font-bold text-white">{deck.rating}</span>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-10 w-10 rounded-xl hover:bg-primary hover:text-black transition-colors">
+                              <ExternalLink className="h-5 w-5" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center py-20 bg-white/[0.02] rounded-3xl border border-dashed border-white/10">
+                      <p className="text-white/20 text-lg">No records match your current query.</p>
+                      <Button variant="link" className="text-primary mt-2" onClick={() => setSearchTerm("")}>Clear Filters</Button>
+                    </div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
       {selectedDeck && (
-        <Card className="glass-card border-primary/10">
-          <CardHeader className="flex flex-row justify-between items-start">
+        <Card className="glass-card border-white/10 bg-black/90 backdrop-blur-3xl p-8 rounded-[2.5rem] shadow-3xl">
+          <CardHeader className="flex flex-row justify-between items-start p-0 mb-8">
             <div>
-              <CardTitle>{pitchDecks.find((deck) => deck.id === selectedDeck)?.name} Pitch Deck</CardTitle>
-              <CardDescription>{pitchDecks.find((deck) => deck.id === selectedDeck)?.description}</CardDescription>
+              <CardTitle className="text-3xl font-bold text-white mb-2">{pitchDecks.find((deck) => deck.id === selectedDeck)?.name} Pitch Deck</CardTitle>
+              <CardDescription className="text-white/40 text-lg">{pitchDecks.find((deck) => deck.id === selectedDeck)?.description}</CardDescription>
             </div>
-            <Button variant="outline" className="border-gray-800" onClick={() => setSelectedDeck(null)}>
+            <Button variant="outline" className="border-white/10 rounded-xl px-6" onClick={() => setSelectedDeck(null)}>
               Close
             </Button>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="aspect-[4/3] w-full bg-black/50 rounded-lg overflow-hidden">
+            <div className="aspect-[16/9] w-full bg-black/50 rounded-2xl overflow-hidden border border-white/10 shadow-inner">
               <iframe
                 src={pitchDecks.find((deck) => deck.id === selectedDeck)?.url}
                 className="w-full h-full"
@@ -358,23 +340,23 @@ export function PitchExamples() {
               />
             </div>
 
-            <div className="flex justify-between p-6">
-              <div className="flex gap-2">
-                <Button variant="outline" className="border-gray-800 gap-2">
+            <div className="flex justify-between mt-8">
+              <div className="flex gap-3">
+                <Button variant="outline" className="border-white/10 rounded-xl px-6 gap-2">
                   <Star className="h-4 w-4" />
-                  Save
+                  Save to Vault
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-gray-800 gap-2"
+                  className="border-white/10 rounded-xl px-6 gap-2"
                   onClick={() => window.open(pitchDecks.find((deck) => deck.id === selectedDeck)?.url, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4" />
-                  Open in New Tab
+                  Deep Analysis
                 </Button>
               </div>
               <Button
-                className="bg-primary hover:bg-primary/90 text-black"
+                className="bg-primary hover:bg-primary/90 text-black font-bold rounded-xl px-10 shadow-[0_0_20px_rgba(39,174,96,0.3)]"
                 onClick={() => window.open(pitchDecks.find((deck) => deck.id === selectedDeck)?.url, "_blank")}
               >
                 <Download className="mr-2 h-4 w-4" />

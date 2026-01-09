@@ -1,3 +1,6 @@
+"use client"
+
+import { motion } from "framer-motion"
 import {
   BarChart3,
   Calendar,
@@ -11,427 +14,285 @@ import {
   TrendingUp,
   Briefcase,
   Award,
+  ArrowUpRight,
+  Clock,
+  Zap,
+  Target,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { BentoCard } from "@/components/dashboard/bento-grid"
+import { BentoGrid, BentoCard } from "@/components/dashboard/bento-grid"
 import { MetricCard } from "@/components/dashboard/metric-card"
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+}
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+}
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-white">
-          Welcome back, <span className="text-primary">Founder</span>
-        </h1>
-        <p className="text-white/60">
-          Track your progress, manage tasks, and access resources to help grow your startup.
-        </p>
-      </div>
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={container}
+      className="flex flex-col gap-8 p-8 max-w-7xl mx-auto"
+    >
+      <motion.div variants={item} className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-primary font-medium tracking-wider uppercase text-xs">
+            <Zap className="h-3 w-3 fill-primary" />
+            Founder Command Center
+          </div>
+          <h1 className="text-4xl font-bold text-white tracking-tight">
+            Welcome back, <span className="text-primary italic">Extraordinaire</span>
+          </h1>
+          <p className="text-white/60 max-w-xl">
+            The future doesn't build itself. You're 65% of the way to your next milestone.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" className="border-white/10 text-white hover:bg-white/5 rounded-full">
+            <Calendar className="mr-2 h-4 w-4" />
+            Schedule
+          </Button>
+          <Button className="bg-primary hover:bg-primary/90 text-black font-bold rounded-full shadow-[0_0_15px_rgba(39,174,96,0.3)]">
+            <Rocket className="mr-2 h-4 w-4" />
+            New Project
+          </Button>
+        </div>
+      </motion.div>
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="bg-black border border-primary/20 rounded-full p-1">
+      <Tabs defaultValue="overview" className="space-y-8">
+        <TabsList className="bg-white/5 border border-white/10 rounded-full p-1 self-start">
           <TabsTrigger
             value="overview"
-            className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+            className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-black transition-all duration-300"
           >
             Overview
           </TabsTrigger>
           <TabsTrigger
-            value="snapshot"
-            className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+            value="intelligence"
+            className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-black transition-all duration-300"
           >
-            Snapshot
+            Intelligence
           </TabsTrigger>
           <TabsTrigger
-            value="projects"
-            className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+            value="roadmap"
+            className="rounded-full px-8 data-[state=active]:bg-primary data-[state=active]:text-black transition-all duration-300"
           >
-            Projects
+            Roadmap
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview" className="space-y-8 outline-none">
+          {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="glass-card border-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Rocket className="h-5 w-5 text-primary animate-pulse-green" />
-                  Active Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-white">2</div>
-                <p className="text-sm text-white/60 mt-1">Startup projects in progress</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-primary animate-pulse-green" />
-                  Pending Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-white">3</div>
-                <p className="text-sm text-white/60 mt-1">Tasks awaiting completion</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary animate-pulse-green" />
-                  Upcoming Events
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-white">2</div>
-                <p className="text-sm text-white/60 mt-1">Events scheduled this week</p>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/10">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary animate-pulse-green" />
-                  Resources
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-white">3</div>
-                <p className="text-sm text-white/60 mt-1">Available startup resources</p>
-              </CardContent>
-            </Card>
+            {[
+              { title: "Active Projects", value: "2", icon: Rocket, trend: "+1 this month" },
+              { title: "Pending Tasks", value: "3", icon: CheckCircle, trend: "2 high priority" },
+              { title: "Market Insights", value: "12", icon: Target, trend: "New data available" },
+              { title: "Network Growth", value: "+24%", icon: Users, trend: "4 new leads" },
+            ].map((stat, i) => (
+              <motion.div key={i} variants={item}>
+                <Card className="glass-card border-white/5 hover:border-primary/20 transition-all duration-500 group overflow-hidden relative">
+                  <div className="absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                    <stat.icon className="h-24 w-24 text-primary" />
+                  </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-white/60 text-sm font-medium flex items-center gap-2 uppercase tracking-widest">
+                      <stat.icon className="h-4 w-4 text-primary" />
+                      {stat.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
+                    <p className="text-xs text-primary flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      {stat.trend}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="glass-card border-primary/10 lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-white">Project Progress</CardTitle>
-                <CardDescription className="text-white/60">Track your startup projects</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-white">Healthcare Assistant</h3>
-                      <p className="text-sm text-white/60">Stage: Validation</p>
-                    </div>
-                    <span className="text-sm text-white/60">Updated 2 days ago</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Project Progress */}
+            <motion.div variants={item} className="lg:col-span-2">
+              <Card className="glass-card border-white/5 h-full">
+                <CardHeader className="flex flex-row items-center justify-between pb-8">
+                  <div>
+                    <CardTitle className="text-xl text-white">Active Trajectory</CardTitle>
+                    <CardDescription className="text-white/40">Real-time status of your ventures</CardDescription>
                   </div>
-                  <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "65%" }}></div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-white/60">Progress</span>
-                    <span className="text-sm font-medium text-primary">65%</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-white">Sustainable Supply Chain Platform</h3>
-                      <p className="text-sm text-white/60">Stage: Ideation</p>
-                    </div>
-                    <span className="text-sm text-white/60">Updated 5 days ago</span>
-                  </div>
-                  <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "30%" }}></div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-white/60">Progress</span>
-                    <span className="text-sm font-medium text-primary">30%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card border-primary/10">
-              <CardHeader>
-                <CardTitle className="text-white">Recent Tasks</CardTitle>
-                <CardDescription className="text-white/60">Your pending action items</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3 p-3 rounded-md bg-primary/5 border border-primary/10">
-                  <div className="mt-0.5 text-primary">
-                    <Circle className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-white">Complete market research</h4>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-white/60">
-                      <div className="flex items-center gap-1">
-                        <ClockIcon className="h-3.5 w-3.5" />
-                        <span>Due: Tomorrow</span>
+                  <Button variant="ghost" className="text-primary hover:text-primary/80 hover:bg-primary/5">
+                    Manage All <ArrowUpRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  {[
+                    { name: "Healthcare AI Assistant", stage: "Validation", progress: 65, color: "bg-primary" },
+                    { name: "Sustainable Supply Chain", stage: "Ideation", progress: 32, color: "bg-cyan-400" },
+                  ].map((project, i) => (
+                    <div key={i} className="space-y-3 group">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-white group-hover:text-primary transition-colors">
+                            {project.name}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/40 border border-white/5 uppercase tracking-tighter">
+                              {project.stage}
+                            </span>
+                            <span className="text-[10px] text-white/20">• Updated 2d ago</span>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-white">{project.progress}%</span>
                       </div>
-                      <span>•</span>
-                      <span className="px-1.5 py-0.5 rounded text-xs bg-red-500/20 text-red-400">High Priority</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-md bg-primary/5 border border-primary/10">
-                  <div className="mt-0.5 text-primary">
-                    <Circle className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-white">Schedule mentor meeting</h4>
-                    <div className="mt-1 flex items-center gap-2 text-sm text-white/60">
-                      <div className="flex items-center gap-1">
-                        <ClockIcon className="h-3.5 w-3.5" />
-                        <span>Due: Today</span>
+                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${project.progress}%` }}
+                          transition={{ duration: 1, delay: 0.5 + i * 0.2 }}
+                          className={`h-full ${project.color} shadow-[0_0_10px_rgba(255,255,255,0.1)]`}
+                        />
                       </div>
-                      <span>•</span>
-                      <span className="px-1.5 py-0.5 rounded text-xs bg-red-500/20 text-red-400">High Priority</span>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="link" className="text-primary hover:text-primary/80 p-0">
-                  View all tasks
-                </Button>
-              </CardFooter>
-            </Card>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Task Radar */}
+            <motion.div variants={item}>
+              <Card className="glass-card border-white/5 h-full">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-xl text-white">Critical Path</CardTitle>
+                  <CardDescription className="text-white/40">Immediate action required</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { task: "Refine Market Research", due: "Tomorrow", priority: "High", icon: Target },
+                    { task: "Schedule Mentor Session", due: "Today", priority: "High", icon: Users },
+                    { task: "Update Pitch Deck", due: "Friday", priority: "Medium", icon: FileText },
+                  ].map((task, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-all cursor-pointer group">
+                      <div className="h-10 w-10 rounded-lg bg-black flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary group-hover:text-black transition-all">
+                        <task.icon size={18} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-white group-hover:text-primary transition-colors">{task.task}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Clock className="h-3 w-3 text-white/20" />
+                          <span className="text-[10px] text-white/40">{task.due}</span>
+                          <span className={`text-[10px] uppercase font-bold tracking-widest ${task.priority === 'High' ? 'text-red-400' : 'text-primary'}`}>
+                            {task.priority}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+                <CardFooter className="pt-2">
+                  <Button variant="ghost" className="w-full text-white/40 hover:text-white text-xs">
+                    View Full Roadmap
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
           </div>
 
-          <Card className="glass-card border-primary/10">
-            <CardHeader>
-              <CardTitle className="text-white">Startup Metrics</CardTitle>
-              <CardDescription className="text-white/60">Key performance indicators</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-primary/5">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-white/60">User Growth</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold text-white">24%</span>
-                      <span className="text-sm text-primary">+24%</span>
+          {/* Performance Pulse */}
+          <motion.div variants={item}>
+            <Card className="glass-card border-white/5 overflow-hidden">
+              <CardHeader className="pb-8">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl text-white">Venture Vitality</CardTitle>
+                    <CardDescription className="text-white/40">Aggregated performance across all modules</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
+                      <span className="text-xs text-white/60">Live Analytics</span>
                     </div>
                   </div>
-                  <LineChart className="h-5 w-5 text-primary" />
                 </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-primary/5">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-white/60">Engagement</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold text-white">12%</span>
-                      <span className="text-sm text-primary">+12%</span>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {[
+                    { label: "Growth Potential", value: "84%", trend: "+2.4%", icon: TrendingUp },
+                    { label: "Community Engagement", value: "1.2k", trend: "+120", icon: Users },
+                    { label: "Resource Efficiency", value: "92%", trend: "+5.1%", icon: BarChart3 },
+                    { label: "Founder Readiness", value: "Master", trend: "Level up!", icon: Award },
+                  ].map((metric, i) => (
+                    <div key={i} className="space-y-2 relative group">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-white/40 uppercase tracking-widest">{metric.label}</p>
+                        <metric.icon className="h-4 w-4 text-primary opacity-20 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="flex items-end gap-2">
+                        <span className="text-2xl font-bold text-white">{metric.value}</span>
+                        <span className="text-[10px] text-primary mb-1">{metric.trend}</span>
+                      </div>
+                      <div className="h-1 w-full bg-white/5 rounded-full mt-2 overflow-hidden">
+                        <motion.div
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ duration: 1.5, delay: 1 + i * 0.1 }}
+                          className="h-full bg-gradient-to-r from-primary/20 to-primary origin-left"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <BarChart3 className="h-5 w-5 text-primary" />
+                  ))}
                 </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-primary/5">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-white/60">Conversion</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold text-white">8%</span>
-                      <span className="text-sm text-primary">+8%</span>
-                    </div>
-                  </div>
-                  <PieChart className="h-5 w-5 text-primary" />
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-primary/5">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-white/60">Retention</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-semibold text-white">18%</span>
-                      <span className="text-sm text-primary">+18%</span>
-                    </div>
-                  </div>
-                  <LineChart className="h-5 w-5 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
-        <TabsContent value="snapshot" className="space-y-6">
-          <Card className="glass-card border-primary/10">
-            <CardHeader>
-              <CardTitle className="text-white">Startup Snapshot</CardTitle>
-              <CardDescription className="text-white/60">Key metrics and indicators for your startup</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <MetricCard
-                  title="Waitlist Signups"
-                  value="1,248"
-                  change="+32% this month"
-                  icon={<Users className="h-5 w-5" />}
-                />
-                <MetricCard
-                  title="Runway"
-                  value="8.5 months"
-                  change="-0.5 from last month"
-                  icon={<ClockIcon className="h-5 w-5" />}
-                />
-                <MetricCard
-                  title="Monthly Burn Rate"
-                  value="$42,500"
-                  change="+$2,500 from last month"
-                  icon={<DollarSign className="h-5 w-5" />}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <BentoCard title="Funding Status" icon={<Briefcase className="h-5 w-5" />}>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80">Pre-seed Round</span>
-                      <span className="text-primary font-medium">$350,000</span>
-                    </div>
-                    <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary" style={{ width: "70%" }}></div>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-white/60">Target: $500,000</span>
-                      <span className="text-white/60">70% Complete</span>
-                    </div>
-                    <div className="pt-2">
-                      <p className="text-white/80 text-sm">
-                        Next investor meeting: <span className="text-primary">May 15, 2023</span>
-                      </p>
-                    </div>
-                  </div>
-                </BentoCard>
-
-                <BentoCard title="Customer Acquisition" icon={<TrendingUp className="h-5 w-5" />}>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-white/60 text-sm">CAC</p>
-                        <p className="text-white text-xl font-medium">$42</p>
-                        <p className="text-primary text-xs">-12% from last month</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-white/60 text-sm">LTV</p>
-                        <p className="text-white text-xl font-medium">$285</p>
-                        <p className="text-primary text-xs">+8% from last month</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-white/60 text-sm">Conversion Rate</p>
-                        <p className="text-white text-xl font-medium">3.2%</p>
-                        <p className="text-primary text-xs">+0.5% from last month</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-white/60 text-sm">LTV:CAC Ratio</p>
-                        <p className="text-white text-xl font-medium">6.8:1</p>
-                        <p className="text-primary text-xs">+1.2 from last month</p>
-                      </div>
-                    </div>
-                  </div>
-                </BentoCard>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <MetricCard
-                  title="Active Users"
-                  value="842"
-                  change="+18% this month"
-                  icon={<Users className="h-5 w-5" />}
-                />
-                <MetricCard
-                  title="Churn Rate"
-                  value="2.4%"
-                  change="-0.3% from last month"
-                  icon={<TrendingUp className="h-5 w-5" />}
-                />
-                <MetricCard
-                  title="NPS Score"
-                  value="72"
-                  change="+5 points from last survey"
-                  icon={<Award className="h-5 w-5" />}
-                />
-              </div>
-
-              <BentoCard title="Market Penetration" icon={<PieChart className="h-5 w-5" />}>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-white/80">North America</span>
-                        <span className="text-primary">68%</span>
-                      </div>
-                      <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: "68%" }}></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-white/80">Europe</span>
-                        <span className="text-primary">24%</span>
-                      </div>
-                      <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: "24%" }}></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-white/80">Asia-Pacific</span>
-                        <span className="text-primary">8%</span>
-                      </div>
-                      <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary" style={{ width: "8%" }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-white/60 text-sm">Target markets by current user distribution</p>
-                </div>
-              </BentoCard>
-            </CardContent>
-          </Card>
+        <TabsContent value="intelligence" className="h-[400px] flex items-center justify-center border border-white/5 rounded-3xl bg-white/[0.02]">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="h-16 w-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Zap className="h-8 w-8 text-primary animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-white uppercase tracking-tighter">AI Core Loading...</h3>
+            <p className="text-white/40 text-sm">
+              We're calibrating Juno for your specific project vertical. Your intelligence dashboard will be ready shortly.
+            </p>
+            <Button variant="outline" className="border-primary/20 text-primary hover:bg-primary/10 rounded-full mt-4">
+              Access Beta AI Tools
+            </Button>
+          </div>
         </TabsContent>
 
-        <TabsContent value="projects">
-          <div className="text-center py-12 glass-card border border-primary/10 rounded-lg">
-            <h3 className="text-xl font-medium text-white">Projects Tab Content</h3>
-            <p className="text-white/60 mt-2">This tab would display all your projects in detail.</p>
+        <TabsContent value="roadmap" className="h-[400px] flex items-center justify-center border border-white/5 rounded-3xl bg-white/[0.02]">
+          <div className="text-center space-y-4 max-w-sm">
+            <div className="h-16 w-16 bg-cyan-400/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Target className="h-8 w-8 text-cyan-400 animate-bounce" />
+            </div>
+            <h3 className="text-xl font-bold text-white uppercase tracking-tighter">Roadmap Architect</h3>
+            <p className="text-white/40 text-sm">
+              Building your multi-year trajectory based on current market signals. Stand by for launch coordinates.
+            </p>
+            <Button variant="outline" className="border-cyan-400/20 text-cyan-400 hover:bg-cyan-400/10 rounded-full mt-4">
+              Define Milestones
+            </Button>
           </div>
         </TabsContent>
       </Tabs>
-    </div>
-  )
-}
-
-function Circle({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-    </svg>
-  )
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
+    </motion.div>
   )
 }
