@@ -91,23 +91,6 @@ And it sure as hell doesn't change the world.`,
   }
 
   useEffect(() => {
-    // Fixed image preloading approach
-    try {
-      const bgImage = new Image()
-      bgImage.src =
-        "https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Website%20backgrounds/upscalemedia-transformed-ojypcL68F0lDklQoXOOWH8FcZ92dro.png"
-
-      bgImage.onload = () => {
-        console.log("Background image loaded successfully")
-      }
-
-      bgImage.onerror = (error) => {
-        console.error("Failed to load background image", error)
-      }
-    } catch (error) {
-      console.error("Error in image preloading:", error)
-    }
-
     // Set a minimum display time for the preloader (5 seconds)
     const timer = setTimeout(() => {
       setIsLoading(false)
