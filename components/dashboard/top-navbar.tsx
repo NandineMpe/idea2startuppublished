@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useUser, useClerk } from "@clerk/nextjs"
 import { Search, Bell, Settings, LogOut, User, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,30 +14,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
 
 export function TopNavbar() {
-  const { user } = useUser()
-  const { signOut } = useClerk()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
 
   const handleSignOut = () => {
-    signOut({ redirectUrl: "/" })
+    router.push("/")
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const formatJoinDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-    })
+  const user = {
+    fullName: "Founder Extraordinaire",
+    imageUrl: "/placeholder.svg",
+    email: "founder@ideatostartup.io",
+    isVerified: true,
+    joinDate: "Jan 2026"
   }
 
   return (
@@ -71,10 +62,8 @@ export function TopNavbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-white/10 hover:border-primary/50 transition-all duration-300 p-0">
                 <Avatar className="h-full w-full">
-                  <AvatarImage src={user?.imageUrl || "/placeholder.svg"} alt={user?.fullName || ""} />
-                  <AvatarFallback className="bg-primary text-black font-bold">
-                    {user?.fullName ? getInitials(user.fullName) : user?.firstName?.[0] || "U"}
-                  </AvatarFallback>
+                  <AvatarImage src={user.imageUrl} alt={user.fullName} />
+                  <AvatarFallback className="bg-primary text-black font-bold">FE</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -83,18 +72,16 @@ export function TopNavbar() {
                 <div className="flex flex-col space-y-3">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border border-primary/20">
-                      <AvatarImage src={user?.imageUrl || "/placeholder.svg"} />
-                      <AvatarFallback className="bg-primary text-black">
-                        {user?.fullName ? getInitials(user.fullName) : "U"}
-                      </AvatarFallback>
+                      <AvatarImage src={user.imageUrl} />
+                      <AvatarFallback className="bg-primary text-black">FE</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <p className="text-sm font-semibold text-white">{user?.fullName || user?.firstName || "User"}</p>
-                      <p className="text-xs text-white/50">{user?.primaryEmailAddress?.emailAddress}</p>
+                      <p className="text-sm font-semibold text-white">{user.fullName}</p>
+                      <p className="text-xs text-white/50">{user.email}</p>
                     </div>
                   </div>
 
-                  {user?.primaryEmailAddress?.verification?.status === "verified" && (
+                  {user.isVerified && (
                     <Badge variant="secondary" className="bg-primary/20 text-primary border-none text-[10px] w-fit">
                       <Shield className="h-3 w-3 mr-1" />
                       Verified Founder
@@ -102,12 +89,7 @@ export function TopNavbar() {
                   )}
 
                   <div className="flex items-center space-x-2 text-[10px] text-white/40 pt-1">
-                    <span>Member since {user?.createdAt ? formatJoinDate(new Date(user.createdAt)) : "Recently"}</span>
-                    {user?.externalAccounts?.[0]?.provider && (
-                      <Badge variant="outline" className="text-[10px] capitalize border-white/10 text-white/40">
-                        {user.externalAccounts[0].provider}
-                      </Badge>
-                    )}
+                    <span>Member since {user.joinDate}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
@@ -123,7 +105,7 @@ export function TopNavbar() {
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem onClick={handleSignOut} className="p-3 focus:bg-red-500/10 text-red-400 cursor-pointer">
                 <LogOut className="mr-3 h-4 w-4" />
-                <span className="text-sm font-medium">Safe Sign Out</span>
+                <span className="text-sm font-medium">Exit Dashboard</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

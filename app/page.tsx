@@ -7,13 +7,11 @@ import Image from "next/image"
 import Hotspot from "@/components/hotspot"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import Preloader from "@/components/preloader"
-import { useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 
 export default function Home() {
   const [isHovered, setIsHovered] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const { isSignedIn, isLoaded } = useAuth()
   const router = useRouter()
 
   // Founder information for hotspots with non-linear positioning
@@ -89,14 +87,7 @@ And it sure as hell doesn't change the world.`,
   ]
 
   const handleDashboardClick = () => {
-    if (!isLoaded) return // Wait for auth to load
-
-    if (isSignedIn) {
-      router.push("/dashboard")
-    } else {
-      // Use Clerk's standard sign-in route
-      router.push("/sign-in")
-    }
+    router.push("/dashboard")
   }
 
   useEffect(() => {
@@ -138,10 +129,9 @@ And it sure as hell doesn't change the world.`,
         >
           <Button
             onClick={handleDashboardClick}
-            disabled={!isLoaded}
             className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
           >
-            {!isLoaded ? "Loading..." : isSignedIn ? "My Dashboard" : "Sign In"}
+            Launch Terminal
           </Button>
         </motion.div>
       </div>
@@ -199,15 +189,13 @@ And it sure as hell doesn't change the world.`,
               >
                 <Button
                   onClick={handleDashboardClick}
-                  disabled={!isLoaded}
-                  className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${
-                    isHovered ? "pl-10 pr-14" : "px-12"
-                  }`}
+                  className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${isHovered ? "pl-10 pr-14" : "px-12"
+                    }`}
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
                 >
                   <span className="relative z-10 flex items-center">
-                    {!isLoaded ? "Loading..." : isHovered ? "Yes, Let's Go" : "Hop On?"}
+                    {isHovered ? "Yes, Let's Go" : "Hop On?"}
                     {isHovered && (
                       <motion.span
                         className="ml-2 text-primary"
