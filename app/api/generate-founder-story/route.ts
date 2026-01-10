@@ -1,10 +1,12 @@
 import { OpenAI } from "openai"
 import { NextResponse } from "next/server"
 
-// Initialize the OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Initialize the OpenAI client lazily to avoid build-time errors
+const getOpenAIClient = () => {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+}
 
 // Fallback story in case of API failure
 const fallbackStory = `I noticed a significant problem in my industry that wasn't being addressed effectively. Drawing on my background and expertise, I decided to create a solution that would make a real difference. 
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
 
     try {
       // Call the OpenAI API
+      const openai = getOpenAIClient()
       const response = await openai.chat.completions.create({
         model: "gpt-4o", // Using GPT-4o for best quality
         messages: [
