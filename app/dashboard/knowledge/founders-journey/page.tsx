@@ -153,7 +153,43 @@ export default function FoundersJourneyPage() {
       {currentStep === 0 && (
         <div className="space-y-10">
           <section className="space-y-4">
-            <h2 className="text-2xl font-bold">Personal Experience</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Personal Experience</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-primary/50 text-primary hover:bg-primary/10"
+                onClick={async () => {
+                  const name = prompt("What is your full name? (Or paste your LinkedIn URL)")
+                  if (name) {
+                    try {
+                      setIsGenerating(true) // Reusing state for loader UI
+                      const res = await fetch("/api/research-founder", {
+                        method: "POST",
+                        body: JSON.stringify({ name }),
+                        headers: { 'Content-Type': 'application/json' }
+                      })
+                      if (!res.ok) throw new Error("Search failed")
+                      const data = await res.json()
+
+                      // Auto-fill
+                      if (data.personalExperience) handleInputChange("personalExperience", data.personalExperience)
+                      if (data.industryExperience) handleInputChange("industryExperience", data.industryExperience) // Will update state but this field is on step 2, which is fine
+                      if (data.relevantProjects) handleInputChange("relevantProjects", data.relevantProjects)
+
+                      alert("We found some info and pre-filled your answers!")
+                    } catch (e) {
+                      alert("Could not fetch profile data.")
+                    } finally {
+                      setIsGenerating(false)
+                    }
+                  }
+                }}
+              >
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Sync from Digital Footprint (Exa)
+              </Button>
+            </div>
             <p className="text-gray-400">
               Describe a challenge or frustration you personally faced that motivated you to start your business.
             </p>
