@@ -1,4 +1,5 @@
-import { ReadableStream } from "stream/web"
+// import { ReadableStream } from "stream/web"
+
 
 export function GeminiStream(response: Response): ReadableStream<Uint8Array> {
   const reader = response.body?.getReader()
