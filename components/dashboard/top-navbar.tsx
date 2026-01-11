@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Bell, Settings, LogOut, User, Shield } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, Bell, Settings, LogOut, User as UserIcon, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,22 +15,33 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { User } from "@supabase/supabase-js"
 
 export function TopNavbar() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [user, setUser] = useState<User | null>(null)
+  const supabase = createClient()
 
-  const handleSignOut = () => {
-    router.push("/")
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [supabase])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/login")
   }
 
-  const user = {
-    fullName: "Guest Founder",
-    imageUrl: "", // Empty string will trigger fallback
-    email: "founder@ideatostartup.io",
-    isVerified: false,
-    joinDate: "2026"
-  }
+  const userEmail = user?.email || "guest@ideatostartup.io"
+  const userInitials = userEmail.substring(0, 2).toUpperCase()
+  const userName = user?.user_metadata?.full_name || userEmail.split('@')[0]
 
   return (
     <header className="bg-black/40 backdrop-blur-md border-b border-white/5 sticky top-0 z-40 transition-all duration-300">
@@ -62,8 +73,8 @@ export function TopNavbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full border-2 border-white/10 hover:border-primary/50 transition-all duration-300 p-0">
                 <Avatar className="h-full w-full">
-                  <AvatarImage src={user.imageUrl} alt={user.fullName} />
-                  <AvatarFallback className="bg-primary text-black font-bold">FE</AvatarFallback>
+                  <AvatarImage src="" alt={userName} />
+                  <AvatarFallback className="bg-primary text-black font-bold">{userInitials}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -72,30 +83,28 @@ export function TopNavbar() {
                 <div className="flex flex-col space-y-3">
                   <div className="flex items-center space-x-3">
                     <Avatar className="h-10 w-10 border border-primary/20">
-                      <AvatarImage src={user.imageUrl} />
-                      <AvatarFallback className="bg-primary text-black">FE</AvatarFallback>
+                      <AvatarImage src="" />
+                      <AvatarFallback className="bg-primary text-black">{userInitials}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <p className="text-sm font-semibold text-white">{user.fullName}</p>
-                      <p className="text-xs text-white/50">{user.email}</p>
+                      <p className="text-sm font-semibold text-white capitalize">{userName}</p>
+                      <p className="text-xs text-white/50">{userEmail}</p>
                     </div>
                   </div>
 
-                  {user.isVerified && (
-                    <Badge variant="secondary" className="bg-primary/20 text-primary border-none text-[10px] w-fit">
-                      <Shield className="h-3 w-3 mr-1" />
-                      Verified Founder
-                    </Badge>
-                  )}
+                  <Badge variant="secondary" className="bg-primary/20 text-primary border-none text-[10px] w-fit">
+                    <Shield className="h-3 w-3 mr-1" />
+                    Member
+                  </Badge>
 
                   <div className="flex items-center space-x-2 text-[10px] text-white/40 pt-1">
-                    <span>Member since {user.joinDate}</span>
+                    <span>{user ? "Authenticated via Supabase" : "Guest Mode"}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-white/5" />
               <DropdownMenuItem className="p-3 focus:bg-white/5 cursor-pointer">
-                <User className="mr-3 h-4 w-4 text-primary" />
+                <UserIcon className="mr-3 h-4 w-4 text-primary" />
                 <span className="text-sm">Founder Profile</span>
               </DropdownMenuItem>
               <DropdownMenuItem className="p-3 focus:bg-white/5 cursor-pointer">
