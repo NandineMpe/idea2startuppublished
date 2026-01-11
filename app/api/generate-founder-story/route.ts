@@ -1,12 +1,5 @@
-import { OpenAI } from "openai"
 import { NextResponse } from "next/server"
-
-// Initialize the OpenAI client lazily to avoid build-time errors
-const getOpenAIClient = () => {
-  return new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  })
-}
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // Fallback story in case of API failure
 const fallbackStory = `I noticed a significant problem in my industry that wasn't being addressed effectively. Drawing on my background and expertise, I decided to create a solution that would make a real difference. 
@@ -36,15 +29,15 @@ export async function POST(request: Request) {
     }
 
     // Check if API key is available
-    if (!process.env.OPENAI_API_KEY) {
-      console.error("OpenAI API key is not configured")
+    if (!process.env.GOOGLE_GEMINI_API_KEY) {
+      console.error("Gemini API key is not configured")
       return NextResponse.json(
-        { error: "OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable." },
+        { error: "Gemini API key is not configured. Please set the GOOGLE_GEMINI_API_KEY environment variable." },
         { status: 500 },
       )
     }
 
-    // Format the input for the OpenAI API
+    // Format the input for the Gemini API
     const formattedInput = {
       personalExperience,
       emotion: selectedEmotion,
@@ -59,14 +52,12 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Call the OpenAI API
-      const openai = getOpenAIClient()
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o", // Using GPT-4o for best quality
-        messages: [
-          {
-            role: "system",
-            content: `Founder Story Builder – Expert-Level Narrative Creation
+      // Initialize Gemini
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
+      // Use gemini-pro (stable)
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+
+      const systemPrompt = `Founder Story Builder – Expert-Level Narrative Creation
 You are a seasoned storytelling expert, founder coach, and brand strategist working with visionary entrepreneurs. Your goal is to help them transform their raw, real-life experiences into a compelling, credible, emotionally resonant founder story.
 
 You are now supporting a user who has just completed a guided 3-part flow in our Founder Story Builder. They've filled out:
@@ -104,33 +95,30 @@ If business details like business name, business model, value proposition, targe
 
 If market analysis data is provided, use it to strengthen the story with relevant statistics and insights.
 
-End with a line that captures purpose and ambition, e.g. "That's why I started [company] ��� to make sure no one else has to go through what I did."
+End with a line that captures purpose and ambition, e.g. "That's why I started [company] — to make sure no one else has to go through what I did."
 
-Format the story with proper paragraph breaks using double newlines. Use plain text formatting - do not use markdown formatting like headings, bullet points, or other special characters.`,
-          },
-          {
-            role: "user",
-            content: JSON.stringify(formattedInput),
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1000,
-      })
+Format the story with proper paragraph breaks using double newlines. Use plain text formatting - do not use markdown formatting like headings, bullet points, or other special characters.`
 
-      // Extract the generated story
-      const generatedStory = response.choices[0].message.content
+      // Generate content
+      const result = await model.generateContent([
+        systemPrompt,
+        JSON.stringify(formattedInput)
+      ])
+
+      const response = await result.response
+      const generatedStory = response.text()
 
       // Return the generated story
       return NextResponse.json({ story: generatedStory || fallbackStory })
-    } catch (openaiError) {
-      console.error("Error generating founder story:", openaiError)
+    } catch (geminiError) {
+      console.error("Error generating founder story with Gemini:", geminiError)
       return NextResponse.json(
         { error: "Failed to generate founder story. Please try again." },
         { status: 500 }
       )
     }
   } catch (error) {
-    console.error("Error generating founder story:", error)
+    console.error("Error in founder story route:", error)
     return NextResponse.json(
       { error: "Failed to generate founder story" },
       { status: 500 }
