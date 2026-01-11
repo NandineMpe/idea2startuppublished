@@ -346,7 +346,7 @@ export async function POST(request: Request) {
     // Configure Gemini 2.5 Pro with specified parameters
     // Note: Removed the tools configuration that was causing the error
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
+      model: "gemini-pro",
       generationConfig: {
         temperature: 0.4,
         topP: 0.95,
