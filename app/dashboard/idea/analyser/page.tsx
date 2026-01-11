@@ -36,7 +36,6 @@ export default function IdeaAnalyser() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [useMockApi, setUseMockApi] = useState(false)
   const { toast } = useToast()
 
   const handleInputChange = (field: keyof IdeaData, value: string) => {
@@ -59,9 +58,10 @@ export default function IdeaAnalyser() {
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 300000)
+      const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
 
-      const apiEndpoint = useMockApi ? "/api/mock-idea-analysis" : "/api/openai-idea-analysis"
+      // Use the OpenAI analysis endpoint
+      const apiEndpoint = "/api/openai-idea-analysis"
 
       const response = await fetch(apiEndpoint, {
         method: "POST",
@@ -73,26 +73,7 @@ export default function IdeaAnalyser() {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        if (!useMockApi) {
-          setUseMockApi(true)
-          const mockResponse = await fetch("/api/mock-idea-analysis", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData),
-          })
-
-          if (!mockResponse.ok) throw new Error("Analysis failed. Please try again later.")
-
-          const data = await mockResponse.json()
-          setAnalysis(data.analysis)
-          toast({
-            title: "Analysis Complete",
-            description: "Using offline intelligence for faster results.",
-          })
-          setIsAnalyzing(false)
-          return
-        }
-        throw new Error("System is currently overloaded. Please try again.")
+        throw new Error("Analysis failed. Please try again.")
       }
 
       const data = await response.json()
@@ -194,13 +175,7 @@ export default function IdeaAnalyser() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
-              <div className="flex flex-col">
-                <Label htmlFor="use-mock-api" className="text-white font-medium">Turbo Mode</Label>
-                <span className="text-[10px] text-white/40 uppercase tracking-widest">Faster, but less granular analysis</span>
-              </div>
-              <Switch id="use-mock-api" checked={useMockApi} onCheckedChange={setUseMockApi} className="data-[state=checked]:bg-primary" />
-            </div>
+
 
             <Button
               onClick={handleAnalyze}

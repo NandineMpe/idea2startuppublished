@@ -124,16 +124,16 @@ Format the story with proper paragraph breaks using double newlines. Use plain t
       return NextResponse.json({ story: generatedStory || fallbackStory })
     } catch (openaiError) {
       console.error("Error generating founder story:", openaiError)
-      return NextResponse.json({
-        error: "Failed to generate founder story",
-        story: fallbackStory,
-      })
+      return NextResponse.json(
+        { error: "Failed to generate founder story. Please try again." },
+        { status: 500 }
+      )
     }
   } catch (error) {
     console.error("Error generating founder story:", error)
-    return NextResponse.json({
-      error: "Failed to generate founder story",
-      story: fallbackStory,
-    })
+    return NextResponse.json(
+      { error: "Failed to generate founder story" },
+      { status: 500 }
+    )
   }
 }
