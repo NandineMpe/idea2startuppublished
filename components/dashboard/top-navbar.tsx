@@ -25,11 +25,11 @@ export function TopNavbar() {
   }
 
   const user = {
-    fullName: "Founder Extraordinaire",
-    imageUrl: "/placeholder.svg",
+    fullName: "Guest Founder",
+    imageUrl: "", // Empty string will trigger fallback
     email: "founder@ideatostartup.io",
-    isVerified: true,
-    joinDate: "Jan 2026"
+    isVerified: false,
+    joinDate: "2026"
   }
 
   return (
