@@ -57,7 +57,7 @@
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
     "marked": "latest",
-    "next": "15.1.4",
+    "next": "15.1.11",
     "next-themes": "^0.4.6",
     "nodemailer": "latest",
     "openai": "latest",
