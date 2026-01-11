@@ -17,9 +17,8 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
 
-        // Using gemini-2.0-flash-exp for chat as it's faster and better for conversation, or fallback to pro
-        // Ideally use 'gemini-pro' for stability as requested
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+        // Using gemini-2.5-pro for chat as requested
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" })
 
         // Convert messages to Gemini format
         // Gemini expects simplified roles and history. 

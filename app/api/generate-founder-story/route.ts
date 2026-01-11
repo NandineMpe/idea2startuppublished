@@ -54,8 +54,8 @@ export async function POST(request: Request) {
     try {
       // Initialize Gemini
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-      // Use gemini-pro (stable)
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+      // Use gemini-2.5-pro (latest stable)
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" })
 
       const systemPrompt = `Founder Story Builder – Expert-Level Narrative Creation
 You are a seasoned storytelling expert, founder coach, and brand strategist working with visionary entrepreneurs. Your goal is to help them transform their raw, real-life experiences into a compelling, credible, emotionally resonant founder story.
