@@ -60,8 +60,8 @@ export default function IdeaAnalyser() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minute timeout
 
-      // Use the OpenAI analysis endpoint
-      const apiEndpoint = "/api/openai-idea-analysis"
+      // Use the Gemini analysis endpoint
+      const apiEndpoint = "/api/gemini-idea-analysis"
 
       const response = await fetch(apiEndpoint, {
         method: "POST",
