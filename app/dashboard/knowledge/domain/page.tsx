@@ -6,7 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { FileText, CheckCircle, Loader2 } from "lucide-react"
 
+import { useToast } from "@/hooks/use-toast"
+
 export default function DomainKnowledgePage() {
+  const { toast } = useToast()
   const [files, setFiles] = useState<File[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
@@ -15,21 +18,69 @@ export default function DomainKnowledgePage() {
     setFiles((prevFiles) => [...prevFiles, ...newFiles])
   }
 
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.onerror = (e) => reject(e)
+      // Basic text reading. valid for .txt, .md, .html, .csv
+      reader.readAsText(file)
+    })
+  }
+
   const handleSubmit = async () => {
     if (files.length === 0) return
 
     setIsUploading(true)
 
-    // Simulate upload process
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const uploadPromises = files.map(async (file) => {
+        try {
+          const content = await readFileContent(file)
+          const response = await fetch("/api/save-knowledge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              content: content
+            })
+          })
 
-    // Add file names to uploaded files
-    const newUploadedFiles = files.map((file) => file.name)
-    setUploadedFiles((prev) => [...prev, ...newUploadedFiles])
+          if (!response.ok) throw new Error("Failed to save")
+          return file.name
+        } catch (err) {
+          console.error("Upload error for file " + file.name, err)
+          return null
+        }
+      })
 
-    // Clear current files
-    setFiles([])
-    setIsUploading(false)
+      const results = await Promise.all(uploadPromises)
+      const successfulUploads = results.filter(Boolean) as string[]
+
+      if (successfulUploads.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...successfulUploads])
+        toast({
+          title: "Documents Processed",
+          description: `Successfully memorized ${successfulUploads.length} document(s).`,
+        })
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: "Could not process documents.",
+          variant: "destructive"
+        })
+      }
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive"
+      })
+    } finally {
+      setFiles([])
+      setIsUploading(false)
+    }
   }
 
   return (
