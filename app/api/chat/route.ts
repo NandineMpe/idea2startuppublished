@@ -19,8 +19,8 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
 
-        // Using gemini-2.5-pro for chat as requested
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" })
+        // Using gemini-1.5-pro for better stability
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
 
         // Convert messages to Gemini format
         // Gemini expects simplified roles and history. 
