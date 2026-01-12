@@ -19,8 +19,8 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
 
-        // Using gemini-1.5-pro for better stability
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
+        // Using gemini-1.5-flash for speed and context
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
         // Convert messages to Gemini format
         // Gemini expects simplified roles and history. 

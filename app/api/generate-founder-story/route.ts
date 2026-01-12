@@ -54,8 +54,8 @@ export async function POST(request: Request) {
     try {
       // Initialize Gemini
       const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-      // Use gemini-1.5-pro for better quota stability
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
+      // Use gemini-1.5-flash for speed and availability
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
       // Query Supermemory for relevant context
       let memoryContext = ""
