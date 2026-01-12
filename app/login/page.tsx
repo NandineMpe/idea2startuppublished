@@ -49,11 +49,16 @@ export default async function Login({
         const password = formData.get("password") as string
         const supabase = await createClient()
 
+        // Ensure we don't accidentally use localhost in production if origin is missing or misconfigured
+        const redirectUrl = origin && !origin.includes("localhost")
+            ? `${origin}/auth/callback`
+            : `https://${process.env.NEXT_PUBLIC_VERCEL_URL || "idea2startuppublished.vercel.app"}/auth/callback`
+
         const { error } = await supabase.auth.signUp({
             email,
             password,
             options: {
-                emailRedirectTo: `${origin}/auth/callback`,
+                emailRedirectTo: redirectUrl,
             },
         })
 
