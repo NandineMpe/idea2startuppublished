@@ -373,15 +373,41 @@ export async function POST(request: Request) {
       // Removed the tools configuration that was causing the error
     })
 
+
+    // Query Supermemory for relevant context to augment the analysis (Founder's Super Brain)
+    let memoryContext = ""
+    try {
+      const { queryMemory } = await import("@/lib/supermemory")
+      // We query based on the idea description to find relevant uploaded documents
+      const memories = await queryMemory(ideaDescription)
+      if (memories && memories.length > 0) {
+        // Format memories for the prompt
+        // memories is likely an array of objects with 'content' or similar, depending on search implementation
+        // My previous implementation of queryMemory returns `data.results`.
+        memoryContext = memories.map((m: any) => m.content || JSON.stringify(m)).join("\n\n")
+      }
+    } catch (err) {
+      console.warn("Failed to query Super Brain:", err)
+      // Continue without context if memory fails
+    }
+
     // Prepare the prompt with all available information
     const prompt = `
 ${SYSTEM_PROMPT}
 
+# ========= FOUNDER'S SUPER BRAIN CONTEXT =========
+The following legitimate domain knowledge and internal insights have been retrieved from the founder's uploaded documents. Use this context to ground your analysis in the specific reality of their industry and expertise. 
+IF this context contradicts general knowledge, prioritize this context as it represents their specific strategic angle.
+
+${memoryContext ? memoryContext : "No specific domain documents found."}
+
+# ========= USER INPUT =========
 Idea Description (What idea are you thinking about?): ${ideaDescription}
 ${proposedSolution ? `Proposed Solution (What solution are you thinking of?): ${proposedSolution}` : ""}
 ${intendedUsers ? `Intended Users (Who is it for?): ${intendedUsers}` : ""}
 ${geographicFocus ? `Geographic Focus (Where is it for?): ${geographicFocus}` : ""}
 `
+
 
     try {
       // Call Gemini API for analysis with extended timeout

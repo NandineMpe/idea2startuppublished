@@ -57,8 +57,26 @@ export async function POST(request: Request) {
       // Use gemini-2.5-pro (latest stable)
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" })
 
+      // Query Supermemory for relevant context
+      let memoryContext = ""
+      try {
+        const { queryMemory } = await import("@/lib/supermemory")
+        // Use personal experience + industry experience as query hook
+        const query = `${personalExperience} ${industryExperience} ${relevantProjects}`.substring(0, 300)
+        const memories = await queryMemory(query)
+        if (memories && memories.length > 0) {
+          memoryContext = memories.map((m: any) => m.content || JSON.stringify(m)).join("\n---\n")
+        }
+      } catch (e) {
+        console.warn("Super Brain query failed:", e)
+      }
+
       const systemPrompt = `Founder Story Builder – Expert-Level Narrative Creation
 You are a seasoned storytelling expert, founder coach, and brand strategist working with visionary entrepreneurs. Your goal is to help them transform their raw, real-life experiences into a compelling, credible, emotionally resonant founder story.
+
+# SUPER BRAIN CONTEXT (User's Uploaded Intelligence)
+Use the following background information (if any) to enrich the story with specific industry details or philosophy, but ONLY if relevant to the narrative arc:
+${memoryContext}
 
 You are now supporting a user who has just completed a guided 3-part flow in our Founder Story Builder. They've filled out:
 
