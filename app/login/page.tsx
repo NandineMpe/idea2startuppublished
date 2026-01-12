@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { SubmitButton } from "./submit-button"
 
 export default async function Login({
     searchParams,
@@ -34,7 +35,7 @@ export default async function Login({
         })
 
         if (error) {
-            return redirect("/login?message=Could not authenticate user")
+            return redirect(`/login?message=${encodeURIComponent(error.message)}`)
         }
 
         return redirect("/dashboard")
@@ -57,7 +58,7 @@ export default async function Login({
         })
 
         if (error) {
-            return redirect("/login?message=Could not authenticate user")
+            return redirect(`/login?message=${encodeURIComponent(error.message)}`)
         }
 
         return redirect("/login?message=Check email to continue sign in process")
@@ -86,12 +87,13 @@ export default async function Login({
                     placeholder="••••••••"
                     required
                 />
-                <Button formAction={login} className="bg-primary text-black font-bold mb-2 rounded-md px-4 py-2">
+
+                <SubmitButton formAction={login} className="bg-primary text-black font-bold mb-2 rounded-md px-4 py-2" pendingText="Signing In...">
                     Sign In
-                </Button>
-                <Button formAction={signup} variant="outline" className="border-white/20 text-white rounded-md px-4 py-2 hover:bg-white/10">
+                </SubmitButton>
+                <SubmitButton formAction={signup} variant="outline" className="border-white/20 text-white rounded-md px-4 py-2 hover:bg-white/10" pendingText="Signing Up...">
                     Sign Up
-                </Button>
+                </SubmitButton>
                 {searchParams?.message && (
                     <p className="mt-4 p-4 bg-white/10 text-center rounded-md font-medium text-white">
                         {searchParams.message}
