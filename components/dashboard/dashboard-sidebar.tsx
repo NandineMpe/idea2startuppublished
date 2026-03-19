@@ -1,9 +1,7 @@
 "use client"
 
 import type React from "react"
-
 import {
-  ChevronDown,
   ChevronRight,
   Lightbulb,
   BookOpen,
@@ -31,13 +29,12 @@ import {
   Megaphone,
   Wallet,
   Cog,
-  UserCircle,
   UsersRound,
+  Zap,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useContext, createContext } from "react"
-
 import { cn } from "@/lib/utils"
 import { PresentationIcon } from "lucide-react"
 
@@ -70,7 +67,7 @@ const navSections: NavSection[] = [
     title: "Chief Business Strategist",
     roleSlug: "cbs",
     icon: Briefcase,
-    color: "text-yellow-400",
+    color: "text-amber-400",
     items: [
       { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", icon: Lightbulb },
       { title: "Value Proposition", href: "/dashboard/idea/value-proposition", icon: Target },
@@ -95,7 +92,7 @@ const navSections: NavSection[] = [
     title: "Chief Marketing Officer",
     roleSlug: "cmo",
     icon: Megaphone,
-    color: "text-pink-400",
+    color: "text-rose-400",
     items: [
       { title: "Go-To-Market Strategy", href: "/dashboard/market/strategy", icon: Rocket },
       { title: "Pitch Vault", href: "/dashboard/pitch", icon: PresentationIcon },
@@ -121,7 +118,7 @@ const navSections: NavSection[] = [
     title: "Chief Operating Officer",
     roleSlug: "coo",
     icon: Cog,
-    color: "text-purple-400",
+    color: "text-violet-400",
     items: [
       { title: "LLC Formation", href: "/dashboard/market/llc-formation", icon: FileText },
       { title: "Legal Requirements", href: "/dashboard/market/legal", icon: Scale },
@@ -141,54 +138,61 @@ const SidebarContext = createContext<{
 })
 
 export function useSidebar() {
-  const context = useContext(SidebarContext)
-  if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider")
-  }
-  return context
+  return useContext(SidebarContext)
 }
 
 export function DashboardSidebar() {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(true)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    Dashboard: true,
-    "Your Team": false,
     "Chief Business Strategist": true,
-    "Chief Research Officer": true,
-    "Chief Marketing Officer": true,
-    "Chief Financial Officer": true,
-    "Chief Operating Officer": true,
+    "Chief Research Officer": false,
+    "Chief Marketing Officer": false,
+    "Chief Financial Officer": false,
+    "Chief Operating Officer": false,
   })
 
-  const toggleExpanded = () => {
-    setExpanded((prev) => !prev)
+  const toggleSection = (title: string) => {
+    setExpandedSections((prev) => ({ ...prev, [title]: !prev[title] }))
   }
 
-  const toggleSection = (title: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [title]: !prev[title],
-    }))
-  }
+  const sectionHasActive = (section: NavSection) =>
+    section.items.some((item) => pathname === item.href)
 
   return (
     <SidebarContext.Provider value={{ expanded, setExpanded }}>
       <aside
         className={cn(
-          "h-full overflow-y-auto custom-scrollbar bg-black border-r border-primary/10 flex flex-col transition-all duration-300 relative",
-          expanded ? "w-64" : "w-16",
+          "h-full flex flex-col border-r border-border bg-card transition-all duration-200",
+          expanded ? "w-[260px]" : "w-[52px]",
         )}
       >
-        <button
-          onClick={toggleExpanded}
-          className="absolute top-4 right-2 text-white/70 hover:text-primary transition-colors z-10"
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        >
-          {expanded ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-        </button>
+        {/* Workspace Header */}
+        <div className={cn(
+          "flex items-center gap-3 border-b border-border shrink-0",
+          expanded ? "px-4 py-4" : "px-2 py-4 justify-center"
+        )}>
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          {expanded && (
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-foreground truncate">IdeaToStartup</p>
+              <p className="text-[11px] text-muted-foreground truncate">Startup workspace</p>
+            </div>
+          )}
+          {expanded && (
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-accent"
+            >
+              <PanelLeftClose size={15} />
+            </button>
+          )}
+        </div>
 
-        <div className="flex-1 py-4">
+        {/* Navigation */}
+        <nav className={cn("flex-1 overflow-y-auto scrollbar-auto-hide py-2", expanded ? "px-2" : "px-1")}>
           {navSections.map((section) => {
             const isTopLevel = section.title === "Dashboard" || section.title === "Your Team"
 
@@ -196,100 +200,78 @@ export function DashboardSidebar() {
               const mainItem = section.items[0]
               const isActive = pathname === mainItem.href
               return (
-                <div key={section.title} className="px-4 py-1">
+                <div key={section.title} className="mb-0.5">
                   <Link
                     href={mainItem.href}
                     className={cn(
-                      "flex items-center gap-2 py-2 font-medium transition-colors",
-                      isActive ? "text-primary" : "text-white/80 hover:text-primary",
+                      "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
+                      expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
                     )}
                   >
-                    <section.icon className="h-5 w-5" />
+                    <section.icon className={cn("shrink-0", isActive ? "text-primary" : "", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
                     {expanded && <span>{mainItem.title}</span>}
                   </Link>
                 </div>
               )
             }
 
+            const isExpanded = expandedSections[section.title]
+            const hasActive = sectionHasActive(section)
+
             return (
-              <div key={section.title} className="py-1">
+              <div key={section.title} className="mt-1">
                 <button
                   className={cn(
-                    "flex items-center justify-between w-full px-4 py-2 text-sm font-medium transition-colors group",
-                    !expanded && "justify-center",
+                    "flex items-center w-full rounded-md text-[13px] transition-colors group",
+                    expanded ? "px-2.5 py-[7px] gap-2.5 justify-between" : "px-0 py-[7px] justify-center",
+                    hasActive && !isExpanded
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
                   )}
                   onClick={() => expanded && toggleSection(section.title)}
+                  title={expanded ? undefined : section.title}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <section.icon className={cn("h-5 w-5", section.color || "text-white/70")} />
-                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-black" />
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="relative shrink-0">
+                      <section.icon className={cn(section.color || "text-muted-foreground", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
+                      {hasActive && !expanded && (
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />
+                      )}
                     </div>
                     {expanded && (
-                      <div className="flex flex-col items-start">
-                        <span className={cn("text-xs font-normal", section.color || "text-white/60")}>
-                          {section.title}
-                        </span>
-                      </div>
+                      <span className="truncate font-medium">{section.title}</span>
                     )}
                   </div>
                   {expanded && (
-                    <div className="flex items-center gap-1">
-                      {section.roleSlug && (
-                        <Link
-                          href={`/dashboard/team/${section.roleSlug}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-1 rounded hover:bg-white/10 transition-colors"
-                          title={`View ${section.title} profile`}
-                        >
-                          <UserCircle className="h-3.5 w-3.5 text-white/40 hover:text-primary" />
-                        </Link>
+                    <ChevronRight
+                      className={cn(
+                        "h-3.5 w-3.5 text-muted-foreground/50 shrink-0 transition-transform duration-200",
+                        isExpanded && "rotate-90"
                       )}
-                      {expandedSections[section.title] ? (
-                        <ChevronDown className="h-4 w-4 text-white/40" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-white/40" />
-                      )}
-                    </div>
+                    />
                   )}
                 </button>
 
-                {expanded && expandedSections[section.title] && (
-                  <div className="mt-1 space-y-0.5 px-4">
-                    {section.items.map((item) => {
-                      const isActive = pathname === item.href
+                {expanded && isExpanded && (
+                  <div className="ml-[18px] pl-3 border-l border-border mt-0.5 mb-1 space-y-px">
+                    {section.items.map((navItem) => {
+                      const isActive = pathname === navItem.href
                       return (
                         <Link
-                          key={item.title}
-                          href={item.href}
+                          key={navItem.title}
+                          href={navItem.href}
                           className={cn(
-                            "flex items-center gap-2 px-4 py-1.5 text-sm rounded-md transition-all",
-                            isActive ? "text-primary font-medium bg-primary/5" : "text-white/70 hover:text-primary hover:bg-white/5",
+                            "flex items-center gap-2 px-2 py-[6px] text-[13px] rounded-md transition-colors",
+                            isActive
+                              ? "text-primary font-medium bg-primary/5"
+                              : "text-muted-foreground hover:text-foreground hover:bg-accent",
                           )}
                         >
-                          <item.icon className={cn("h-3.5 w-3.5", isActive ? "text-primary" : "text-white/50")} />
-                          <span>{item.title}</span>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {!expanded && (
-                  <div className="mt-1 space-y-1 px-1">
-                    {section.items.map((item) => {
-                      const isActive = pathname === item.href
-                      return (
-                        <Link
-                          key={item.title}
-                          href={item.href}
-                          title={item.title}
-                          className={cn(
-                            "flex items-center justify-center py-2 text-sm rounded-md transition-all",
-                            isActive ? "text-primary font-medium" : "text-white/80 hover:text-primary",
-                          )}
-                        >
-                          <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-white/70")} />
+                          <navItem.icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-primary" : "")} />
+                          <span className="truncate">{navItem.title}</span>
                         </Link>
                       )
                     })}
@@ -298,20 +280,29 @@ export function DashboardSidebar() {
               </div>
             )
           })}
-        </div>
+        </nav>
 
-        <div className="mt-auto border-t border-primary/10 py-4 px-4">
+        {/* Footer */}
+        <div className={cn("border-t border-border shrink-0", expanded ? "p-2" : "p-1")}>
+          {!expanded && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex items-center justify-center w-full py-2 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-accent mb-1"
+            >
+              <PanelLeftOpen size={15} />
+            </button>
+          )}
           <Link
             href="/dashboard/settings"
             className={cn(
-              "flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-all",
-              !expanded ? "justify-center" : "",
-              pathname === "/dashboard/settings" ? "text-primary font-medium" : "text-white/80 hover:text-primary",
+              "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
+              expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+              pathname === "/dashboard/settings"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
             )}
           >
-            <Settings
-              className={cn("h-4 w-4", pathname === "/dashboard/settings" ? "text-primary" : "text-white/70")}
-            />
+            <Settings className={cn("shrink-0", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
             {expanded && <span>Settings</span>}
           </Link>
         </div>

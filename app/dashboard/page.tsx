@@ -2,17 +2,17 @@
 
 import { motion } from "framer-motion"
 import {
-  Zap,
   ArrowUpRight,
   Briefcase,
   FlaskConical,
   Megaphone,
   Wallet,
   Cog,
-  Crown,
-  UserCircle,
+  Users,
+  Activity,
+  TrendingUp,
+  Zap,
 } from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/paperclip"
 import { AgentStatusDot } from "@/components/dashboard/agent-status-dot"
@@ -29,13 +29,13 @@ const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 },
+    transition: { staggerChildren: 0.06 },
   },
 }
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
 }
 
 export default function DashboardPage() {
@@ -44,115 +44,119 @@ export default function DashboardPage() {
       initial="hidden"
       animate="show"
       variants={container}
-      className="flex flex-col gap-8 p-8 max-w-7xl mx-auto"
+      className="flex flex-col gap-6 p-6 lg:p-8 max-w-6xl mx-auto"
     >
       {/* Header */}
-      <motion.div variants={item} className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-primary font-medium tracking-wider uppercase text-xs">
-          <Crown className="h-3 w-3 fill-primary" />
-          Founder Command Center
-        </div>
-        <h1 className="text-4xl font-bold text-white tracking-tight">
-          Welcome, <span className="text-primary italic">CEO</span>
+      <motion.div variants={item} className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold text-foreground">
+          Command Center
         </h1>
-        <p className="text-white/60 max-w-xl">
-          Your executive team is standing by. Select a team member to delegate work or review their responsibilities.
+        <p className="text-sm text-muted-foreground">
+          Your executive team is standing by. Select a member to delegate work or review their capabilities.
         </p>
       </motion.div>
 
-      {/* Mini Org Chart */}
-      <motion.div variants={item} className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/20 bg-primary/5">
-          <Crown className="h-3.5 w-3.5 text-primary" />
-          <span className="text-xs font-medium text-primary">You (CEO)</span>
+      {/* Quick Stats */}
+      <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Active Agents", value: "5", icon: Users, trend: "All online" },
+          { label: "Tasks Running", value: "0", icon: Activity, trend: "Ready" },
+          { label: "Monthly Budget", value: "$190", icon: Wallet, trend: "5 agents" },
+          { label: "Completion Rate", value: "—", icon: TrendingUp, trend: "No data yet" },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <stat.icon className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[11px] text-muted-foreground">{stat.trend}</span>
+            </div>
+            <p className="text-xl font-semibold text-foreground">{stat.value}</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">{stat.label}</p>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Section Header */}
+      <motion.div variants={item} className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[15px] font-semibold text-foreground">Executive Team</h2>
+          <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+            {ROLE_ORDER.length} members
+          </span>
         </div>
-        <Zap className="h-3 w-3 text-white/20" />
-        {ROLE_ORDER.map((slug) => {
-          const config = ROLE_CONFIGS[slug]
-          const Icon = roleIcons[slug] || UserCircle
-          return (
-            <Link
-              key={slug}
-              href={`/dashboard/team/${slug}`}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 hover:border-primary/30 transition-colors bg-white/5 hover:bg-primary/5"
-            >
-              <Icon className={`h-3 w-3 ${config.color}`} />
-              <span className="text-xs text-white/70">{config.shortTitle}</span>
-              <AgentStatusDot status="active" size="sm" />
-            </Link>
-          )
-        })}
+        <Link
+          href="/dashboard/team"
+          className="text-[13px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+        >
+          View org chart
+          <ArrowUpRight className="h-3 w-3" />
+        </Link>
       </motion.div>
 
       {/* Executive Team Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {ROLE_ORDER.map((slug, i) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        {ROLE_ORDER.map((slug) => {
           const config = ROLE_CONFIGS[slug]
-          const Icon = roleIcons[slug] || UserCircle
+          const Icon = roleIcons[slug] || Briefcase
 
           return (
             <motion.div key={slug} variants={item}>
-              <Link href={`/dashboard/team/${slug}`}>
-                <Card className="glass-card border-white/5 hover:border-primary/20 transition-all duration-300 h-full group hover:bg-white/5 cursor-pointer">
-                  <CardHeader>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`w-12 h-12 rounded-lg ${config.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                        <Icon className={`h-6 w-6 ${config.color}`} />
+              <Link href={`/dashboard/team/${slug}`} className="block group">
+                <div className="rounded-lg border border-border bg-card hover:bg-accent/50 transition-all duration-200 p-5 h-full">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg ${config.bgColor} flex items-center justify-center`}>
+                        <Icon className={`h-4 w-4 ${config.color}`} />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <AgentStatusDot status="active" size="md" showLabel />
-                        <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-primary transition-colors" />
+                      <div>
+                        <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">
+                          {config.shortTitle}
+                        </p>
+                        <p className="text-[12px] text-muted-foreground">{config.title}</p>
                       </div>
                     </div>
-                    <CardTitle className="text-xl text-white group-hover:text-primary transition-colors">
-                      {config.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-white/50 mb-4">
-                      {config.capabilities}
-                    </CardDescription>
-                    <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                      <span className="text-xs text-white/30">
-                        {config.responsibilities.length} responsibilities
-                      </span>
-                      <span className="text-xs text-white/30">
-                        ${config.budgetMonthlyCents / 100}/mo budget
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <AgentStatusDot status="active" size="sm" />
+                      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  <p className="text-[12px] text-muted-foreground leading-relaxed mb-4 line-clamp-2">
+                    {config.capabilities}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <span className="text-[11px] text-muted-foreground">
+                      {config.responsibilities.length} tools
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      ${config.budgetMonthlyCents / 100}/mo
+                    </span>
+                  </div>
+                </div>
               </Link>
             </motion.div>
           )
         })}
 
-        {/* Team Overview Card */}
+        {/* Quick Actions Card */}
         <motion.div variants={item}>
-          <Link href="/dashboard/team">
-            <Card className="glass-card border-primary/10 hover:border-primary/30 transition-all duration-300 h-full group hover:bg-primary/5 cursor-pointer">
-              <CardHeader>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Crown className="h-6 w-6 text-primary" />
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-white/20 group-hover:text-primary transition-colors" />
-                </div>
-                <CardTitle className="text-xl text-white group-hover:text-primary transition-colors">
-                  Team Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-white/50 mb-4">
-                  View the full org chart, cost dashboard, and manage all agents from one place.
-                </CardDescription>
-                <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                  <span className="text-xs text-white/30">5 executives</span>
-                  <span className="text-xs text-primary font-medium">View all</span>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <div className="rounded-lg border border-dashed border-border bg-card/50 p-5 h-full flex flex-col items-center justify-center text-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Zap className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-foreground">Quick Start</p>
+              <p className="text-[12px] text-muted-foreground mt-1">
+                Click any executive to start delegating tasks to your AI team.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/team"
+              className="text-[12px] text-primary hover:text-primary/80 font-medium transition-colors"
+            >
+              View full team
+            </Link>
+          </div>
         </motion.div>
       </div>
     </motion.div>

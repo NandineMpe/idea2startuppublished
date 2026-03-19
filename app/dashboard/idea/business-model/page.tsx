@@ -92,48 +92,48 @@ export default function BusinessModelPage() {
   return (
     <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <FileText className="h-6 w-6 text-yellow-400" />
           Business Model Generator
         </h1>
-        <p className="text-white/50 mt-1">Design your business model using the Business Model Canvas and Lean Canvas frameworks.</p>
+        <p className="text-muted-foreground mt-1">Design your business model using the Business Model Canvas and Lean Canvas frameworks.</p>
       </div>
 
       {/* Input Form */}
-      <Card className="glass-card border-white/5">
+      <Card className="glass-card border-border">
         <CardContent className="pt-6 space-y-4">
           <div>
-            <Label className="text-white/80">Business Idea *</Label>
+            <Label className="text-foreground/80">Business Idea *</Label>
             <Textarea
               placeholder="Describe your business idea in detail..."
-              className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]"
+              className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40 min-h-[100px]"
               value={formData.businessIdea}
               onChange={(e) => setFormData((p) => ({ ...p, businessIdea: e.target.value }))}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label className="text-white/80">Target Market</Label>
+              <Label className="text-foreground/80">Target Market</Label>
               <Input
                 placeholder="e.g. B2B SaaS, Consumer Mobile..."
-                className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40"
                 value={formData.targetMarket}
                 onChange={(e) => setFormData((p) => ({ ...p, targetMarket: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-white/80">Revenue Approach</Label>
+              <Label className="text-foreground/80">Revenue Approach</Label>
               <Input
                 placeholder="e.g. Subscription, Freemium, Marketplace..."
-                className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40"
                 value={formData.revenueApproach}
                 onChange={(e) => setFormData((p) => ({ ...p, revenueApproach: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-white/80">Current Stage</Label>
+              <Label className="text-foreground/80">Current Stage</Label>
               <Select value={formData.stage} onValueChange={(v) => setFormData((p) => ({ ...p, stage: v }))}>
-                <SelectTrigger className="mt-1.5 bg-white/5 border-white/10 text-white">
+                <SelectTrigger className="mt-1.5 bg-accent border-white/10 text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,8 +175,8 @@ export default function BusinessModelPage() {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Business Model Canvas</h2>
-              <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/10 text-white/70 gap-1.5">
+              <h2 className="text-lg font-semibold text-foreground">Business Model Canvas</h2>
+              <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/10 text-muted-foreground gap-1.5">
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy All"}
               </Button>
@@ -186,12 +186,12 @@ export default function BusinessModelPage() {
                 const content = result.sections[key]
                 if (!content) return null
                 return (
-                  <Card key={key} className={`glass-card border-white/5 border-l-2 ${canvasHighlight[key] || "border-l-white/20"}`}>
+                  <Card key={key} className={`glass-card border-border border-l-2 ${canvasHighlight[key] || "border-l-white/20"}`}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-primary text-xs uppercase tracking-wider">{key}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+                      <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
                     </CardContent>
                   </Card>
                 )
@@ -200,12 +200,12 @@ export default function BusinessModelPage() {
             {Object.entries(result.sections)
               .filter(([key]) => !sectionOrder.includes(key))
               .map(([key, content]) => (
-                <Card key={key} className="glass-card border-white/5">
+                <Card key={key} className="glass-card border-border">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-primary text-xs uppercase tracking-wider">{key}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+                    <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
                   </CardContent>
                 </Card>
               ))}

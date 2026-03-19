@@ -76,50 +76,50 @@ export default function ValuePropositionPage() {
   return (
     <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Target className="h-6 w-6 text-yellow-400" />
           Value Proposition Generator
         </h1>
-        <p className="text-white/50 mt-1">Create a compelling value proposition using the Value Proposition Canvas framework.</p>
+        <p className="text-muted-foreground mt-1">Create a compelling value proposition using the Value Proposition Canvas framework.</p>
       </div>
 
       {/* Input Form */}
-      <Card className="glass-card border-white/5">
+      <Card className="glass-card border-border">
         <CardContent className="pt-6 space-y-4">
           <div>
-            <Label className="text-white/80">Product / Service Description *</Label>
+            <Label className="text-foreground/80">Product / Service Description *</Label>
             <Textarea
               placeholder="Describe what you're building and what it does..."
-              className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]"
+              className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40 min-h-[100px]"
               value={formData.productDescription}
               onChange={(e) => setFormData((p) => ({ ...p, productDescription: e.target.value }))}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-white/80">Target Customer</Label>
+              <Label className="text-foreground/80">Target Customer</Label>
               <Input
                 placeholder="Who is this for? e.g. Solo founders, SMB owners..."
-                className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40"
                 value={formData.targetCustomer}
                 onChange={(e) => setFormData((p) => ({ ...p, targetCustomer: e.target.value }))}
               />
             </div>
             <div>
-              <Label className="text-white/80">Problem Being Solved</Label>
+              <Label className="text-foreground/80">Problem Being Solved</Label>
               <Input
                 placeholder="What core problem does this address?"
-                className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40"
                 value={formData.problemSolved}
                 onChange={(e) => setFormData((p) => ({ ...p, problemSolved: e.target.value }))}
               />
             </div>
           </div>
           <div>
-            <Label className="text-white/80">Existing Alternatives</Label>
+            <Label className="text-foreground/80">Existing Alternatives</Label>
             <Input
               placeholder="What do customers use today? e.g. Excel, manual process, competitor X..."
-              className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              className="mt-1.5 bg-accent border-white/10 text-foreground placeholder:text-muted-foreground/40"
               value={formData.existingAlternatives}
               onChange={(e) => setFormData((p) => ({ ...p, existingAlternatives: e.target.value }))}
             />
@@ -156,8 +156,8 @@ export default function ValuePropositionPage() {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Your Value Proposition</h2>
-              <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/10 text-white/70 gap-1.5">
+              <h2 className="text-lg font-semibold text-foreground">Your Value Proposition</h2>
+              <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/10 text-muted-foreground gap-1.5">
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy All"}
               </Button>
@@ -166,12 +166,12 @@ export default function ValuePropositionPage() {
               const content = result.sections[key]
               if (!content) return null
               return (
-                <Card key={key} className="glass-card border-white/5">
+                <Card key={key} className="glass-card border-border">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-primary text-sm uppercase tracking-wider">{key}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+                    <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
                   </CardContent>
                 </Card>
               )
@@ -180,12 +180,12 @@ export default function ValuePropositionPage() {
             {Object.entries(result.sections)
               .filter(([key]) => !sectionOrder.includes(key))
               .map(([key, content]) => (
-                <Card key={key} className="glass-card border-white/5">
+                <Card key={key} className="glass-card border-border">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-primary text-sm uppercase tracking-wider">{key}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+                    <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
                   </CardContent>
                 </Card>
               ))}

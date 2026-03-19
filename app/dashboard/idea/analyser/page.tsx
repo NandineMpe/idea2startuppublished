@@ -102,8 +102,8 @@ export default function IdeaAnalyser() {
           <Sparkles className="h-3 w-3" />
           Intelligence Module
         </div>
-        <h1 className="text-4xl font-bold text-white tracking-tight">Idea Analyser</h1>
-        <p className="text-white/40 text-lg">Stress-test your concept before committing a single line of code.</p>
+        <h1 className="text-4xl font-bold text-foreground tracking-tight">Idea Analyser</h1>
+        <p className="text-muted-foreground/60 text-lg">Stress-test your concept before committing a single line of code.</p>
       </motion.div>
 
       <motion.div
@@ -111,20 +111,20 @@ export default function IdeaAnalyser() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="glass-card border-white/5 relative overflow-hidden group">
+        <Card className="glass-card border-border relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Lightbulb size={120} className="text-primary" />
           </div>
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Lightbulb className="text-primary h-5 w-5" />
               Idea Blueprint
             </CardTitle>
-            <CardDescription className="text-white/40">Provide the core details of your vision.</CardDescription>
+            <CardDescription className="text-muted-foreground/60">Provide the core details of your vision.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 relative z-10">
             <div className="space-y-2">
-              <Label htmlFor="ideaDescription" className="text-white/70">The Core Concept</Label>
+              <Label htmlFor="ideaDescription" className="text-foreground/70">The Core Concept</Label>
               <Textarea
                 id="ideaDescription"
                 placeholder="What is the problem you're solving?"
@@ -136,7 +136,7 @@ export default function IdeaAnalyser() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="proposedSolution" className="text-white/70 flex items-center gap-2">
+                <Label htmlFor="proposedSolution" className="text-foreground/70 flex items-center gap-2">
                   <Target size={14} className="text-primary" /> The Solution
                 </Label>
                 <Textarea
@@ -149,7 +149,7 @@ export default function IdeaAnalyser() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="intendedUsers" className="text-white/70 flex items-center gap-2">
+                <Label htmlFor="intendedUsers" className="text-foreground/70 flex items-center gap-2">
                   <Users size={14} className="text-primary" /> Target Audience
                 </Label>
                 <Textarea
@@ -163,7 +163,7 @@ export default function IdeaAnalyser() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="geographicFocus" className="text-white/70 flex items-center gap-2">
+              <Label htmlFor="geographicFocus" className="text-foreground/70 flex items-center gap-2">
                 <Globe size={14} className="text-primary" /> Market Focus
               </Label>
               <Textarea
@@ -222,10 +222,10 @@ export default function IdeaAnalyser() {
             className="space-y-8 pb-20"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-3 italic">
+              <h2 className="text-2xl font-bold text-foreground flex items-center gap-3 italic">
                 <CheckCircle2 className="text-primary h-6 w-6" /> Juno's Verdict
               </h2>
-              <Button variant="outline" className="text-white/40 border-white/10 hover:bg-white/5 rounded-full px-6">Export PDF</Button>
+              <Button variant="outline" className="text-muted-foreground/60 border-white/10 hover:bg-accent rounded-full px-6">Export PDF</Button>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
@@ -236,12 +236,12 @@ export default function IdeaAnalyser() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 + index * 0.1 }}
                 >
-                  <Card className="glass-card border-white/5 hover:border-primary/20 transition-all duration-500">
-                    <CardHeader className="bg-white/5">
+                  <Card className="glass-card border-border hover:border-primary/20 transition-all duration-500">
+                    <CardHeader className="bg-accent">
                       <CardTitle className="text-primary text-sm uppercase tracking-widest">{section.title}</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6">
-                      <div className="text-white/80 leading-relaxed space-y-4">
+                      <div className="text-foreground/80 leading-relaxed space-y-4">
                         {section.content.split("\n\n").map((p, pi) => (
                           <p key={pi}>{p}</p>
                         ))}
@@ -258,8 +258,8 @@ export default function IdeaAnalyser() {
               transition={{ delay: 0.8 }}
               className="p-8 rounded-3xl bg-primary/10 border border-primary/20 text-center space-y-4"
             >
-              <h3 className="text-xl font-bold text-white">Ready to proceed?</h3>
-              <p className="text-white/60">Your next step is defining your Value Proposition based on these insights.</p>
+              <h3 className="text-xl font-bold text-foreground">Ready to proceed?</h3>
+              <p className="text-muted-foreground">Your next step is defining your Value Proposition based on these insights.</p>
               <Button className="bg-primary text-black font-bold h-12 px-10 rounded-full">Continue to Value Prop →</Button>
             </motion.div>
           </motion.div>

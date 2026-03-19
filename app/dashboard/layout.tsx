@@ -8,11 +8,11 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-black text-white selection:bg-primary/30">
+    <div className="flex h-screen bg-background text-foreground">
       <DashboardSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopNavbar />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-black text-white custom-scrollbar transition-all duration-500 ease-in-out">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar">
           {children}
         </main>
       </div>

@@ -85,30 +85,30 @@ export default function RoadmapPage() {
   return (
     <div className="flex flex-col gap-6 p-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <GitBranch className="h-6 w-6 text-purple-400" />
           Product Roadmap Builder
         </h1>
-        <p className="text-white/50 mt-1">Generate a phased development plan with milestones, tasks, and success metrics.</p>
+        <p className="text-muted-foreground mt-1">Generate a phased development plan with milestones, tasks, and success metrics.</p>
       </div>
 
       {/* Input Form */}
-      <Card className="glass-card border-white/5">
+      <Card className="glass-card border-border">
         <CardContent className="pt-6 space-y-4">
           <div>
-            <Label className="text-white/80">Product Description *</Label>
+            <Label className="text-foreground/80">Product Description *</Label>
             <Textarea
               placeholder="Describe what you're building, its core features, and who it's for..."
-              className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]"
+              className="mt-1.5 bg-white/5 border-border text-foreground placeholder:text-muted-foreground/40 min-h-[100px]"
               value={formData.productDescription}
               onChange={(e) => setFormData((p) => ({ ...p, productDescription: e.target.value }))}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label className="text-white/80">Current Stage</Label>
+              <Label className="text-foreground/80">Current Stage</Label>
               <Select value={formData.currentStage} onValueChange={(v) => setFormData((p) => ({ ...p, currentStage: v }))}>
-                <SelectTrigger className="mt-1.5 bg-white/5 border-white/10 text-white">
+                <SelectTrigger className="mt-1.5 bg-white/5 border-border text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -120,9 +120,9 @@ export default function RoadmapPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-white/80">Timeline</Label>
+              <Label className="text-foreground/80">Timeline</Label>
               <Select value={formData.timeline} onValueChange={(v) => setFormData((p) => ({ ...p, timeline: v }))}>
-                <SelectTrigger className="mt-1.5 bg-white/5 border-white/10 text-white">
+                <SelectTrigger className="mt-1.5 bg-white/5 border-border text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -134,10 +134,10 @@ export default function RoadmapPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-white/80">Key Goals</Label>
+              <Label className="text-foreground/80">Key Goals</Label>
               <Input
                 placeholder="e.g. Launch MVP, get 100 users..."
-                className="mt-1.5 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                className="mt-1.5 bg-white/5 border-border text-foreground placeholder:text-muted-foreground/40"
                 value={formData.keyGoals}
                 onChange={(e) => setFormData((p) => ({ ...p, keyGoals: e.target.value }))}
               />
@@ -173,8 +173,8 @@ export default function RoadmapPage() {
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Your Product Roadmap</h2>
-              <Button variant="outline" size="sm" onClick={handleCopy} className="border-white/10 text-white/70 gap-1.5">
+              <h2 className="text-lg font-semibold text-foreground">Your Product Roadmap</h2>
+              <Button variant="outline" size="sm" onClick={handleCopy} className="border-border text-muted-foreground gap-1.5">
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                 {copied ? "Copied" : "Copy All"}
               </Button>
@@ -182,7 +182,7 @@ export default function RoadmapPage() {
 
             {/* Timeline visualization */}
             <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 w-px bg-white/10" />
+              <div className="absolute left-4 top-0 bottom-0 w-px bg-accent" />
               {Object.entries(result.sections).map(([key, content]) => {
                 const phaseKey = getPhaseKey(key)
                 const colors = phaseKey ? phaseColors[phaseKey] : null
@@ -190,7 +190,7 @@ export default function RoadmapPage() {
                 return (
                   <div key={key} className="relative pl-10 pb-6">
                     <div className={`absolute left-2.5 top-1.5 w-3 h-3 rounded-full border-2 border-black ${colors?.dot || "bg-white/30"}`} />
-                    <Card className={`glass-card border-white/5 ${colors ? `border-l-2 ${colors.border}` : ""}`}>
+                    <Card className={`glass-card border-border ${colors ? `border-l-2 ${colors.border}` : ""}`}>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-primary text-sm uppercase tracking-wider flex items-center gap-2">
                           {phaseKey ? <Flag className="h-3.5 w-3.5" /> : <Milestone className="h-3.5 w-3.5" />}
@@ -198,7 +198,7 @@ export default function RoadmapPage() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-white/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
+                        <p className="text-foreground/80 text-sm whitespace-pre-wrap leading-relaxed">{content}</p>
                       </CardContent>
                     </Card>
                   </div>

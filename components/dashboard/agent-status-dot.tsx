@@ -11,14 +11,14 @@ interface AgentStatusDotProps {
 
 const statusConfig: Record<AgentStatus, { color: string; label: string; pulse: boolean }> = {
   active: { color: "bg-emerald-500", label: "Active", pulse: true },
-  paused: { color: "bg-yellow-500", label: "Paused", pulse: false },
+  paused: { color: "bg-amber-500", label: "Paused", pulse: false },
   terminated: { color: "bg-red-500", label: "Terminated", pulse: false },
 }
 
 const sizeConfig = {
-  sm: "w-2 h-2",
-  md: "w-2.5 h-2.5",
-  lg: "w-3 h-3",
+  sm: "w-1.5 h-1.5",
+  md: "w-2 h-2",
+  lg: "w-2.5 h-2.5",
 }
 
 export function AgentStatusDot({ status, size = "sm", showLabel = false }: AgentStatusDotProps) {
@@ -28,12 +28,12 @@ export function AgentStatusDot({ status, size = "sm", showLabel = false }: Agent
     <div className="flex items-center gap-1.5">
       <span className="relative flex">
         {config.pulse && (
-          <span className={cn("absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping", config.color)} />
+          <span className={cn("absolute inline-flex h-full w-full rounded-full opacity-50 animate-ping", config.color)} />
         )}
         <span className={cn("relative inline-flex rounded-full", config.color, sizeConfig[size])} />
       </span>
       {showLabel && (
-        <span className="text-xs text-white/60">{config.label}</span>
+        <span className="text-[11px] text-muted-foreground font-medium">{config.label}</span>
       )}
     </div>
   )

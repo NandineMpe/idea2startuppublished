@@ -211,7 +211,7 @@ export default function ConsumerMarketInsightsPage() {
 
               {parsedMarketSizeData && (
                 <div className="text-center mb-8">
-                  <p className="text-white/80 mb-6">
+                  <p className="text-foreground/80 mb-6">
                     Estimated market size for {query} based on TAM, SAM, and SOM calculations
                   </p>
                   <MarketSizeChart
@@ -237,9 +237,9 @@ export default function ConsumerMarketInsightsPage() {
                         {parsedMarketSizeData?.tam?.value || "Not available"}
                       </div>
                     </div>
-                    <p className="text-white/70 mb-3">{parsedMarketSizeData?.tam?.description || "Global market"}</p>
+                    <p className="text-foreground/70 mb-3">{parsedMarketSizeData?.tam?.description || "Global market"}</p>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-sm text-white/60">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <span>Method: {parsedMarketSizeData?.tam?.method || "Industry research"}</span>
                       </div>
                       <Button
@@ -259,17 +259,17 @@ export default function ConsumerMarketInsightsPage() {
                     {activeCalculationDetail === "tam" && (
                       <div className="mt-3 bg-blue-950/20 p-3 rounded-md border border-blue-900/50 text-sm">
                         <div className="mb-2">
-                          <span className="text-white/60">Methodology:</span>{" "}
-                          <span className="text-white/90">{parsedMarketSizeData?.tamMethodology || "N/A"}</span>
+                          <span className="text-muted-foreground">Methodology:</span>{" "}
+                          <span className="text-foreground/90">{parsedMarketSizeData?.tamMethodology || "N/A"}</span>
                         </div>
                         <div className="mb-2">
-                          <span className="text-white/60">Data Source:</span>{" "}
-                          <span className="text-white/90">
+                          <span className="text-muted-foreground">Data Source:</span>{" "}
+                          <span className="text-foreground/90">
                             {parsedMarketSizeData?.tam?.source || "Industry reports"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-white/60">Confidence:</span>{" "}
+                          <span className="text-muted-foreground">Confidence:</span>{" "}
                           <span
                             className={`${
                               parsedMarketSizeData?.tam?.confidence === "High"
@@ -301,11 +301,11 @@ export default function ConsumerMarketInsightsPage() {
                         {parsedMarketSizeData?.sam?.value || "Not available"}
                       </div>
                     </div>
-                    <p className="text-white/70 mb-3">
+                    <p className="text-foreground/70 mb-3">
                       {parsedMarketSizeData?.sam?.description || "Serviceable market segment"}
                     </p>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-sm text-white/60">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <span>Method: {parsedMarketSizeData?.sam?.method || "Geographic filtering"}</span>
                       </div>
                       <Button
@@ -325,15 +325,15 @@ export default function ConsumerMarketInsightsPage() {
                     {activeCalculationDetail === "sam" && (
                       <div className="mt-3 bg-purple-950/20 p-3 rounded-md border border-purple-900/50 text-sm">
                         <div className="mb-2">
-                          <span className="text-white/60">Methodology:</span>{" "}
-                          <span className="text-white/90">{parsedMarketSizeData?.samMethodology || "N/A"}</span>
+                          <span className="text-muted-foreground">Methodology:</span>{" "}
+                          <span className="text-foreground/90">{parsedMarketSizeData?.samMethodology || "N/A"}</span>
                         </div>
                         <div className="mb-2">
-                          <span className="text-white/60">Data Source:</span>{" "}
-                          <span className="text-white/90">{parsedMarketSizeData?.sam?.source || "Filtered TAM"}</span>
+                          <span className="text-muted-foreground">Data Source:</span>{" "}
+                          <span className="text-foreground/90">{parsedMarketSizeData?.sam?.source || "Filtered TAM"}</span>
                         </div>
                         <div>
-                          <span className="text-white/60">Confidence:</span>{" "}
+                          <span className="text-muted-foreground">Confidence:</span>{" "}
                           <span
                             className={`${
                               parsedMarketSizeData?.sam?.confidence === "High"
@@ -365,11 +365,11 @@ export default function ConsumerMarketInsightsPage() {
                         {parsedMarketSizeData?.som?.value || "Not available"}
                       </div>
                     </div>
-                    <p className="text-white/70 mb-3">
+                    <p className="text-foreground/70 mb-3">
                       {parsedMarketSizeData?.som?.description || "Obtainable market share"}
                     </p>
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-sm text-white/60">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <span>Method: {parsedMarketSizeData?.som?.method || "Realistic projection"}</span>
                       </div>
                       <Button
@@ -389,17 +389,17 @@ export default function ConsumerMarketInsightsPage() {
                     {activeCalculationDetail === "som" && (
                       <div className="mt-3 bg-pink-950/20 p-3 rounded-md border border-pink-900/50 text-sm">
                         <div className="mb-2">
-                          <span className="text-white/60">Methodology:</span>{" "}
-                          <span className="text-white/90">{parsedMarketSizeData?.somMethodology || "N/A"}</span>
+                          <span className="text-muted-foreground">Methodology:</span>{" "}
+                          <span className="text-foreground/90">{parsedMarketSizeData?.somMethodology || "N/A"}</span>
                         </div>
                         <div className="mb-2">
-                          <span className="text-white/60">Data Source:</span>{" "}
-                          <span className="text-white/90">
+                          <span className="text-muted-foreground">Data Source:</span>{" "}
+                          <span className="text-foreground/90">
                             {parsedMarketSizeData?.som?.source || "Competitor analysis"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-white/60">Confidence:</span>{" "}
+                          <span className="text-muted-foreground">Confidence:</span>{" "}
                           <span
                             className={`${
                               parsedMarketSizeData?.som?.confidence === "High"
@@ -456,7 +456,7 @@ export default function ConsumerMarketInsightsPage() {
         content: (
           <div
             id="fullAnalysis"
-            className="prose prose-invert max-w-none prose-headings:text-primary prose-a:text-primary prose-strong:text-white prose-headings:border-b prose-headings:border-gray-800 prose-headings:pb-2 prose-headings:mb-4 prose-h2:mt-8 prose-p:text-white/80 prose-li:text-white/80"
+            className="prose prose-invert max-w-none prose-headings:text-primary prose-a:text-primary prose-strong:text-foreground prose-headings:border-b prose-headings:border-gray-800 prose-headings:pb-2 prose-headings:mb-4 prose-h2:mt-8 prose-p:text-foreground/80 prose-li:text-foreground/80"
           >
             <div dangerouslySetInnerHTML={{ __html: highlightSearchTerm(cleanedContent) }} />
           </div>
@@ -515,7 +515,7 @@ export default function ConsumerMarketInsightsPage() {
 
     try {
       const regex = new RegExp(`(${searchTerm})`, "gi")
-      const highlightedContent = content.replace(regex, '<mark class="bg-primary/20 text-white px-1 rounded">$1</mark>')
+      const highlightedContent = content.replace(regex, '<mark class="bg-primary/20 text-foreground px-1 rounded">$1</mark>')
       return marked(highlightedContent)
     } catch (error) {
       console.error("Error highlighting search term:", error)
@@ -584,8 +584,8 @@ export default function ConsumerMarketInsightsPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-white">Consumer and Market Insights</h1>
-        <p className="text-white/60">Deep market analysis for your business</p>
+        <h1 className="text-3xl font-bold text-foreground">Consumer and Market Insights</h1>
+        <p className="text-muted-foreground">Deep market analysis for your business</p>
       </div>
 
       {error && (
@@ -594,7 +594,7 @@ export default function ConsumerMarketInsightsPage() {
             <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-red-500">Error</h3>
-              <p className="text-white/80">{error}</p>
+              <p className="text-foreground/80">{error}</p>
             </div>
           </CardContent>
         </Card>
@@ -606,56 +606,56 @@ export default function ConsumerMarketInsightsPage() {
             <h2 className="text-2xl font-bold">
               Consumer and Market <span className="text-primary">Insights</span>
             </h2>
-            <p className="text-white/80 max-w-3xl">
+            <p className="text-foreground/80 max-w-3xl">
               Our advanced market research tool provides deep, non-obvious consumer insights that fuel startup ideation,
               product-market fit, and category-defining strategy. We uncover the truth behind consumer behavior and
               market demand, translating it into actionable insights for founders and product builders.
             </p>
-            <p className="text-white/80 max-w-3xl">
+            <p className="text-foreground/80 max-w-3xl">
               Unlike surface-level summaries or recycled startup advice, our analysis delivers clarity, critical
               assessment, and original insight that cuts through noise and drives decisions.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="glass-card border-primary/10 overflow-hidden group hover:border-primary transition-all duration-300">
+            <Card className="glass-card border-border overflow-hidden group hover:border-primary transition-all duration-300">
               <div className="h-1 bg-gradient-to-r from-primary to-primary/50"></div>
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-all duration-300">
                   <PieChart className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold text-primary mb-4">Market Definition & Size</h3>
-                <p className="text-white/80">
+                <p className="text-foreground/80">
                   Get a comprehensive analysis of your market size with TAM, SAM, and SOM calculations based on credible
                   assumptions.
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="glass-card border-primary/10 overflow-hidden group hover:border-primary transition-all duration-300">
+            <Card className="glass-card border-border overflow-hidden group hover:border-primary transition-all duration-300">
               <div className="h-1 bg-gradient-to-r from-primary to-primary/50"></div>
               <CardContent className="p-6 flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-all duration-300">
                   <Target className="h-6 w-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold text-primary mb-4">Detailed Insights</h3>
-                <p className="text-white/80">
+                <p className="text-foreground/80">
                   Discover comprehensive insights about market dynamics, consumer behavior, trends, and opportunities.
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="glass-card border-primary/10 p-6">
+          <Card className="glass-card border-border p-6">
             <div className="flex flex-col gap-4">
               <div className="relative">
-                <label htmlFor="market-query" className="text-sm font-medium text-white/60 mb-2 block">
+                <label htmlFor="market-query" className="text-sm font-medium text-muted-foreground mb-2 block">
                   Enter an industry, product, or market to analyze
                 </label>
                 <div className="relative">
                   <Input
                     id="market-query"
-                    className="bg-black border-gray-800 focus:border-primary text-white pr-10"
+                    className="bg-background border-gray-800 focus:border-primary text-foreground pr-10"
                     placeholder="e.g., Electric vehicles, Plant-based meat, Cryptocurrency"
                     value={query}
                     onChange={(e) => {
@@ -668,7 +668,7 @@ export default function ConsumerMarketInsightsPage() {
                   />
                   {query && (
                     <button
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       onClick={() => setQuery("")}
                     >
                       <X className="h-4 w-4" />
@@ -679,19 +679,19 @@ export default function ConsumerMarketInsightsPage() {
                 {/* Recent searches dropdown */}
                 {showRecentSearches && recentSearches.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full bg-gray-900 border border-gray-800 rounded-md shadow-lg">
-                    <div className="py-1 text-sm text-white/60 px-3">Recent searches</div>
+                    <div className="py-1 text-sm text-muted-foreground px-3">Recent searches</div>
                     {recentSearches
                       .filter((search) => search.toLowerCase().includes(query.toLowerCase()))
                       .map((search, index) => (
                         <button
                           key={index}
-                          className="w-full text-left px-4 py-2 hover:bg-gray-800 text-white flex items-center"
+                          className="w-full text-left px-4 py-2 hover:bg-gray-800 text-foreground flex items-center"
                           onClick={() => {
                             setQuery(search)
                             setShowRecentSearches(false)
                           }}
                         >
-                          <Search className="h-4 w-4 mr-2 text-white/60" />
+                          <Search className="h-4 w-4 mr-2 text-muted-foreground" />
                           {search}
                         </button>
                       ))}
@@ -727,7 +727,7 @@ export default function ConsumerMarketInsightsPage() {
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
-                  <div className="flex justify-between mt-1 text-xs text-white/60">
+                  <div className="flex justify-between mt-1 text-xs text-muted-foreground">
                     <span>Gathering data</span>
                     <span>Analyzing insights</span>
                     <span>Finalizing report</span>
@@ -743,16 +743,16 @@ export default function ConsumerMarketInsightsPage() {
             <div>
               <h2 className="text-2xl font-bold flex items-center">
                 <span className="text-primary mr-2">{query}</span>
-                <span className="text-sm text-white/60 font-normal bg-gray-800 px-2 py-1 rounded">Market Analysis</span>
+                <span className="text-sm text-muted-foreground font-normal bg-gray-800 px-2 py-1 rounded">Market Analysis</span>
               </h2>
-              <p className="text-white/60 text-sm mt-1">Analysis generated on {new Date().toLocaleDateString()}</p>
+              <p className="text-muted-foreground text-sm mt-1">Analysis generated on {new Date().toLocaleDateString()}</p>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search in content..."
-                  className="pl-9 bg-black border-gray-800 h-9"
+                  className="pl-9 bg-background border-gray-800 h-9"
                   value={searchTerm}
                   onChange={handleSearchChange}
                 />
@@ -821,7 +821,7 @@ export default function ConsumerMarketInsightsPage() {
             {sections.map((section) => (
               <div key={section.id} className="border border-primary/20 rounded-lg overflow-hidden">
                 <button
-                  className="w-full flex items-center justify-between p-4 bg-black hover:bg-gray-900 text-white"
+                  className="w-full flex items-center justify-between p-4 bg-background hover:bg-gray-900 text-foreground"
                   onClick={() => toggleSection(section.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -829,9 +829,9 @@ export default function ConsumerMarketInsightsPage() {
                     <h3 className="text-lg font-semibold">{section.title}</h3>
                   </div>
                   {expandedSections[section.id] ? (
-                    <ChevronUp className="h-5 w-5 text-white/60" />
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-white/60" />
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
                   )}
                 </button>
                 {expandedSections[section.id] && (
@@ -843,7 +843,7 @@ export default function ConsumerMarketInsightsPage() {
                     ) : section.content && section.content.toString().includes("No content found") ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <AlertCircle className="h-10 w-10 text-primary/50 mb-4" />
-                        <p className="text-white/60 max-w-md">
+                        <p className="text-muted-foreground max-w-md">
                           This section may be included in another part of the analysis or structured differently. Please
                           check the Full Analysis section to see all content.
                         </p>

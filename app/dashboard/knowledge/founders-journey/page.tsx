@@ -132,7 +132,7 @@ export default function FoundersJourneyPage() {
                   <span className="text-xs font-medium">{index + 1}</span>
                 </StepperIndicator>
                 <div className="space-y-0.5 px-2">
-                  <StepperTitle className="text-white">{step.title}</StepperTitle>
+                  <StepperTitle className="text-foreground">{step.title}</StepperTitle>
                   <StepperDescription className="text-gray-400">{step.description}</StepperDescription>
                 </div>
               </StepperTrigger>
@@ -194,7 +194,7 @@ export default function FoundersJourneyPage() {
               Describe a challenge or frustration you personally faced that motivated you to start your business.
             </p>
             <Textarea
-              className="min-h-[120px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+              className="min-h-[120px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
               placeholder="Describe your experience..."
               value={formData.personalExperience}
               onChange={(e) => handleInputChange("personalExperience", e.target.value)}
@@ -210,42 +210,42 @@ export default function FoundersJourneyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Frustration" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Frustration" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Frustration")}
               >
                 Frustration
               </Button>
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Determination" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Determination" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Determination")}
               >
                 Determination
               </Button>
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Empathy" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Empathy" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Empathy")}
               >
                 Empathy
               </Button>
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Drive for Change" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Drive for Change" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Drive for Change")}
               >
                 Drive for Change
               </Button>
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Resilience" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Resilience" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Resilience")}
               >
                 Resilience
               </Button>
               <Button
                 variant="outline"
-                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-black ${selectedEmotion === "Passion" ? "border-[#32CD32] bg-black/50" : ""}`}
+                className={`h-14 border-gray-800 hover:border-[#32CD32] hover:bg-background ${selectedEmotion === "Passion" ? "border-[#32CD32] bg-background/50" : ""}`}
                 onClick={() => handleEmotionSelect("Passion")}
               >
                 Passion
@@ -267,7 +267,7 @@ export default function FoundersJourneyPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Industry Experience</label>
               <Textarea
-                className="min-h-[100px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+                className="min-h-[100px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
                 placeholder="What relevant industry experience gives you an edge?"
                 value={formData.industryExperience}
                 onChange={(e) => handleInputChange("industryExperience", e.target.value)}
@@ -277,7 +277,7 @@ export default function FoundersJourneyPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Relevant Projects</label>
               <Textarea
-                className="min-h-[100px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+                className="min-h-[100px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
                 placeholder="Have you built similar things before? What technical or operational experience do you have?"
                 value={formData.relevantProjects}
                 onChange={(e) => handleInputChange("relevantProjects", e.target.value)}
@@ -287,7 +287,7 @@ export default function FoundersJourneyPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Network Advantages</label>
               <Textarea
-                className="min-h-[100px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+                className="min-h-[100px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
                 placeholder="Who are you connected to that would be valuable in this space?"
                 value={formData.networkAdvantages}
                 onChange={(e) => handleInputChange("networkAdvantages", e.target.value)}
@@ -297,7 +297,7 @@ export default function FoundersJourneyPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Why Now?</label>
               <Textarea
-                className="min-h-[100px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+                className="min-h-[100px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
                 placeholder="Why is now the right time to solve this problem?"
                 value={formData.whyNow}
                 onChange={(e) => handleInputChange("whyNow", e.target.value)}
@@ -316,7 +316,7 @@ export default function FoundersJourneyPage() {
               Describe the exact moment when everything clicked and you knew you had to build this solution.
             </p>
             <Textarea
-              className="min-h-[120px] bg-black border-gray-800 focus:border-[#32CD32] text-white"
+              className="min-h-[120px] bg-background border-gray-800 focus:border-[#32CD32] text-foreground"
               placeholder="Describe the moment..."
               value={formData.ahaMoment}
               onChange={(e) => handleInputChange("ahaMoment", e.target.value)}
@@ -330,7 +330,7 @@ export default function FoundersJourneyPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Button
                 variant="outline"
-                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-black flex flex-col items-start p-4 ${selectedTone === "VC Pitch" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
+                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-background flex flex-col items-start p-4 ${selectedTone === "VC Pitch" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
                 onClick={() => handleToneSelect("VC Pitch")}
               >
                 <span className="font-bold">VC Pitch</span>
@@ -338,7 +338,7 @@ export default function FoundersJourneyPage() {
               </Button>
               <Button
                 variant="outline"
-                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-black flex flex-col items-start p-4 ${selectedTone === "Team Building" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
+                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-background flex flex-col items-start p-4 ${selectedTone === "Team Building" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
                 onClick={() => handleToneSelect("Team Building")}
               >
                 <span className="font-bold">Team Building</span>
@@ -346,7 +346,7 @@ export default function FoundersJourneyPage() {
               </Button>
               <Button
                 variant="outline"
-                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-black flex flex-col items-start p-4 ${selectedTone === "Press & Media" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
+                className={`h-24 border-gray-800 hover:border-[#32CD32] hover:bg-background flex flex-col items-start p-4 ${selectedTone === "Press & Media" ? "border-[#32CD32] bg-[#32CD32]/10" : ""}`}
                 onClick={() => handleToneSelect("Press & Media")}
               >
                 <span className="font-bold">Press & Media</span>
@@ -355,15 +355,15 @@ export default function FoundersJourneyPage() {
             </div>
           </section>
 
-          <Card className="bg-black border-gray-800 p-6">
+          <Card className="bg-background border-gray-800 p-6">
             <h3 className="text-xl font-bold mb-4">Your Story</h3>
 
             {generatedStory ? (
               <div className="mb-6">
-                <p className="text-white whitespace-pre-line">{generatedStory}</p>
+                <p className="text-foreground whitespace-pre-line">{generatedStory}</p>
                 <div className="flex justify-center mt-6">
                   <Button
-                    className="bg-gray-800 hover:bg-gray-700 text-white mr-4"
+                    className="bg-gray-800 hover:bg-gray-700 text-foreground mr-4"
                     onClick={() => setGeneratedStory(null)}
                   >
                     Reset
@@ -417,7 +417,7 @@ export default function FoundersJourneyPage() {
         >
           Previous
         </Button>
-        <Button className="bg-gray-700 hover:bg-gray-600 text-white" onClick={handleNext} disabled={currentStep === 2}>
+        <Button className="bg-gray-700 hover:bg-gray-600 text-foreground" onClick={handleNext} disabled={currentStep === 2}>
           Next
         </Button>
       </div>

@@ -122,46 +122,46 @@ export default function GoToMarketPage() {
       </div>
 
       {/* Condensed Market Definition Section */}
-      <Card className="glass-card border-primary/10">
+      <Card className="glass-card border-border">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
             <div className="bg-primary/10 p-2 rounded-full">
               <Network className="h-5 w-5 text-primary" />
             </div>
-            <CardTitle className="text-2xl font-bold text-white">What is a Market?</CardTitle>
+            <CardTitle className="text-2xl font-bold text-foreground">What is a Market?</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="pb-4">
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-black/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
+              <div className="bg-background/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="bg-primary/10 p-1.5 rounded-full">
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                   </div>
                   <h3 className="font-semibold text-primary">Shared Need</h3>
                 </div>
-                <p className="text-white/80 text-sm">Share a common need or desire that your product can address</p>
+                <p className="text-foreground/80 text-sm">Share a common need or desire that your product can address</p>
               </div>
 
-              <div className="bg-black/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
+              <div className="bg-background/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="bg-primary/10 p-1.5 rounded-full">
                     <DollarSign className="h-4 w-4 text-primary" />
                   </div>
                   <h3 className="font-semibold text-primary">Purchasing Power</h3>
                 </div>
-                <p className="text-white/80 text-sm">Are willing to spend money to resolve that need</p>
+                <p className="text-foreground/80 text-sm">Are willing to spend money to resolve that need</p>
               </div>
 
-              <div className="bg-black/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
+              <div className="bg-background/50 border border-gray-800 rounded-lg p-4 hover:border-primary/30 transition-colors duration-300">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="bg-primary/10 p-1.5 rounded-full">
                     <Users className="h-4 w-4 text-primary" />
                   </div>
                   <h3 className="font-semibold text-primary">Mutual Influence</h3>
                 </div>
-                <p className="text-white/80 text-sm">
+                <p className="text-foreground/80 text-sm">
                   Crucially, influence each other when making purchasing decisions
                 </p>
               </div>
@@ -170,7 +170,7 @@ export default function GoToMarketPage() {
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
               <div className="flex items-start gap-2">
                 <Quote className="h-6 w-6 text-primary flex-shrink-0 mt-1" />
-                <p className="text-sm italic text-white">
+                <p className="text-sm italic text-foreground">
                   "When a great team meets a bad market, the market wins. When a bad team meets a great market—something
                   special happens." <span className="text-primary font-medium">— Andy Rachleff</span>
                 </p>
@@ -181,7 +181,7 @@ export default function GoToMarketPage() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="glass-card border-primary/10 lg:col-span-2">
+        <Card className="glass-card border-border lg:col-span-2">
           <CardHeader className="pb-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -202,11 +202,11 @@ export default function GoToMarketPage() {
                 <Select value={domesticMarket} onValueChange={setDomesticMarket}>
                   <SelectTrigger
                     id="domestic-market"
-                    className="glass-input text-white border-primary/10 focus-visible:ring-primary/30 [&>span]:flex [&>span]:items-center [&>span]:gap-2"
+                    className="glass-input text-foreground border-border focus-visible:ring-primary/30 [&>span]:flex [&>span]:items-center [&>span]:gap-2"
                   >
                     <SelectValue placeholder="Select domestic market" />
                   </SelectTrigger>
-                  <SelectContent className="glass border-primary/10 [&_*[role=option]>span]:flex [&_*[role=option]>span]:items-center [&_*[role=option]>span]:gap-2">
+                  <SelectContent className="glass border-border [&_*[role=option]>span]:flex [&_*[role=option]>span]:items-center [&_*[role=option]>span]:gap-2">
                     {domesticMarkets.map((market) => (
                       <SelectItem key={market.value} value={market.value}>
                         <span className="text-lg leading-none">{market.flag}</span>{" "}
@@ -222,11 +222,11 @@ export default function GoToMarketPage() {
                 <Select onValueChange={handleAddMarket}>
                   <SelectTrigger
                     id="add-market"
-                    className="glass-input text-white border-primary/10 focus-visible:ring-primary/30 [&>span]:flex [&>span]:items-center [&>span]:gap-2"
+                    className="glass-input text-foreground border-border focus-visible:ring-primary/30 [&>span]:flex [&>span]:items-center [&>span]:gap-2"
                   >
                     <SelectValue placeholder="Select market to add" />
                   </SelectTrigger>
-                  <SelectContent className="glass border-primary/10 [&_*[role=option]>span]:flex [&_*[role=option]>span]:items-center [&_*[role=option]>span]:gap-2">
+                  <SelectContent className="glass border-border [&_*[role=option]>span]:flex [&_*[role=option]>span]:items-center [&_*[role=option]>span]:gap-2">
                     {geographicMarkets.map((continent) => (
                       <SelectGroup key={continent.continent}>
                         <SelectLabel>{continent.continent}</SelectLabel>
@@ -267,13 +267,13 @@ export default function GoToMarketPage() {
                   return (
                     <div
                       key={marketCode}
-                      className="flex items-center gap-1.5 bg-black/50 text-white px-3 py-1.5 rounded-full text-sm"
+                      className="flex items-center gap-1.5 bg-background/50 text-foreground px-3 py-1.5 rounded-full text-sm"
                     >
                       <span className="text-base">{marketDetails.flag}</span>
                       <span>{marketDetails.label}</span>
                       <button
                         onClick={() => handleRemoveMarket(marketCode)}
-                        className="ml-1.5 text-white/60 hover:text-white"
+                        className="ml-1.5 text-muted-foreground hover:text-foreground"
                       >
                         <span className="sr-only">Remove</span>
                         <svg
@@ -296,7 +296,7 @@ export default function GoToMarketPage() {
                 })}
 
                 {selectedMarkets.length === 0 && (
-                  <div className="text-white/60 text-sm">No target markets selected. Add markets above.</div>
+                  <div className="text-muted-foreground text-sm">No target markets selected. Add markets above.</div>
                 )}
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function GoToMarketPage() {
           </CardContent>
         </Card>
 
-        <Card className="glass-card border-primary/10">
+        <Card className="glass-card border-border">
           <CardHeader>
             <div className="flex items-center gap-2">
               <div className="bg-primary/10 p-2 rounded-full">
@@ -320,60 +320,60 @@ export default function GoToMarketPage() {
           <CardContent className="p-6">
             <div className="flex flex-col items-center">
               <div className="relative w-32 h-32 mb-4">
-                <div className="absolute inset-0 rounded-full bg-black/50"></div>
+                <div className="absolute inset-0 rounded-full bg-background/50"></div>
                 <div
                   className="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-primary/70"
                   style={{ clipPath: "polygon(0 0, 65% 0, 65% 100%, 0 100%)" }}
                 ></div>
-                <div className="absolute inset-2 rounded-full bg-black flex items-center justify-center">
+                <div className="absolute inset-2 rounded-full bg-background flex items-center justify-center">
                   <span className="text-3xl font-bold text-primary">65%</span>
                 </div>
               </div>
-              <p className="text-center text-white/80 mb-4">
+              <p className="text-center text-foreground/80 mb-4">
                 Your GTM plan is on track, but there are a few areas that need attention.
               </p>
               <div className="w-full space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-white">Market Research</span>
+                  <span className="text-foreground">Market Research</span>
                   <span className="text-primary">85%</span>
                 </div>
-                <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-background/50 rounded-full overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: "85%" }}></div>
                 </div>
 
                 <div className="flex justify-between text-sm">
-                  <span className="text-white">Pricing Strategy</span>
+                  <span className="text-foreground">Pricing Strategy</span>
                   <span className="text-primary">70%</span>
                 </div>
-                <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-background/50 rounded-full overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: "70%" }}></div>
                 </div>
 
                 <div className="flex justify-between text-sm">
-                  <span className="text-white">Channel Strategy</span>
+                  <span className="text-foreground">Channel Strategy</span>
                   <span className="text-primary">40%</span>
                 </div>
-                <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-background/50 rounded-full overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: "40%" }}></div>
                 </div>
               </div>
             </div>
           </CardContent>
-          <CardFooter className="bg-black/30 border-t border-primary/10 px-6 py-3">
+          <CardFooter className="bg-background/30 border-t border-border px-6 py-3">
             <Button className="w-full bg-primary hover:bg-primary/90 text-black">Improve Your Score</Button>
           </CardFooter>
         </Card>
       </div>
 
       {/* Replace the grid of cards with tabs */}
-      <Card className="glass-card border-primary/10">
+      <Card className="glass-card border-border">
         <CardHeader>
           <CardTitle>Go-To-Market Tools</CardTitle>
           <CardDescription>Select a tool to help build your go-to-market strategy</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-black/50 rounded-lg h-auto p-1">
+            <TabsList className="grid w-full grid-cols-4 bg-background/50 rounded-lg h-auto p-1">
               <TabsTrigger
                 value="problem-solution-fit"
                 className="py-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-md"
@@ -406,17 +406,17 @@ export default function GoToMarketPage() {
                   <Rocket className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-extrabold text-white mb-2">Problem Solution Fit</h3>
-                  <p className="text-white/80 mb-4">
+                  <h3 className="text-2xl font-extrabold text-foreground mb-2">Problem Solution Fit</h3>
+                  <p className="text-foreground/80 mb-4">
                     Validate that your solution actually solves a real, meaningful problem for your target audience.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Problem Discovery</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Problem Discovery</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">
                       Solution Validation
                     </span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">User Interviews</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Early Feedback</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">User Interviews</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Early Feedback</span>
                   </div>
                   <Button className="bg-primary hover:bg-primary/90 text-black">
                     Assess Fit <ArrowRight className="ml-2 h-4 w-4" />
@@ -431,15 +431,15 @@ export default function GoToMarketPage() {
                   <Globe className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-extrabold text-white mb-2">Product Market Fit</h3>
-                  <p className="text-white/80 mb-4">
+                  <h3 className="text-2xl font-extrabold text-foreground mb-2">Product Market Fit</h3>
+                  <p className="text-foreground/80 mb-4">
                     Demonstrate that your product satisfies a strong market demand and users are willing to pay for it.
                   </p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Retention</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Engagement</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">NPS</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Revenue</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Retention</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Engagement</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">NPS</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Revenue</span>
                   </div>
                   <Button className="bg-primary hover:bg-primary/90 text-black">
                     Measure PMF <ArrowRight className="ml-2 h-4 w-4" />
@@ -454,13 +454,13 @@ export default function GoToMarketPage() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-extrabold text-white mb-2">Customer Acquisition</h3>
-                  <p className="text-white/80 mb-4">Create a strategy to acquire and retain your first customers.</p>
+                  <h3 className="text-2xl font-extrabold text-foreground mb-2">Customer Acquisition</h3>
+                  <p className="text-foreground/80 mb-4">Create a strategy to acquire and retain your first customers.</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Acquisition</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Activation</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Retention</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Referral</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Acquisition</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Activation</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Retention</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Referral</span>
                   </div>
                   <Button className="bg-primary hover:bg-primary/90 text-black">
                     Plan Acquisition <ArrowRight className="ml-2 h-4 w-4" />
@@ -475,15 +475,15 @@ export default function GoToMarketPage() {
                   <BarChart3 className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-2xl font-extrabold text-white mb-2">Scaling Plan</h3>
-                  <p className="text-white/80 mb-4">Develop a plan for scaling operations, team, and market reach.</p>
+                  <h3 className="text-2xl font-extrabold text-foreground mb-2">Scaling Plan</h3>
+                  <p className="text-foreground/80 mb-4">Develop a plan for scaling operations, team, and market reach.</p>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Growth Loops</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Team</span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Growth Loops</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Team</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">
                       Internationalization
                     </span>
-                    <span className="text-xs bg-black/50 text-white/80 px-2 py-1 rounded-full">Process</span>
+                    <span className="text-xs bg-background/50 text-foreground/80 px-2 py-1 rounded-full">Process</span>
                   </div>
                   <Button className="bg-primary hover:bg-primary/90 text-black">
                     Build Scaling Plan <ArrowRight className="ml-2 h-4 w-4" />

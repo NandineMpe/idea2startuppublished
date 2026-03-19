@@ -100,7 +100,7 @@ And it sure as hell doesn't change the world.`,
   }, [])
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-black">
+    <div className="relative min-h-screen overflow-x-hidden bg-background">
       {isLoading && <Preloader />}
 
       {/* Dashboard Navigation */}
@@ -112,7 +112,7 @@ And it sure as hell doesn't change the world.`,
         >
           <Button
             onClick={handleDashboardClick}
-            className="bg-black/40 backdrop-blur-md border border-primary/30 text-white hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
+            className="bg-background/40 backdrop-blur-md border border-primary/30 text-foreground hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
           >
             Launch Terminal
           </Button>
@@ -130,7 +130,7 @@ And it sure as hell doesn't change the world.`,
             className="object-cover"
             priority
           />
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-0 bg-background/30" />
         </div>
 
         {/* Interactive Hotspots */}
@@ -153,13 +153,13 @@ And it sure as hell doesn't change the world.`,
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.5 }}
           >
-            <h1 className="text-4xl md:text-6xl font-light text-white mb-6 tracking-tight leading-tight">
+            <h1 className="text-4xl md:text-6xl font-light text-foreground mb-6 tracking-tight leading-tight">
               Hey, <span className="text-primary font-normal">Founder Extraordinaire</span>.
               <br />
               We've Been Expecting You.
             </h1>
 
-            <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto mb-12 font-light leading-relaxed">
+            <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto mb-12 font-light leading-relaxed">
               Your idea is the ticket and it deserves to be in motion. Hop on and join other founders enroute to
               building the future — with the right intelligence, at the right time.
             </p>
@@ -172,7 +172,7 @@ And it sure as hell doesn't change the world.`,
               >
                 <Button
                   onClick={handleDashboardClick}
-                  className={`relative bg-transparent border-2 border-primary text-white hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${isHovered ? "pl-10 pr-14" : "px-12"
+                  className={`relative bg-transparent border-2 border-primary text-foreground hover:bg-primary/10 px-12 py-6 rounded-none text-lg font-light tracking-wider uppercase transition-all duration-300 overflow-hidden ${isHovered ? "pl-10 pr-14" : "px-12"
                     }`}
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
@@ -201,7 +201,7 @@ And it sure as hell doesn't change the world.`,
             animate={{ opacity: 1 }}
             transition={{ delay: 1.5, duration: 1 }}
           >
-            <p className="text-white/60 text-sm mb-3">
+            <p className="text-muted-foreground text-sm mb-3">
               Click on the founders on the train, and Juno, to learn more about their stories.
             </p>
           </motion.div>

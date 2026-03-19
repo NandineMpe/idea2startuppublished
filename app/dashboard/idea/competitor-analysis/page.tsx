@@ -120,15 +120,15 @@ export default function CompetitorAnalysisPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold text-white mb-6">Competitor Analysis</h1>
-      <p className="text-white/60 mb-8">Analyze your competition and identify your unique advantages in the market.</p>
+      <h1 className="text-3xl font-bold text-foreground mb-6">Competitor Analysis</h1>
+      <p className="text-muted-foreground mb-8">Analyze your competition and identify your unique advantages in the market.</p>
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-8">
         {/* Problem Framing Card */}
-        <Card className="glass-card border-primary/10">
+        <Card className="glass-card border-border">
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CardTitle className="text-lg font-semibold text-white">What market are you interested in?</CardTitle>
+              <CardTitle className="text-lg font-semibold text-foreground">What market are you interested in?</CardTitle>
               <span className="group relative">
                 <Info className="w-4 h-4 text-primary cursor-pointer" />
                 <span className="absolute left-6 top-0 z-10 hidden group-hover:block min-w-[220px] bg-gray-900 text-gray-100 text-xs rounded-lg px-3 py-2 shadow-lg border border-gray-700">
@@ -136,8 +136,8 @@ export default function CompetitorAnalysisPage() {
                 </span>
               </span>
             </div>
-            <CardDescription className="text-white/60">
-              <span className="italic text-white/40">
+            <CardDescription className="text-muted-foreground">
+              <span className="italic text-muted-foreground/60">
                 e.g., "Social fitness apps" or "Enterprise knowledge management"
               </span>
             </CardDescription>
@@ -147,16 +147,16 @@ export default function CompetitorAnalysisPage() {
               value={problem}
               onChange={(e) => setProblem(e.target.value)}
               placeholder="e.g., Climate tech for carbon credits"
-              className="glass-input text-white border-primary/10 focus-visible:ring-primary/30 resize-none min-h-[90px]"
+              className="glass-input text-foreground border-border focus-visible:ring-primary/30 resize-none min-h-[90px]"
             />
           </CardContent>
         </Card>
 
         {/* Optional additional context */}
-        <Card className="glass-card border-primary/10">
+        <Card className="glass-card border-border">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold text-white">Additional context (optional)</CardTitle>
-            <CardDescription className="text-white/60">
+            <CardTitle className="text-lg font-semibold text-foreground">Additional context (optional)</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Provide any additional details that might help with the analysis.
             </CardDescription>
           </CardHeader>
@@ -170,7 +170,7 @@ export default function CompetitorAnalysisPage() {
                   className={
                     edgePills.includes(pill)
                       ? "bg-primary text-black border-primary hover:bg-primary/90"
-                      : "border-gray-700 text-white hover:bg-gray-800"
+                      : "border-gray-700 text-foreground hover:bg-gray-800"
                   }
                   onClick={() => togglePill(pill)}
                 >
@@ -182,17 +182,17 @@ export default function CompetitorAnalysisPage() {
               value={uniqueEdge}
               onChange={(e) => setUniqueEdge(e.target.value)}
               placeholder="Any specific aspects of this market you're interested in..."
-              className="glass-input text-white border-primary/10 focus-visible:ring-primary/30 resize-none min-h-[60px]"
+              className="glass-input text-foreground border-border focus-visible:ring-primary/30 resize-none min-h-[60px]"
             />
             <div>
-              <label className="block text-sm font-medium text-white/60 mb-1">
-                Known gaps or opportunities? <span className="text-white/40">(optional)</span>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
+                Known gaps or opportunities? <span className="text-muted-foreground/60">(optional)</span>
               </label>
               <Textarea
                 value={knownGaps}
                 onChange={(e) => setKnownGaps(e.target.value)}
                 placeholder="e.g., underserved customer segments, technological gaps..."
-                className="glass-input text-white border-primary/10 focus-visible:ring-primary/30 resize-none min-h-[60px]"
+                className="glass-input text-foreground border-border focus-visible:ring-primary/30 resize-none min-h-[60px]"
               />
             </div>
           </CardContent>
@@ -227,12 +227,12 @@ export default function CompetitorAnalysisPage() {
           {/* Quick navigation */}
           {competitorNames.length > 0 && (
             <div className="mb-6 bg-gray-900/50 p-4 rounded-lg border border-primary/20">
-              <h3 className="text-white font-medium mb-2">Quick Navigation:</h3>
+              <h3 className="text-foreground font-medium mb-2">Quick Navigation:</h3>
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs border-gray-700 text-white hover:bg-gray-800"
+                  className="text-xs border-gray-700 text-foreground hover:bg-gray-800"
                   onClick={() => document.getElementById("market-context")?.scrollIntoView({ behavior: "smooth" })}
                 >
                   Market Context
@@ -242,7 +242,7 @@ export default function CompetitorAnalysisPage() {
                     key={idx}
                     variant="outline"
                     size="sm"
-                    className="text-xs border-gray-700 text-white hover:bg-gray-800"
+                    className="text-xs border-gray-700 text-foreground hover:bg-gray-800"
                     onClick={() => document.getElementById(`competitor-${idx}`)?.scrollIntoView({ behavior: "smooth" })}
                   >
                     {name}
@@ -251,7 +251,7 @@ export default function CompetitorAnalysisPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs border-gray-700 text-white hover:bg-gray-800"
+                  className="text-xs border-gray-700 text-foreground hover:bg-gray-800"
                   onClick={() => document.getElementById("strategic-gaps")?.scrollIntoView({ behavior: "smooth" })}
                 >
                   Strategic Gaps
@@ -259,7 +259,7 @@ export default function CompetitorAnalysisPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs border-gray-700 text-white hover:bg-gray-800"
+                  className="text-xs border-gray-700 text-foreground hover:bg-gray-800"
                   onClick={() => document.getElementById("implications")?.scrollIntoView({ behavior: "smooth" })}
                 >
                   Implications
@@ -269,30 +269,30 @@ export default function CompetitorAnalysisPage() {
           )}
 
           {/* Market Context Section */}
-          <Card id="market-context" className="glass-card border-primary/10 mb-6">
+          <Card id="market-context" className="glass-card border-border mb-6">
             <CardHeader className="border-b border-gray-800">
               <CardTitle className="text-xl font-semibold text-primary">Market Context</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               {marketContext ? (
                 <div
-                  className="text-white/80 text-sm space-y-2 leading-relaxed"
+                  className="text-foreground/80 text-sm space-y-2 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: formatMarkdown(marketContext) || "" }}
                 />
               ) : (
-                <p className="text-white/60 italic">No market context available.</p>
+                <p className="text-muted-foreground italic">No market context available.</p>
               )}
             </CardContent>
           </Card>
 
           {/* Key Competitors Section */}
-          <Card className="glass-card border-primary/10 mb-6">
+          <Card className="glass-card border-border mb-6">
             <CardHeader className="border-b border-gray-800">
               <CardTitle className="text-xl font-semibold text-primary">Key Competitors</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               {keyCompetitors ? (
-                <div className="text-white/80 text-sm space-y-2 leading-relaxed">
+                <div className="text-foreground/80 text-sm space-y-2 leading-relaxed">
                   {competitorNames.length > 0 ? (
                     <div className="space-y-4">
                       {competitorNames.map((name, idx) => (
@@ -304,7 +304,7 @@ export default function CompetitorAnalysisPage() {
                           <h3 className="text-primary font-medium mb-2">
                             {idx + 1}. {name}
                           </h3>
-                          <div className="text-sm text-white/70">
+                          <div className="text-sm text-foreground/70">
                             {/* We'll display the raw competitor info for now */}
                             {keyCompetitors.includes(name) &&
                               keyCompetitors.split(name)[1]?.split(/\d+\./)[0]?.trim().replace(/•/g, "•  ")}
@@ -314,26 +314,26 @@ export default function CompetitorAnalysisPage() {
                     </div>
                   ) : (
                     <div
-                      className="text-white/80"
+                      className="text-foreground/80"
                       dangerouslySetInnerHTML={{ __html: formatMarkdown(keyCompetitors) || "" }}
                     />
                   )}
                 </div>
               ) : (
-                <p className="text-white/60 italic">No competitor information available.</p>
+                <p className="text-muted-foreground italic">No competitor information available.</p>
               )}
             </CardContent>
           </Card>
 
           {/* Competitor Summaries Section */}
           {competitorSummaries && (
-            <Card className="glass-card border-primary/10 mb-6">
+            <Card className="glass-card border-border mb-6">
               <CardHeader className="border-b border-gray-800">
                 <CardTitle className="text-xl font-semibold text-primary">Competitor Summaries</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div
-                  className="text-white/80 text-sm space-y-4 leading-relaxed"
+                  className="text-foreground/80 text-sm space-y-4 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: formatMarkdown(competitorSummaries) || "" }}
                 />
               </CardContent>
@@ -341,48 +341,48 @@ export default function CompetitorAnalysisPage() {
           )}
 
           {/* Strategic Gaps & Opportunities Section */}
-          <Card id="strategic-gaps" className="glass-card border-primary/10 mb-6">
+          <Card id="strategic-gaps" className="glass-card border-border mb-6">
             <CardHeader className="border-b border-gray-800">
               <CardTitle className="text-xl font-semibold text-primary">Strategic Gaps & Opportunities</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               {strategicGaps ? (
                 <div
-                  className="text-white/80 text-sm space-y-2 leading-relaxed"
+                  className="text-foreground/80 text-sm space-y-2 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: formatMarkdown(strategicGaps) || "" }}
                 />
               ) : (
-                <p className="text-white/60 italic">No strategic gaps information available.</p>
+                <p className="text-muted-foreground italic">No strategic gaps information available.</p>
               )}
             </CardContent>
           </Card>
 
           {/* Implications for New Entrants Section */}
-          <Card id="implications" className="glass-card border-primary/10 mb-6">
+          <Card id="implications" className="glass-card border-border mb-6">
             <CardHeader className="border-b border-gray-800">
               <CardTitle className="text-xl font-semibold text-primary">Implications for New Entrants</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               {implications ? (
                 <div
-                  className="text-white/80 text-sm space-y-2 leading-relaxed"
+                  className="text-foreground/80 text-sm space-y-2 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: formatMarkdown(implications) || "" }}
                 />
               ) : (
-                <p className="text-white/60 italic">No implications information available.</p>
+                <p className="text-muted-foreground italic">No implications information available.</p>
               )}
             </CardContent>
           </Card>
 
           {/* Full Analysis (for reference) */}
-          <Card className="glass-card border-primary/10 mb-6">
+          <Card className="glass-card border-border mb-6">
             <CardHeader className="border-b border-gray-800">
               <CardTitle className="text-xl font-semibold text-primary">Full Analysis</CardTitle>
-              <CardDescription className="text-white/60">Complete unformatted analysis for reference</CardDescription>
+              <CardDescription className="text-muted-foreground">Complete unformatted analysis for reference</CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-800 overflow-auto max-h-[500px]">
-                <pre className="whitespace-pre-wrap text-white/80 text-sm font-mono">{analysis}</pre>
+                <pre className="whitespace-pre-wrap text-foreground/80 text-sm font-mono">{analysis}</pre>
               </div>
             </CardContent>
           </Card>

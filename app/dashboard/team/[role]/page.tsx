@@ -20,8 +20,8 @@ export default function TeamRolePage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
-          <h1 className="text-2xl font-bold text-white mb-2">Role not found</h1>
-          <p className="text-white/50 mb-6">The role &quot;{roleSlug}&quot; doesn&apos;t exist in your organization.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Role not found</h1>
+          <p className="text-muted-foreground mb-6">The role &quot;{roleSlug}&quot; doesn&apos;t exist in your organization.</p>
           <Link
             href="/dashboard/team"
             className="text-primary hover:text-primary/80 flex items-center gap-2 justify-center"

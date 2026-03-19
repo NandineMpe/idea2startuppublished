@@ -290,30 +290,30 @@ export default function FeedbackInsights() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-white">Feedback & Insights</h1>
-        <p className="text-white/60">Collect, analyze, and act on customer feedback to improve your startup.</p>
+        <h1 className="text-3xl font-bold text-foreground">Feedback & Insights</h1>
+        <p className="text-muted-foreground">Collect, analyze, and act on customer feedback to improve your startup.</p>
       </div>
 
       <Tabs defaultValue="feedback" className="space-y-6" onValueChange={setActiveTab}>
         <div className="flex justify-between items-center">
-          <TabsList className="bg-black border border-primary/20 rounded-full p-1">
+          <TabsList className="bg-background border border-primary/20 rounded-full p-1">
             <TabsTrigger
               value="feedback"
-              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-foreground"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
               Feedback Collection
             </TabsTrigger>
             <TabsTrigger
               value="insights"
-              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-foreground"
             >
               <Lightbulb className="h-4 w-4 mr-2" />
               AI Insights
             </TabsTrigger>
             <TabsTrigger
               value="trends"
-              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-white"
+              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-foreground"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               Trends
@@ -349,32 +349,32 @@ export default function FeedbackInsights() {
           {showAddForm && (
             <Card className="glass-card border-primary/10">
               <CardHeader>
-                <CardTitle className="text-white">Add New Feedback</CardTitle>
-                <CardDescription className="text-white/80">
+                <CardTitle className="text-foreground">Add New Feedback</CardTitle>
+                <CardDescription className="text-foreground/80">
                   Record customer feedback from interviews, support conversations, or surveys.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="source" className="text-white">
+                    <Label htmlFor="source" className="text-foreground">
                       Feedback Source
                     </Label>
                     <Input
                       id="source"
                       placeholder="e.g., User Interview, Survey, Support"
-                      className="glass-input text-white border-primary/10 focus-visible:ring-primary/30"
+                      className="glass-input text-foreground border-primary/10 focus-visible:ring-primary/30"
                       value={newFeedback.source}
                       onChange={(e) => handleInputChange("source", e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category" className="text-white">
+                    <Label htmlFor="category" className="text-foreground">
                       Category
                     </Label>
                     <select
                       id="category"
-                      className="w-full glass-input text-white border-primary/10 focus-visible:ring-primary/30 rounded-md p-2"
+                      className="w-full glass-input text-foreground border-primary/10 focus-visible:ring-primary/30 rounded-md p-2"
                       value={newFeedback.category}
                       onChange={(e) => handleInputChange("category", e.target.value)}
                     >
@@ -389,20 +389,20 @@ export default function FeedbackInsights() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="feedback" className="text-white">
+                  <Label htmlFor="feedback" className="text-foreground">
                     Feedback Content
                   </Label>
                   <Textarea
                     id="feedback"
                     placeholder="Enter the feedback here..."
-                    className="min-h-[120px] glass-input text-white border-primary/10 focus-visible:ring-primary/30"
+                    className="min-h-[120px] glass-input text-foreground border-primary/10 focus-visible:ring-primary/30"
                     value={newFeedback.content}
                     onChange={(e) => handleInputChange("content", e.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-white">Sentiment</Label>
+                  <Label className="text-foreground">Sentiment</Label>
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -410,7 +410,7 @@ export default function FeedbackInsights() {
                       className={`flex-1 ${
                         newFeedback.sentiment === "positive"
                           ? "bg-primary/10 border-primary text-primary"
-                          : "bg-black border-gray-700 text-white"
+                          : "bg-background border-gray-700 text-foreground"
                       }`}
                       onClick={() => handleSentimentChange("positive")}
                     >
@@ -423,7 +423,7 @@ export default function FeedbackInsights() {
                       className={`flex-1 ${
                         newFeedback.sentiment === "neutral"
                           ? "bg-yellow-500/10 border-yellow-500 text-yellow-500"
-                          : "bg-black border-gray-700 text-white"
+                          : "bg-background border-gray-700 text-foreground"
                       }`}
                       onClick={() => handleSentimentChange("neutral")}
                     >
@@ -436,7 +436,7 @@ export default function FeedbackInsights() {
                       className={`flex-1 ${
                         newFeedback.sentiment === "negative"
                           ? "bg-red-500/10 border-red-500 text-red-500"
-                          : "bg-black border-gray-700 text-white"
+                          : "bg-background border-gray-700 text-foreground"
                       }`}
                       onClick={() => handleSentimentChange("negative")}
                     >
@@ -447,7 +447,7 @@ export default function FeedbackInsights() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-white">Rating (1-5)</Label>
+                  <Label className="text-foreground">Rating (1-5)</Label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map((rating) => (
                       <Button
@@ -457,7 +457,7 @@ export default function FeedbackInsights() {
                         className={`flex-1 ${
                           newFeedback.rating === rating
                             ? "bg-primary/10 border-primary text-primary"
-                            : "bg-black border-gray-700 text-white"
+                            : "bg-background border-gray-700 text-foreground"
                         }`}
                         onClick={() => handleRatingChange(rating)}
                       >
@@ -468,13 +468,13 @@ export default function FeedbackInsights() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tags" className="text-white">
+                  <Label htmlFor="tags" className="text-foreground">
                     Tags (comma separated)
                   </Label>
                   <Input
                     id="tags"
                     placeholder="e.g., onboarding, pricing, feature-request"
-                    className="glass-input text-white border-primary/10 focus-visible:ring-primary/30"
+                    className="glass-input text-foreground border-primary/10 focus-visible:ring-primary/30"
                     value={newFeedback.tags}
                     onChange={(e) => handleInputChange("tags", e.target.value)}
                   />
@@ -503,14 +503,14 @@ export default function FeedbackInsights() {
           <Card className="glass-card border-primary/10">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-white">Feedback Collection</CardTitle>
-                <CardDescription className="text-white/80">
+                <CardTitle className="text-foreground">Feedback Collection</CardTitle>
+                <CardDescription className="text-foreground/80">
                   Browse and analyze feedback from your customers.
                 </CardDescription>
               </div>
               <Button
                 variant="outline"
-                className="border-primary/20 bg-black hover:bg-primary/10 hover:border-primary/50 text-white"
+                className="border-primary/20 bg-background hover:bg-primary/10 hover:border-primary/50 text-foreground"
               >
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
@@ -524,8 +524,8 @@ export default function FeedbackInsights() {
               ) : feedback.length === 0 ? (
                 <div className="text-center py-12">
                   <MessageSquare className="h-12 w-12 text-primary/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-white mb-2">No feedback yet</h3>
-                  <p className="text-white/60 max-w-md mx-auto">
+                  <h3 className="text-lg font-medium text-foreground mb-2">No feedback yet</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
                     Start collecting feedback from your customers to improve your product.
                   </p>
                 </div>
@@ -539,8 +539,8 @@ export default function FeedbackInsights() {
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-2">
                           {getSentimentIcon(item.sentiment)}
-                          <span className="font-medium text-white">{item.source}</span>
-                          <span className="text-xs text-white/60">{formatDate(item.createdAt)}</span>
+                          <span className="font-medium text-foreground">{item.source}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(item.createdAt)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           {item.rating && (
@@ -559,7 +559,7 @@ export default function FeedbackInsights() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-white/60 hover:text-red-500 hover:bg-red-500/10"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
                             onClick={() => handleDeleteFeedback(item.id)}
                             disabled={isDeleting === item.id}
                           >
@@ -571,14 +571,14 @@ export default function FeedbackInsights() {
                           </Button>
                         </div>
                       </div>
-                      <p className="text-white/80 mb-2">{item.content}</p>
+                      <p className="text-foreground/80 mb-2">{item.content}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <span className="px-2 py-1 text-xs rounded-full bg-primary/20 text-primary">
                           {item.category}
                         </span>
                         {item.tags &&
                           item.tags.map((tag) => (
-                            <span key={tag} className="px-2 py-1 text-xs rounded-full bg-gray-800 text-white/70">
+                            <span key={tag} className="px-2 py-1 text-xs rounded-full bg-gray-800 text-foreground/70">
                               {tag}
                             </span>
                           ))}
@@ -594,8 +594,8 @@ export default function FeedbackInsights() {
         <TabsContent value="insights" className="space-y-6">
           <Card className="glass-card border-primary/10">
             <CardHeader>
-              <CardTitle className="text-white">AI-Generated Insights</CardTitle>
-              <CardDescription className="text-white/80">
+              <CardTitle className="text-foreground">AI-Generated Insights</CardTitle>
+              <CardDescription className="text-foreground/80">
                 Our AI analyzes your feedback to identify patterns and actionable insights.
               </CardDescription>
             </CardHeader>
@@ -609,11 +609,11 @@ export default function FeedbackInsights() {
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
                         <Lightbulb className="h-5 w-5 text-primary" />
-                        <h3 className="font-medium text-white">{insight.title}</h3>
+                        <h3 className="font-medium text-foreground">{insight.title}</h3>
                       </div>
                       <div>{getImpactBadge(insight.impact)}</div>
                     </div>
-                    <p className="text-white/80 mb-3">{insight.description}</p>
+                    <p className="text-foreground/80 mb-3">{insight.description}</p>
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-1 text-xs rounded-full bg-primary/20 text-primary">
                         {insight.category}
@@ -634,8 +634,8 @@ export default function FeedbackInsights() {
         <TabsContent value="trends" className="space-y-6">
           <Card className="glass-card border-primary/10">
             <CardHeader>
-              <CardTitle className="text-white">Feedback Trends</CardTitle>
-              <CardDescription className="text-white/80">
+              <CardTitle className="text-foreground">Feedback Trends</CardTitle>
+              <CardDescription className="text-foreground/80">
                 Track how feedback and sentiment evolve over time.
               </CardDescription>
             </CardHeader>
@@ -643,8 +643,8 @@ export default function FeedbackInsights() {
               <div className="flex items-center justify-center p-12 border border-dashed border-primary/20 rounded-lg">
                 <div className="text-center">
                   <AlertCircle className="h-12 w-12 text-primary/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-white mb-2">Trend Analysis</h3>
-                  <p className="text-white/60 max-w-md">
+                  <h3 className="text-lg font-medium text-foreground mb-2">Trend Analysis</h3>
+                  <p className="text-muted-foreground max-w-md">
                     Advanced trend analysis to help you see how your feedback metrics change over time.
                   </p>
                 </div>
@@ -655,39 +655,39 @@ export default function FeedbackInsights() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card className="glass-card border-primary/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
                   Feedback Sources
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-white">{new Set(feedback.map((item) => item.source)).size}</div>
-                <p className="text-sm text-white/60 mt-1">Different feedback channels</p>
+                <div className="text-4xl font-bold text-foreground">{new Set(feedback.map((item) => item.source)).size}</div>
+                <p className="text-sm text-muted-foreground mt-1">Different feedback channels</p>
               </CardContent>
             </Card>
 
             <Card className="glass-card border-primary/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-primary" />
                   Total Feedback
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-white">{feedback.length}</div>
-                <p className="text-sm text-white/60 mt-1">Pieces of feedback collected</p>
+                <div className="text-4xl font-bold text-foreground">{feedback.length}</div>
+                <p className="text-sm text-muted-foreground mt-1">Pieces of feedback collected</p>
               </CardContent>
             </Card>
 
             <Card className="glass-card border-primary/10">
               <CardHeader className="pb-2">
-                <CardTitle className="text-white flex items-center gap-2">
+                <CardTitle className="text-foreground flex items-center gap-2">
                   <BarChart className="h-5 w-5 text-primary" />
                   Sentiment Ratio
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-4xl font-bold text-white">
+                <div className="text-4xl font-bold text-foreground">
                   {feedback.length > 0
                     ? Math.round(
                         (feedback.filter((item) => item.sentiment === "positive").length / feedback.length) * 100,
@@ -695,7 +695,7 @@ export default function FeedbackInsights() {
                     : 0}
                   %
                 </div>
-                <p className="text-sm text-white/60 mt-1">Positive sentiment</p>
+                <p className="text-sm text-muted-foreground mt-1">Positive sentiment</p>
               </CardContent>
             </Card>
           </div>

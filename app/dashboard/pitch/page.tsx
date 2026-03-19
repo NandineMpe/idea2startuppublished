@@ -53,15 +53,15 @@ export default function PitchVaultPage() {
             <PresentationIcon className="h-4 w-4" />
             Venture Narrative Engine
           </div>
-          <h1 className="text-5xl font-extrabold text-white tracking-tighter">
+          <h1 className="text-5xl font-extrabold text-foreground tracking-tighter">
             Pitch <span className="text-primary italic">Vault</span>
           </h1>
-          <p className="text-white/50 max-w-2xl text-lg leading-relaxed">
+          <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed">
             Craft narratives that captivate, convince, and conquer. From 30-second hooks to institutional-grade decks.
           </p>
         </div>
         <div className="flex gap-4">
-          <Button variant="outline" className="border-white/10 text-white hover:bg-white/5 rounded-full px-6">
+          <Button variant="outline" className="border-border text-foreground hover:bg-accent rounded-full px-6">
             <Download className="mr-2 h-4 w-4" />
             Deck Guidelines
           </Button>
@@ -104,14 +104,14 @@ export default function PitchVaultPage() {
             key={card.id}
             whileHover={{ y: -5 }}
             onClick={() => setActiveTab(card.id)}
-            className={`cursor-pointer p-6 rounded-3xl border border-white/5 transition-all duration-300 relative group overflow-hidden ${activeTab === card.id ? "bg-white/[0.05] border-white/20 ring-1 ring-white/10" : "bg-white/[0.02] hover:bg-white/[0.04]"
+            className={`cursor-pointer p-6 rounded-3xl border border-border transition-all duration-300 relative group overflow-hidden ${activeTab === card.id ? "bg-white/[0.05] border-white/20 ring-1 ring-white/10" : "bg-white/[0.02] hover:bg-white/[0.04]"
               }`}
           >
             <div className={`w-12 h-12 rounded-2xl ${card.bg} flex items-center justify-center mb-4 transition-transform group-hover:scale-110 duration-500`}>
               <card.icon className={`h-6 w-6 ${card.color}`} />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">{card.title}</h3>
-            <p className="text-sm text-white/40 mb-4">{card.desc}</p>
+            <h3 className="text-xl font-bold text-foreground mb-2">{card.title}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{card.desc}</p>
             <div className={`inline-flex items-center text-xs font-bold uppercase tracking-widest ${card.color} opacity-0 group-hover:opacity-100 transition-opacity`}>
               Customize <ArrowRight className="ml-2 h-3 w-3" />
             </div>
@@ -138,45 +138,45 @@ export default function PitchVaultPage() {
               transition={{ duration: 0.3 }}
             >
               <TabsContent value="elevator-pitch" className="mt-0 ring-0 focus-visible:ring-0 outline-none">
-                <div className="glass-card rounded-[2.5rem] border-white/5 overflow-hidden">
-                  <div className="bg-gradient-to-r from-primary/10 via-transparent to-transparent p-8 border-b border-white/5">
+                <div className="glass-card rounded-[2.5rem] border-border overflow-hidden">
+                  <div className="bg-gradient-to-r from-primary/10 via-transparent to-transparent p-8 border-b border-border">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="p-2 rounded-lg bg-primary/20 text-primary">
                         <Sparkles size={16} />
                       </span>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">Elevator Pitch Builder</h2>
+                      <h2 className="text-2xl font-bold text-foreground tracking-tight">Elevator Pitch Builder</h2>
                     </div>
-                    <p className="text-white/40 text-sm">Perfect your high-stakes introduction using proven psychological frameworks.</p>
+                    <p className="text-muted-foreground text-sm">Perfect your high-stakes introduction using proven psychological frameworks.</p>
                   </div>
                   <ElevatorPitch />
                 </div>
               </TabsContent>
 
               <TabsContent value="full-pitch" className="mt-0 ring-0 focus-visible:ring-0 outline-none">
-                <div className="glass-card rounded-[2.5rem] border-white/5 overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-400/10 via-transparent to-transparent p-8 border-b border-white/5">
+                <div className="glass-card rounded-[2.5rem] border-border overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-400/10 via-transparent to-transparent p-8 border-b border-border">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="p-2 rounded-lg bg-blue-400/20 text-blue-400">
                         <Target size={16} />
                       </span>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">Full Narrative Architect</h2>
+                      <h2 className="text-2xl font-bold text-foreground tracking-tight">Full Narrative Architect</h2>
                     </div>
-                    <p className="text-white/40 text-sm">Construct a multi-dimensional story that covers every facet of your vision.</p>
+                    <p className="text-muted-foreground text-sm">Construct a multi-dimensional story that covers every facet of your vision.</p>
                   </div>
                   <FullPitch />
                 </div>
               </TabsContent>
 
               <TabsContent value="pitch-examples" className="mt-0 ring-0 focus-visible:ring-0 outline-none">
-                <div className="glass-card rounded-[2.5rem] border-white/5 overflow-hidden">
-                  <div className="bg-gradient-to-r from-amber-400/10 via-transparent to-transparent p-8 border-b border-white/5">
+                <div className="glass-card rounded-[2.5rem] border-border overflow-hidden">
+                  <div className="bg-gradient-to-r from-amber-400/10 via-transparent to-transparent p-8 border-b border-border">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="p-2 rounded-lg bg-amber-400/20 text-amber-400">
                         <Trophy size={16} />
                       </span>
-                      <h2 className="text-2xl font-bold text-white tracking-tight">Venture Hall of Fame</h2>
+                      <h2 className="text-2xl font-bold text-foreground tracking-tight">Venture Hall of Fame</h2>
                     </div>
-                    <p className="text-white/40 text-sm">Deconstruct the decks that birthed the world's most valuable companies.</p>
+                    <p className="text-muted-foreground text-sm">Deconstruct the decks that birthed the world's most valuable companies.</p>
                   </div>
                   <PitchExamples />
                 </div>
