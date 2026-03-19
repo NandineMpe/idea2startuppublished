@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +11,11 @@ export async function POST(request: Request) {
     if (!businessIdea) {
       return NextResponse.json({ error: "Business idea is required" }, { status: 400 })
     }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     // Check if API key exists
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -36,7 +43,7 @@ The pitch should be:
 
 This pitch will be used for networking events, conferences, and casual introductions, so it should be adaptable to different audiences while maintaining authenticity.`
 
-    const prompt = `
+    const prompt = `${companyBlock}
 Business Idea: ${businessIdea}
 ${personalBackground ? `Personal Background: ${personalBackground}` : ""}
 ${goals ? `Networking Goals: ${goals}` : ""}

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 const defaultSections = [
   { title: "1. PROBLEM DEFINITION & HYPOTHESIS VALIDATION", content: "Analysis not available due to an error. Please try again later." },
@@ -92,8 +94,13 @@ export async function POST(request: Request) {
       // Continue without context
     }
 
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
+
     const prompt = `
-# FOUNDER'S SUPER BRAIN CONTEXT
+${companyBlock}# FOUNDER'S SUPER BRAIN CONTEXT
 ${memoryContext || "No specific domain documents found."}
 
 # USER INPUT

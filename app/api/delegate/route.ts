@@ -13,7 +13,9 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
 import { TOOLS, AGENT_LABELS } from "@/lib/ai-tools"
+import { getCompanyContext } from "@/lib/company-context"
 
 interface PlannedTask {
   agent: string          // cbs | cro | cmo | cfo | coo
@@ -98,8 +100,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
     }
 
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const startupContext = context?.trim() || companyContext || "Not provided"
+
     // ── Step 1: Use Claude to plan the delegation ──────────────────────────
-    const userPrompt = `STRATEGIC GOAL: ${goal}\n\nSTARTUP CONTEXT:\n${context || "Not provided"}`
+    const userPrompt = `STRATEGIC GOAL: ${goal}\n\nSTARTUP CONTEXT:\n${startupContext}`
 
     const { text: planText } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),

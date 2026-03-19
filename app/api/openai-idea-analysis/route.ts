@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 const defaultSections = [
   { title: "1. PROBLEM DEFINITION & HYPOTHESIS VALIDATION", content: "Analysis not available." },
@@ -53,7 +55,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured", analysis: { sections: defaultSections } })
     }
 
-    const prompt = `Idea: ${ideaDescription}
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
+
+    const prompt = `${companyBlock}Idea: ${ideaDescription}
 ${proposedSolution ? `Solution: ${proposedSolution}` : ""}
 ${intendedUsers ? `Users: ${intendedUsers}` : ""}
 ${geographicFocus ? `Geography: ${geographicFocus}` : ""}`

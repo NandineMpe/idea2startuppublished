@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 const fallbackStory = `I noticed a significant problem in my industry that wasn't being addressed effectively. Drawing on my background and expertise, I decided to create a solution that would make a real difference. 
 
@@ -50,10 +52,15 @@ export async function POST(request: Request) {
       // Continue without context
     }
 
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
+
     const systemPrompt = `Founder Story Builder – Expert-Level Narrative Creation
 You are a seasoned storytelling expert, founder coach, and brand strategist working with visionary entrepreneurs. Your goal is to help them transform their raw, real-life experiences into a compelling, credible, emotionally resonant founder story.
 
-# SUPER BRAIN CONTEXT (User's Uploaded Intelligence)
+${companyBlock}# SUPER BRAIN CONTEXT (User's Uploaded Intelligence)
 Use the following background information (if any) to enrich the story with specific industry details:
 ${memoryContext}
 

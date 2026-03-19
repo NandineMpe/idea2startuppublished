@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 const SYSTEM_PROMPT = `You are a business model architect trained in the Business Model Canvas (Osterwalder), Lean Canvas (Ash Maurya), and venture strategy frameworks. Generate a comprehensive business model analysis.
 
@@ -63,7 +65,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
     }
 
-    const prompt = `# USER INPUT
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
+
+    const prompt = `${companyBlock}# USER INPUT
 Business Idea: ${businessIdea}
 ${targetMarket ? `Target Market: ${targetMarket}` : ""}
 ${revenueApproach ? `Revenue Approach: ${revenueApproach}` : ""}

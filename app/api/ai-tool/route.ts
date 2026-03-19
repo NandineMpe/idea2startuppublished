@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { runTool, TOOLS } from "@/lib/ai-tools"
+import { getCompanyContext } from "@/lib/company-context"
 
 export async function POST(request: Request) {
   try {
@@ -19,15 +20,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
     }
 
-    const text = await runTool(tool, inputs)
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+
+    const text = await runTool(tool, inputs, companyContext)
 
     // Persist output to Supabase (fire-and-forget)
     try {
-      const supabase = await createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
       if (user) {
         const title =
           Object.values(inputs).find((v) => v && String(v).trim())

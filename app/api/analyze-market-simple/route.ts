@@ -1,6 +1,8 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 export const runtime = "nodejs"
 
@@ -13,6 +15,11 @@ export async function POST(req: Request) {
     }
 
     console.log("Starting market analysis for:", query)
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const systemPrompt = `# Deep Consumer & Market Insights Generator
 
@@ -123,7 +130,7 @@ IMPORTANT: Do not deviate from the exact section headings provided above. The fr
 
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
-      prompt: `Provide a comprehensive market analysis for the following business idea: ${query}`,
+      prompt: `${companyBlock}Provide a comprehensive market analysis for the following business idea: ${query}`,
       system: systemPrompt,
       temperature: 0.2,
       topP: 0.95,

@@ -3,6 +3,7 @@ import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { addToMemory, queryMemory } from "@/lib/supermemory"
+import { getCompanyContext } from "@/lib/company-context"
 
 export async function POST(req: Request) {
   try {
@@ -47,9 +48,15 @@ export async function POST(req: Request) {
         })
     }
 
-    const promptWithContext = context
+    const companyContext = await getCompanyContext(userId)
+    const companyBlock =
+      companyContext && companyContext.trim()
+        ? `# COMPANY CONTEXT (what we know about this startup)\n${companyContext}\n\n`
+        : ""
+
+    const promptWithContext = companyBlock + (context
       ? `Context from previous conversations:\n${context}\n\nUser Question: ${lastMessage}`
-      : lastMessage
+      : lastMessage)
 
     const systemPrompt = `You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader — you challenge assumptions and push for clarity. Be concise, insightful, and actionable.`
 

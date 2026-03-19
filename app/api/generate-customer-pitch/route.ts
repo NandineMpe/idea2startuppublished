@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
+import { getCompanyContext } from "@/lib/company-context"
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +11,11 @@ export async function POST(request: Request) {
     if (!businessIdea && !projectId) {
       return NextResponse.json({ error: "Business idea or project ID is required" }, { status: 400 })
     }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContext(user?.id)
+    const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     // Check if API key exists
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -54,7 +61,7 @@ The hooks should be 3 headline-style hooks that could be used for landing pages,
 
 Make reasonable assumptions about the target audience, pain points, and market trends based on the business idea provided. Be specific and compelling, even with limited information.`
 
-    const prompt = `Business Idea: ${businessIdea || "Selected project from database"}`
+    const prompt = `${companyBlock}Business Idea: ${businessIdea || "Selected project from database"}`
 
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),

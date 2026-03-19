@@ -24,6 +24,7 @@ import {
   Globe,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
   Briefcase,
   FlaskConical,
   Megaphone,
@@ -58,6 +59,7 @@ const navSections: NavSection[] = [
     icon: LayoutDashboard,
     items: [
       { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Company Profile", href: "/dashboard/company", icon: Building2 },
       { title: "Strategic Command", href: "/dashboard/command", icon: Zap },
     ],
   },

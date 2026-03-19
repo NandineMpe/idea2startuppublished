@@ -423,7 +423,11 @@ Write in a professional tone suitable for investors and stakeholders.`,
 
 // ─── Tool runner ─────────────────────────────────────────────────────────────
 
-export async function runTool(toolId: string, inputs: Record<string, string>): Promise<string> {
+export async function runTool(
+  toolId: string,
+  inputs: Record<string, string>,
+  companyContext?: string,
+): Promise<string> {
   const tool = TOOLS[toolId]
   if (!tool) throw new Error(`Unknown tool: ${toolId}`)
 
@@ -434,10 +438,15 @@ export async function runTool(toolId: string, inputs: Record<string, string>): P
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n")
 
+  const prompt =
+    companyContext && companyContext.trim()
+      ? `# COMPANY CONTEXT (what we know about this startup)\n${companyContext}\n\n# USER REQUEST\n${userInput}`
+      : userInput
+
   const { text } = await generateText({
     model: anthropic("claude-sonnet-4-20250514"),
     system: tool.systemPrompt,
-    prompt: userInput,
+    prompt,
     maxTokens: 6000,
     temperature: 0.4,
   })

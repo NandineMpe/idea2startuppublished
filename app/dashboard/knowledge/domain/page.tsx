@@ -18,64 +18,58 @@ export default function DomainKnowledgePage() {
     setFiles((prevFiles) => [...prevFiles, ...newFiles])
   }
 
-  const readFileContent = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result as string)
-      reader.onerror = (e) => reject(e)
-      // Basic text reading. valid for .txt, .md, .html, .csv
-      reader.readAsText(file)
-    })
-  }
-
   const handleSubmit = async () => {
     if (files.length === 0) return
 
     setIsUploading(true)
 
     try {
-      const uploadPromises = files.map(async (file) => {
+      const successfulUploads: string[] = []
+      for (const file of files) {
         try {
-          const content = await readFileContent(file)
-          const response = await fetch("/api/save-knowledge", {
+          const formData = new FormData()
+          formData.append("file", file)
+          formData.append("type", "document")
+          const response = await fetch("/api/company/assets", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileName: file.name,
-              content: content
-            })
+            body: formData,
           })
 
-          if (!response.ok) throw new Error("Failed to save")
-          return file.name
+          if (response.status === 401) {
+            toast({
+              title: "Sign in required",
+              description: "Please sign in to upload documents.",
+              variant: "destructive",
+            })
+            break
+          }
+          if (!response.ok) {
+            const err = await response.json()
+            throw new Error(err.error ?? "Failed to save")
+          }
+          successfulUploads.push(file.name)
         } catch (err) {
           console.error("Upload error for file " + file.name, err)
-          return null
+          toast({
+            title: "Upload Failed",
+            description: err instanceof Error ? err.message : "Could not process " + file.name,
+            variant: "destructive",
+          })
         }
-      })
-
-      const results = await Promise.all(uploadPromises)
-      const successfulUploads = results.filter(Boolean) as string[]
+      }
 
       if (successfulUploads.length > 0) {
         setUploadedFiles((prev) => [...prev, ...successfulUploads])
         toast({
           title: "Documents Processed",
-          description: `Successfully memorized ${successfulUploads.length} document(s).`,
-        })
-      } else {
-        toast({
-          title: "Upload Failed",
-          description: "Could not process documents.",
-          variant: "destructive"
+          description: `Successfully memorized ${successfulUploads.length} document(s). Supports PDF, TXT, MD, HTML, CSV.`,
         })
       }
-
     } catch (error) {
       toast({
         title: "Error",
         description: "An unexpected error occurred.",
-        variant: "destructive"
+        variant: "destructive",
       })
     } finally {
       setFiles([])
@@ -190,7 +184,17 @@ export default function DomainKnowledgePage() {
           </div>
 
           <div className="w-full max-w-4xl mx-auto border border-dashed border-primary/20 rounded-lg bg-background/20 overflow-hidden">
-            <FileUpload onChange={handleFileUpload} />
+            <FileUpload
+              onChange={handleFileUpload}
+              multiple
+              accept={{
+                "application/pdf": [".pdf"],
+                "text/plain": [".txt"],
+                "text/markdown": [".md"],
+                "text/html": [".html"],
+                "text/csv": [".csv"],
+              }}
+            />
           </div>
         </CardContent>
       </Card>
