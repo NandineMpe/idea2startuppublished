@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { createClient } from "@/lib/supabase/server"
 
 const TOOL_PROMPTS: Record<string, string> = {
   "opportunity-scanner": `You are a market opportunity analyst. Given a business domain or industry, identify 5-8 emerging opportunities. For each opportunity provide:
@@ -292,6 +293,36 @@ export async function POST(request: Request) {
     })
 
     if (!text) throw new Error("Empty response from API")
+
+    // Persist output to Supabase (fire-and-forget — don't block the response)
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user) {
+        const title =
+          Object.values(inputs).find((v) => v && String(v).trim())
+            ? String(Object.values(inputs)[0]).slice(0, 80)
+            : tool
+
+        supabase
+          .from("ai_outputs")
+          .insert({
+            user_id: user.id,
+            tool,
+            title,
+            inputs,
+            output: text,
+          })
+          .then(({ error: dbErr }) => {
+            if (dbErr) console.error("Failed to save ai_output:", dbErr.message)
+          })
+      }
+    } catch {
+      // Non-fatal
+    }
 
     return NextResponse.json({ result: text })
   } catch (error) {

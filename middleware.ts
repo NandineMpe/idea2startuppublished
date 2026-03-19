@@ -1,8 +1,8 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
+import type { NextRequest } from 'next/server'
 
-// Temporary: disable Supabase auth/session handling so the app runs without login
 export async function middleware(request: NextRequest) {
-    return NextResponse.next()
+    return await updateSession(request)
 }
 
 export const config = {
