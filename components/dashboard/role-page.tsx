@@ -47,6 +47,7 @@ export function RolePage({ config }: RolePageProps) {
   const [showIssueForm, setShowIssueForm] = useState(false)
   const [issueTitle, setIssueTitle] = useState("")
   const [issueDescription, setIssueDescription] = useState("")
+  const [issues, setIssues] = useState<import("@/types/paperclip").Issue[]>([])
 
   const fetchAgent = useCallback(async () => {
     try {
@@ -55,6 +56,16 @@ export function RolePage({ config }: RolePageProps) {
         setAgent(resolved)
         setAgentStatus(resolved.status)
         setPaperclipOnline(true)
+        // Fetch issues for this agent
+        try {
+          const issuesRes = await fetch(`/api/paperclip/companies/${resolved.companyId}/issues`)
+          if (issuesRes.ok) {
+            const all: import("@/types/paperclip").Issue[] = await issuesRes.json()
+            setIssues(all.filter((i) => i.assignedAgentId === resolved.id))
+          }
+        } catch {
+          // non-fatal
+        }
       } else {
         setPaperclipOnline(false)
       }
@@ -302,31 +313,66 @@ export function RolePage({ config }: RolePageProps) {
         </div>
       </motion.div>
 
-      {/* Activity */}
+      {/* Activity / Issues */}
       <motion.div variants={item}>
-        <h2 className="text-[15px] font-semibold text-foreground mb-3">Recent Activity</h2>
-        <div className="rounded-lg border border-border bg-card p-6">
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
-              <Play className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-[15px] font-semibold text-foreground">Work Queue</h2>
+          {issues.length > 0 && (
+            <span className="text-[11px] text-muted-foreground">{issues.length} issue{issues.length !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          {issues.length > 0 ? (
+            <div className="divide-y divide-border">
+              {issues.map((issue) => (
+                <div key={issue.id} className="flex items-start gap-3 px-4 py-3">
+                  <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                    issue.status === "closed" ? "bg-emerald-500" :
+                    issue.status === "in_progress" ? "bg-primary animate-pulse" :
+                    "bg-muted-foreground/40"
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-foreground truncate">{issue.title}</p>
+                    {issue.description && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{issue.description}</p>
+                    )}
+                    <p className="text-[11px] text-muted-foreground/60 mt-1 capitalize">
+                      {issue.status.replace("_", " ")} · {new Date(issue.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded capitalize ${
+                    issue.status === "closed" ? "bg-emerald-500/10 text-emerald-500" :
+                    issue.status === "in_progress" ? "bg-primary/10 text-primary" :
+                    "bg-muted text-muted-foreground"
+                  }`}>
+                    {issue.status.replace("_", " ")}
+                  </span>
+                </div>
+              ))}
             </div>
-            <p className="text-[13px] text-muted-foreground">No activity yet</p>
-            <p className="text-[12px] text-muted-foreground/60 mt-1">
-              {paperclipOnline
-                ? "Assign a task or send a heartbeat to trigger work"
-                : "Start Paperclip with: npm run dev:all"}
-            </p>
-            <div className="flex gap-2 mt-4">
-              <Button variant="outline" size="sm" onClick={() => setShowIssueForm(true)} className="gap-1.5 text-[13px] h-8">
-                <Plus className="h-3.5 w-3.5" />
-                Assign Task
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => handleAction("heartbeat")} disabled={isLoading !== null} className="gap-1.5 text-[13px] h-8">
-                <Zap className="h-3.5 w-3.5" />
-                Send Heartbeat
-              </Button>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
+                <Play className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-[13px] text-muted-foreground">No tasks assigned yet</p>
+              <p className="text-[12px] text-muted-foreground/60 mt-1">
+                {paperclipOnline
+                  ? "Use Strategic Command to deploy this agent on a goal"
+                  : "Start Paperclip with: npm run dev:all"}
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => setShowIssueForm(true)} className="gap-1.5 text-[13px] h-8">
+                  <Plus className="h-3.5 w-3.5" />
+                  Assign Task
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleAction("heartbeat")} disabled={isLoading !== null} className="gap-1.5 text-[13px] h-8">
+                  <Zap className="h-3.5 w-3.5" />
+                  Send Heartbeat
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
