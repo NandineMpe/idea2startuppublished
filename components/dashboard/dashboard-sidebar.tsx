@@ -26,6 +26,13 @@ import {
   Globe,
   PanelLeftClose,
   PanelLeftOpen,
+  Briefcase,
+  FlaskConical,
+  Megaphone,
+  Wallet,
+  Cog,
+  UserCircle,
+  UsersRound,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -38,89 +45,93 @@ type NavItem = {
   title: string
   href: string
   icon: React.ElementType
-  comingSoon?: boolean
-  greyedOut?: boolean
 }
 
 type NavSection = {
   title: string
+  roleSlug?: string
   icon: React.ElementType
+  color?: string
   items: NavItem[]
 }
 
 const navSections: NavSection[] = [
   {
-    title: "Main",
+    title: "Dashboard",
     icon: LayoutDashboard,
-    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ title: "Command Center", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    title: "Knowledge Bank",
-    icon: BookOpen,
+    title: "Your Team",
+    icon: UsersRound,
+    items: [{ title: "Team Overview", href: "/dashboard/team", icon: UsersRound }],
+  },
+  {
+    title: "Chief Business Strategist",
+    roleSlug: "cbs",
+    icon: Briefcase,
+    color: "text-yellow-400",
     items: [
-      { title: "Founder's Journey", href: "/dashboard/knowledge/founders-journey", icon: Rocket },
-      { title: "Domain Knowledge", href: "/dashboard/knowledge/domain", icon: FileText },
+      { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", icon: Lightbulb },
+      { title: "Value Proposition", href: "/dashboard/idea/value-proposition", icon: Target },
+      { title: "Business Model", href: "/dashboard/idea/business-model", icon: FileText },
+      { title: "Opportunity Scanner", href: "/dashboard/market/opportunity-scanner", icon: Search },
+    ],
+  },
+  {
+    title: "Chief Research Officer",
+    roleSlug: "cro",
+    icon: FlaskConical,
+    color: "text-blue-400",
+    items: [
+      { title: "Consumer & Market Insights", href: "/dashboard/idea/market-insights", icon: BarChart3 },
+      { title: "Competitor Analysis", href: "/dashboard/idea/competitor-analysis", icon: Users },
+      { title: "Advanced Competition", href: "/dashboard/scale/competition", icon: Target },
+      { title: "Domain Knowledge", href: "/dashboard/knowledge/domain", icon: BookOpen },
       { title: "Feedback & Insights", href: "/dashboard/knowledge/feedback", icon: MessageSquare },
     ],
   },
   {
-    title: "Idea to Product",
-    icon: Lightbulb,
+    title: "Chief Marketing Officer",
+    roleSlug: "cmo",
+    icon: Megaphone,
+    color: "text-pink-400",
     items: [
-      { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", icon: Lightbulb },
-      { title: "Consumer and Market Insights", href: "/dashboard/idea/market-insights", icon: BarChart3 },
-      { title: "Competitor Analysis", href: "/dashboard/idea/competitor-analysis", icon: Users },
-      {
-        title: "Value Proposition Generator",
-        href: "/dashboard/idea/value-proposition",
-        icon: Target,
-        greyedOut: true,
-      },
-      { title: "Business Model Generator", href: "/dashboard/idea/business-model", icon: FileText, greyedOut: true },
-      { title: "Product Roadmap Builder", href: "/dashboard/idea/roadmap", icon: GitBranch, greyedOut: true },
-    ],
-  },
-  {
-    title: "Product to Market",
-    icon: TrendingUp,
-    items: [
-      { title: "LLC Formation Service", href: "/dashboard/market/llc-formation", icon: FileText, greyedOut: true },
-      { title: "Startup Legal Requirements", href: "/dashboard/market/legal", icon: Scale, greyedOut: true },
       { title: "Go-To-Market Strategy", href: "/dashboard/market/strategy", icon: Rocket },
       { title: "Pitch Vault", href: "/dashboard/pitch", icon: PresentationIcon },
-      { title: "Investor Database", href: "/dashboard/market/investors", icon: Database, greyedOut: true },
-      { title: "Funding Readiness Score", href: "/dashboard/market/funding-score", icon: Target, greyedOut: true },
-      {
-        title: "Funding Strategy Optimizer",
-        href: "/dashboard/market/funding-strategy",
-        icon: Settings,
-        greyedOut: true,
-      },
-      {
-        title: "Business Opportunity Scanner",
-        href: "/dashboard/market/opportunity-scanner",
-        icon: Search,
-        greyedOut: true,
-      },
+      { title: "Founder's Journey", href: "/dashboard/knowledge/founders-journey", icon: TrendingUp },
+      { title: "Global Startup Events", href: "/dashboard/scale/events", icon: Calendar },
+      { title: "Internationalisation", href: "/dashboard/scale/international", icon: Globe },
     ],
   },
   {
-    title: "Market to Scale",
-    icon: TrendingUp,
+    title: "Chief Financial Officer",
+    roleSlug: "cfo",
+    icon: Wallet,
+    color: "text-emerald-400",
     items: [
-      { title: "Startup Credits Database", href: "/dashboard/scale/credits", icon: Database, greyedOut: true },
-      { title: "Global Startup Events 2025", href: "/dashboard/scale/events", icon: Calendar, greyedOut: true },
-      { title: "Financial Engineering", href: "/dashboard/scale/financial", icon: LineChart, greyedOut: true },
-      { title: "Recruiting Agent", href: "/dashboard/scale/recruiting", icon: Users, greyedOut: true },
-      { title: "Advanced Competition Analyzer", href: "/dashboard/scale/competition", icon: Target, greyedOut: true },
-      { title: "Internationalisation Strategy", href: "/dashboard/scale/international", icon: Globe, greyedOut: true },
-      { title: "Full Business Plan", href: "/dashboard/scale/business-plan", icon: FileText, greyedOut: true },
-      { title: "Cap Table Management", href: "/dashboard/scale/cap-table", icon: PieChart, greyedOut: true },
+      { title: "Financial Engineering", href: "/dashboard/scale/financial", icon: LineChart },
+      { title: "Funding Readiness", href: "/dashboard/market/funding-score", icon: Target },
+      { title: "Funding Strategy", href: "/dashboard/market/funding-strategy", icon: Settings },
+      { title: "Cap Table", href: "/dashboard/scale/cap-table", icon: PieChart },
+      { title: "Startup Credits", href: "/dashboard/scale/credits", icon: Database },
+    ],
+  },
+  {
+    title: "Chief Operating Officer",
+    roleSlug: "coo",
+    icon: Cog,
+    color: "text-purple-400",
+    items: [
+      { title: "LLC Formation", href: "/dashboard/market/llc-formation", icon: FileText },
+      { title: "Legal Requirements", href: "/dashboard/market/legal", icon: Scale },
+      { title: "Recruiting Agent", href: "/dashboard/scale/recruiting", icon: Users },
+      { title: "Full Business Plan", href: "/dashboard/scale/business-plan", icon: FileText },
+      { title: "Product Roadmap", href: "/dashboard/idea/roadmap", icon: GitBranch },
     ],
   },
 ]
 
-// Create a context for the sidebar state
 const SidebarContext = createContext<{
   expanded: boolean
   setExpanded: React.Dispatch<React.SetStateAction<boolean>>
@@ -141,11 +152,13 @@ export function DashboardSidebar() {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(true)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    Main: true,
-    "Knowledge Bank": true,
-    "Idea to Product": true,
-    "Product to Market": true,
-    "Market to Scale": true,
+    Dashboard: true,
+    "Your Team": false,
+    "Chief Business Strategist": true,
+    "Chief Research Officer": true,
+    "Chief Marketing Officer": true,
+    "Chief Financial Officer": true,
+    "Chief Operating Officer": true,
   })
 
   const toggleExpanded = () => {
@@ -167,7 +180,6 @@ export function DashboardSidebar() {
           expanded ? "w-64" : "w-16",
         )}
       >
-        {/* Toggle button at the top */}
         <button
           onClick={toggleExpanded}
           className="absolute top-4 right-2 text-white/70 hover:text-primary transition-colors z-10"
@@ -177,109 +189,117 @@ export function DashboardSidebar() {
         </button>
 
         <div className="flex-1 py-4">
-          {navSections.map((section) => (
-            <div key={section.title} className="py-1">
-              {section.title === "Main" ? (
-                <div className="px-4 py-2">
+          {navSections.map((section) => {
+            const isTopLevel = section.title === "Dashboard" || section.title === "Your Team"
+
+            if (isTopLevel) {
+              const mainItem = section.items[0]
+              const isActive = pathname === mainItem.href
+              return (
+                <div key={section.title} className="px-4 py-1">
                   <Link
-                    href="/dashboard"
-                    className="flex items-center gap-2 text-primary font-medium hover:text-primary/90 transition-colors"
+                    href={mainItem.href}
+                    className={cn(
+                      "flex items-center gap-2 py-2 font-medium transition-colors",
+                      isActive ? "text-primary" : "text-white/80 hover:text-primary",
+                    )}
                   >
-                    <LayoutDashboard className="h-5 w-5" />
-                    {expanded && <span>Dashboard</span>}
+                    <section.icon className="h-5 w-5" />
+                    {expanded && <span>{mainItem.title}</span>}
                   </Link>
                 </div>
-              ) : (
-                <>
-                  <button
-                    className={cn(
-                      "flex items-center justify-between w-full px-4 py-2 text-sm font-medium text-white hover:text-primary transition-colors",
-                      !expanded && "justify-center",
-                    )}
-                    onClick={() => expanded && toggleSection(section.title)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <section.icon
-                        className={`h-5 w-5 ${section.title === "Idea to Product" || section.title === "Product to Market" ? "text-primary" : "text-white/70"}`}
-                      />
-                      {expanded && (
-                        <span
-                          className={
-                            section.title === "Idea to Product" || section.title === "Product to Market"
-                              ? "text-primary"
-                              : "text-white"
-                          }
-                        >
+              )
+            }
+
+            return (
+              <div key={section.title} className="py-1">
+                <button
+                  className={cn(
+                    "flex items-center justify-between w-full px-4 py-2 text-sm font-medium transition-colors group",
+                    !expanded && "justify-center",
+                  )}
+                  onClick={() => expanded && toggleSection(section.title)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <section.icon className={cn("h-5 w-5", section.color || "text-white/70")} />
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-black" />
+                    </div>
+                    {expanded && (
+                      <div className="flex flex-col items-start">
+                        <span className={cn("text-xs font-normal", section.color || "text-white/60")}>
                           {section.title}
                         </span>
+                      </div>
+                    )}
+                  </div>
+                  {expanded && (
+                    <div className="flex items-center gap-1">
+                      {section.roleSlug && (
+                        <Link
+                          href={`/dashboard/team/${section.roleSlug}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1 rounded hover:bg-white/10 transition-colors"
+                          title={`View ${section.title} profile`}
+                        >
+                          <UserCircle className="h-3.5 w-3.5 text-white/40 hover:text-primary" />
+                        </Link>
+                      )}
+                      {expandedSections[section.title] ? (
+                        <ChevronDown className="h-4 w-4 text-white/40" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-white/40" />
                       )}
                     </div>
-                    {expanded &&
-                      (expandedSections[section.title] ? (
-                        <ChevronDown className="h-4 w-4 text-white/70" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-white/70" />
-                      ))}
-                  </button>
-
-                  {expanded && expandedSections[section.title] && (
-                    <div className="mt-1 space-y-1 px-4">
-                      {section.items.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                          <div key={item.title} className="relative">
-                            <Link
-                              href={item.greyedOut ? "#" : item.href}
-                              onClick={(e) => item.greyedOut && e.preventDefault()}
-                              className={cn(
-                                "flex items-center justify-between px-4 py-2 text-sm rounded-md transition-all",
-                                isActive ? "text-primary font-medium" : "text-white/80 hover:text-primary",
-                                item.greyedOut && "text-gray-500/70 hover:text-gray-500/70 cursor-not-allowed",
-                              )}
-                            >
-                              <div className="flex items-center gap-2">
-                                <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-white/70")} />
-                                <span>{item.title}</span>
-                              </div>
-                              {item.greyedOut && (
-                                <span className="text-xs px-2 py-0.5 rounded bg-gray-800 text-gray-400">Soon</span>
-                              )}
-                            </Link>
-                          </div>
-                        )
-                      })}
-                    </div>
                   )}
+                </button>
 
-                  {!expanded && (
-                    <div className="mt-1 space-y-1 px-1">
-                      {section.items.map((item) => {
-                        const isActive = pathname === item.href
-                        return (
-                          <Link
-                            key={item.title}
-                            href={item.greyedOut ? "#" : item.href}
-                            onClick={(e) => item.greyedOut && e.preventDefault()}
-                            title={`${item.title}${item.greyedOut ? " (Coming Soon)" : ""}`}
-                            className={cn(
-                              "flex items-center justify-center py-2 text-sm rounded-md transition-all",
-                              isActive ? "text-primary font-medium" : "text-white/80 hover:text-primary",
-                              item.greyedOut && "text-gray-500/70 hover:text-gray-500/70 cursor-not-allowed",
-                            )}
-                          >
-                            <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-white/70")} />
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ))}
+                {expanded && expandedSections[section.title] && (
+                  <div className="mt-1 space-y-0.5 px-4">
+                    {section.items.map((item) => {
+                      const isActive = pathname === item.href
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-2 px-4 py-1.5 text-sm rounded-md transition-all",
+                            isActive ? "text-primary font-medium bg-primary/5" : "text-white/70 hover:text-primary hover:bg-white/5",
+                          )}
+                        >
+                          <item.icon className={cn("h-3.5 w-3.5", isActive ? "text-primary" : "text-white/50")} />
+                          <span>{item.title}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {!expanded && (
+                  <div className="mt-1 space-y-1 px-1">
+                    {section.items.map((item) => {
+                      const isActive = pathname === item.href
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          title={item.title}
+                          className={cn(
+                            "flex items-center justify-center py-2 text-sm rounded-md transition-all",
+                            isActive ? "text-primary font-medium" : "text-white/80 hover:text-primary",
+                          )}
+                        >
+                          <item.icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-white/70")} />
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
-        {/* Settings link at the bottom */}
         <div className="mt-auto border-t border-primary/10 py-4 px-4">
           <Link
             href="/dashboard/settings"

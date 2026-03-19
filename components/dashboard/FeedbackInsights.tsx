@@ -643,10 +643,9 @@ export default function FeedbackInsights() {
               <div className="flex items-center justify-center p-12 border border-dashed border-primary/20 rounded-lg">
                 <div className="text-center">
                   <AlertCircle className="h-12 w-12 text-primary/50 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-white mb-2">Trend Analysis Coming Soon</h3>
+                  <h3 className="text-lg font-medium text-white mb-2">Trend Analysis</h3>
                   <p className="text-white/60 max-w-md">
-                    We're working on advanced trend analysis features. Check back soon to see how your feedback metrics
-                    change over time.
+                    Advanced trend analysis to help you see how your feedback metrics change over time.
                   </p>
                 </div>
               </div>
