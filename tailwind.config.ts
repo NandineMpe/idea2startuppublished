@@ -65,6 +65,9 @@ const config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -75,7 +78,11 @@ const config = {
           to: { height: "0" },
         },
         "fade-in": {
-          from: { opacity: "0", transform: "translateY(4px)" },
+          from: { opacity: "0", transform: "translateY(5px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
       },
@@ -83,6 +90,12 @@ const config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-up": "fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
+      },
+      boxShadow: {
+        "ambient-sm": "0 1px 4px hsl(25 15% 18% / 0.06)",
+        "ambient": "0 2px 16px hsl(25 15% 18% / 0.07), 0 1px 4px hsl(25 15% 18% / 0.04)",
+        "ambient-lg": "0 8px 32px hsl(25 15% 18% / 0.08), 0 2px 8px hsl(25 15% 18% / 0.04)",
       },
     },
   },

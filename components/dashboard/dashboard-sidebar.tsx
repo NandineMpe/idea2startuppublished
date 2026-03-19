@@ -56,7 +56,10 @@ const navSections: NavSection[] = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
-    items: [{ title: "Command Center", href: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Strategic Command", href: "/dashboard/command", icon: Zap },
+    ],
   },
   {
     title: "Your Team",
@@ -67,7 +70,7 @@ const navSections: NavSection[] = [
     title: "Chief Business Strategist",
     roleSlug: "cbs",
     icon: Briefcase,
-    color: "text-amber-400",
+    color: "text-amber-600",
     items: [
       { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", icon: Lightbulb },
       { title: "Value Proposition", href: "/dashboard/idea/value-proposition", icon: Target },
@@ -79,7 +82,7 @@ const navSections: NavSection[] = [
     title: "Chief Research Officer",
     roleSlug: "cro",
     icon: FlaskConical,
-    color: "text-blue-400",
+    color: "text-sky-600",
     items: [
       { title: "Consumer & Market Insights", href: "/dashboard/idea/market-insights", icon: BarChart3 },
       { title: "Competitor Analysis", href: "/dashboard/idea/competitor-analysis", icon: Users },
@@ -92,7 +95,7 @@ const navSections: NavSection[] = [
     title: "Chief Marketing Officer",
     roleSlug: "cmo",
     icon: Megaphone,
-    color: "text-rose-400",
+    color: "text-rose-500",
     items: [
       { title: "Go-To-Market Strategy", href: "/dashboard/market/strategy", icon: Rocket },
       { title: "Pitch Vault", href: "/dashboard/pitch", icon: PresentationIcon },
@@ -105,7 +108,7 @@ const navSections: NavSection[] = [
     title: "Chief Financial Officer",
     roleSlug: "cfo",
     icon: Wallet,
-    color: "text-emerald-400",
+    color: "text-emerald-600",
     items: [
       { title: "Financial Engineering", href: "/dashboard/scale/financial", icon: LineChart },
       { title: "Funding Readiness", href: "/dashboard/market/funding-score", icon: Target },
@@ -118,7 +121,7 @@ const navSections: NavSection[] = [
     title: "Chief Operating Officer",
     roleSlug: "coo",
     icon: Cog,
-    color: "text-violet-400",
+    color: "text-violet-600",
     items: [
       { title: "LLC Formation", href: "/dashboard/market/llc-formation", icon: FileText },
       { title: "Legal Requirements", href: "/dashboard/market/legal", icon: Scale },
