@@ -66,8 +66,58 @@ export async function getIssues(companyId: string): Promise<Issue[]> {
   return paperclipFetch<Issue[]>(`/companies/${companyId}/issues`)
 }
 
+export async function createIssue(companyId: string, data: {
+  title: string
+  description: string
+  assignedAgentId?: string
+}): Promise<Issue> {
+  return paperclipFetch<Issue>(`/companies/${companyId}/issues`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
 export async function getGoals(companyId: string): Promise<Goal[]> {
   return paperclipFetch<Goal[]>(`/companies/${companyId}/goals`)
+}
+
+export async function createGoal(companyId: string, data: {
+  title: string
+  description: string
+  parentGoalId?: string
+}): Promise<Goal> {
+  return paperclipFetch<Goal>(`/companies/${companyId}/goals`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}
+
+export async function resolveAgentByName(agentName: string): Promise<Agent | null> {
+  try {
+    const companies = await getCompanies()
+    for (const company of companies) {
+      const agents = await getAgents(company.id)
+      const match = agents.find((a) => a.name === agentName)
+      if (match) return match
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+export async function getAllAgents(): Promise<Agent[]> {
+  try {
+    const companies = await getCompanies()
+    const allAgents: Agent[] = []
+    for (const company of companies) {
+      const agents = await getAgents(company.id)
+      allAgents.push(...agents)
+    }
+    return allAgents
+  } catch {
+    return []
+  }
 }
 
 export const ROLE_CONFIGS: Record<string, RoleConfig> = {
@@ -79,8 +129,8 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     role: "ceo",
     capabilities: "Business strategy, idea validation, value proposition design, business model innovation, opportunity assessment",
     budgetMonthlyCents: 5000,
-    color: "text-yellow-400",
-    bgColor: "bg-yellow-400/10",
+    color: "text-amber-400",
+    bgColor: "bg-amber-400/10",
     responsibilities: [
       { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", description: "Validate your startup idea with AI-driven market intelligence." },
       { title: "Value Proposition Generator", href: "/dashboard/idea/value-proposition", description: "Create compelling value propositions that resonate with your audience." },
@@ -101,7 +151,7 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     responsibilities: [
       { title: "Consumer & Market Insights", href: "/dashboard/idea/market-insights", description: "Deep dive into consumer behavior and market dynamics." },
       { title: "Competitor Analysis", href: "/dashboard/idea/competitor-analysis", description: "Analyze your competitive landscape." },
-      { title: "Advanced Competition Analyzer", href: "/dashboard/scale/competition", description: "Advanced tools for competitive intelligence." },
+      { title: "Advanced Competition Analyzer", href: "/dashboard/scale/competition", description: "Deep competitive intelligence with SWOT and positioning." },
       { title: "Domain Knowledge", href: "/dashboard/knowledge/domain", description: "Build and leverage your domain expertise." },
       { title: "Feedback & Insights", href: "/dashboard/knowledge/feedback", description: "Collect and analyze user feedback." },
     ],
@@ -114,13 +164,13 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     role: "cmo",
     capabilities: "Go-to-market strategy, pitch creation, brand storytelling, founder narrative, event strategy, international marketing",
     budgetMonthlyCents: 4000,
-    color: "text-pink-400",
-    bgColor: "bg-pink-400/10",
+    color: "text-rose-400",
+    bgColor: "bg-rose-400/10",
     responsibilities: [
       { title: "Go-To-Market Strategy", href: "/dashboard/market/strategy", description: "Generate a comprehensive plan to launch and scale." },
       { title: "Pitch Vault", href: "/dashboard/pitch", description: "Craft compelling pitches for investors, customers, and partners." },
       { title: "Founder's Journey", href: "/dashboard/knowledge/founders-journey", description: "Build your founder story and brand narrative." },
-      { title: "Global Startup Events", href: "/dashboard/scale/events", description: "Discover startup events and networking opportunities worldwide." },
+      { title: "Global Startup Events", href: "/dashboard/scale/events", description: "Find conferences, accelerators, and networking opportunities." },
       { title: "Internationalisation Strategy", href: "/dashboard/scale/international", description: "Expand your startup into global markets." },
     ],
   },
@@ -150,8 +200,8 @@ export const ROLE_CONFIGS: Record<string, RoleConfig> = {
     role: "general",
     capabilities: "Operations management, legal compliance, LLC formation, recruiting, business planning, product roadmap execution",
     budgetMonthlyCents: 3000,
-    color: "text-purple-400",
-    bgColor: "bg-purple-400/10",
+    color: "text-violet-400",
+    bgColor: "bg-violet-400/10",
     responsibilities: [
       { title: "LLC Formation Service", href: "/dashboard/market/llc-formation", description: "Set up your legal entity." },
       { title: "Startup Legal Requirements", href: "/dashboard/market/legal", description: "Navigate legal requirements for your startup." },
