@@ -44,7 +44,7 @@ ${goals ? `Networking Goals: ${goals}` : ""}
 Based on this information, please craft my networking elevator pitch.`
 
     const { text } = await generateText({
-      model: anthropic("claude-3-5-sonnet-20240620"),
+      model: anthropic("claude-sonnet-4-20250514"),
       prompt,
       system: systemPrompt,
       maxTokens: 1000,

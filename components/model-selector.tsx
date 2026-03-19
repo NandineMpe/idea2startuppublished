@@ -9,29 +9,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const models = [
   {
-    value: "openai",
-    label: "OpenAI GPT-4",
-    apiRoute: "/api/chat/openai",
+    value: "claude-sonnet",
+    label: "Claude Sonnet 4",
+    apiRoute: "/api/chat",
   },
   {
-    value: "anthropic",
-    label: "Anthropic Claude",
-    apiRoute: "/api/chat/anthropic",
-  },
-  {
-    value: "perplexity",
-    label: "Perplexity",
-    apiRoute: "/api/chat/perplexity",
-  },
-  {
-    value: "deepseek",
-    label: "DeepSeek Chat",
+    value: "claude-sonnet-alt",
+    label: "Claude Sonnet 4 (Alt)",
     apiRoute: "/api/chat/deepseek",
-  },
-  {
-    value: "gemini",
-    label: "Google Gemini",
-    apiRoute: "/api/chat/gemini",
   },
 ]
 

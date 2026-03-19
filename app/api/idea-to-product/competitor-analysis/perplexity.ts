@@ -125,7 +125,7 @@ Use bullet points for clarity where appropriate`
 
   try {
     const { text } = await generateText({
-      model: anthropic("claude-3-5-sonnet-20240620"),
+      model: anthropic("claude-sonnet-4-20250514"),
       prompt: `Provide a comprehensive competitor analysis for: ${query}`,
       system: systemPrompt,
       maxTokens: 4000,

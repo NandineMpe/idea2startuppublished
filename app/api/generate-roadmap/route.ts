@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai"
+import { anthropic } from "@ai-sdk/anthropic"
+import { generateText } from "ai"
 
 const SYSTEM_PROMPT = `You are a product strategy and roadmap expert trained in agile product management, the RICE framework, and startup execution strategy. Generate a detailed, actionable product roadmap.
 
@@ -58,37 +59,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Product description is required" }, { status: 400 })
     }
 
-    if (!process.env.GOOGLE_GEMINI_API_KEY) {
-      return NextResponse.json({ error: "Google Gemini API key is not configured" }, { status: 500 })
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: { temperature: 0.5, topP: 0.95, topK: 40 },
-      safetySettings: [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-      ],
-    })
-
-    const prompt = `${SYSTEM_PROMPT}
-
-# USER INPUT
+    const prompt = `# USER INPUT
 Product: ${productDescription}
 ${currentStage ? `Current Stage: ${currentStage}` : ""}
 ${keyGoals ? `Key Goals: ${keyGoals}` : ""}
 ${timeline ? `Timeline Preference: ${timeline}` : ""}`
 
-    const result = await Promise.race([
-      model.generateContent(prompt),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Request timed out")), 120000)),
-    ]) as any
-
-    const response = await result.response
-    const text = response.text()
+    const { text } = await generateText({
+      model: anthropic("claude-sonnet-4-20250514"),
+      prompt,
+      system: SYSTEM_PROMPT,
+      maxTokens: 4000,
+      temperature: 0.5,
+    })
 
     if (!text) throw new Error("Empty response from API")
 

@@ -1,98 +1,57 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
-import { GeminiStream } from "@/lib/gemini-stream"
-import { StreamingTextResponse } from "@/lib/deepseek-stream" // Reusing text response wrapper
+import { anthropic } from "@ai-sdk/anthropic"
+import { streamText } from "ai"
 import { addToMemory, queryMemory } from "@/lib/supermemory"
 
-export const runtime = "edge"
-
 export async function POST(req: Request) {
-    try {
-        const { messages } = await req.json()
-        const lastMessage = messages[messages.length - 1].content
+  try {
+    const { messages } = await req.json()
+    const lastMessage = messages[messages.length - 1].content
 
-        if (!process.env.GOOGLE_GEMINI_API_KEY) {
-            return new Response(JSON.stringify({ error: "Missing GOOGLE_GEMINI_API_KEY" }), {
-                status: 500,
-                headers: { 'Content-Type': 'application/json' }
-            })
-        }
-
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY)
-
-        // Using gemini-1.5-flash for speed and context
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-
-        // Convert messages to Gemini format
-        // Gemini expects simplified roles and history. 
-        // It's stateless by default unless using startChat, but here we likely just want single-turn or simple history mapping
-
-        // Simple Prompt construction for now:
-        // Query Supermemory for relevant context
-        let context = ""
-        try {
-            const memories = await queryMemory(lastMessage)
-            if (memories && memories.length > 0) {
-                // Adjust based on actual Supermemory response structure, assuming it returns an array of objects with content
-                context = memories.map((m: any) => m.content).join("\n---\n")
-            }
-        } catch (e) {
-            console.error("Supermemory query failed", e)
-        }
-
-        // Fire-and-forget: Save user message to memory
-        addToMemory(lastMessage).catch(err => console.error("Failed to save to memory", err))
-
-        // Construct history from previous messages
-        // We inject the context into the system or first message if possible, or just prepend to the latest prompt
-
-        let promptWithContext = lastMessage
-        if (context) {
-            promptWithContext = `Context from previous conversations/memories:\n${context}\n\nUser Question: ${lastMessage}`
-        }
-
-        const history = messages.slice(0, -1).map((m: any) => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.content }]
-        }))
-
-        const chat = model.startChat({
-            history: history,
-            generationConfig: {
-                maxOutputTokens: 1000,
-            },
-        })
-
-        const result = await chat.sendMessageStream(promptWithContext)
-
-        // Convert to readable stream
-        const stream = GeminiStream(result.stream as any) // Type casting as our helper expects a Response object typically but we can adapt
-
-        // Actually, our GeminiStream helper expects a Fetch Response (ReadableStream). 
-        // The Gemini SDK returns a custom stream structure.
-        // We need to write a custom iterator for the SDK stream.
-
-        const encodedStream = new ReadableStream({
-            async start(controller) {
-                const encoder = new TextEncoder()
-                try {
-                    for await (const chunk of result.stream) {
-                        const text = chunk.text()
-                        controller.enqueue(encoder.encode(text))
-                    }
-                    controller.close()
-                } catch (error) {
-                    controller.error(error)
-                }
-            },
-        })
-
-        return new StreamingTextResponse(encodedStream)
-
-    } catch (error: any) {
-        console.error("Chat error:", error)
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        })
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({ error: "Missing ANTHROPIC_API_KEY" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      })
     }
+
+    let context = ""
+    try {
+      const memories = await queryMemory(lastMessage)
+      if (memories && memories.length > 0) {
+        context = memories.map((m: any) => m.content).join("\n---\n")
+      }
+    } catch {
+      // Continue without context
+    }
+
+    addToMemory(lastMessage).catch(() => {})
+
+    let promptWithContext = lastMessage
+    if (context) {
+      promptWithContext = `Context from previous conversations/memories:\n${context}\n\nUser Question: ${lastMessage}`
+    }
+
+    const systemPrompt = `You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader — you challenge assumptions and push for clarity. Be concise, insightful, and actionable.`
+
+    const result = streamText({
+      model: anthropic("claude-sonnet-4-20250514"),
+      system: systemPrompt,
+      messages: [
+        ...messages.slice(0, -1).map((m: any) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+        { role: "user" as const, content: promptWithContext },
+      ],
+      maxTokens: 1000,
+    })
+
+    return result.toDataStreamResponse()
+  } catch (error: any) {
+    console.error("Chat error:", error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
 }

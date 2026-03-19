@@ -84,7 +84,7 @@ Return the response as a JSON object with the following structure:
     const prompt = `Create an investor elevator pitch based on this startup idea: ${businessIdea || "Project ID: " + projectId}`
 
     const response = await generateText({
-      model: anthropic("claude-3-5-sonnet-20240620"),
+      model: anthropic("claude-sonnet-4-20250514"),
       prompt,
       system: systemPrompt,
       maxTokens: 2000,

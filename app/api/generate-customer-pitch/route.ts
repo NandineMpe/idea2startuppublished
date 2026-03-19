@@ -57,7 +57,7 @@ Make reasonable assumptions about the target audience, pain points, and market t
     const prompt = `Business Idea: ${businessIdea || "Selected project from database"}`
 
     const { text } = await generateText({
-      model: anthropic("claude-3-5-sonnet-20240620"),
+      model: anthropic("claude-sonnet-4-20250514"),
       prompt,
       system: systemPrompt,
       maxTokens: 2000,

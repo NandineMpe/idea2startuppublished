@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai"
+import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
 
@@ -122,7 +122,7 @@ Present 3–5 key bullets summarizing the opportunity, challenge, and next step
 IMPORTANT: Do not deviate from the exact section headings provided above. The frontend application parses these headings to extract and display the content correctly.`
 
     const { text } = await generateText({
-      model: openai("gpt-4o"),
+      model: anthropic("claude-sonnet-4-20250514"),
       prompt: `Provide a comprehensive market analysis for the following business idea: ${query}`,
       system: systemPrompt,
       temperature: 0.2,
