@@ -12,10 +12,10 @@ A **once-per-day, curated news surface** at the top of the Command Center that a
 |------|---------|
 | **1 — Header** | Existing title + subtitle (“Command Center” / executive team copy). |
 | **2 — Quick stats** | Unchanged 4-card row (agents, tasks, budget, completion). |
-| **3 — Today’s Brief** *(new)* | Full-width panel **above** “Executive Team.” On very wide screens, optional future: two-column (Brief left, stats+team right); **v1 is single column** for clarity. |
-| **4 — Executive Team** | Existing grid (unchanged below the feed). |
+| **3 — Two-column row** *(lg+)* | **Left:** Executive Team heading + agent grid. **Right:** **Today’s Brief** in a fixed-width sidebar (`~380px`), **sticky** while scrolling the main column. |
+| **Mobile / &lt; lg** | Stack: stats → Executive Team → Today’s Brief (full width below the team). |
 
-**Rationale:** Founders scan top-to-bottom. Signal (news) sits **above** delegation (executives) so “what changed in the world” is seen before “who does the work.”
+**Rationale:** Stats stay full-width. The brief stays visible on the **right** on large screens (like a live ticker / briefing panel) while founders scan the executive grid. On small screens the brief stacks under the team so the layout doesn’t squeeze.
 
 ---
 
@@ -80,4 +80,4 @@ Each row is **one line + metadata**, easy to skim (not a blog card with huge ima
 
 ## Summary
 
-**One panel, five sections, compact rows with source + time, double-click to read.** Stats stay above the fold; the brief sits between stats and the executive team so founders see **world signal** before **team actions**.
+**One panel, five sections, compact rows with source + time, double-click to read.** Stats stay full-width; on large screens the brief sits in a **sticky right sidebar** beside the executive team; on mobile it stacks **below** the team.

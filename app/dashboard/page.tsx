@@ -45,7 +45,7 @@ export default function DashboardPage() {
       initial="hidden"
       animate="show"
       variants={container}
-      className="flex flex-col gap-6 p-6 lg:p-8 max-w-6xl mx-auto"
+      className="flex flex-col gap-6 p-6 lg:p-8 max-w-[1400px] mx-auto"
     >
       {/* Header */}
       <motion.div variants={item} className="flex flex-col gap-1">
@@ -76,30 +76,28 @@ export default function DashboardPage() {
         ))}
       </motion.div>
 
-      {/* Founder daily brief — wireframe; see docs/command-center-daily-feed.md */}
-      <motion.div variants={item}>
-        <FounderDailyFeed />
-      </motion.div>
+      {/* Main column + Today's Brief sidebar (see docs/command-center-daily-feed.md) */}
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
+          {/* Section Header */}
+          <motion.div variants={item} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[15px] font-semibold text-foreground">Executive Team</h2>
+              <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                {ROLE_ORDER.length} members
+              </span>
+            </div>
+            <Link
+              href="/dashboard/team"
+              className="text-[13px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
+            >
+              View org chart
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </motion.div>
 
-      {/* Section Header */}
-      <motion.div variants={item} className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-semibold text-foreground">Executive Team</h2>
-          <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-            {ROLE_ORDER.length} members
-          </span>
-        </div>
-        <Link
-          href="/dashboard/team"
-          className="text-[13px] text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-        >
-          View org chart
-          <ArrowUpRight className="h-3 w-3" />
-        </Link>
-      </motion.div>
-
-      {/* Executive Team Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* Executive Team Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {ROLE_ORDER.map((slug) => {
           const config = ROLE_CONFIGS[slug]
           const Icon = roleIcons[slug] || Briefcase
@@ -164,6 +162,15 @@ export default function DashboardPage() {
             </Link>
           </div>
         </motion.div>
+          </div>
+        </div>
+
+        <motion.aside
+          variants={item}
+          className="w-full lg:w-[min(100%,380px)] lg:shrink-0 lg:sticky lg:top-20 lg:self-start"
+        >
+          <FounderDailyFeed />
+        </motion.aside>
       </div>
     </motion.div>
   )

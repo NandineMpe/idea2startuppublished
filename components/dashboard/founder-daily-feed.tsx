@@ -141,22 +141,35 @@ function FeedRow({
   )
 }
 
-export function FounderDailyFeed() {
+type FounderDailyFeedProps = {
+  /** e.g. sidebar layout: sticky + max height */
+  className?: string
+}
+
+export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
   return (
-    <section className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b border-border bg-muted/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-        <div>
-          <h2 className="text-[15px] font-semibold text-foreground">Today&apos;s Brief</h2>
-          <p className="text-[12px] text-muted-foreground">
-            Curated for your startup · Daily refresh (wireframe — sample items)
+    <section
+      className={cn(
+        "rounded-xl border border-border bg-card overflow-hidden flex flex-col",
+        "max-h-[min(85vh,920px)] lg:max-h-[calc(100vh-6rem)]",
+        className,
+      )}
+    >
+      <div className="px-4 py-3 border-b border-border bg-muted/30 flex flex-col gap-1 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
+          <div>
+            <h2 className="text-[15px] font-semibold text-foreground">Today&apos;s Brief</h2>
+            <p className="text-[12px] text-muted-foreground">
+              Curated for your startup · Daily refresh (wireframe — sample items)
+            </p>
+          </div>
+          <p className="text-[11px] text-muted-foreground sm:text-right shrink-0">
+            Double-click a story to open the source
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground sm:text-right">
-          Double-click a story to open the source
-        </p>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-6 overflow-y-auto min-h-0 flex-1">
         {SECTIONS.map((section) => {
           const Icon = section.icon
           return (
