@@ -59,6 +59,7 @@ const navSections: NavSection[] = [
     icon: LayoutDashboard,
     items: [
       { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Knowledge base", href: "/dashboard/knowledge", icon: Database },
       { title: "Company Profile", href: "/dashboard/company", icon: Building2 },
       { title: "Strategic Command", href: "/dashboard/command", icon: Zap },
     ],
@@ -202,23 +203,36 @@ export function DashboardSidebar() {
             const isTopLevel = section.title === "Dashboard" || section.title === "Your Team"
 
             if (isTopLevel) {
-              const mainItem = section.items[0]
-              const isActive = pathname === mainItem.href
               return (
-                <div key={section.title} className="mb-0.5">
-                  <Link
-                    href={mainItem.href}
-                    className={cn(
-                      "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
-                      expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                    )}
-                  >
-                    <section.icon className={cn("shrink-0", isActive ? "text-primary" : "", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
-                    {expanded && <span>{mainItem.title}</span>}
-                  </Link>
+                <div key={section.title} className="mb-1 space-y-px">
+                  {section.items.map((navItem) => {
+                    const isActive =
+                      pathname === navItem.href ||
+                      (navItem.href !== "/dashboard" && pathname.startsWith(navItem.href + "/"))
+                    return (
+                      <Link
+                        key={navItem.href}
+                        href={navItem.href}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
+                          expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+                          isActive
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-accent",
+                        )}
+                        title={expanded ? undefined : navItem.title}
+                      >
+                        <navItem.icon
+                          className={cn(
+                            "shrink-0",
+                            isActive ? "text-primary" : "",
+                            expanded ? "h-4 w-4" : "h-[18px] w-[18px]",
+                          )}
+                        />
+                        {expanded && <span className="truncate">{navItem.title}</span>}
+                      </Link>
+                    )
+                  })}
                 </div>
               )
             }

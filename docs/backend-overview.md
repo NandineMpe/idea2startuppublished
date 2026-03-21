@@ -96,6 +96,7 @@ Below: **method(s)** and **primary behavior**. Unless noted, routes use Supabase
 | **`/api/company/scrape`** | POST | `fetch` URL + **html-to-text**, save as `scraped_url` asset, trim content, fire-and-forget Supermemory. |
 | **`/api/company/context`** | GET | Returns aggregated string from **`getCompanyContext(userId)`** (profile + assets + Supermemory). |
 | **`/api/save-knowledge`** | POST | JSON body → **`addToMemory`** (Supermemory) with optional `userId`. |
+| **`/api/knowledge`** | GET, POST | **GET** `?q=` — semantic **search** over Supermemory for the signed-in user. **POST** `{ content }` — **add** a memory snippet (same user scope). Powers the Company Knowledge Base UI. |
 
 ### 5.3 Unified AI tool execution
 
