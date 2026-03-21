@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion } from "framer-motion"
 import {
   Building2,
   Save,
@@ -14,12 +13,12 @@ import {
   CheckCircle,
   AlertCircle,
   Upload,
+  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useDropzone } from "react-dropzone"
 import { cn } from "@/lib/utils"
 
 const PROFILE_FIELDS = [
@@ -34,6 +33,19 @@ const PROFILE_FIELDS = [
   { key: "team_summary", label: "Team Summary", placeholder: "Who's on the team?", type: "textarea" },
   { key: "funding_goal", label: "Funding Goal", placeholder: "e.g. $2M Seed", type: "input" },
 ] as const
+
+const FOUNDER_FIELDS = [
+  { key: "founder_name", label: "Your Name", placeholder: "Full name", type: "input" },
+  { key: "founder_location", label: "Where You Are", placeholder: "City, country, timezone — e.g. San Francisco, PST", type: "input" },
+  {
+    key: "founder_background",
+    label: "Your Background",
+    placeholder: "What you've been doing: career path, education, experience, current focus. Full integration of where you are.",
+    type: "textarea",
+  },
+] as const
+
+const ALL_PROFILE_KEYS = [...PROFILE_FIELDS.map((f) => f.key), ...FOUNDER_FIELDS.map((f) => f.key)]
 
 const STAGE_OPTIONS = ["Idea", "Pre-seed", "MVP", "Launched", "Growth"]
 
@@ -55,7 +67,7 @@ export default function CompanyProfilePage() {
       const data = await res.json()
       if (data.profile) {
         const p: Record<string, string> = {}
-        for (const k of PROFILE_FIELDS.map((f) => f.key)) {
+        for (const k of ALL_PROFILE_KEYS) {
           p[k] = data.profile[k] ?? ""
         }
         setProfile(p)
@@ -136,14 +148,15 @@ export default function CompanyProfilePage() {
     }
   }
 
-  const onDrop = useCallback(
-    async (acceptedFiles: File[]) => {
-      if (acceptedFiles.length === 0) return
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files
+      if (!files || files.length === 0) return
       setUploading(true)
       setMessage(null)
       let hasError = false
       try {
-        for (const file of acceptedFiles) {
+        for (const file of Array.from(files)) {
           try {
             const formData = new FormData()
             formData.append("file", file)
@@ -156,39 +169,27 @@ export default function CompanyProfilePage() {
               const err = await res.json()
               throw new Error(err.error ?? "Upload failed")
             }
-          } catch (e) {
-            setMessage({ text: e instanceof Error ? e.message : "Upload failed", type: "error" })
+          } catch (err) {
+            setMessage({ text: err instanceof Error ? err.message : "Upload failed", type: "error" })
             hasError = true
             break
           }
         }
         if (!hasError) {
-          setMessage({ text: `${acceptedFiles.length} file(s) uploaded`, type: "success" })
+          setMessage({ text: `${files.length} file(s) uploaded`, type: "success" })
           fetchAssets()
         }
       } finally {
         setUploading(false)
+        e.target.value = ""
       }
     },
     [uploadType, fetchAssets],
   )
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    disabled: uploading,
-    accept: {
-      "application/pdf": [".pdf"],
-      "text/plain": [".txt"],
-      "text/markdown": [".md"],
-      "text/html": [".html"],
-      "text/csv": [".csv"],
-    },
-    multiple: true,
-  })
-
   return (
     <div className="flex flex-col gap-8 p-6 lg:p-8 max-w-4xl mx-auto">
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <div>
         <div className="flex items-center gap-3 mb-1">
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <Building2 className="h-4.5 w-4.5 text-primary" />
@@ -200,12 +201,34 @@ export default function CompanyProfilePage() {
             </p>
           </div>
         </div>
-      </motion.div>
+      </div>
+
+      {/* Section D — Scrape from Web (first) */}
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-[15px] flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            Scrape from Web
+          </CardTitle>
+          <CardDescription>Paste a URL to fetch and save its content for agents</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://..."
+              value={scrapeUrl}
+              onChange={(e) => setScrapeUrl(e.target.value)}
+              className="text-[13px] h-9 bg-background"
+            />
+            <Button onClick={handleScrape} disabled={scraping || !scrapeUrl.trim()} className="gap-1.5">
+              {scraping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Fetch & Save"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {message && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
+        <div
           className={cn(
             "flex items-center gap-2 px-3 py-2 rounded-lg text-[13px]",
             message.type === "success"
@@ -215,7 +238,7 @@ export default function CompanyProfilePage() {
         >
           {message.type === "success" ? <CheckCircle className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
           {message.text}
-        </motion.div>
+        </div>
       )}
 
       {/* Section A — Company Profile */}
@@ -265,6 +288,45 @@ export default function CompanyProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Founder Profile — where they are, what they've been doing */}
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-[15px] flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Founder Profile
+          </CardTitle>
+          <CardDescription>
+            Where you are and what you've been doing. Full integration so agents understand your context.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {FOUNDER_FIELDS.map((f) => (
+            <div key={f.key} className="space-y-1.5">
+              <label className="text-[13px] font-medium text-foreground">{f.label}</label>
+              {f.type === "textarea" ? (
+                <Textarea
+                  value={profile[f.key] ?? ""}
+                  onChange={(e) => setProfile((p) => ({ ...p, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  className="text-[13px] min-h-[120px] bg-background"
+                />
+              ) : (
+                <Input
+                  value={profile[f.key] ?? ""}
+                  onChange={(e) => setProfile((p) => ({ ...p, [f.key]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  className="text-[13px] h-9 bg-background"
+                />
+              )}
+            </div>
+          ))}
+          <Button onClick={handleSaveProfile} disabled={saving} className="gap-2">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Save Profile
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Section B & C — Pitch Deck + Documents */}
       <Card className="border-border bg-card">
         <CardHeader>
@@ -288,24 +350,28 @@ export default function CompanyProfilePage() {
               Document
             </Button>
           </div>
-          <div
-            {...getRootProps()}
+          <label
             className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-              isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+              "block border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+              "border-border hover:border-primary/50",
             )}
           >
-            <input {...getInputProps()} />
+            <input
+              type="file"
+              accept=".pdf,.txt,.md,.html,.csv"
+              multiple
+              disabled={uploading}
+              onChange={handleFileChange}
+              className="hidden"
+            />
             {uploading ? (
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2 block" />
             ) : (
-              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2 block" />
             )}
-            <p className="text-[13px] text-foreground">
-              {isDragActive ? "Drop files here" : "Drag & drop or click to upload"}
-            </p>
+            <p className="text-[13px] text-foreground">Click to upload</p>
             <p className="text-[12px] text-muted-foreground mt-1">PDF, TXT, MD, HTML, CSV</p>
-          </div>
+          </label>
           {assets.length > 0 && (
             <div className="space-y-2">
               <p className="text-[12px] font-medium text-muted-foreground">Saved assets</p>
@@ -323,30 +389,6 @@ export default function CompanyProfilePage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Section D — Scrape from Web */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-[15px] flex items-center gap-2">
-            <LinkIcon className="h-4 w-4" />
-            Scrape from Web
-          </CardTitle>
-          <CardDescription>Paste a URL to fetch and save its content for agents</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Input
-              placeholder="https://..."
-              value={scrapeUrl}
-              onChange={(e) => setScrapeUrl(e.target.value)}
-              className="text-[13px] h-9 bg-background"
-            />
-            <Button onClick={handleScrape} disabled={scraping || !scrapeUrl.trim()} className="gap-1.5">
-              {scraping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Fetch & Save"}
-            </Button>
-          </div>
         </CardContent>
       </Card>
 

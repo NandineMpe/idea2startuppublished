@@ -22,6 +22,9 @@ export interface CompanyProfileRow {
   traction: string | null
   team_summary: string | null
   funding_goal: string | null
+  founder_name: string | null
+  founder_location: string | null
+  founder_background: string | null
 }
 
 export interface CompanyAssetRow {
@@ -47,7 +50,7 @@ export async function getCompanyContext(userId: string | undefined): Promise<str
     // 1. Company profile
     const { data: profile } = await supabase
       .from("company_profile")
-      .select("company_name, tagline, problem, solution, target_market, industry, stage, traction, team_summary, funding_goal")
+      .select("company_name, tagline, problem, solution, target_market, industry, stage, traction, team_summary, funding_goal, founder_name, founder_location, founder_background")
       .eq("user_id", userId)
       .single()
 
@@ -65,6 +68,15 @@ export async function getCompanyContext(userId: string | undefined): Promise<str
       if (profile.funding_goal) fields.push(`Funding Goal: ${profile.funding_goal}`)
       if (fields.length > 0) {
         parts.push(`## Company Profile\n${truncate(fields.join(" | "), MAX_PROFILE_LENGTH)}`)
+      }
+
+      // Founder profile — where they are, what they've been doing
+      const founderFields: string[] = []
+      if (profile.founder_name) founderFields.push(`Founder: ${profile.founder_name}`)
+      if (profile.founder_location) founderFields.push(`Location: ${profile.founder_location}`)
+      if (profile.founder_background) founderFields.push(profile.founder_background)
+      if (founderFields.length > 0) {
+        parts.push(`## Founder Profile\n${truncate(founderFields.join("\n"), MAX_PROFILE_LENGTH)}`)
       }
     }
 

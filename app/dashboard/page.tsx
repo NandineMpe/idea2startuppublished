@@ -16,6 +16,7 @@ import {
 import Link from "next/link"
 import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/paperclip"
 import { AgentStatusDot } from "@/components/dashboard/agent-status-dot"
+import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 
 const roleIcons: Record<string, React.ElementType> = {
   cbs: Briefcase,
@@ -73,6 +74,11 @@ export default function DashboardPage() {
             <p className="text-[12px] text-muted-foreground mt-0.5">{stat.label}</p>
           </div>
         ))}
+      </motion.div>
+
+      {/* Founder daily brief — wireframe; see docs/command-center-daily-feed.md */}
+      <motion.div variants={item}>
+        <FounderDailyFeed />
       </motion.div>
 
       {/* Section Header */}

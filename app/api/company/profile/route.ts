@@ -50,6 +50,9 @@ export async function PUT(request: Request) {
       traction,
       team_summary,
       funding_goal,
+      founder_name,
+      founder_location,
+      founder_background,
     } = body
 
     const { data, error } = await supabase
@@ -67,6 +70,9 @@ export async function PUT(request: Request) {
           traction: traction ?? null,
           team_summary: team_summary ?? null,
           funding_goal: funding_goal ?? null,
+          founder_name: founder_name ?? null,
+          founder_location: founder_location ?? null,
+          founder_background: founder_background ?? null,
         },
         { onConflict: "user_id" },
       )
