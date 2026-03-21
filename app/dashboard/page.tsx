@@ -76,9 +76,9 @@ export default function DashboardPage() {
         ))}
       </motion.div>
 
-      {/* Main column + Today's Brief sidebar (see docs/command-center-daily-feed.md) */}
+      {/* Main column + Today's Brief: brief first on mobile (plain, always visible); team left + brief right on lg+ */}
       <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
-        <div className="flex-1 min-w-0 flex flex-col gap-6">
+        <div className="order-2 lg:order-1 flex-1 min-w-0 flex flex-col gap-6">
           {/* Section Header */}
           <motion.div variants={item} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -165,12 +165,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <motion.aside
-          variants={item}
-          className="w-full lg:w-[min(100%,380px)] lg:shrink-0 lg:sticky lg:top-20 lg:self-start"
-        >
+        {/* Plain aside — no motion variants here (avoids opacity stuck hidden on some layouts) */}
+        <aside className="order-1 lg:order-2 w-full lg:w-[380px] lg:shrink-0 lg:sticky lg:top-20 lg:self-start">
           <FounderDailyFeed />
-        </motion.aside>
+        </aside>
       </div>
     </motion.div>
   )

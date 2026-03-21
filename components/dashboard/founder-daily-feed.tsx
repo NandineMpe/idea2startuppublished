@@ -112,16 +112,16 @@ function FeedRow({
     <div
       role="button"
       tabIndex={0}
-      onDoubleClick={open}
+      onClick={open}
       onKeyDown={(e) => {
         if (e.key === "Enter") open()
       }}
       className={cn(
-        "group rounded-md border border-transparent px-3 py-2.5 -mx-1",
-        "hover:bg-muted/60 hover:border-border cursor-default select-none",
+        "group rounded-md border border-border/80 bg-background px-3 py-2.5 -mx-1",
+        "hover:bg-muted/80 hover:border-primary/30 cursor-pointer select-none",
         "transition-colors",
       )}
-      title="Double-click to open in a new tab"
+      title="Click to open in a new tab"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -150,26 +150,19 @@ export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-card overflow-hidden flex flex-col",
-        "max-h-[min(85vh,920px)] lg:max-h-[calc(100vh-6rem)]",
+        "rounded-lg border-2 border-primary/25 bg-card text-foreground shadow-sm flex flex-col",
+        "min-h-[280px] max-h-[min(80vh,880px)] lg:max-h-[calc(100vh-7rem)] overflow-hidden",
         className,
       )}
     >
-      <div className="px-4 py-3 border-b border-border bg-muted/30 flex flex-col gap-1 shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
-          <div>
-            <h2 className="text-[15px] font-semibold text-foreground">Today&apos;s Brief</h2>
-            <p className="text-[12px] text-muted-foreground">
-              Curated for your startup · Daily refresh (wireframe — sample items)
-            </p>
-          </div>
-          <p className="text-[11px] text-muted-foreground sm:text-right shrink-0">
-            Double-click a story to open the source
-          </p>
-        </div>
+      <div className="px-4 py-3 border-b border-border bg-primary/5 shrink-0">
+        <h2 className="text-base font-semibold text-foreground">Today&apos;s Brief</h2>
+        <p className="text-[13px] text-muted-foreground mt-0.5">
+          Sample items · Double-click a row to open the link
+        </p>
       </div>
 
-      <div className="p-4 space-y-6 overflow-y-auto min-h-0 flex-1">
+      <div className="p-4 space-y-6 overflow-y-auto min-h-0 flex-1 bg-card">
         {SECTIONS.map((section) => {
           const Icon = section.icon
           return (
