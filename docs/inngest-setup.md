@@ -51,11 +51,10 @@ INNGEST_EVENT_KEY=your_event_key_here
 # Single-user testing for cron fan-out (no listUsers)
 JUNO_TEST_USER_ID=<supabase-auth-user-uuid>
 
-# Optional: Twilio WhatsApp for daily brief delivery
+# Twilio (shared sender) — per-user destination is stored in company_profile (Settings → WhatsApp)
 # TWILIO_ACCOUNT_SID=...
 # TWILIO_AUTH_TOKEN=...
 # TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-# JUNO_WHATSAPP_TO=+1...
 ```
 
 **Do not commit** real keys. Keep `.env.local` gitignored.
@@ -70,6 +69,20 @@ Inngest must reach:
 
 1. Deploy to Vercel (or your host) with env vars set.
 2. In **Inngest Dashboard → Apps → your app → Sync / URL**, ensure the **production URL** matches your deployment (Inngest often auto-detects after first successful sync).
+
+### CLI / terminal sync (activates crons + function registry)
+
+After each deploy (or if the dashboard shows stale functions), **PUT** your serve endpoint. Inngest Cloud picks up function definitions including **cron** triggers.
+
+**Production example** (use `curl.exe` on Windows so PowerShell doesn’t alias `curl`):
+
+```bash
+curl.exe -X PUT "https://idea2startuppublished.vercel.app/api/inngest" --fail-with-body
+```
+
+Success looks like: `{"message":"Successfully registered","modified":true}` and HTTP **200**.
+
+Requires **`INNGEST_SIGNING_KEY`** on Vercel so the handler matches your Inngest **environment** (Production vs Dev).
 
 If sync fails, check:
 

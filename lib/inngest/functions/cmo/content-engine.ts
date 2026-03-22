@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest/client"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
 import { generateComments, generateLinkedInPost } from "@/lib/juno/ai-engine"
-import { saveContentToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import { saveContentToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
 import type { ScoredItem } from "@/lib/juno/scoring"
 import type { DailyBriefPayload } from "@/lib/juno/types"
 
@@ -56,12 +56,6 @@ export const contentEngine = inngest.createFunction(
     )
 
     await step.run("notify-approval", async () => {
-      const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
-      if (!phone) {
-        console.log("[CMO]", linkedinPost.post?.slice(0, 400))
-        return
-      }
-
       const msg = [
         `📝 *LinkedIn post ready*`,
         `Angle: ${linkedinPost.angle}`,
@@ -71,7 +65,10 @@ export const contentEngine = inngest.createFunction(
         `Reply: ✅ Approve | ⏭️ Skip`,
       ].join("\n")
 
-      await sendWhatsApp(phone, msg)
+      const r = await sendWhatsAppToUser(userId, msg)
+      if (!r.success) {
+        console.log("[CMO] (no verified WhatsApp)", linkedinPost.post?.slice(0, 400))
+      }
     })
 
     await step.sendEvent("content-ready", {

@@ -52,6 +52,9 @@ export interface CompanyProfile {
   keywords: string[]
   differentiators: string
   traction: string
+  /** E.164 WhatsApp; optional — see `company_profile` migration */
+  whatsapp_number?: string | null
+  whatsapp_verified?: boolean | null
   /** Full row for forward-compat / extra columns */
   raw: Record<string, unknown>
 }
@@ -224,6 +227,8 @@ async function loadProfile(supabase: SupabaseClient, userId: string): Promise<Co
     keywords: parseArray(row.keywords),
     differentiators: (row.differentiators as string) || (row.unique_value as string) || "",
     traction: (row.traction as string) || "",
+    whatsapp_number: (row.whatsapp_number as string | null | undefined) ?? null,
+    whatsapp_verified: Boolean(row.whatsapp_verified),
     raw: row as Record<string, unknown>,
   }
 }

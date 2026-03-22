@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest/client"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
 import { analyzeTechTrends } from "@/lib/juno/ai-engine"
-import { saveContentToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import { saveContentToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
 import { scrapeArxiv, scrapeHackerNews } from "@/lib/juno/scrapers"
 import type { RawItem } from "@/lib/juno/types"
 
@@ -86,11 +86,6 @@ export const techRadar = inngest.createFunction(
 
       if (analysis.trends?.length > 0) {
         await step.run(`notify-${i}`, async () => {
-          const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
-          if (!phone) {
-            console.log("[CTO techRadar] trends:", analysis.trends?.slice(0, 2))
-            return
-          }
           const msg = [
             `🔬 *Tech Radar*`,
             "",
@@ -98,7 +93,10 @@ export const techRadar = inngest.createFunction(
               (t) => `• *${t.trend}*\n  ${t.relevance}\n  → ${t.action}`,
             ),
           ].join("\n")
-          await sendWhatsApp(phone, msg)
+          const r = await sendWhatsAppToUser(userId, msg)
+          if (!r.success) {
+            console.log("[CTO techRadar] trends (no verified WhatsApp):", analysis.trends?.slice(0, 2))
+          }
         })
       }
     }

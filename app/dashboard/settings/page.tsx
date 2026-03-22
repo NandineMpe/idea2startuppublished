@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { WhatsAppSetup } from "@/components/whatsapp-setup"
 
 export default function SettingsPage() {
   const [name, setName] = useState("Alex Johnson")
@@ -173,6 +174,10 @@ export default function SettingsPage() {
                     className="data-[state=checked]:bg-primary"
                   />
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-border">
+                <WhatsAppSetup />
               </div>
 
               <div className="flex justify-end">

@@ -66,6 +66,45 @@ export async function sendWhatsApp(
   }
 }
 
+/**
+ * Load WhatsApp destination from `company_profile` (E.164, verified).
+ * Returns null if unset, unverified, or on error.
+ */
+export async function getUserWhatsAppNumber(userId: string): Promise<string | null> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return null
+  }
+  try {
+    const supabase = getServiceClient()
+    const { data, error } = await supabase
+      .from("company_profile")
+      .select("whatsapp_number, whatsapp_verified")
+      .eq("user_id", userId)
+      .maybeSingle()
+
+    if (error || !data?.whatsapp_number || !data.whatsapp_verified) return null
+    return data.whatsapp_number as string
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Send WhatsApp to a user by `userId` (reads verified number from DB).
+ * No-op if not configured.
+ */
+export async function sendWhatsAppToUser(
+  userId: string,
+  body: string,
+): Promise<{ success: boolean; sid?: string; error?: string }> {
+  const phone = await getUserWhatsAppNumber(userId)
+  if (!phone) {
+    console.log(`[WhatsApp] User ${userId} has no verified WhatsApp number — skipping send`)
+    return { success: false, error: "no_number" }
+  }
+  return sendWhatsApp(phone, body)
+}
+
 // ─── Persist brief to Supabase ───────────────────────────────────
 
 export async function saveBriefToDB(params: {

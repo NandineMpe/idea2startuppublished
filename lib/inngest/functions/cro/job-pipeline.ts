@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { generateOutreach, scoreLeadFit } from "@/lib/juno/ai-engine"
-import { saveContentToDB, saveLeadToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import { saveContentToDB, saveLeadToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
 import { scrapeJobBoards } from "@/lib/juno/scrapers"
 import { getFanOutUserIds } from "@/lib/juno/users"
 import type { JobListing, LeadDiscoveredPayload, LeadFitResult } from "@/lib/juno/types"
@@ -112,14 +112,6 @@ export const jobBoardScanner = inngest.createFunction(
 
     if (scoredLeads.length > 0) {
       await step.run("notify-new-leads", async () => {
-        const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
-        if (!phone) {
-          console.log(
-            "[CRO] New leads (no FOUNDER_WHATSAPP / JUNO_WHATSAPP_TO):",
-            scoredLeads.length,
-          )
-          return
-        }
         const msg = [
           `🎯 *${scoredLeads.length} new leads*`,
           "",
@@ -127,7 +119,10 @@ export const jobBoardScanner = inngest.createFunction(
             (l) => `• *${l.company}* — ${l.title}\n  Fit: ${l.icpFit}/10 | ${l.pitchAngle}`,
           ),
         ].join("\n")
-        await sendWhatsApp(phone, msg)
+        const r = await sendWhatsAppToUser(userId, msg)
+        if (!r.success) {
+          console.log("[CRO] New leads (no verified WhatsApp):", scoredLeads.length)
+        }
       })
     }
 

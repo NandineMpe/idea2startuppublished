@@ -10,7 +10,6 @@ import {
   Circle,
   Play,
   Loader2,
-  ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useEffect, useState, useCallback, useRef } from "react"
@@ -37,7 +36,7 @@ const PIPELINES: Pipeline[] = [
     id: "cbs",
     title: "Daily brief",
     subtitle: "Scored news, research, regulation — tuned to your company context.",
-    schedule: "Cron · 05:00 daily",
+    schedule: "Scheduled · ~05:00 daily",
     href: "/dashboard/team/cbs",
     icon: Briefcase,
     accent: "text-amber-600 bg-amber-500/10 border-amber-500/20",
@@ -49,7 +48,7 @@ const PIPELINES: Pipeline[] = [
     id: "cro",
     title: "Lead & job scan",
     subtitle: "HN hiring + Remotive — ICP fit scoring, qualified leads surfaced.",
-    schedule: "Cron · every 6h",
+    schedule: "Scheduled · every 6h",
     href: "/dashboard/team/cro",
     icon: FlaskConical,
     accent: "text-sky-600 bg-sky-500/10 border-sky-500/20",
@@ -61,14 +60,14 @@ const PIPELINES: Pipeline[] = [
     id: "cto",
     title: "Tech radar",
     subtitle: "arXiv + HN → trends and technical post suggestions.",
-    schedule: "Cron · 06:00 daily",
+    schedule: "Scheduled · ~06:00 daily",
     href: "/dashboard/team",
     icon: Cpu,
     accent: "text-violet-600 bg-violet-500/10 border-violet-500/20",
     statusKey: "cto",
     windowHours: 26,
     triggerable: false,
-    triggerNote: "Cron only · runs at 06:00",
+    triggerNote: "Scheduled only · runs ~06:00",
   },
   {
     id: "cmo",
@@ -84,8 +83,6 @@ const PIPELINES: Pipeline[] = [
     triggerNote: "Chains from CBS brief",
   },
 ]
-
-const INNGEST_DASHBOARD = "https://app.inngest.com/functions"
 
 function statusDot(lastRun: string | null, windowHours: number) {
   if (!lastRun) return "none"
@@ -204,7 +201,7 @@ export function IntelligencePipelines() {
         } else {
           setTriggerResult({
             id: pipeline,
-            msg: "Still running — check Inngest dashboard for live logs.",
+            msg: "Still running — give it another minute, then refresh. Your feed updates when the job finishes.",
             ok: false,
           })
         }
@@ -253,15 +250,6 @@ export function IntelligencePipelines() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <a
-            href={INNGEST_DASHBOARD}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[12px] text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0"
-          >
-            Run logs
-            <ExternalLink className="h-3 w-3" />
-          </a>
           <Link
             href="/dashboard/team"
             className="text-[12px] text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
@@ -284,14 +272,6 @@ export function IntelligencePipelines() {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-muted-foreground tabular-nums">{elapsed}s elapsed</span>
-              <a
-                href={INNGEST_DASHBOARD}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-primary hover:text-primary/80 flex items-center gap-0.5"
-              >
-                Full logs <ExternalLink className="h-2.5 w-2.5" />
-              </a>
             </div>
           </div>
 

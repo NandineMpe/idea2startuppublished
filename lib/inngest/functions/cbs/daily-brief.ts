@@ -9,7 +9,7 @@ import {
   scrapeRegulation,
 } from "@/lib/juno/scrapers"
 import { formatBrief } from "@/lib/juno/brief-formatter"
-import { saveBriefToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import { saveBriefToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
 import { scoreItems } from "@/lib/juno/scoring"
 import type { DailyBriefPayload, ScoredItem } from "@/lib/juno/types"
 
@@ -105,12 +105,11 @@ export const dailyBrief = inngest.createFunction(
         }),
       ),
       step.run("send-whatsapp", async () => {
-        const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
-        if (!phone) {
-          console.log("[CBS Brief]", brief.whatsapp)
-          return { success: false as const }
+        const r = await sendWhatsAppToUser(userId, brief.whatsapp)
+        if (!r.success) {
+          console.log("[CBS Brief] (no verified WhatsApp — logging)", brief.whatsapp.slice(0, 600))
         }
-        return sendWhatsApp(phone, brief.whatsapp)
+        return r
       }),
     ])
 

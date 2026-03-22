@@ -155,6 +155,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | **`/api/test`** | GET | Simple JSON `{ message, timestamp }` health check. |
 | **`/api/inngest`** | GET, POST, PUT | **Inngest** serve handler — registers durable workflows (`lib/inngest/functions/`). See `docs/architecture-agentic-inngest.md`. |
 | **`/api/juno/trigger-daily-brief`** | POST | Manual brief: body `{ userId }` or **`JUNO_TEST_USER_ID`** — `inngest.send({ name: "juno/brief.requested", data: { userId, profileId: "manual-trigger" } })`. Needs **`INNGEST_EVENT_KEY`**. |
+| **`/api/settings/whatsapp`** | GET, POST | **GET** — `{ whatsappNumber, verified, sandboxNumber }`. **POST** `{ whatsappNumber }` (E.164 or `null` to clear) — saves to **`company_profile`**, sends Twilio test message; **`whatsapp_verified`** set on success. |
 
 ---
 

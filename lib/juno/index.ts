@@ -30,4 +30,11 @@ export {
 export { formatBrief } from "./brief-formatter"
 
 // Delivery
-export { sendWhatsApp, saveBriefToDB, saveLeadToDB, saveContentToDB } from "./delivery"
+export {
+  sendWhatsApp,
+  sendWhatsAppToUser,
+  getUserWhatsAppNumber,
+  saveBriefToDB,
+  saveLeadToDB,
+  saveContentToDB,
+} from "./delivery"

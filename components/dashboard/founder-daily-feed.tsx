@@ -166,7 +166,7 @@ export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
           <div className="py-8 text-center">
             <p className="text-[13px] text-muted-foreground">No brief generated yet.</p>
             <p className="text-[12px] text-muted-foreground/70 mt-1">
-              The CBS pipeline runs at 05:00 daily once Inngest is connected.
+              Your daily brief runs around 05:00 once your company profile is set up.
             </p>
           </div>
         ) : (
