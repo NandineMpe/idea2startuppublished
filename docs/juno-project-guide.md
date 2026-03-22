@@ -159,4 +159,15 @@ Sensitive steps (**LinkedIn post**, **outreach send**) go through **approval** (
 
 ---
 
+### Implemented in repo (starter)
+
+| Area | Location |
+|------|----------|
+| CBS daily brief | `lib/inngest/functions/cbs/daily-brief.ts` — cron fan-out + `juno/daily-brief.run` |
+| CMO content | `lib/inngest/functions/cmo/content-engine.ts` — `juno/brief.generated` |
+| CRO leads | `lib/inngest/functions/cro/job-pipeline.ts` — scanner / enrichment / outreach stubs |
+| Scrapers | `lib/juno/scrapers.ts` — **ArXiv live**; news / PH / Crunchbase / jobs **stub** |
+| Context for jobs | `lib/company-context-admin.ts` (service role) |
+| Manual trigger | `POST /api/juno/trigger-daily-brief` |
+
 *This guide is the north star for restructuring `lib/inngest/functions/` into role-based modules and event chains.*

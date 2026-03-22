@@ -29,8 +29,17 @@ Add these in **Vercel → Project → Settings → Environment Variables** for *
 # Same signing key as dev in Inngest, OR use the dev server flow below
 INNGEST_SIGNING_KEY=your_signing_key_here
 
-# Optional — only if you call inngest.send() from the app
-# INNGEST_EVENT_KEY=...
+# Required for POST /api/juno/trigger-daily-brief (manual daily brief)
+INNGEST_EVENT_KEY=your_event_key_here
+
+# Single-user testing for cron fan-out (no listUsers)
+JUNO_TEST_USER_ID=<supabase-auth-user-uuid>
+
+# Optional: Twilio WhatsApp for daily brief delivery
+# TWILIO_ACCOUNT_SID=...
+# TWILIO_AUTH_TOKEN=...
+# TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+# JUNO_WHATSAPP_TO=+1...
 ```
 
 **Do not commit** real keys. Keep `.env.local` gitignored.

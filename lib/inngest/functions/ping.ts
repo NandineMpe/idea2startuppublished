@@ -1,9 +1,5 @@
-import { inngest } from "./client"
+import { inngest } from "@/lib/inngest/client"
 
-/**
- * Health check — trigger manually from Inngest UI with event `juno/ping`.
- * Proves `/api/inngest` wiring before adding cron / fan-out agent jobs.
- */
 export const junoPing = inngest.createFunction(
   {
     id: "juno-ping",
@@ -18,6 +14,3 @@ export const junoPing = inngest.createFunction(
     return health
   },
 )
-
-/** Register all functions with `serve()` in `app/api/inngest/route.ts`. */
-export const inngestFunctions = [junoPing]
