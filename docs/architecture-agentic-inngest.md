@@ -12,6 +12,43 @@
 
 ---
 
+## Juno vs IdeaToStartup v1 — three principles
+
+These separate **Juno** (autonomous, composable executives) from **v1** (isolated chat + one-off API calls).
+
+### 1. Agents **chain**, not just run
+
+The daily brief is **not a dead end**. When it surfaces something actionable — e.g. *“Profound is hiring a Controller”* — that becomes an **event**, not only a row in a feed.
+
+**Flow (one morning scrape can trigger a full pipeline):**
+
+1. **Daily brief / scrape** finishes parsing → emits **`juno/lead.discovered`** (or domain-specific name) with payload such as `{ userId, company, role, angle, sourceUrl, rawSnippet }`.
+2. **CRO** (research) function is triggered by that event → enriches the lead (firmographics, news, angles) → persists + emits **`juno/lead.enriched`** (or the same event with `phase: "enriched"`).
+3. **CMO** function listens for **`juno/lead.enriched`** → drafts outreach (email, LinkedIn angle, talk track) → persists to `ai_outputs` / inbox.
+
+**Inngest shape:** inside the brief function, after classifying a high-value item:
+
+```ts
+await step.sendEvent("signal-lead", {
+  name: "juno/lead.discovered",
+  data: { userId, company: "Profound", role: "Controller", angle: "...", sourceUrl: "..." },
+})
+```
+
+Downstream functions register with `triggers: [{ event: "juno/lead.discovered" }]` (and optionally **`waitForEvent`** / fan-out if you need ordering). Each step is **retryable**, **observable**, and **independent** — swap CMO prompt without touching the brief.
+
+**v1 behavior:** brief would show a line of text; the user would manually ask CRO, then CMO — no shared pipeline, no durability.
+
+### 2. *(To articulate)*
+
+*Reserved for the next principle — e.g. trust / verification, or human-in-the-loop gates.*
+
+### 3. *(To articulate)*
+
+*Reserved — e.g. memory + state across days, or org-wide vs user-scoped runs.*
+
+---
+
 ## Current app (baseline)
 
 | Layer | Today |
@@ -69,14 +106,20 @@ Use a **`juno/`** prefix so dashboards stay readable:
 | `juno/daily.tick` | Global or per-env cron entry (fan-out to users in a step) |
 | `juno/user.brief.requested` | User asked for async brief |
 | `juno/delegate.plan_ready` | Delegate produced tasks; optional chained execution |
+| **`juno/lead.discovered`** | Emitted when brief/scrape surfaces actionable intel (company + role + angle) — **starts CRO → CMO chain** |
+| **`juno/lead.enriched`** | CRO finished enrichment; optional trigger for CMO outreach draft |
+
+### Functions
 
 | Function id | Trigger | Role |
 |-------------|---------|------|
 | `juno-daily-brief` | Cron `0 7 * * *` (example) | Fan-out: for each active user, run curated brief pipeline |
 | `juno-exec-run-tool` | Event `juno/tool.run` | Wraps `runTool` with company context |
 | `juno-delegate-execute` | Event after delegate | Sequential or parallel `ai-tool` calls |
+| `juno-cro-enrich-lead` | `juno/lead.discovered` | Research / enrichment step (competition tool, web, etc.) |
+| `juno-cmo-draft-outreach` | `juno/lead.enriched` | GTM copy, sequences, angles |
 
-Start **narrow**: one **cron** that processes **one** job type (e.g. “refresh Today’s Brief candidates”) before full per-user fan-out.
+Start **narrow**: one **cron** that processes **one** job type (e.g. “refresh Today’s Brief candidates”) before full per-user fan-out. Add **`step.sendEvent`** to **`juno/lead.discovered`** only after brief quality is good enough to avoid noise.
 
 ---
 
@@ -132,3 +175,5 @@ RLS: same as today (`user_id` = `auth.uid()`).
 ## Summary
 
 You’re moving from **“API routes that run when the user clicks”** to **“Inngest functions that run on time or on events, call the same brain (`getCompanyContext` + tools), and persist results.”** The UI becomes **command + inbox**, not the only execution engine.
+
+**Principle 1 in one line:** the daily brief **emits**; CRO and CMO **subscribe** — **`step.sendEvent`** is the handoff, not a new chat session.
