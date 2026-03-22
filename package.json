@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "inngest:dev": "npx inngest-cli@latest dev",
     "dev:paperclip": "cd paperclip && pnpm dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:paperclip\"",
     "seed:agents": "npx tsx scripts/seed-agents.ts",

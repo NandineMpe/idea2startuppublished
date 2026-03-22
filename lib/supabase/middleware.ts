@@ -33,6 +33,7 @@ export async function updateSession(request: NextRequest) {
     // This prevents issues with Supabase trying to set cookies on static files
     if (
         request.nextUrl.pathname.startsWith('/_next') ||
+        request.nextUrl.pathname.startsWith('/api/inngest') ||
         request.nextUrl.pathname.startsWith('/api/webhooks') ||
         request.nextUrl.pathname.includes('.')
     ) {
