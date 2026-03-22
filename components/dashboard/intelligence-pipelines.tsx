@@ -8,9 +8,11 @@ import {
   Cpu,
   ArrowUpRight,
   Circle,
+  Play,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { formatDistanceToNow } from "date-fns"
 
 type PipelineStatus = Record<string, string | null>
@@ -24,7 +26,9 @@ type Pipeline = {
   icon: typeof Briefcase
   accent: string
   statusKey: string
-  windowHours: number // how many hours before we consider it stale
+  windowHours: number
+  triggerable: boolean   // can be fired manually via /api/intelligence/trigger
+  triggerNote?: string   // shown when not triggerable
 }
 
 const PIPELINES: Pipeline[] = [
@@ -38,6 +42,7 @@ const PIPELINES: Pipeline[] = [
     accent: "text-amber-600 bg-amber-500/10 border-amber-500/20",
     statusKey: "cbs",
     windowHours: 26,
+    triggerable: true,
   },
   {
     id: "cro",
@@ -49,6 +54,7 @@ const PIPELINES: Pipeline[] = [
     accent: "text-sky-600 bg-sky-500/10 border-sky-500/20",
     statusKey: "cro",
     windowHours: 7,
+    triggerable: true,
   },
   {
     id: "cto",
@@ -60,17 +66,21 @@ const PIPELINES: Pipeline[] = [
     accent: "text-violet-600 bg-violet-500/10 border-violet-500/20",
     statusKey: "cto",
     windowHours: 26,
+    triggerable: false,
+    triggerNote: "Cron only · runs at 06:00",
   },
   {
     id: "cmo",
     title: "Content queue",
-    subtitle: "LinkedIn drafts, comments, outreach — pending your approval.",
+    subtitle: "LinkedIn drafts, comments, outreach — chains from CBS brief automatically.",
     schedule: "08:00 · 12:00 · 16:00 weekdays",
     href: "/dashboard/team/cmo",
     icon: Megaphone,
     accent: "text-rose-600 bg-rose-500/10 border-rose-500/20",
     statusKey: "cmo",
     windowHours: 9,
+    triggerable: false,
+    triggerNote: "Chains from CBS brief",
   },
 ]
 
@@ -84,13 +94,49 @@ function statusDot(lastRun: string | null, windowHours: number) {
 
 export function IntelligencePipelines() {
   const [status, setStatus] = useState<PipelineStatus>({})
+  const [triggering, setTriggering] = useState<string | null>(null)
+  const [triggerResult, setTriggerResult] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
 
-  useEffect(() => {
+  const fetchStatus = useCallback(() => {
     fetch("/api/intelligence/feed")
       .then((r) => r.json())
       .then((d) => setStatus(d.pipelineStatus ?? {}))
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetchStatus()
+  }, [fetchStatus])
+
+  const handleTrigger = async (pipeline: string) => {
+    setTriggering(pipeline)
+    setTriggerResult(null)
+    try {
+      const res = await fetch("/api/intelligence/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipeline }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setTriggerResult({
+          id: pipeline,
+          msg: pipeline === "cbs"
+            ? "Brief requested — check back in ~60s. CMO content will generate automatically after."
+            : "Job scan requested — check back in ~60s.",
+          ok: true,
+        })
+        // Refresh status after a delay
+        setTimeout(fetchStatus, 10_000)
+      } else {
+        setTriggerResult({ id: pipeline, msg: data.error ?? "Failed to trigger", ok: false })
+      }
+    } catch {
+      setTriggerResult({ id: pipeline, msg: "Could not reach server", ok: false })
+    } finally {
+      setTriggering(null)
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -98,7 +144,7 @@ export function IntelligencePipelines() {
         <div>
           <h2 className="text-[15px] font-semibold text-foreground">Automated reporting</h2>
           <p className="text-[12px] text-muted-foreground mt-0.5">
-            Background jobs run on your profile — outputs land in the feed and content queue.
+            Background jobs run on your profile — outputs land in the feed and content queue below.
           </p>
         </div>
         <Link
@@ -110,45 +156,50 @@ export function IntelligencePipelines() {
         </Link>
       </div>
 
+      {triggerResult && (
+        <div
+          className={cn(
+            "text-[13px] px-3 py-2 rounded-md",
+            triggerResult.ok
+              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+              : "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+          )}
+        >
+          {triggerResult.msg}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {PIPELINES.map((p) => {
           const lastRun = status[p.statusKey] ?? null
           const dot = statusDot(lastRun, p.windowHours)
           const dotColor =
-            dot === "green"
-              ? "text-emerald-500"
-              : dot === "amber"
-              ? "text-amber-500"
-              : dot === "red"
-              ? "text-rose-500"
-              : "text-muted-foreground/30"
+            dot === "green" ? "text-emerald-500"
+            : dot === "amber" ? "text-amber-500"
+            : dot === "red" ? "text-rose-500"
+            : "text-muted-foreground/30"
           const lastRunLabel = lastRun
             ? formatDistanceToNow(new Date(lastRun), { addSuffix: true })
             : "Never run"
+          const isTriggering = triggering === p.id
 
           return (
-            <Link
+            <div
               key={p.id}
-              href={p.href}
-              className={cn(
-                "group rounded-lg border bg-card p-4 transition-colors hover:bg-accent/40",
-                "border-border",
-              )}
+              className="group rounded-lg border bg-card p-4 border-border"
             >
               <div className="flex items-start gap-3">
-                <div
-                  className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
-                    p.accent,
-                  )}
-                >
+                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", p.accent)}>
                   <p.icon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-[13px] font-semibold text-foreground group-hover:text-primary truncate">
+                    <Link
+                      href={p.href}
+                      className="text-[13px] font-semibold text-foreground hover:text-primary truncate"
+                    >
                       {p.title}
-                    </p>
+                    </Link>
                     <Circle className={cn("h-2 w-2 fill-current shrink-0", dotColor)} />
                   </div>
                   <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-2">
@@ -158,10 +209,29 @@ export function IntelligencePipelines() {
                     <p className="text-[11px] text-muted-foreground/80">{p.schedule}</p>
                     <p className="text-[11px] text-muted-foreground/60 shrink-0">{lastRunLabel}</p>
                   </div>
+
+                  <div className="mt-3">
+                    {p.triggerable ? (
+                      <button
+                        onClick={() => handleTrigger(p.id)}
+                        disabled={isTriggering || triggering !== null}
+                        className={cn(
+                          "flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md transition-colors",
+                          "bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed",
+                        )}
+                      >
+                        {isTriggering
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Play className="h-3 w-3" />}
+                        {isTriggering ? "Running…" : "Run now"}
+                      </button>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground/50 italic">{p.triggerNote}</p>
+                    )}
+                  </div>
                 </div>
-                <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
               </div>
-            </Link>
+            </div>
           )
         })}
       </div>
