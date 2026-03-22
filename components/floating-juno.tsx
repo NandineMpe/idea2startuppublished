@@ -36,7 +36,8 @@ type View = "chat" | "history"
 
 const WELCOME: Message = {
   role: "assistant",
-  content: "Hey! I'm Juno, your startup sidekick. How can I help you build today?",
+  content:
+    "Hi — I'm Juno. Ask questions about your company, market, or what the briefs mean. I can also help you think through next steps; scheduled intel runs in the background.",
 }
 
 function formatRelativeTime(dateStr: string) {

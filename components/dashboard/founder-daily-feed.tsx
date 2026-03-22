@@ -156,9 +156,9 @@ export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
       )}
     >
       <div className="px-4 py-3 border-b border-border bg-primary/5 shrink-0">
-        <h2 className="text-base font-semibold text-foreground">Today&apos;s Brief</h2>
+        <h2 className="text-base font-semibold text-foreground">Signal feed</h2>
         <p className="text-[13px] text-muted-foreground mt-0.5">
-          Sample items · Double-click a row to open the link
+          Preview layout · Live items will mirror your scored daily brief (CBS pipeline)
         </p>
       </div>
 

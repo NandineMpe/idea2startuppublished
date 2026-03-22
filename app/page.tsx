@@ -24,11 +24,9 @@ export default function Home() {
       project: "Your Startup Sidekick",
       product: "Personal startup companion.",
       description: `I'm Juno.
-Think of me as your personal startup sidekick. But I'm not here to cheerlead. I'm here to challenge your thinking, sharpen your direction, and help you build something that actually matters.
+I'm your intelligence layer — not a generic writing bot. I watch your market, competitors, and pipeline using your company profile, then report what matters: briefs, leads, and signals you can act on.
 
-Because average doesn't get funded.
-It doesn't get shipped.
-And it sure as hell doesn't change the world.`,
+You stay in control; I surface the story the data is telling.`,
       color: "cyan",
       opacity: 1,
       isJuno: true,

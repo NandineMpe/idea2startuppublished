@@ -1,5 +1,9 @@
 # Command Center — Founder Daily Brief (design outline)
 
+## Product stance (2025)
+
+The dashboard is framed as **intelligence reporting** (scheduled briefs, lead scans, tech radar, content queue) grounded in **company profile + knowledge**, not as a generic “generate everything” app. Generative tools remain in the sidebar under each chief role; **Overview** explains what Juno *monitors* and *delivers*.
+
 ## Purpose
 
 A **once-per-day, curated news surface** at the top of the Command Center that answers: *What should this founder know today?* It complements the executive team grid by surfacing **external signal** (AI releases, research, competitors, funding) personalized to the startup’s profile (industry, stage, competitors, geography).

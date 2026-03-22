@@ -43,7 +43,7 @@ export function TopNavbar() {
       {/* Search trigger */}
       <button className="flex items-center gap-2 text-[13px] text-muted-foreground hover:text-foreground bg-surface-2 hover:bg-surface-3 border border-border rounded-md px-3 py-1.5 transition-colors w-64">
         <Search className="h-3.5 w-3.5" />
-        <span>Search...</span>
+        <span>Search intelligence…</span>
         <kbd className="ml-auto text-[11px] text-muted-foreground/60 bg-background border border-border rounded px-1.5 py-0.5 font-mono flex items-center gap-0.5">
           <Command className="h-2.5 w-2.5" /> K
         </kbd>

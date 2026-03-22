@@ -55,19 +55,18 @@ type NavSection = {
 
 const navSections: NavSection[] = [
   {
-    title: "Dashboard",
+    title: "Intelligence",
     icon: LayoutDashboard,
     items: [
       { title: "Overview", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Company profile", href: "/dashboard/company", icon: Building2 },
       { title: "Knowledge base", href: "/dashboard/knowledge", icon: Database },
-      { title: "Company Profile", href: "/dashboard/company", icon: Building2 },
-      { title: "Strategic Command", href: "/dashboard/command", icon: Zap },
     ],
   },
   {
-    title: "Your Team",
+    title: "Your team",
     icon: UsersRound,
-    items: [{ title: "Team Overview", href: "/dashboard/team", icon: UsersRound }],
+    items: [{ title: "Team overview", href: "/dashboard/team", icon: UsersRound }],
   },
   {
     title: "Chief Business Strategist",
@@ -75,6 +74,7 @@ const navSections: NavSection[] = [
     icon: Briefcase,
     color: "text-amber-600",
     items: [
+      { title: "Strategic Command", href: "/dashboard/command", icon: Zap },
       { title: "Business Idea Analysis", href: "/dashboard/idea/analyser", icon: Lightbulb },
       { title: "Value Proposition", href: "/dashboard/idea/value-proposition", icon: Target },
       { title: "Business Model", href: "/dashboard/idea/business-model", icon: FileText },
@@ -151,7 +151,7 @@ export function DashboardSidebar() {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(true)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    "Chief Business Strategist": true,
+    "Chief Business Strategist": false,
     "Chief Research Officer": false,
     "Chief Marketing Officer": false,
     "Chief Financial Officer": false,
@@ -183,8 +183,8 @@ export function DashboardSidebar() {
           </div>
           {expanded && (
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-foreground truncate">IdeaToStartup</p>
-              <p className="text-[11px] text-muted-foreground truncate">Startup workspace</p>
+              <p className="text-[13px] font-semibold text-foreground truncate">Juno</p>
+              <p className="text-[11px] text-muted-foreground truncate">Intelligence workspace</p>
             </div>
           )}
           {expanded && (
@@ -200,7 +200,7 @@ export function DashboardSidebar() {
         {/* Navigation */}
         <nav className={cn("flex-1 overflow-y-auto scrollbar-auto-hide py-2", expanded ? "px-2" : "px-1")}>
           {navSections.map((section) => {
-            const isTopLevel = section.title === "Dashboard" || section.title === "Your Team"
+            const isTopLevel = section.title === "Intelligence" || section.title === "Your team"
 
             if (isTopLevel) {
               return (
