@@ -153,6 +153,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | Route | Methods | Description |
 |--------|---------|-------------|
 | **`/api/test`** | GET | Simple JSON `{ message, timestamp }` health check. |
+| **`/api/inngest`** | GET, POST, PUT | **Inngest** serve handler — registers durable workflows (`lib/inngest/functions.ts`). See `docs/architecture-agentic-inngest.md`. |
 
 ---
 
