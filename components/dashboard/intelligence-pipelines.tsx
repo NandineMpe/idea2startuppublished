@@ -10,9 +10,10 @@ import {
   Circle,
   Play,
   Loader2,
+  ExternalLink,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { formatDistanceToNow } from "date-fns"
 
 type PipelineStatus = Record<string, string | null>
@@ -27,8 +28,8 @@ type Pipeline = {
   accent: string
   statusKey: string
   windowHours: number
-  triggerable: boolean   // can be fired manually via /api/intelligence/trigger
-  triggerNote?: string   // shown when not triggerable
+  triggerable: boolean
+  triggerNote?: string
 }
 
 const PIPELINES: Pipeline[] = [
@@ -84,6 +85,8 @@ const PIPELINES: Pipeline[] = [
   },
 ]
 
+const INNGEST_DASHBOARD = "https://app.inngest.com/functions"
+
 function statusDot(lastRun: string | null, windowHours: number) {
   if (!lastRun) return "none"
   const ageHours = (Date.now() - new Date(lastRun).getTime()) / 3_600_000
@@ -92,25 +95,132 @@ function statusDot(lastRun: string | null, windowHours: number) {
   return "red"
 }
 
+// Live run log lines shown while polling
+const LOG_LINES: Record<string, string[]> = {
+  cbs: [
+    "Fetching company context…",
+    "Scraping arXiv for relevant papers…",
+    "Scraping Hacker News…",
+    "Scraping news sources…",
+    "Scraping ProductHunt…",
+    "Scraping regulatory sources…",
+    "Scoring items against your company context…",
+    "Formatting brief…",
+    "Saving to database…",
+    "Done — check Signal feed →",
+  ],
+  cro: [
+    "Fetching company context…",
+    "Scraping HN Who's Hiring…",
+    "Scraping Remotive job board…",
+    "Scoring leads for ICP fit…",
+    "Saving qualified leads…",
+    "Generating outreach copy for top leads…",
+    "Done — check Content queue ↓",
+  ],
+}
+
 export function IntelligencePipelines() {
   const [status, setStatus] = useState<PipelineStatus>({})
   const [triggering, setTriggering] = useState<string | null>(null)
   const [triggerResult, setTriggerResult] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
 
-  const fetchStatus = useCallback(() => {
-    fetch("/api/intelligence/feed")
-      .then((r) => r.json())
-      .then((d) => setStatus(d.pipelineStatus ?? {}))
-      .catch(() => {})
+  // Live run state
+  const [activeRun, setActiveRun] = useState<{ pipeline: string; startedAt: number } | null>(null)
+  const [logIndex, setLogIndex] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const logRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/intelligence/feed")
+      const d = await res.json()
+      const newStatus: PipelineStatus = d.pipelineStatus ?? {}
+      setStatus(newStatus)
+      return newStatus
+    } catch {
+      return {}
+    }
   }, [])
 
   useEffect(() => {
     fetchStatus()
   }, [fetchStatus])
 
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    if (logRef.current) clearInterval(logRef.current)
+    if (elapsedRef.current) clearInterval(elapsedRef.current)
+    pollRef.current = null
+    logRef.current = null
+    elapsedRef.current = null
+    setActiveRun(null)
+    setLogIndex(0)
+    setElapsed(0)
+  }, [])
+
+  const startPolling = useCallback((pipeline: string, previousStatus: PipelineStatus) => {
+    const startedAt = Date.now()
+    setActiveRun({ pipeline, startedAt })
+    setLogIndex(0)
+    setElapsed(0)
+
+    // Advance log lines every ~8s
+    const lines = LOG_LINES[pipeline] ?? []
+    let li = 0
+    logRef.current = setInterval(() => {
+      li = Math.min(li + 1, lines.length - 1)
+      setLogIndex(li)
+    }, 8_000)
+
+    // Elapsed timer every second
+    elapsedRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1_000)
+
+    // Poll DB every 8s for up to 3 minutes
+    let attempts = 0
+    pollRef.current = setInterval(async () => {
+      attempts++
+      const newStatus = await fetchStatus()
+      const prevTs = previousStatus[pipeline]
+      const newTs = newStatus[pipeline]
+
+      const changed = newTs && newTs !== prevTs
+      const timeout = attempts >= 22 // 22 × 8s = ~3 min
+
+      if (changed || timeout) {
+        stopPolling()
+        if (changed) {
+          setTriggerResult({
+            id: pipeline,
+            msg: pipeline === "cbs"
+              ? "Brief generated — Signal feed updated. CMO content drafts will appear below shortly."
+              : "Lead scan complete — check Content queue below.",
+            ok: true,
+          })
+        } else {
+          setTriggerResult({
+            id: pipeline,
+            msg: "Still running — check Inngest dashboard for live logs.",
+            ok: false,
+          })
+        }
+      }
+    }, 8_000)
+  }, [fetchStatus, stopPolling])
+
+  // Cleanup on unmount
+  useEffect(() => () => stopPolling(), [stopPolling])
+
   const handleTrigger = async (pipeline: string) => {
     setTriggering(pipeline)
     setTriggerResult(null)
+
+    const previousStatus = await fetchStatus()
+
     try {
       const res = await fetch("/api/intelligence/trigger", {
         method: "POST",
@@ -119,15 +229,7 @@ export function IntelligencePipelines() {
       })
       const data = await res.json()
       if (res.ok) {
-        setTriggerResult({
-          id: pipeline,
-          msg: pipeline === "cbs"
-            ? "Brief requested — check back in ~60s. CMO content will generate automatically after."
-            : "Job scan requested — check back in ~60s.",
-          ok: true,
-        })
-        // Refresh status after a delay
-        setTimeout(fetchStatus, 10_000)
+        startPolling(pipeline, previousStatus)
       } else {
         setTriggerResult({ id: pipeline, msg: data.error ?? "Failed to trigger", ok: false })
       }
@@ -138,6 +240,9 @@ export function IntelligencePipelines() {
     }
   }
 
+  const runningPipeline = activeRun?.pipeline
+  const logLines = runningPipeline ? LOG_LINES[runningPipeline] ?? [] : []
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -147,16 +252,75 @@ export function IntelligencePipelines() {
             Background jobs run on your profile — outputs land in the feed and content queue below.
           </p>
         </div>
-        <Link
-          href="/dashboard/team"
-          className="text-[12px] text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
-        >
-          My team
-          <ArrowUpRight className="h-3 w-3" />
-        </Link>
+        <div className="flex items-center gap-3">
+          <a
+            href={INNGEST_DASHBOARD}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12px] text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0"
+          >
+            Run logs
+            <ExternalLink className="h-3 w-3" />
+          </a>
+          <Link
+            href="/dashboard/team"
+            className="text-[12px] text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
+          >
+            My team
+            <ArrowUpRight className="h-3 w-3" />
+          </Link>
+        </div>
       </div>
 
-      {triggerResult && (
+      {/* Live run monitor */}
+      {activeRun && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span className="text-[13px] font-medium text-foreground">
+                {PIPELINES.find((p) => p.id === activeRun.pipeline)?.title} running…
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-muted-foreground tabular-nums">{elapsed}s elapsed</span>
+              <a
+                href={INNGEST_DASHBOARD}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-primary hover:text-primary/80 flex items-center gap-0.5"
+              >
+                Full logs <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Step log */}
+          <div className="space-y-1">
+            {logLines.map((line, i) => {
+              const done = i < logIndex
+              const active = i === logIndex
+              const pending = i > logIndex
+              return (
+                <div key={i} className={cn("flex items-center gap-2 text-[12px]", pending && "opacity-30")}>
+                  {done ? (
+                    <Circle className="h-1.5 w-1.5 fill-emerald-500 text-emerald-500 shrink-0" />
+                  ) : active ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                  ) : (
+                    <Circle className="h-1.5 w-1.5 text-muted-foreground/30 shrink-0" />
+                  )}
+                  <span className={cn(done ? "text-muted-foreground line-through" : active ? "text-foreground font-medium" : "text-muted-foreground")}>
+                    {line}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {triggerResult && !activeRun && (
         <div
           className={cn(
             "text-[13px] px-3 py-2 rounded-md",
@@ -182,48 +346,51 @@ export function IntelligencePipelines() {
             ? formatDistanceToNow(new Date(lastRun), { addSuffix: true })
             : "Never run"
           const isTriggering = triggering === p.id
+          const isRunning = runningPipeline === p.id
 
           return (
-            <div
-              key={p.id}
-              className="group rounded-lg border bg-card p-4 border-border"
-            >
+            <div key={p.id} className={cn(
+              "rounded-lg border bg-card p-4 transition-colors",
+              isRunning ? "border-primary/40 bg-primary/5" : "border-border",
+            )}>
               <div className="flex items-start gap-3">
                 <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", p.accent)}>
-                  <p.icon className="h-4 w-4" />
+                  {isRunning
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <p.icon className="h-4 w-4" />
+                  }
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={p.href}
-                      className="text-[13px] font-semibold text-foreground hover:text-primary truncate"
-                    >
+                    <Link href={p.href} className="text-[13px] font-semibold text-foreground hover:text-primary truncate">
                       {p.title}
                     </Link>
-                    <Circle className={cn("h-2 w-2 fill-current shrink-0", dotColor)} />
+                    <Circle className={cn("h-2 w-2 fill-current shrink-0", isRunning ? "text-primary animate-pulse" : dotColor)} />
                   </div>
-                  <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-2">
-                    {p.subtitle}
-                  </p>
+                  <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-2">{p.subtitle}</p>
                   <div className="flex items-center justify-between mt-2 gap-2">
                     <p className="text-[11px] text-muted-foreground/80">{p.schedule}</p>
-                    <p className="text-[11px] text-muted-foreground/60 shrink-0">{lastRunLabel}</p>
+                    <p className="text-[11px] text-muted-foreground/60 shrink-0">
+                      {isRunning ? "Running now…" : lastRunLabel}
+                    </p>
                   </div>
 
                   <div className="mt-3">
                     {p.triggerable ? (
                       <button
                         onClick={() => handleTrigger(p.id)}
-                        disabled={isTriggering || triggering !== null}
+                        disabled={isTriggering || isRunning || triggering !== null || activeRun !== null}
                         className={cn(
                           "flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md transition-colors",
-                          "bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed",
+                          isRunning
+                            ? "bg-primary/10 text-primary cursor-default"
+                            : "bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed",
                         )}
                       >
-                        {isTriggering
+                        {isRunning || isTriggering
                           ? <Loader2 className="h-3 w-3 animate-spin" />
                           : <Play className="h-3 w-3" />}
-                        {isTriggering ? "Running…" : "Run now"}
+                        {isRunning ? "Running…" : isTriggering ? "Starting…" : "Run now"}
                       </button>
                     ) : (
                       <p className="text-[11px] text-muted-foreground/50 italic">{p.triggerNote}</p>
