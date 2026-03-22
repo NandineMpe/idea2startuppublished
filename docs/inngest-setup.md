@@ -1,6 +1,22 @@
 # Enable Inngest (cron + event chains)
 
-You already have **`/api/inngest`** and a **`juno/ping`** function. To turn it on in **dev** and **production**, do the following.
+You already have **`/api/inngest`** and registered functions under **`lib/inngest/functions/`** (not only **`juno/ping`** — CBS/CRO/CMO pipelines too). Use the steps below for **dev** and **production**.
+
+---
+
+## 0. Vercel + Inngest (official integration)
+
+If you used **Vercel → Integrations → Inngest** and connected this project:
+
+- Inngest can **wire env** into Vercel so production **`https://<your-domain>/api/inngest`** syncs after deploy.
+- You may still add **`INNGEST_EVENT_KEY`** in Vercel if the app calls **`inngest.send()`** (e.g. **`POST /api/juno/trigger-daily-brief`**). Cron + **`step.sendEvent`** inside functions do not need it.
+
+**If functions don’t appear or sync fails:**
+
+- **Deployment Protection** on preview URLs can block Inngest — see [Inngest + Vercel](https://www.inngest.com/docs/deploy/vercel) (disable protection for the URL Inngest calls, or use production).
+- Confirm **`/api/inngest`** returns **200** without a logged-in user (this repo **allows** that path in middleware).
+
+**Docs vs this repo:** Inngest’s guide may use **`src/inngest/functions.ts`** and **`@inngest/functions`**. We use **`lib/inngest/client.ts`**, **`lib/inngest/functions/index.ts`**, and **`app/api/inngest/route.ts`** — same pattern, different import paths.
 
 ---
 
@@ -21,7 +37,7 @@ You already have **`/api/inngest`** and a **`juno/ping`** function. To turn it o
 | **`INNGEST_SIGNING_KEY`** | **Yes** | Inngest Cloud authenticates requests to your `serve` endpoint. Copy **Production** signing key from the dashboard. |
 | **`INNGEST_EVENT_KEY`** | Optional | Only if your **Next.js app** sends events with `inngest.send()` (e.g. from API routes). Cron + `step.sendEvent` inside functions do **not** require this. |
 
-Add these in **Vercel → Project → Settings → Environment Variables** for **Production** (and **Preview** if you want previews to register functions).
+With the **Vercel integration**, many values are handled for you; add any missing keys under **Vercel → Project → Settings → Environment Variables** (Production / Preview as needed).
 
 ### Local (`.env.local`)
 
@@ -91,42 +107,48 @@ In another terminal:
 npm run dev
 ```
 
-Point the dev server at your local app URL (often `http://localhost:3000`). Trigger **`juno/ping`** from the Inngest UI against the dev app.
+Point the dev server at your local app URL (often `http://localhost:3000`).
 
-Optional: `package.json` script:
+**Invoke locally:** open **`http://127.0.0.1:8288/functions`** (Inngest Dev Server UI) → find a function (e.g. **`juno-ping`**) → **Invoke**. Runs appear in the **Runs** view with step-by-step progress — same pattern as Inngest’s getting-started **`hello-world`** flow.
 
-```json
-"inngest:dev": "npx inngest-cli@latest dev"
-```
+You can also send test events from the dashboard (e.g. event name **`juno/ping`** with `{}` data).
+
+This repo includes **`npm run inngest:dev`** → `npx inngest-cli@latest dev`.
 
 ---
 
 ## 7. Add a cron (next step)
 
-In `lib/inngest/functions.ts`, register a function with a **cron** trigger, e.g.:
+In **`lib/inngest/functions/`**, add a function with a **cron** trigger (Inngest **v4** shape):
 
 ```ts
-triggers: [{ cron: "0 7 * * *" }], // 07:00 UTC daily — adjust TZ needs via Inngest or schedule
+inngest.createFunction(
+  {
+    id: "my-cron-fn",
+    triggers: [{ cron: "0 7 * * *" }], // 07:00 UTC — adjust as needed
+  },
+  async ({ step }) => { /* ... */ },
+)
 ```
 
-Export it in `inngestFunctions` and redeploy. See [Inngest cron](https://www.inngest.com/docs/guides/scheduled-functions) for timezone options.
+Register it in **`lib/inngest/functions/index.ts`** (`inngestFunctions` array) and redeploy. See [Inngest scheduled functions](https://www.inngest.com/docs/guides/scheduled-functions).
 
 ---
 
 ## Checklist summary
 
-- [ ] Inngest account + app created  
-- [ ] `INNGEST_SIGNING_KEY` in Vercel (Production)  
-- [ ] Deploy so `/api/inngest` is public  
+- [ ] Inngest account + app; **Vercel integration** connected (or env vars set manually)  
+- [ ] Production deploy; **`/api/inngest`** reachable; **Deployment Protection** not blocking sync  
 - [ ] Middleware allows `/api/inngest` without session  
-- [ ] Functions visible in Inngest dashboard  
-- [ ] `juno/ping` test run succeeds  
-- [ ] (Optional) `inngest-cli dev` for local  
-- [ ] Add cron function when ready  
+- [ ] Functions visible in Inngest dashboard (CBS/CRO/CMO + **`juno-ping`**)  
+- [ ] **`juno/ping`** test run succeeds (cloud or local **8288**)  
+- [ ] `INNGEST_EVENT_KEY` in Vercel if you use **`POST /api/juno/trigger-daily-brief`**  
 
 ---
 
 ## References
 
 - Architecture: `docs/architecture-agentic-inngest.md`  
-- Code: `lib/inngest/client.ts`, `lib/inngest/functions.ts`, `app/api/inngest/route.ts`
+- Juno pipelines: `docs/juno-project-guide.md`  
+- Code: `lib/inngest/client.ts`, `lib/inngest/functions/index.ts`, `app/api/inngest/route.ts`  
+- Inngest + Vercel: [Deploy to Vercel](https://www.inngest.com/docs/deploy/vercel) (official)
