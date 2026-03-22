@@ -16,7 +16,7 @@ export async function GET() {
     const ctx = await getCompanyContext(user.id)
     const context = ctx?.promptBlock ?? ""
 
-    return NextResponse.json({ context: context || "No company profile set. Add one at /dashboard/company." })
+    return NextResponse.json({ context: context || "No company profile set. Fill in My Context → Company & Founder to enable all agents." })
   } catch (error) {
     console.error("Company context GET error:", error)
     return NextResponse.json({ context: "" }, { status: 500 })
