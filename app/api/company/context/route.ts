@@ -13,7 +13,8 @@ export async function GET() {
       return NextResponse.json({ context: "" })
     }
 
-    const context = await getCompanyContext(user.id)
+    const ctx = await getCompanyContext(user.id)
+    const context = ctx?.promptBlock ?? ""
 
     return NextResponse.json({ context: context || "No company profile set. Add one at /dashboard/company." })
   } catch (error) {

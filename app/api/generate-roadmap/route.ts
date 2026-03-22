@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
-import { getCompanyContext } from "@/lib/company-context"
+import { getCompanyContextPrompt } from "@/lib/company-context"
 
 const SYSTEM_PROMPT = `You are a product strategy and roadmap expert trained in agile product management, the RICE framework, and startup execution strategy. Generate a detailed, actionable product roadmap.
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContext(user?.id)
+    const companyContext = await getCompanyContextPrompt(user?.id)
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const prompt = `${companyBlock}# USER INPUT

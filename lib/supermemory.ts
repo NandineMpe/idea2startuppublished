@@ -1,7 +1,8 @@
 const SUPERMEMORY_API_URL = "https://api.supermemory.ai"
-const SUPERMEMORY_API_KEY =
-  process.env.SUPERMEMORY_API_KEY ||
-  "sm_Y5EdXMcTdAFUUTycFevS3m_wUyMRSqZZrBkrvQNFqvwBENWZmcaOSwPfnYNAXLidwBOBNyOiJqqSsEZJUhVAAgy"
+
+function getSupermemoryApiKey(): string | undefined {
+  return process.env.SUPERMEMORY_API_KEY
+}
 
 export const supermemory = {}
 
@@ -10,6 +11,11 @@ export const supermemory = {}
  * Pass userId to namespace the memory so each user has their own isolated context.
  */
 export async function addToMemory(content: string, userId?: string) {
+  const apiKey = getSupermemoryApiKey()
+  if (!apiKey) {
+    console.warn("Supermemory: SUPERMEMORY_API_KEY not set; skipping memorize")
+    return null
+  }
   try {
     const body: Record<string, unknown> = { content }
     if (userId) {
@@ -21,7 +27,7 @@ export async function addToMemory(content: string, userId?: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPERMEMORY_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
     })
@@ -42,9 +48,13 @@ export async function addToMemory(content: string, userId?: string) {
  * Search Supermemory for relevant context.
  * Pass userId to restrict results to that user's memories only.
  */
-export async function queryMemory(query: string, userId?: string) {
+export async function queryMemory(query: string, userId?: string, topK = 5) {
+  const apiKey = getSupermemoryApiKey()
+  if (!apiKey) {
+    return []
+  }
   try {
-    const body: Record<string, unknown> = { query, top_k: 5 }
+    const body: Record<string, unknown> = { query, top_k: topK }
     if (userId) {
       body.containerTags = [`user:${userId}`]
     }
@@ -53,7 +63,7 @@ export async function queryMemory(query: string, userId?: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${SUPERMEMORY_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(body),
     })

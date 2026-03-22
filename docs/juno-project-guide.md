@@ -34,13 +34,14 @@ lib/inngest/                          # orchestration (Inngest)
 └── tools/                            # shared capabilities
     ├── scrapers.ts                   # arXiv, Crunchbase, Product Hunt, news
     ├── linkedin.ts                   # post, comment, connect
-    ├── whatsapp.ts                   # Twilio delivery / approval prompts
+    ├── delivery.ts                   # Twilio WhatsApp + Supabase `ai_outputs` persistence
     ├── job-boards.ts                 # LinkedIn Jobs, Indeed
     └── enrichment.ts                 # company data (e.g. BuiltWith-style)
 
 lib/                                  # shared app logic (already exists)
 ├── company-context.ts                # assembled agent context (profile + assets + memory)
-├── scoring.ts                        # relevance scoring (Claude) — to add / expand
+├── scoring.ts                        # scoreItems(RawItem[], CompanyContext) — Claude 0–10 + category/urgency
+├── ai-engine.ts                     # LinkedIn post, lead fit, outreach, tech trends, comments (@anthropic-ai/sdk)
 └── brief-formatter.ts                # WhatsApp / email / dashboard formatting — to add
 
 app/api/
@@ -133,7 +134,7 @@ Sensitive steps (**LinkedIn post**, **outreach send**) go through **approval** (
 |------|------------------|
 | LLM | `ANTHROPIC_API_KEY` |
 | Inngest | `INNGEST_SIGNING_KEY`, optional `INNGEST_EVENT_KEY` |
-| WhatsApp | Twilio / Meta — see `whatsapp.ts` |
+| WhatsApp | Twilio — see `lib/juno/delivery.ts` |
 | Data | `EXA_API_KEY`, Crunchbase, etc. |
 | App | Supabase, Supermemory (existing) |
 
@@ -163,10 +164,11 @@ Sensitive steps (**LinkedIn post**, **outreach send**) go through **approval** (
 
 | Area | Location |
 |------|----------|
-| CBS daily brief | `lib/inngest/functions/cbs/daily-brief.ts` — cron fan-out + `juno/daily-brief.run` |
-| CMO content | `lib/inngest/functions/cmo/content-engine.ts` — `juno/brief.generated` |
-| CRO leads | `lib/inngest/functions/cro/job-pipeline.ts` — scanner / enrichment / outreach stubs |
-| Scrapers | `lib/juno/scrapers.ts` — **ArXiv live**; news / PH / Crunchbase / jobs **stub** |
+| CBS daily brief | `lib/inngest/functions/cbs/daily-brief.ts` — cron → `juno/brief.requested` → scrape/score/format/deliver → `juno/brief.generated` |
+| CMO content | `content-engine` (`juno/brief.generated`), `commentEngine` (cron weekdays), `relationshipTracker` (`juno/content.published`) |
+| CTO tech radar | `lib/inngest/functions/cto/tech-radar.ts` — `techRadar` (cron 6am UTC), `platformPoster` (`juno/content.approved`, platform `technical`) |
+| CRO leads | `lib/inngest/functions/cro/job-pipeline.ts` — `juno/jobs.scan.requested` → `scrapeJobBoards` + `scoreLeadFit` → `juno/lead.discovered` → `leadOutreach` (score ≥7) |
+| Scrapers | `lib/juno/scrapers.ts` — ArXiv, HN, Google News, **Remotive jobs** (`scrapeJobBoards`); PH/regulation stub |
 | Context for jobs | `lib/company-context-admin.ts` (service role) |
 | Manual trigger | `POST /api/juno/trigger-daily-brief` |
 

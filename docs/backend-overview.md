@@ -154,7 +154,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 |--------|---------|-------------|
 | **`/api/test`** | GET | Simple JSON `{ message, timestamp }` health check. |
 | **`/api/inngest`** | GET, POST, PUT | **Inngest** serve handler — registers durable workflows (`lib/inngest/functions/`). See `docs/architecture-agentic-inngest.md`. |
-| **`/api/juno/trigger-daily-brief`** | POST | Auth user only — `inngest.send({ name: "juno/daily-brief.run", data: { userId } })`. Needs **`INNGEST_EVENT_KEY`**. |
+| **`/api/juno/trigger-daily-brief`** | POST | Manual brief: body `{ userId }` or **`JUNO_TEST_USER_ID`** — `inngest.send({ name: "juno/brief.requested", data: { userId, profileId: "manual-trigger" } })`. Needs **`INNGEST_EVENT_KEY`**. |
 
 ---
 

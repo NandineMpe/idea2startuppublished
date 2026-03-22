@@ -1,0 +1,315 @@
+/**
+ * Juno AI engine — LinkedIn, lead fit, outreach, trends, comments.
+ * Uses @anthropic-ai/sdk with full CompanyContext.promptBlock.
+ */
+
+import Anthropic from "@anthropic-ai/sdk"
+import type { CompanyContext } from "@/lib/company-context"
+import type { ScoredItem } from "./types"
+
+const anthropic = new Anthropic()
+
+function extractText(response: Anthropic.Messages.Message): string {
+  return response.content
+    .filter((c) => c.type === "text")
+    .map((c) => (c as { text: string }).text)
+    .join("")
+}
+
+function hasAnthropicKey(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY)
+}
+
+// ─── LinkedIn Post Generation ────────────────────────────────────
+
+export async function generateLinkedInPost(params: {
+  context: CompanyContext
+  briefItems: ScoredItem[]
+}): Promise<{ post: string; angle: string }> {
+  if (!hasAnthropicKey()) {
+    return { post: "", angle: "Set ANTHROPIC_API_KEY" }
+  }
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1500,
+    messages: [
+      {
+        role: "user",
+        content: `You are writing a LinkedIn post AS this founder. You know their company deeply from the context below. Write in their voice — as someone who is building this specific thing, in this specific market.
+
+${params.context.promptBlock}
+
+TODAY'S INTELLIGENCE (from daily brief):
+${params.briefItems
+  .slice(0, 5)
+  .map((i) => `- ${i.title}: ${i.whyItMatters}`)
+  .join("\n")}
+
+Write ONE LinkedIn post. Rules:
+- First person, as the founder
+- Open with a hook (controversial take, surprising insight, lesson from building)
+- Reference something specific about your company, market, or journey
+- Short paragraphs (1-2 sentences)
+- 150-250 words
+- Tie to today's brief if there's a natural angle
+- End with a question or discussion prompt
+- NO hashtags unless genuinely relevant (max 2)
+- Sound like someone who builds, not someone who talks about building
+- If you reference your product, be specific about what it does based on the context
+
+Return JSON: {"angle": "one sentence describing the content angle", "post": "the full post text"}`,
+      },
+    ],
+  })
+
+  const text = extractText(response)
+  try {
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as { post?: string; angle?: string }
+    return { post: parsed.post || "", angle: parsed.angle || "" }
+  } catch {
+    return { post: text, angle: "Generated post" }
+  }
+}
+
+// ─── Lead Scoring ────────────────────────────────────────────────
+
+export async function scoreLeadFit(params: {
+  context: CompanyContext
+  company: string
+  role: string
+  description: string
+}): Promise<{
+  icpFit: number
+  timing: "urgent" | "warm" | "cold"
+  budgetSignal: "high" | "medium" | "low"
+  pitchAngle: string
+}> {
+  const fallback = {
+    icpFit: 5,
+    timing: "warm" as const,
+    budgetSignal: "medium" as const,
+    pitchAngle: "Review manually",
+  }
+
+  if (!hasAnthropicKey()) return fallback
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 500,
+    messages: [
+      {
+        role: "user",
+        content: `You are qualifying a lead for a startup. You know everything about the company from the context below — their product, their ICP, how they create value. Use this to judge fit precisely.
+
+${params.context.promptBlock}
+
+LEAD:
+- Company: ${params.company}
+- They're hiring for: ${params.role}
+- Job description: ${params.description.substring(0, 800)}
+
+Questions to answer:
+- Does this company match our ICP?
+- Does the role they're hiring for indicate a need our product addresses?
+- What specific value could we offer them?
+
+Return JSON:
+{
+  "icpFit": 0-10,
+  "timing": "urgent" | "warm" | "cold",
+  "budgetSignal": "high" | "medium" | "low",
+  "pitchAngle": "one specific sentence referencing THEIR role and OUR product capability"
+}`,
+      },
+    ],
+  })
+
+  const text = extractText(response)
+  try {
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<{
+      icpFit: number
+      timing: string
+      budgetSignal: string
+      pitchAngle: string
+    }>
+    const timing = ["urgent", "warm", "cold"].includes(parsed.timing ?? "")
+      ? (parsed.timing as "urgent" | "warm" | "cold")
+      : fallback.timing
+    const budgetSignal = ["high", "medium", "low"].includes(parsed.budgetSignal ?? "")
+      ? (parsed.budgetSignal as "high" | "medium" | "low")
+      : fallback.budgetSignal
+    return {
+      icpFit: typeof parsed.icpFit === "number" ? Math.min(10, Math.max(0, parsed.icpFit)) : fallback.icpFit,
+      timing,
+      budgetSignal,
+      pitchAngle: typeof parsed.pitchAngle === "string" ? parsed.pitchAngle : fallback.pitchAngle,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+// ─── Outreach Generation ─────────────────────────────────────────
+
+export async function generateOutreach(params: {
+  context: CompanyContext
+  company: string
+  role: string
+  jobUrl: string
+  pitchAngle: string
+}): Promise<{
+  linkedinConnect: string
+  linkedinDM: string
+  email: string
+}> {
+  const empty = { linkedinConnect: "", linkedinDM: "", email: "" }
+  if (!hasAnthropicKey()) return empty
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2000,
+    messages: [
+      {
+        role: "user",
+        content: `You are drafting outreach AS this founder. You know their company deeply — write from their authentic perspective, referencing real details about what they've built.
+
+${params.context.promptBlock}
+
+TARGET:
+- Company: ${params.company}
+- They're hiring: ${params.role}
+- Job posting: ${params.jobUrl}
+- Why we're a fit: ${params.pitchAngle}
+
+Generate three messages written as the founder:
+1. LinkedIn connection request (300 chars MAX)
+2. LinkedIn DM follow-up (if they accept)
+3. Cold email (with subject line)
+
+Rules:
+- Reference the specific job posting
+- Reference specific capabilities of OUR product from the context
+- Lead with value: what problem we solve for THEM
+- Sound like a founder, not a sales team
+- "Would it be worth a quick chat?" not "Book a demo"
+
+Return JSON: {"linkedinConnect": "...", "linkedinDM": "...", "email": "..."}`,
+      },
+    ],
+  })
+
+  const text = extractText(response)
+  try {
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<typeof empty>
+    return {
+      linkedinConnect: parsed.linkedinConnect ?? "",
+      linkedinDM: parsed.linkedinDM ?? "",
+      email: parsed.email ?? "",
+    }
+  } catch {
+    return empty
+  }
+}
+
+// ─── Tech Trend Analysis ─────────────────────────────────────────
+
+export async function analyzeTechTrends(params: {
+  context: CompanyContext
+  items: Array<{ title: string; source: string; description: string }>
+}): Promise<{
+  trends: Array<{ trend: string; relevance: string; action: string }>
+  postSuggestions: string[]
+}> {
+  const empty = { trends: [] as Array<{ trend: string; relevance: string; action: string }>, postSuggestions: [] as string[] }
+  if (!hasAnthropicKey()) return empty
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2000,
+    messages: [
+      {
+        role: "user",
+        content: `You are a CTO analyst. You know this company's product, tech stack, and market from the context below. Analyse how recent tech developments affect THEM specifically.
+
+${params.context.promptBlock}
+
+Recent tech news and releases:
+${params.items
+  .slice(0, 15)
+  .map((i) => `- [${i.source}] ${i.title}: ${i.description.substring(0, 200)}`)
+  .join("\n")}
+
+Analyse:
+1. Key trends that affect THIS company's product or stack (max 5)
+   - Each trend should reference specific aspects of our product/stack
+2. Technical post/thread ideas for HN, Reddit, or dev.to (max 3)
+   - Each should position the founder as an expert in their specific domain
+
+Return JSON:
+{
+  "trends": [{"trend": "...", "relevance": "how this specifically affects us", "action": "concrete next step"}],
+  "postSuggestions": ["topic and angle tied to our expertise"]
+}`,
+      },
+    ],
+  })
+
+  const text = extractText(response)
+  try {
+    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<typeof empty>
+    return {
+      trends: Array.isArray(parsed.trends) ? parsed.trends : [],
+      postSuggestions: Array.isArray(parsed.postSuggestions) ? parsed.postSuggestions : [],
+    }
+  } catch {
+    return empty
+  }
+}
+
+// ─── Comment Generation ──────────────────────────────────────────
+
+export async function generateComments(params: {
+  context: CompanyContext
+  targetPosts: Array<{ author: string; content: string; url: string }>
+}): Promise<Array<{ author: string; url: string; comment: string }>> {
+  if (params.targetPosts.length === 0) return []
+  if (!hasAnthropicKey()) return []
+
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2000,
+    messages: [
+      {
+        role: "user",
+        content: `You write LinkedIn comments AS this founder. You know their company, expertise, and perspective from the context below. Comments should reflect their specific domain knowledge.
+
+${params.context.promptBlock}
+
+For each post, write a comment that:
+- Adds value from the founder's specific expertise/experience
+- References something concrete (a pattern they've seen building their product, data from their market)
+- 2-3 sentences max
+- NEVER sycophantic
+- Sounds like a peer with deep domain knowledge
+
+POSTS:
+${params.targetPosts.map((p, i) => `[${i}] By ${p.author}:\n"${p.content.substring(0, 300)}..."`).join("\n\n")}
+
+Return JSON array: [{"index": 0, "comment": "..."}]`,
+      },
+    ],
+  })
+
+  const text = extractText(response)
+  try {
+    const parsed = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] || "[]") as Array<{ index?: number; comment?: string }>
+    return parsed.map((c) => ({
+      author: params.targetPosts[c.index ?? 0]?.author || "Unknown",
+      url: params.targetPosts[c.index ?? 0]?.url || "",
+      comment: c.comment ?? "",
+    }))
+  } catch {
+    return []
+  }
+}

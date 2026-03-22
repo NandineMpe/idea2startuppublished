@@ -1,3 +1,14 @@
+import { getActiveUserIds } from "@/lib/company-context"
+
+/**
+ * Fan-out for CBS/CRO: test user, else founders with a company profile (`company_name` set).
+ */
+export async function getFanOutUserIds(): Promise<string[]> {
+  const test = process.env.JUNO_TEST_USER_ID?.trim()
+  if (test) return [test]
+  return getActiveUserIds()
+}
+
 /**
  * Users to run Juno background jobs for.
  * - If `JUNO_TEST_USER_ID` is set, only that user (local / staging).

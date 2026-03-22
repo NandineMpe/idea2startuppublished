@@ -9,12 +9,14 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:paperclip\"",
     "seed:agents": "npx tsx scripts/seed-agents.ts",
     "build": "next build",
+    "deploy": "npx vercel deploy --prod --yes",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",
     "@ai-sdk/openai": "latest",
+    "@anthropic-ai/sdk": "^0.80.0",
     "@emotion/is-prop-valid": "latest",
     "@fontsource/inter": "^5.2.8",
     "@google/generative-ai": "latest",

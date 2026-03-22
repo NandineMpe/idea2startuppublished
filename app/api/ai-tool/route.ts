@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { runTool, TOOLS } from "@/lib/ai-tools"
-import { getCompanyContext } from "@/lib/company-context"
+import { getCompanyContextPrompt } from "@/lib/company-context"
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContext(user?.id)
+    const companyContext = await getCompanyContextPrompt(user?.id)
 
     const text = await runTool(tool, inputs, companyContext)
 

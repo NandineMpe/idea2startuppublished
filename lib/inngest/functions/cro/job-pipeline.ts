@@ -1,96 +1,190 @@
-import { anthropic } from "@ai-sdk/anthropic"
-import { generateText } from "ai"
 import { inngest } from "@/lib/inngest/client"
-import { getCompanyContextForJobs } from "@/lib/company-context-admin"
-import { getJunoTargetUserIds } from "@/lib/juno/users"
-import type { EnrichedLeadPayload, LeadPayload } from "@/lib/juno/types"
+import { getCompanyContext } from "@/lib/company-context"
+import { generateOutreach, scoreLeadFit } from "@/lib/juno/ai-engine"
+import { saveContentToDB, saveLeadToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import { scrapeJobBoards } from "@/lib/juno/scrapers"
+import { getFanOutUserIds } from "@/lib/juno/users"
+import type { JobListing, LeadDiscoveredPayload, LeadFitResult } from "@/lib/juno/types"
 
-/** Every 4 hours — stub lead until job boards API is wired. */
-export const jobBoardScanner = inngest.createFunction(
+type ScoredJobLead = JobListing & LeadFitResult
+
+// ─── Fan-out ─────────────────────────────────────────────────────
+
+export const jobScanFanOut = inngest.createFunction(
   {
-    id: "juno-cro-job-board-scanner",
-    name: "CRO · Job board scanner (stub → lead.discovered)",
-    triggers: [{ cron: "0 */4 * * *" }],
+    id: "cro-job-scan-fanout",
+    name: "CRO: Job Scan Fan-Out",
+    triggers: [{ cron: "0 */6 * * *" }],
   },
   async ({ step }) => {
-    const userIds = await step.run("users", getJunoTargetUserIds)
-    const userId = userIds[0]
-    if (!userId) return { skipped: true }
-
-    await step.sendEvent("lead-discovered", {
-      name: "juno/lead.discovered",
-      data: {
-        userId,
-        company: "Profound (example)",
-        role: "Controller",
-        sourceUrl: "https://example.com/jobs/stub",
-        snippet: "Stub: wire LinkedIn Jobs / Indeed in lib/juno/scrapers job-boards",
-      } satisfies LeadPayload,
-    })
-
-    return { ok: true, userId }
+    const userIds = await step.run("load-users", getFanOutUserIds)
+    if (userIds.length > 0) {
+      await step.sendEvent(
+        "fan-out-jobs-scan",
+        userIds.map((userId) => ({
+          name: "juno/jobs.scan.requested" as const,
+          data: { userId },
+        })),
+      )
+    }
+    return { users: userIds.length }
   },
 )
 
-export const leadEnrichment = inngest.createFunction(
+// ─── Per-user job board scanner ──────────────────────────────────
+
+export const jobBoardScanner = inngest.createFunction(
   {
-    id: "juno-cro-lead-enrichment",
-    name: "CRO · Lead enrichment",
+    id: "cro-job-board-scanner",
+    name: "CRO: Job Board Scanner",
+    retries: 2,
+    concurrency: { limit: 3 },
+    triggers: [{ event: "juno/jobs.scan.requested" }],
+  },
+  async ({ event, step }) => {
+    const { userId } = event.data as { userId: string }
+
+    const context = await step.run("load-context", () =>
+      getCompanyContext(userId, {
+        queryHint: "customers hiring ICP target market product value",
+      }),
+    )
+
+    if (!context) {
+      return { userId, found: 0, qualified: 0, reason: "no_company_profile" }
+    }
+
+    const { keywords } = context.extracted
+    const kw = keywords.length > 0 ? keywords : ["startup", "software", "remote"]
+
+    const listings = await step.run("scan-boards", () => scrapeJobBoards({ keywords: kw }))
+
+    if (listings.length === 0) {
+      return { userId, found: 0, qualified: 0 }
+    }
+
+    const scoredLeads = await step.run("score-leads", async (): Promise<ScoredJobLead[]> => {
+      const results: ScoredJobLead[] = []
+      for (const listing of listings.slice(0, 15)) {
+        try {
+          const score = await scoreLeadFit({
+            context,
+            company: listing.company,
+            role: listing.title,
+            description: listing.description,
+          })
+          if (score.icpFit >= 6) {
+            results.push({ ...listing, ...score })
+          }
+        } catch (e) {
+          console.error(`[CRO] Score failed for ${listing.company}:`, e)
+        }
+      }
+      return results
+    })
+
+    for (const [i, lead] of scoredLeads.entries()) {
+      await step.run(`persist-lead-${i}`, () =>
+        saveLeadToDB({
+          userId,
+          company: lead.company,
+          role: lead.title,
+          url: lead.url,
+          score: lead.icpFit,
+          pitchAngle: lead.pitchAngle,
+          source: lead.source,
+        }),
+      )
+
+      await step.sendEvent(`lead-discovered-${i}`, {
+        name: "juno/lead.discovered" as const,
+        data: {
+          userId,
+          company: lead.company,
+          role: lead.title,
+          url: lead.url,
+          score: lead.icpFit,
+          pitchAngle: lead.pitchAngle,
+          source: lead.source,
+        } satisfies LeadDiscoveredPayload,
+      })
+    }
+
+    if (scoredLeads.length > 0) {
+      await step.run("notify-new-leads", async () => {
+        const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
+        if (!phone) {
+          console.log(
+            "[CRO] New leads (no FOUNDER_WHATSAPP / JUNO_WHATSAPP_TO):",
+            scoredLeads.length,
+          )
+          return
+        }
+        const msg = [
+          `🎯 *${scoredLeads.length} new leads*`,
+          "",
+          ...scoredLeads.slice(0, 3).map(
+            (l) => `• *${l.company}* — ${l.title}\n  Fit: ${l.icpFit}/10 | ${l.pitchAngle}`,
+          ),
+        ].join("\n")
+        await sendWhatsApp(phone, msg)
+      })
+    }
+
+    return {
+      userId,
+      found: listings.length,
+      qualified: scoredLeads.length,
+    }
+  },
+)
+
+// ─── Lead outreach (event-driven) ────────────────────────────────
+
+export const leadOutreach = inngest.createFunction(
+  {
+    id: "cro-lead-outreach",
+    name: "CRO: Lead Outreach",
+    retries: 1,
+    concurrency: { limit: 2 },
     triggers: [{ event: "juno/lead.discovered" }],
   },
   async ({ event, step }) => {
-    const lead = event.data as LeadPayload
-    const ctx = await step.run("context", () => getCompanyContextForJobs(lead.userId))
+    const data = event.data as LeadDiscoveredPayload
+    const { userId, company, role, url, pitchAngle, score } = data
 
-    const enrichment = await step.run("enrich", async () => {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        return "Stub enrichment — set ANTHROPIC_API_KEY. Company: " + lead.company
-      }
-      const { text } = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
-        maxTokens: 1200,
-        system:
-          "You are CRO. Enrich this hiring signal: company fit, angle for outreach, 5 bullet facts (inferred OK if needed). Markdown.",
-        prompt: `Company context:\n${ctx.slice(0, 6000)}\n\nLead:\n${JSON.stringify(lead)}`,
-      })
-      return text
-    })
+    if (typeof score !== "number" || score < 7) {
+      return { skipped: true as const, reason: "below_score_threshold" }
+    }
 
-    const enriched: EnrichedLeadPayload = { ...lead, enrichment }
+    const context = await step.run("load-context", () =>
+      getCompanyContext(userId, { queryHint: "product value proposition customers" }),
+    )
 
-    await step.sendEvent("lead-enriched", {
-      name: "juno/lead.enriched",
-      data: enriched,
-    })
+    if (!context) {
+      return { skipped: true as const, reason: "no_company_profile" }
+    }
 
-    return { ok: true }
-  },
-)
+    const outreach = await step.run("generate-outreach", () =>
+      generateOutreach({
+        context,
+        company,
+        role,
+        jobUrl: url,
+        pitchAngle,
+      }),
+    )
 
-export const outreachDraft = inngest.createFunction(
-  {
-    id: "juno-cro-outreach-draft",
-    name: "CRO/CMO · Outreach draft (WhatsApp approval stub)",
-    triggers: [{ event: "juno/lead.enriched" }],
-  },
-  async ({ event, step }) => {
-    const lead = event.data as EnrichedLeadPayload
+    await step.run("save-outreach", () =>
+      saveContentToDB({
+        userId,
+        platform: "linkedin",
+        contentType: "outreach",
+        body: JSON.stringify(outreach),
+        status: "pending_approval",
+      }),
+    )
 
-    const draft = await step.run("draft-outreach", async () => {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        return "Stub outreach — connect Claude"
-      }
-      const { text } = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
-        maxTokens: 800,
-        system: "Draft a short cold DM / email (under 200 words) to a hiring lead. Professional, specific.",
-        prompt: `${JSON.stringify(lead)}`,
-      })
-      return text
-    })
-
-    console.log("[juno/outreach] approval queue (stub):\n", draft.slice(0, 400))
-
-    return { ok: true, userId: lead.userId }
+    return { userId, company, generated: true as const }
   },
 )

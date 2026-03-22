@@ -1,61 +1,168 @@
-import { anthropic } from "@ai-sdk/anthropic"
-import { generateText } from "ai"
 import { inngest } from "@/lib/inngest/client"
-import { getCompanyContextForJobs } from "@/lib/company-context-admin"
+import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
+import { generateComments, generateLinkedInPost } from "@/lib/juno/ai-engine"
+import { saveContentToDB, sendWhatsApp } from "@/lib/juno/delivery"
+import type { ScoredItem } from "@/lib/juno/scoring"
 import type { DailyBriefPayload } from "@/lib/juno/types"
 
-/**
- * Listens for scored brief → drafts LinkedIn post + comment ideas → queues approval (WhatsApp stub).
- */
+// ─── Content Engine (chains from daily brief) ────────────────────
+
 export const contentEngine = inngest.createFunction(
   {
-    id: "juno-cmo-content-engine",
-    name: "CMO · Content engine (brief.generated)",
+    id: "cmo-content-engine",
+    name: "CMO: Content Engine",
+    retries: 2,
     triggers: [{ event: "juno/brief.generated" }],
   },
   async ({ event, step }) => {
-    const data = event.data as DailyBriefPayload
-    const { userId, briefMarkdown } = data
+    const data = event.data as DailyBriefPayload & { items?: ScoredItem[] }
+    const { userId } = data
+    const briefItems = (data.items ?? data.scoredItems ?? []) as ScoredItem[]
 
-    const companyContext = await step.run("context", () => getCompanyContextForJobs(userId))
+    const context = await step.run("load-context", () =>
+      getCompanyContext(userId, {
+        queryHint: "brand voice product positioning thought leadership",
+      }),
+    )
 
-    const drafts = await step.run("draft-linkedin", async () => {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        return {
-          linkedinPost: "Stub LinkedIn post — set ANTHROPIC_API_KEY",
-          commentIdeas: "Stub comment ideas",
-        }
+    if (!context) {
+      await step.sendEvent("content-ready-skipped", {
+        name: "juno/content.ready",
+        data: {
+          userId,
+          contentId: null,
+          platform: "linkedin",
+          type: "post",
+          angle: "",
+          skipped: true,
+          reason: "no_company_profile",
+        },
+      })
+      return { userId, skipped: true as const }
+    }
+
+    const linkedinPost = await step.run("generate-post", () =>
+      generateLinkedInPost({ context, briefItems }),
+    )
+
+    const contentId = await step.run("save-draft", () =>
+      saveContentToDB({
+        userId,
+        platform: "linkedin",
+        contentType: "post",
+        body: linkedinPost.post,
+        status: "pending_approval",
+      }),
+    )
+
+    await step.run("notify-approval", async () => {
+      const phone = process.env.FOUNDER_WHATSAPP || process.env.JUNO_WHATSAPP_TO
+      if (!phone) {
+        console.log("[CMO]", linkedinPost.post?.slice(0, 400))
+        return
       }
-      const post = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
-        maxTokens: 1200,
-        system:
-          "You are the CMO. Write ONE LinkedIn post (under 2200 chars), professional, based on the daily brief.",
-        prompt: `Company:\n${companyContext.slice(0, 8000)}\n\nDaily brief:\n${briefMarkdown.slice(0, 12000)}`,
-      })
-      const comments = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
-        maxTokens: 600,
-        system: "Give 3 very short comment ideas (one line each) for engaging on others' posts this week.",
-        prompt: `Brief:\n${briefMarkdown.slice(0, 6000)}`,
-      })
-      return { linkedinPost: post.text, commentIdeas: comments.text }
-    })
 
-    await step.run("queue-approval-stub", async () => {
-      console.log("[juno/cmo] content.ready — approve for LinkedIn (stub):", drafts.linkedinPost?.slice(0, 200))
-      return { queued: true }
+      const msg = [
+        `📝 *LinkedIn post ready*`,
+        `Angle: ${linkedinPost.angle}`,
+        "",
+        `"${linkedinPost.post.substring(0, 200)}..."`,
+        "",
+        `Reply: ✅ Approve | ⏭️ Skip`,
+      ].join("\n")
+
+      await sendWhatsApp(phone, msg)
     })
 
     await step.sendEvent("content-ready", {
       name: "juno/content.ready",
       data: {
         userId,
-        linkedinDraft: drafts.linkedinPost,
-        sourceBrief: briefMarkdown.slice(0, 500),
+        contentId,
+        platform: "linkedin",
+        type: "post",
+        angle: linkedinPost.angle,
       },
     })
 
-    return { ok: true, userId }
+    return { userId, contentId, angle: linkedinPost.angle }
+  },
+)
+
+// ─── Comment Engine ──────────────────────────────────────────────
+
+export const commentEngine = inngest.createFunction(
+  {
+    id: "cmo-comment-engine",
+    name: "CMO: Comment Engine",
+    retries: 1,
+    concurrency: { limit: 1 },
+    triggers: [{ cron: "0 8,12,16 * * 1-5" }],
+  },
+  async ({ step }) => {
+    const userIds = await step.run("load-users", getActiveUserIds)
+
+    let total = 0
+    for (const [i, userId] of userIds.entries()) {
+      const context = await step.run(`context-${i}`, () =>
+        getCompanyContext(userId, { queryHint: "expertise domain knowledge opinions" }),
+      )
+
+      if (!context) continue
+
+      const comments = await step.run(`comments-${i}`, () =>
+        generateComments({ context, targetPosts: [] }),
+      )
+
+      for (const [ci, comment] of comments.entries()) {
+        await step.run(`save-${i}-${ci}`, () =>
+          saveContentToDB({
+            userId,
+            platform: "linkedin",
+            contentType: "comment",
+            body: JSON.stringify(comment),
+            status: "draft",
+          }),
+        )
+        total++
+      }
+    }
+
+    return { comments: total }
+  },
+)
+
+// ─── Relationship Tracker ────────────────────────────────────────
+
+export const relationshipTracker = inngest.createFunction(
+  {
+    id: "cmo-relationship-tracker",
+    name: "CMO: Relationship Tracker",
+    retries: 1,
+    triggers: [{ event: "juno/content.published" }],
+  },
+  async ({ event, step }) => {
+    await step.run("track", async () => {
+      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.warn("[CMO] relationshipTracker: no SUPABASE_SERVICE_ROLE_KEY")
+        return
+      }
+      const payload = event.data as Record<string, unknown> & { userId?: string }
+      const userId = payload.userId
+      if (!userId) {
+        console.warn("[CMO] relationshipTracker: missing userId")
+        return
+      }
+
+      const { supabaseAdmin } = await import("@/lib/supabase")
+      const { error } = await supabaseAdmin.from("ai_outputs").insert({
+        user_id: userId,
+        type: "relationship_interaction",
+        content: { ...payload, date: new Date().toISOString() },
+      });
+      if (error) console.error("[CMO] relationshipTracker:", error.message)
+    })
+
+    return { tracked: true as const }
   },
 )

@@ -48,10 +48,12 @@ export async function POST(req: Request) {
         })
     }
 
-    const companyContext = await getCompanyContext(userId)
+    const companyCtx = await getCompanyContext(userId, {
+      queryHint: lastMessage.slice(0, 500) || "company strategy product market",
+    })
     const companyBlock =
-      companyContext && companyContext.trim()
-        ? `# COMPANY CONTEXT (what we know about this startup)\n${companyContext}\n\n`
+      companyCtx?.promptBlock?.trim()
+        ? `# COMPANY CONTEXT (what we know about this startup)\n${companyCtx.promptBlock}\n\n`
         : ""
 
     const promptWithContext = companyBlock + (context

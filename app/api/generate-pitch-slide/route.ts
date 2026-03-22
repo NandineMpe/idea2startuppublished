@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { streamText } from "ai"
 import { createClient } from "@/lib/supabase/server"
-import { getCompanyContext } from "@/lib/company-context"
+import { getCompanyContextPrompt } from "@/lib/company-context"
 
 const slidePrompts: Record<string, string> = {
   problem: `You are an expert pitch deck consultant. Generate content for the PROBLEM slide. Focus on: clearly articulating the problem, why it matters, quantifying impact, making it relatable and urgent. Keep to 150-200 words in a professional, investor-focused tone.`,
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContext(user?.id)
+    const companyContext = await getCompanyContextPrompt(user?.id)
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const systemPrompt = slidePrompts[slideType] || "You are an expert pitch deck consultant. Create compelling content for a pitch deck slide."

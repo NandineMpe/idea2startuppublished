@@ -15,7 +15,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { TOOLS, AGENT_LABELS } from "@/lib/ai-tools"
-import { getCompanyContext } from "@/lib/company-context"
+import { getCompanyContextPrompt } from "@/lib/company-context"
 
 interface PlannedTask {
   agent: string          // cbs | cro | cmo | cfo | coo
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContext(user?.id)
+    const companyContext = await getCompanyContextPrompt(user?.id)
     const startupContext = context?.trim() || companyContext || "Not provided"
 
     // ── Step 1: Use Claude to plan the delegation ──────────────────────────
