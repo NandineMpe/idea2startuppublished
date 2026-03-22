@@ -203,4 +203,6 @@ Set these in **Vercel** / **`.env.local`** as appropriate. Do **not** commit sec
 
 When you add a new **`app/api/.../route.ts`** or migration, update this file or add a short pointer in **`docs/README.md`** so the backend map stays accurate.
 
+**Juno / Inngest troubleshooting (step-by-step):** see **`docs/juno-debugging-guide.md`**.
+
 *Last aligned with repo layout: snapshot of `app/api` route files and `supabase/migrations`.*
