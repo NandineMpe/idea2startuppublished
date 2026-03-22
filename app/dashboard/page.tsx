@@ -1,17 +1,11 @@
 "use client"
 
 import { motion } from "framer-motion"
-import {
-  Briefcase,
-  FlaskConical,
-  Cpu,
-  Megaphone,
-  ArrowUpRight,
-  BookOpen,
-} from "lucide-react"
+import { BookOpen, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
+import { ContentQueue } from "@/components/dashboard/content-queue"
 
 const container = {
   hidden: { opacity: 0 },
@@ -40,57 +34,23 @@ export default function DashboardPage() {
         </p>
         <h1 className="text-2xl font-semibold text-foreground">What Juno is watching for you</h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Your backend runs scheduled scrapers, scoring, and delivery — briefs, leads, and radar
-          reports are generated from your{" "}
+          Scheduled pipelines run against your{" "}
           <Link href="/dashboard/context" className="text-primary hover:underline">
             company context
-          </Link>
-          . This is a reporting surface, not a generic content factory.
+          </Link>{" "}
+          and surface briefs, leads, and content drafts here automatically.
         </p>
       </motion.div>
 
-      <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          {
-            label: "Daily brief",
-            value: "~05:00",
-            icon: Briefcase,
-            hint: "CBS · cron",
-          },
-          {
-            label: "Job / lead scan",
-            value: "6h",
-            icon: FlaskConical,
-            hint: "CRO · Inngest",
-          },
-          {
-            label: "Tech radar",
-            value: "~06:00",
-            icon: Cpu,
-            hint: "CTO · Inngest",
-          },
-          {
-            label: "Content drafts",
-            value: "Queue",
-            icon: Megaphone,
-            hint: "CMO · approval",
-          },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{stat.hint}</span>
-            </div>
-            <p className="text-lg font-semibold text-foreground">{stat.value}</p>
-            <p className="text-[12px] text-muted-foreground mt-0.5">{stat.label}</p>
-          </div>
-        ))}
-      </motion.div>
-
       <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
+        {/* Main column */}
         <div className="order-2 lg:order-1 flex-1 min-w-0 flex flex-col gap-8">
           <motion.div variants={item}>
             <IntelligencePipelines />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <ContentQueue />
           </motion.div>
 
           <motion.div variants={item} className="rounded-lg border border-dashed border-border bg-muted/20 p-5">
@@ -100,11 +60,10 @@ export default function DashboardPage() {
                   <BookOpen className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-medium text-foreground">Creation &amp; analysis tools</p>
+                  <p className="text-[13px] font-medium text-foreground">On-demand tools</p>
                   <p className="text-[12px] text-muted-foreground mt-0.5 max-w-xl">
                     Pitch decks, market analysers, and GTM generators are available under{" "}
-                    <strong className="text-foreground/90">Tools &amp; generators</strong> in the sidebar — use them
-                    when you need a specific deliverable.
+                    <strong className="text-foreground/90">Tools &amp; generators</strong> in the sidebar.
                   </p>
                 </div>
               </div>
@@ -119,6 +78,7 @@ export default function DashboardPage() {
           </motion.div>
         </div>
 
+        {/* Signal feed sidebar */}
         <aside className="order-1 lg:order-2 w-full lg:w-[380px] lg:shrink-0 lg:sticky lg:top-20 lg:self-start">
           <FounderDailyFeed />
         </aside>
