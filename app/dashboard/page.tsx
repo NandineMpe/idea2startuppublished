@@ -42,12 +42,8 @@ export default function DashboardPage() {
         <p className="text-sm text-muted-foreground max-w-2xl">
           Your backend runs scheduled scrapers, scoring, and delivery — briefs, leads, and radar
           reports are generated from your{" "}
-          <Link href="/dashboard/company" className="text-primary hover:underline">
-            company profile
-          </Link>{" "}
-          and{" "}
-          <Link href="/dashboard/knowledge" className="text-primary hover:underline">
-            knowledge base
+          <Link href="/dashboard/context" className="text-primary hover:underline">
+            company context
           </Link>
           . This is a reporting surface, not a generic content factory.
         </p>
@@ -106,17 +102,17 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-[13px] font-medium text-foreground">Creation &amp; analysis tools</p>
                   <p className="text-[12px] text-muted-foreground mt-0.5 max-w-xl">
-                    Pitch decks, market analysers, and GTM generators are still available under{" "}
+                    Pitch decks, market analysers, and GTM generators are available under{" "}
                     <strong className="text-foreground/90">Tools &amp; generators</strong> in the sidebar — use them
-                    when you need an asset; the default experience is intelligence reporting.
+                    when you need a specific deliverable.
                   </p>
                 </div>
               </div>
               <Link
-                href="/dashboard/command"
+                href="/dashboard/tools"
                 className="text-[13px] text-primary hover:text-primary/80 flex items-center gap-1 shrink-0 self-start sm:self-center"
               >
-                Legacy task planner
+                Browse tools
                 <ArrowUpRight className="h-3 w-3" />
               </Link>
             </div>

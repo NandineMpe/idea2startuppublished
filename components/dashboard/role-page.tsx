@@ -6,7 +6,6 @@ import {
   Play,
   Pause,
   Zap,
-  ArrowUpRight,
   DollarSign,
   Activity,
   CheckCircle,
@@ -152,9 +151,9 @@ export function RolePage({ config }: RolePageProps) {
       className="flex flex-col gap-6 p-6 lg:p-8 max-w-6xl mx-auto"
     >
       <motion.div variants={item}>
-        <Link href="/dashboard" className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
+        <Link href="/dashboard/team" className="inline-flex items-center gap-1 text-[13px] text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="h-3.5 w-3.5" />
-          Back to Command Center
+          Back to My Team
         </Link>
       </motion.div>
 
@@ -293,26 +292,6 @@ export function RolePage({ config }: RolePageProps) {
         </div>
       </motion.div>
 
-      {/* Responsibilities */}
-      <motion.div variants={item}>
-        <h2 className="text-[15px] font-semibold text-foreground mb-3">Tools & Responsibilities</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {config.responsibilities.map((resp, i) => (
-            <Link key={i} href={resp.href}>
-              <div className="rounded-lg border border-border bg-card hover:bg-accent/50 transition-all duration-200 p-4 h-full group cursor-pointer">
-                <div className="flex items-start justify-between mb-2">
-                  <p className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors">
-                    {resp.title}
-                  </p>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-primary transition-all shrink-0 ml-2" />
-                </div>
-                <p className="text-[12px] text-muted-foreground leading-relaxed">{resp.description}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </motion.div>
-
       {/* Activity / Issues */}
       <motion.div variants={item}>
         <div className="flex items-center justify-between mb-3">
@@ -358,7 +337,7 @@ export function RolePage({ config }: RolePageProps) {
               <p className="text-[13px] text-muted-foreground">No tasks assigned yet</p>
               <p className="text-[12px] text-muted-foreground/60 mt-1">
                 {paperclipOnline
-                  ? "Use Strategic Command to deploy this agent on a goal"
+                  ? "Go to Command Center and deploy a goal — this agent will pick up tasks automatically"
                   : "Start Paperclip with: npm run dev:all"}
               </p>
               <div className="flex gap-2 mt-4">
