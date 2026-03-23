@@ -121,7 +121,7 @@ function saveStored(data: StoredShape) {
   }
 }
 
-export function CommandCenterTodos() {
+export function CommandCenterTodos({ className }: { className?: string } = {}) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [custom, setCustom] = useState<CustomTodo[]>([])
   const [newTitle, setNewTitle] = useState("")
@@ -216,7 +216,10 @@ export function CommandCenterTodos() {
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-xl border border-border bg-card/80 backdrop-blur-sm shadow-sm overflow-hidden"
+      className={cn(
+        "rounded-xl border border-border bg-card/80 backdrop-blur-sm shadow-sm overflow-hidden",
+        className,
+      )}
     >
       <div className="p-4 border-b border-border bg-primary/[0.06]">
         <div className="flex items-start justify-between gap-3">

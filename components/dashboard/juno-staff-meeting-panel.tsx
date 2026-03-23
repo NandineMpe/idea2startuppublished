@@ -1,10 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react"
-import { Loader2 } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react"
+import { Calendar, Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   buildCollaborationViewModel,
   type AgentOrbStatus,
+  type BuildCollaborationOptions,
   type CollaborationViewModel,
   type IntelligenceFeedPayload,
 } from "@/lib/staff-meeting-collaboration"
@@ -155,32 +157,66 @@ function EmptyHint({ children }: { children: ReactNode }) {
   )
 }
 
+type StaffMeetingHistoryRow = {
+  id: string
+  content: unknown
+  metadata?: unknown
+  created_at: string
+}
+
+function formatMeetingTabLabel(iso: string) {
+  return new Date(iso).toLocaleString("en-IE", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 export function JunoStaffMeetingPanel() {
   const [tab, setTab] = useState<
     "meeting" | "brief" | "leads" | "content" | "tech"
   >("meeting")
-  const [data, setData] = useState<CollaborationViewModel | null>(null)
+  const [feed, setFeed] = useState<IntelligenceFeedPayload | null>(null)
+  const [meetings, setMeetings] = useState<StaffMeetingHistoryRow[]>([])
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null)
+  const [dateFilter, setDateFilter] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedMeetingId(null)
+  }, [dateFilter])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/intelligence/feed")
-      if (!res.ok) {
-        if (res.status === 401) {
+      const [feedRes, histRes] = await Promise.all([
+        fetch("/api/intelligence/feed"),
+        fetch("/api/staff-meetings"),
+      ])
+      if (!feedRes.ok) {
+        if (feedRes.status === 401) {
           setError("Sign in to load agent collaboration.")
-          setData(null)
+          setFeed(null)
+          setMeetings([])
           return
         }
         throw new Error("Failed to load intelligence feed")
       }
-      const json = (await res.json()) as IntelligenceFeedPayload
-      setData(buildCollaborationViewModel(json))
+      const feedJson = (await feedRes.json()) as IntelligenceFeedPayload
+      setFeed(feedJson)
+      if (histRes.ok) {
+        const histJson = (await histRes.json()) as { meetings?: StaffMeetingHistoryRow[] }
+        setMeetings(histJson.meetings ?? [])
+      } else {
+        setMeetings([])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load")
-      setData(null)
+      setFeed(null)
+      setMeetings([])
     } finally {
       setLoading(false)
     }
@@ -190,7 +226,38 @@ export function JunoStaffMeetingPanel() {
     load()
   }, [load])
 
-  const d: CollaborationViewModel | null = data
+  const filteredMeetings = useMemo(() => {
+    if (!dateFilter) return meetings
+    return meetings.filter((m) => m.created_at.slice(0, 10) === dateFilter)
+  }, [meetings, dateFilter])
+
+  const activeMeetingRow = useMemo(() => {
+    if (filteredMeetings.length === 0) {
+      if (dateFilter) return null
+      const s = feed?.staffMeeting
+      if (!s) return null
+      return { id: s.id, content: s.content, created_at: s.created_at }
+    }
+    if (selectedMeetingId) {
+      const hit = filteredMeetings.find((m) => m.id === selectedMeetingId)
+      if (hit) return hit
+    }
+    return filteredMeetings[0]
+  }, [filteredMeetings, selectedMeetingId, feed, dateFilter])
+
+  const d = useMemo(() => {
+    if (!feed) return null
+    const override: BuildCollaborationOptions["staffMeetingOverride"] = activeMeetingRow
+      ? { content: activeMeetingRow.content, created_at: activeMeetingRow.created_at }
+      : null
+    return buildCollaborationViewModel(feed, { staffMeetingOverride: override })
+  }, [feed, activeMeetingRow])
+
+  const isHistoricalView = Boolean(
+    feed?.staffMeeting?.id &&
+      activeMeetingRow &&
+      activeMeetingRow.id !== feed.staffMeeting?.id,
+  )
 
   if (loading && !d) {
     return (
@@ -241,6 +308,57 @@ export function JunoStaffMeetingPanel() {
         >
           Refresh
         </button>
+      </div>
+
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide shrink-0">
+            Filter by date
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground"
+            />
+            {dateFilter ? (
+              <button
+                type="button"
+                onClick={() => setDateFilter("")}
+                className="text-[11px] text-primary hover:underline"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {filteredMeetings.length > 0 ? (
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5">
+            {filteredMeetings.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setSelectedMeetingId(m.id)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1.5 text-[12px] border transition-colors",
+                  activeMeetingRow?.id === m.id
+                    ? "border-primary bg-primary/10 text-foreground font-medium"
+                    : "border-border bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                {formatMeetingTabLabel(m.created_at)}
+              </button>
+            ))}
+          </div>
+        ) : dateFilter ? (
+          <p className="text-[12px] text-muted-foreground">No staff meetings on this calendar day.</p>
+        ) : meetings.length === 0 ? (
+          <p className="text-[12px] text-muted-foreground">
+            Previous meetings will appear here after the daily staff meeting runs (08:30 UTC).
+          </p>
+        ) : null}
       </div>
 
       {/* Header */}
@@ -304,6 +422,14 @@ export function JunoStaffMeetingPanel() {
           ))}
         </div>
       </Card>
+
+      {isHistoricalView && tab !== "meeting" ? (
+        <div className="mb-4 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-200/90 leading-snug">
+          Brief, leads, content, and tech radar below reflect the{" "}
+          <strong className="text-amber-100">live</strong> intelligence feed (today), not the staff meeting
+          date selected above.
+        </div>
+      ) : null}
 
       {/* Tab navigation */}
       <div

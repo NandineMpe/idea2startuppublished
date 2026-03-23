@@ -140,10 +140,20 @@ function deriveAgents(
 const EMPTY_SUMMARY =
   "No staff meeting synthesis yet. After CBS, CRO, CMO, and CTO publish outputs in a 24-hour window, the daily staff meeting (08:30 UTC) connects the dots here."
 
-/** Maps `/api/intelligence/feed` (+ staff meeting row) into the Command Center panel model. */
-export function buildCollaborationViewModel(payload: IntelligenceFeedPayload): CollaborationViewModel {
-  const synthesis = parseSynthesis(payload.staffMeeting?.content ?? null)
-  const createdAt = payload.staffMeeting?.created_at ?? new Date().toISOString()
+export type BuildCollaborationOptions = {
+  /** Use this row for the staff meeting block. Omit to use `payload.staffMeeting`. Pass `null` for an empty synthesis. */
+  staffMeetingOverride?: { content: unknown; created_at: string } | null
+}
+
+/** Maps `/api/intelligence/feed` (+ optional staff meeting override) into the Command Center panel model. */
+export function buildCollaborationViewModel(
+  payload: IntelligenceFeedPayload,
+  options?: BuildCollaborationOptions,
+): CollaborationViewModel {
+  const meetingRow =
+    options?.staffMeetingOverride !== undefined ? options.staffMeetingOverride : payload.staffMeeting
+  const synthesis = parseSynthesis(meetingRow?.content ?? null)
+  const createdAt = meetingRow?.created_at ?? new Date().toISOString()
 
   const dateLabel = new Date(createdAt).toLocaleDateString("en-IE", {
     weekday: "long",
