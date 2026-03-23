@@ -38,3 +38,15 @@ export {
   saveLeadToDB,
   saveContentToDB,
 } from "./delivery"
+
+// Obsidian vault (GitHub API)
+export {
+  resolveGithubVaultConfig,
+  listVaultFiles,
+  readVaultFile,
+  readVaultFiles,
+  readVaultFolder,
+  writeVaultFile,
+  getVaultContext,
+} from "./vault"
+export type { VaultFile } from "./vault"

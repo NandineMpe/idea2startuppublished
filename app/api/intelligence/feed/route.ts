@@ -43,6 +43,15 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(1)
 
+    // Latest staff meeting synthesis (agent collaboration)
+    const { data: staffMeetingRows } = await supabase
+      .from("ai_outputs")
+      .select("id, type, content, metadata, created_at")
+      .eq("user_id", user.id)
+      .eq("type", "staff_meeting")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
     // Pipeline status — last run per type
     const typeMap: Record<string, string> = {
       daily_brief: "cbs",
@@ -60,8 +69,20 @@ export async function GET() {
 
     if (briefRows?.[0]) pipelineStatus.cbs = briefRows[0].created_at
     if (leadRows?.[0]) pipelineStatus.cro = leadRows[0].created_at
-    const latestContent = contentRows?.find((r) => r.type === "content_linkedin")
-    if (latestContent) pipelineStatus.cmo = latestContent.created_at
+
+    const latestLinkedinPost =
+      contentRows?.find(
+        (r) =>
+          r.type === "content_linkedin" &&
+          (r.content as { contentType?: string } | undefined)?.contentType === "post",
+      ) ??
+      contentRows?.find(
+        (r) =>
+          r.type === "content_linkedin" &&
+          (r.content as { contentType?: string } | undefined)?.contentType !== "comment",
+      )
+    if (latestLinkedinPost) pipelineStatus.cmo = latestLinkedinPost.created_at
+
     if (radarRows?.[0]) pipelineStatus.cto = radarRows[0].created_at
 
     // Filter content queue: only pending_approval and draft
@@ -70,12 +91,22 @@ export async function GET() {
       return status === "pending_approval" || status === "draft"
     })
 
+    const commentDraftCount = (contentRows ?? []).filter((r) => {
+      const c = r.content as { contentType?: string; status?: string } | undefined
+      return (
+        c?.contentType === "comment" &&
+        (c.status === "pending_approval" || c.status === "draft")
+      )
+    }).length
+
     return NextResponse.json({
       brief: briefRows?.[0] ?? null,
       leads: leadRows ?? [],
       contentQueue,
       radar: radarRows?.[0] ?? null,
       pipelineStatus,
+      staffMeeting: staffMeetingRows?.[0] ?? null,
+      commentDraftCount,
     })
   } catch (err) {
     console.error("Intelligence feed error:", err)

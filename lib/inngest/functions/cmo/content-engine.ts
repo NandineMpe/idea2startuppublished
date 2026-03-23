@@ -55,6 +55,28 @@ export const contentEngine = inngest.createFunction(
       }),
     )
 
+    await step.run("write-draft-to-vault", async () => {
+      const { writeVaultFile } = await import("@/lib/juno/vault")
+      const date = new Date().toISOString().split("T")[0]
+      const md = [
+        `---`,
+        `date: ${date}`,
+        `type: linkedin-draft`,
+        `platform: linkedin`,
+        `---`,
+        ``,
+        `# LinkedIn draft — ${date}`,
+        ``,
+        `**Angle:** ${linkedinPost.angle}`,
+        ``,
+        linkedinPost.post,
+      ].join("\n")
+      const r = await writeVaultFile(`juno/content/${date}-linkedin.md`, md, `Juno: LinkedIn draft ${date}`, userId)
+      if (!r.success && r.error) {
+        console.warn("[CMO] vault write:", r.error)
+      }
+    })
+
     await step.run("notify-approval", async () => {
       const msg = [
         `📝 *LinkedIn post ready*`,

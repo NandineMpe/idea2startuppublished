@@ -50,6 +50,7 @@ for f in \
   "lib/juno/ai-engine.ts" \
   "lib/juno/brief-formatter.ts" \
   "lib/juno/delivery.ts" \
+  "lib/github-vault.ts" \
   "lib/juno/index.ts" \
   "app/api/inngest/route.ts" \
   "app/api/juno/trigger-daily-brief/route.ts"

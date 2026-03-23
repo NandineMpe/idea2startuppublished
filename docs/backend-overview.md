@@ -156,6 +156,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | **`/api/inngest`** | GET, POST, PUT | **Inngest** serve handler — registers durable workflows (`lib/inngest/functions/`). See `docs/architecture-agentic-inngest.md`. |
 | **`/api/juno/trigger-daily-brief`** | POST | Manual brief: body `{ userId }` or **`JUNO_TEST_USER_ID`** — `inngest.send({ name: "juno/brief.requested", data: { userId, profileId: "manual-trigger" } })`. Needs **`INNGEST_EVENT_KEY`**. |
 | **`/api/settings/whatsapp`** | GET, POST | **GET** — `{ whatsappNumber, verified, sandboxNumber }`. **POST** `{ whatsappNumber }` (E.164 or `null` to clear) — saves to **`company_profile`**, sends Twilio test message; **`whatsapp_verified`** set on success. |
+| **`/api/settings/github-vault`** | GET, POST | **Obsidian → GitHub vault:** **GET** current `github_vault_*` fields. **POST** `{ owner, repo, branch?, path? }` — saves pointer on **`company_profile`**; probes GitHub API and returns markdown **file count** (see `lib/github-vault.ts`, `docs/obsidian-github-vault.md`). |
 
 ---
 
@@ -163,7 +164,8 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 
 | Module | Role |
 |--------|------|
-| **`company-context.ts`** | **`getCompanyContext(userId)`** — builds text from `company_profile`, `company_assets` (pitch deck + docs/scrapes), **Supermemory** search. Used by chat, delegate, ai-tool, and many generate routes. |
+| **`company-context.ts`** | **`getCompanyContext(userId)`** — builds text from `company_profile`, `company_assets` (pitch deck + docs/scrapes), optional **GitHub Obsidian vault** (`.md` via `github-vault.ts`), **Supermemory** search. Used by chat, delegate, ai-tool, Inngest agents, and many generate routes. |
+| **`github-vault.ts`** | Lists and reads **markdown** from a GitHub repo (tree + blobs) using **`GITHUB_VAULT_TOKEN`** / **`GITHUB_TOKEN`**. |
 | **`ai-tools.ts`** | Registry of agent **tools** (`TOOLS`), **`runTool`**, prompts; uses **Anthropic** Claude. |
 | **`supermemory.ts`** | **`addToMemory`**, **`queryMemory`** — Supermemory HTTP API with `containerTags: user:<userId>`. |
 | **`exa.ts`** | **`searchFounder`** — Exa neural search for founder-linked content. |
@@ -186,6 +188,8 @@ Set these in **Vercel** / **`.env.local`** as appropriate. Do **not** commit sec
 | **`SUPERMEMORY_API_KEY`** | Supermemory memorize/search. |
 | **`EXA_API_KEY`** | Exa search (`lib/exa.ts`). |
 | **`PAPERCLIP_URL`** | Paperclip service base URL (delegate + proxy). |
+| **`GITHUB_VAULT_TOKEN`** | Optional; **Contents: Read** on the vault repo — required for **private** Obsidian mirrors. |
+| **`GITHUB_TOKEN`** | Fallback if `GITHUB_VAULT_TOKEN` unset (same role). |
 
 **Security note:** `lib/supabase/server.ts` and middleware currently include **fallback** URL/key strings if env vars are missing. Production should rely on **env-only** values and rotate any keys that were ever committed.
 

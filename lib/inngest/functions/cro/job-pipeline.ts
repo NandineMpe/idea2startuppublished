@@ -124,6 +124,29 @@ export const jobBoardScanner = inngest.createFunction(
           console.log("[CRO] New leads (no verified WhatsApp):", scoredLeads.length)
         }
       })
+
+      await step.run("write-leads-to-vault", async () => {
+        const { writeVaultFile } = await import("@/lib/juno/vault")
+        const date = new Date().toISOString().split("T")[0]
+        const md = [
+          `---`,
+          `date: ${date}`,
+          `type: cro-leads`,
+          `count: ${scoredLeads.length}`,
+          `---`,
+          ``,
+          `# Leads — ${date}`,
+          ``,
+          ...scoredLeads.map(
+            (l) =>
+              `## ${l.company} — ${l.title}\n\n- Fit: ${l.icpFit}/10\n- Angle: ${l.pitchAngle}\n- Source: ${l.source}${l.url ? `\n- ${l.url}` : ""}\n`,
+          ),
+        ].join("\n")
+        const r = await writeVaultFile(`juno/leads/${date}.md`, md, `Juno: Leads ${date}`, userId)
+        if (!r.success && r.error) {
+          console.warn("[CRO] vault write:", r.error)
+        }
+      })
     }
 
     return {

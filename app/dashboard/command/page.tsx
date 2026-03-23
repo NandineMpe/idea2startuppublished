@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { CommandCenterTodos } from "@/components/dashboard/command-center-todos"
+import { JunoStaffMeetingPanel } from "@/components/dashboard/juno-staff-meeting-panel"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -263,8 +264,9 @@ export default function CommandPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 p-6 lg:p-8 max-w-7xl mx-auto items-start">
-      <div className="flex-1 min-w-0 w-full space-y-8">
+    <div className="flex flex-col max-w-7xl mx-auto w-full">
+      <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 p-6 lg:p-8 items-start">
+        <div className="flex-1 min-w-0 w-full space-y-8">
       {/* Scroll target for checklist "Open" link */}
       <div id="strategic-command-input" className="scroll-mt-28" aria-hidden />
 
@@ -442,12 +444,17 @@ export default function CommandPage() {
           )}
         </motion.div>
       )}
+        </div>
+
+        {/* Founder checklist — sticky on large screens */}
+        <aside className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-6 lg:self-start">
+          <CommandCenterTodos />
+        </aside>
       </div>
 
-      {/* Founder checklist — sticky on large screens */}
-      <aside className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-6 lg:self-start">
-        <CommandCenterTodos />
-      </aside>
+      <section className="border-t border-border/60 bg-muted/20 px-6 lg:px-8 py-8 lg:py-10">
+        <JunoStaffMeetingPanel />
+      </section>
     </div>
   )
 }

@@ -15,12 +15,16 @@ export { commentEngine, contentEngine, relationshipTracker } from "./cmo-content
 // CTO — Chief Technology Officer
 export { platformPoster, techRadar } from "./cto-tech-radar"
 
+// Staff meeting (synthesis across agents)
+export { staffMeetingFanOut, staffMeeting } from "./staff-meeting"
+
 export { junoPing } from "./ping"
 
 import { commentEngine, contentEngine, relationshipTracker } from "./cmo-content-engine"
 import { dailyBrief, dailyBriefFanOut } from "./cbs-daily-brief"
 import { jobBoardScanner, jobScanFanOut, leadOutreach } from "./cro-lead-pipeline"
 import { platformPoster, techRadar } from "./cto-tech-radar"
+import { staffMeetingFanOut, staffMeeting } from "./staff-meeting"
 import { junoPing } from "./ping"
 
 /** All Inngest functions registered by `app/api/inngest/route.ts`. */
@@ -36,4 +40,6 @@ export const inngestFunctions = [
   jobScanFanOut,
   jobBoardScanner,
   leadOutreach,
+  staffMeetingFanOut,
+  staffMeeting,
 ]

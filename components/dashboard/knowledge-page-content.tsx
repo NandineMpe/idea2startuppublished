@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 
 type MemoryHit = { content?: string }
 
@@ -132,6 +133,8 @@ export function KnowledgePageContent() {
 
   return (
     <div className="flex flex-col gap-6">
+      <GithubVaultSettings />
+
       {assetCount !== null && (
         <p className="text-[13px] text-muted-foreground">
           {assetCount} saved document{assetCount === 1 ? "" : "s"} / assets on file — add more from the{" "}

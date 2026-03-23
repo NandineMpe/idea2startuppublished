@@ -72,6 +72,27 @@ export const techRadar = inngest.createFunction(
         if (error) console.error("[CTO techRadar] ai_outputs insert:", error.message)
       })
 
+      await step.run(`write-tech-radar-vault-${i}`, async () => {
+        const { writeVaultFile } = await import("@/lib/juno/vault")
+        const date = new Date().toISOString().split("T")[0]
+        const trends = analysis.trends || []
+        const md = [
+          `---`,
+          `date: ${date}`,
+          `type: tech-radar`,
+          `sources_scanned: ${allTech.length}`,
+          `---`,
+          ``,
+          `# Tech radar — ${date}`,
+          ``,
+          ...trends.map((t) => `## ${t.trend}\n\n${t.relevance}\n\n→ **Action:** ${t.action}\n`),
+        ].join("\n")
+        const r = await writeVaultFile(`juno/tech-radar/${date}.md`, md, `Juno: Tech radar ${date}`, userId)
+        if (!r.success && r.error) {
+          console.warn("[CTO techRadar] vault write:", r.error)
+        }
+      })
+
       for (const [si, suggestion] of (analysis.postSuggestions || []).entries()) {
         await step.run(`post-suggestion-${i}-${si}`, () =>
           saveContentToDB({

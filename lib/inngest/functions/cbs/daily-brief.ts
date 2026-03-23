@@ -113,6 +113,27 @@ export const dailyBrief = inngest.createFunction(
       }),
     ])
 
+    await step.run("write-to-vault", async () => {
+      const { writeVaultFile } = await import("@/lib/juno/vault")
+      const date = brief.briefDateIso
+      const markdown = [
+        `---`,
+        `date: ${date}`,
+        `type: daily-brief`,
+        `items: ${scored.length}`,
+        `sources: ${allItems.length}`,
+        `---`,
+        ``,
+        `# Daily Brief — ${date}`,
+        ``,
+        brief.email,
+      ].join("\n")
+      const r = await writeVaultFile(`juno/briefs/${date}.md`, markdown, `Juno: Daily brief for ${date}`, userId)
+      if (!r.success && r.error) {
+        console.warn("[CBS Brief] vault write:", r.error)
+      }
+    })
+
     const payload: DailyBriefPayload = {
       userId,
       briefDate: brief.briefDateIso,

@@ -6,11 +6,14 @@
  *   1. Structured profile (company_profile)
  *   2. Assets (company_assets: pitch deck, docs, scrapes)
  *   3. Semantic memory (Supermemory)
+ *   4. Obsidian vault (GitHub): structured excerpts + full markdown scan
  *
  * Output: structured CompanyContext + promptBlock for system prompts.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { fetchGithubVaultMarkdown } from "@/lib/github-vault"
+import { getVaultContext, resolveGithubVaultConfig } from "@/lib/juno/vault"
 import { queryMemory } from "@/lib/supermemory"
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -19,6 +22,8 @@ export interface CompanyContext {
   userId: string
   profile: CompanyProfile
   assets: CompanyAsset[]
+  /** Markdown from GitHub-backed Obsidian vault when configured */
+  vaultFiles: Array<{ path: string; content: string }>
   memoryHits: string[]
   /** Pre-formatted block for Claude / Gemini system prompts */
   promptBlock: string
@@ -106,15 +111,32 @@ export async function getCompanyContext(
 
     const profile = await loadProfile(supabase, userId)
     const assets = await loadAssets(supabase, userId, maxAssets, maxAssetChars)
+
+    let vaultFiles: Array<{ path: string; content: string }> = []
+    const vaultConfig = await resolveGithubVaultConfig(userId)
+    if (vaultConfig) {
+      const vaultResult = await fetchGithubVaultMarkdown(vaultConfig, {
+        maxFiles: 35,
+        maxTotalChars: 72_000,
+        maxPerFileChars: 14_000,
+      })
+      if (vaultResult.error) {
+        console.warn("[company-context] GitHub vault:", vaultResult.error)
+      }
+      vaultFiles = vaultResult.files ?? []
+    }
+
     const memoryHits = await queryMemoryLayer(userId, queryHint, profile)
+    const vaultNarrative = await getVaultContext(userId, { queryHint })
 
     const extracted = extractIntelligence(profile)
-    const promptBlock = buildPromptBlock(profile, assets, memoryHits)
+    const promptBlock = buildPromptBlock(profile, assets, vaultFiles, memoryHits, vaultNarrative)
 
     return {
       userId,
       profile,
       assets,
+      vaultFiles,
       memoryHits,
       promptBlock,
       extracted,
@@ -302,7 +324,9 @@ async function queryMemoryLayer(
 function buildPromptBlock(
   profile: CompanyProfile,
   assets: CompanyAsset[],
+  vaultFiles: Array<{ path: string; content: string }>,
   memoryHits: string[],
+  vaultNarrative: string,
 ): string {
   const sections: string[] = []
 
@@ -351,6 +375,25 @@ function buildPromptBlock(
     sections.push(`\n=== ADDITIONAL CONTEXT FROM KNOWLEDGE BASE ===`)
     for (const hit of memoryHits) {
       sections.push(hit)
+    }
+  }
+
+  if (vaultNarrative.trim()) {
+    sections.push(`\n=== OBSIDIAN VAULT (PRIORITY NOTES) ===`)
+    sections.push(
+      "Structured excerpts: roadmap, decisions, company strategy, competitors, research — from the founder's vault.",
+    )
+    sections.push(vaultNarrative.trim())
+  }
+
+  if (vaultFiles.length > 0) {
+    sections.push(`\n=== OBSIDIAN VAULT (FULL MARKDOWN SCAN) ===`)
+    sections.push(
+      "Additional markdown from the GitHub-backed vault. Treat linked ideas and headings as long-form context.",
+    )
+    for (const vf of vaultFiles) {
+      sections.push(`\n--- file: ${vf.path} ---`)
+      sections.push(vf.content)
     }
   }
 
