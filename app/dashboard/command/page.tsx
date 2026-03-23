@@ -265,6 +265,10 @@ export default function CommandPage() {
 
   return (
     <div className="flex flex-col max-w-7xl mx-auto w-full">
+      <section className="border-b border-border/60 bg-muted/20 px-6 lg:px-8 pt-6 lg:pt-8 pb-8 lg:pb-10">
+        <JunoStaffMeetingPanel />
+      </section>
+
       <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 p-6 lg:p-8 items-start">
         <div className="flex-1 min-w-0 w-full space-y-8">
       {/* Scroll target for checklist "Open" link */}
@@ -451,10 +455,6 @@ export default function CommandPage() {
           <CommandCenterTodos />
         </aside>
       </div>
-
-      <section className="border-t border-border/60 bg-muted/20 px-6 lg:px-8 py-8 lg:py-10">
-        <JunoStaffMeetingPanel />
-      </section>
     </div>
   )
 }
