@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { CommandCenterTodos } from "@/components/dashboard/command-center-todos"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,6 @@ function TaskResultCard({ result }: { result: TaskResult }) {
 
 export default function CommandPage() {
   const [goal, setGoal] = useState("")
-  const [context, setContext] = useState("")
   const [phase, setPhase] = useState<"idle" | "planning" | "executing" | "done">("idle")
   const [plan, setPlan] = useState<Plan | null>(null)
   const [results, setResults] = useState<TaskResult[]>([])
@@ -195,7 +195,7 @@ export default function CommandPage() {
       const res = await fetch("/api/delegate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: goal.trim(), context: context.trim() }),
+        body: JSON.stringify({ goal: goal.trim() }),
       })
       if (!res.ok) {
         const err = await res.json()
@@ -263,7 +263,11 @@ export default function CommandPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 p-6 lg:p-8 max-w-7xl mx-auto items-start">
+      <div className="flex-1 min-w-0 w-full space-y-8">
+      {/* Scroll target for checklist "Open" link */}
+      <div id="strategic-command-input" className="scroll-mt-28" aria-hidden />
+
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-1">
@@ -326,24 +330,14 @@ export default function CommandPage() {
             <label className="text-[13px] font-medium text-foreground">
               Strategic goal <span className="text-red-400">*</span>
             </label>
+            <p className="text-[11px] text-muted-foreground -mt-0.5">
+              Planning uses your saved company profile and context — keep those up to date under Company and My Context.
+            </p>
             <Textarea
               placeholder="e.g. We want to raise a $2M seed round in the next 6 months. Help us prepare."
               value={goal}
               onChange={(e) => setGoal(e.target.value)}
               className="min-h-[100px] text-[13px] bg-background resize-none"
-            />
-          </div>
-
-          {/* Context input */}
-          <div className="space-y-2">
-            <label className="text-[13px] font-medium text-foreground">
-              Startup context <span className="text-[12px] text-muted-foreground font-normal">(helps agents give more relevant output)</span>
-            </label>
-            <Textarea
-              placeholder="e.g. B2B SaaS for HR teams. We have 50 customers, $30K MRR, 2 founders, based in London."
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-              className="min-h-[80px] text-[13px] bg-background resize-none"
             />
           </div>
 
@@ -448,6 +442,12 @@ export default function CommandPage() {
           )}
         </motion.div>
       )}
+      </div>
+
+      {/* Founder checklist — sticky on large screens */}
+      <aside className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-6 lg:self-start">
+        <CommandCenterTodos />
+      </aside>
     </div>
   )
 }
