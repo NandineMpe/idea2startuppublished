@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { WhatsAppSetup } from "@/components/whatsapp-setup"
 
 export default function SettingsPage() {
   const [name, setName] = useState("Alex Johnson")
@@ -176,8 +175,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-border">
-                <WhatsAppSetup />
+              <div className="pt-4 border-t border-border space-y-2">
+                <h4 className="text-sm font-medium text-foreground">Where to find Juno alerts</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Briefs, leads, content queue, and staff meeting summaries appear in the app — open the{" "}
+                  <a href="/dashboard" className="text-primary font-medium underline-offset-4 hover:underline">
+                    Intelligence Feed
+                  </a>{" "}
+                  (home) and the Signal feed on the right. No phone number or third-party messaging setup is required.
+                </p>
               </div>
 
               <div className="flex justify-end">

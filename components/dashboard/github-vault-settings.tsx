@@ -30,6 +30,11 @@ export function GithubVaultSettings() {
     error: string | null
     samplePaths: string[]
   } | null>(null)
+  const [persistedVerify, setPersistedVerify] = useState<{
+    at: string | null
+    fileCount: number | null
+    error: string | null
+  }>({ at: null, fileCount: null, error: null })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -42,6 +47,11 @@ export function GithubVaultSettings() {
         repo: data.repo ?? "",
         branch: data.branch ?? "main",
         path: data.path ?? "",
+      })
+      setPersistedVerify({
+        at: data.lastVerifiedAt ?? null,
+        fileCount: data.lastProbeFileCount ?? null,
+        error: data.lastProbeError ?? null,
       })
     } finally {
       setLoading(false)
@@ -121,7 +131,7 @@ export function GithubVaultSettings() {
               >
                 obsidian-git
               </a>
-              . Juno reads <code className="text-[11px] bg-muted px-1 rounded">.md</code> files via the GitHub API and merges them into every agent&apos;s context — alongside Supabase profile and semantic memory.
+              . Juno reads <code className="text-[11px] bg-muted px-1 rounded">.md</code> files via the GitHub API and merges them into agent context together with the Supabase profile and semantic memory.
             </CardDescription>
           </div>
         </div>
@@ -184,6 +194,23 @@ export function GithubVaultSettings() {
                 />
               </div>
             </div>
+
+            {(persistedVerify.at || persistedVerify.error != null) && (
+              <p className="text-[11px] text-muted-foreground rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
+                <span className="font-medium text-foreground">Last verified: </span>
+                {persistedVerify.at
+                  ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+                      new Date(persistedVerify.at),
+                    )
+                  : "—"}
+                {persistedVerify.fileCount != null && (
+                  <span className="text-foreground"> · {persistedVerify.fileCount} markdown file(s)</span>
+                )}
+                {persistedVerify.error && (
+                  <span className="text-amber-600 dark:text-amber-400"> · {persistedVerify.error}</span>
+                )}
+              </p>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" onClick={save} disabled={saving} className="gap-2">

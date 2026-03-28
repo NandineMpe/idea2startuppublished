@@ -152,12 +152,12 @@ export function AIToolPage({ title, description, toolId, fields, icon, backHref 
             {isLoading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generating...
+                Running…
               </>
             ) : (
               <>
                 <Sparkles className="h-3.5 w-3.5" />
-                Generate with AI
+                Run workflow
               </>
             )}
           </Button>

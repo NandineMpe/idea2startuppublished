@@ -3,6 +3,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 export async function POST(request: Request) {
   try {
@@ -53,7 +54,7 @@ Based on this information, please craft my networking elevator pitch.`
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
       prompt,
-      system: systemPrompt,
+      system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 1000,
     })
 

@@ -3,6 +3,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 const SYSTEM_PROMPT = `You are a value proposition strategist trained in Jobs-to-be-Done theory, the Value Proposition Canvas, and positioning frameworks from April Dunford. Your role is to generate a comprehensive, actionable value proposition for a startup.
 
@@ -73,7 +74,7 @@ ${existingAlternatives ? `Existing Alternatives: ${existingAlternatives}` : ""}`
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
       prompt,
-      system: SYSTEM_PROMPT,
+      system: mergeSystemWithWritingRules(SYSTEM_PROMPT),
       maxTokens: 4000,
       temperature: 0.5,
     })

@@ -78,9 +78,11 @@ export default function ValuePropositionPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Target className="h-6 w-6 text-yellow-400" />
-          Value Proposition Generator
+          Value proposition workflow
         </h1>
-        <p className="text-muted-foreground mt-1">Create a compelling value proposition using the Value Proposition Canvas framework.</p>
+        <p className="text-muted-foreground mt-1">
+          Walk the Value Proposition Canvas with Juno — you review and ship the narrative.
+        </p>
       </div>
 
       {/* Input Form */}
@@ -130,9 +132,9 @@ export default function ValuePropositionPage() {
             className="w-full bg-primary text-black font-semibold hover:bg-primary/90 h-11"
           >
             {isGenerating ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Value Proposition...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Running workflow…</>
             ) : (
-              <><Sparkles className="mr-2 h-4 w-4" /> Generate Value Proposition</>
+              <><Sparkles className="mr-2 h-4 w-4" /> Run workflow</>
             )}
           </Button>
         </CardContent>

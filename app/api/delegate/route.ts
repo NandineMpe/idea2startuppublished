@@ -3,11 +3,9 @@
  *
  * Receives a strategic goal from the user and uses Claude to:
  * 1. Decompose it into concrete tasks for each relevant executive agent
- * 2. Create a Paperclip goal (if Paperclip is online)
- * 3. Return the breakdown so the frontend can execute each task via /api/ai-tool
+ * 2. Return the breakdown so the frontend can execute each task via /api/ai-tool
  *
- * This is the bridge between Paperclip's organisational layer and our tool execution layer.
- * Paperclip manages WHO does WHAT. Our tools determine HOW.
+ * Planning selects WHO does WHAT; tool routes determine HOW.
  */
 
 import { NextResponse } from "next/server"
@@ -16,6 +14,7 @@ import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { TOOLS, AGENT_LABELS } from "@/lib/ai-tools"
 import { getCompanyContextPrompt } from "@/lib/company-context"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 interface PlannedTask {
   agent: string          // cbs | cro | cmo | cfo | coo
@@ -31,7 +30,6 @@ interface PlanResponse {
   goal: string
   breakdown: string     // CEO-level explanation of the delegation
   tasks: PlannedTask[]
-  paperclipGoalId?: string
 }
 
 // Map tool IDs to their available input field keys (for grounding the AI's output)
@@ -112,7 +110,7 @@ export async function POST(request: Request) {
 
     const { text: planText } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
-      system: PLANNING_SYSTEM_PROMPT,
+      system: mergeSystemWithWritingRules(PLANNING_SYSTEM_PROMPT),
       prompt: userPrompt,
       maxTokens: 2000,
       temperature: 0.3,
@@ -153,42 +151,10 @@ export async function POST(request: Request) {
         }
       })
 
-    // ── Step 3: Create Paperclip goal (non-blocking, best-effort) ─────────
-    let paperclipGoalId: string | undefined
-    try {
-      const companiesRes = await fetch(
-        `${process.env.PAPERCLIP_URL || "http://localhost:3100"}/api/companies`,
-        { signal: AbortSignal.timeout(2000) },
-      )
-      if (companiesRes.ok) {
-        const companies: Array<{ id: string }> = await companiesRes.json()
-        if (companies.length > 0) {
-          const goalRes = await fetch(
-            `${process.env.PAPERCLIP_URL || "http://localhost:3100"}/api/companies/${companies[0].id}/goals`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: goal.slice(0, 100),
-                description: `${plan.breakdown}\n\nDelegated tasks: ${tasks.map((t) => `${t.agentLabel}: ${t.title}`).join(", ")}`,
-              }),
-            },
-          )
-          if (goalRes.ok) {
-            const goalData = await goalRes.json()
-            paperclipGoalId = goalData.id
-          }
-        }
-      }
-    } catch {
-      // Paperclip offline — that's OK, we continue without it
-    }
-
     const response: PlanResponse = {
       goal,
       breakdown: plan.breakdown,
       tasks,
-      ...(paperclipGoalId ? { paperclipGoalId } : {}),
     }
 
     return NextResponse.json(response)

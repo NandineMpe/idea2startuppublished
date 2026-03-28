@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
+import type { ScoredItem } from "@/lib/juno/types"
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -9,102 +10,6 @@ function getServiceClient() {
   return createClient(url, key)
 }
 
-function normalizeWhatsAppAddr(addr: string): string {
-  const a = addr.trim()
-  if (a.startsWith("whatsapp:")) return a
-  return `whatsapp:${a}`
-}
-
-// ─── WhatsApp via Twilio ─────────────────────────────────────────
-
-export async function sendWhatsApp(
-  to: string | undefined,
-  body: string,
-): Promise<{ success: boolean; sid?: string; error?: string }> {
-  const sid = process.env.TWILIO_ACCOUNT_SID
-  const token = process.env.TWILIO_AUTH_TOKEN
-  const from = process.env.TWILIO_WHATSAPP_FROM // e.g. whatsapp:+14155238886
-
-  const dest = to?.trim()
-  if (!dest) {
-    console.log("[WhatsApp] No destination. Message:")
-    console.log(body.slice(0, 800))
-    return { success: false, error: "no_phone" }
-  }
-
-  if (!sid || !token || !from) {
-    console.log("[WhatsApp] Twilio not configured. Message:")
-    console.log(body.slice(0, 800))
-    return { success: false, error: "Twilio not configured" }
-  }
-
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
-      },
-      body: new URLSearchParams({
-        From: normalizeWhatsAppAddr(from),
-        To: normalizeWhatsAppAddr(dest),
-        Body: body.slice(0, 1600),
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.text()
-      return { success: false, error: err }
-    }
-
-    const data = (await res.json()) as { sid?: string }
-    return { success: true, sid: data.sid }
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { success: false, error: msg }
-  }
-}
-
-/**
- * Load WhatsApp destination from `company_profile` (E.164, verified).
- * Returns null if unset, unverified, or on error.
- */
-export async function getUserWhatsAppNumber(userId: string): Promise<string | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return null
-  }
-  try {
-    const supabase = getServiceClient()
-    const { data, error } = await supabase
-      .from("company_profile")
-      .select("whatsapp_number, whatsapp_verified")
-      .eq("user_id", userId)
-      .maybeSingle()
-
-    if (error || !data?.whatsapp_number || !data.whatsapp_verified) return null
-    return data.whatsapp_number as string
-  } catch {
-    return null
-  }
-}
-
-/**
- * Send WhatsApp to a user by `userId` (reads verified number from DB).
- * No-op if not configured.
- */
-export async function sendWhatsAppToUser(
-  userId: string,
-  body: string,
-): Promise<{ success: boolean; sid?: string; error?: string }> {
-  const phone = await getUserWhatsAppNumber(userId)
-  if (!phone) {
-    console.log(`[WhatsApp] User ${userId} has no verified WhatsApp number — skipping send`)
-    return { success: false, error: "no_number" }
-  }
-  return sendWhatsApp(phone, body)
-}
-
 // ─── Persist brief to Supabase ───────────────────────────────────
 
 export async function saveBriefToDB(params: {
@@ -113,6 +18,7 @@ export async function saveBriefToDB(params: {
   rawItemCount: number
   scoredItemCount: number
   briefDateIso?: string
+  scoredItems: ScoredItem[]
 }): Promise<void> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     console.warn("[juno/delivery] saveBriefToDB: missing Supabase env — skipping")
@@ -126,15 +32,28 @@ export async function saveBriefToDB(params: {
         ? (params.brief as Record<string, unknown>)
         : { markdown: String(params.brief) }
 
+    const markdown =
+      typeof contentPayload.markdown === "string"
+        ? contentPayload.markdown
+        : String(contentPayload.markdown ?? "")
+
+    const dateStr = params.briefDateIso ?? new Date().toISOString().slice(0, 10)
+    const title = `Daily Brief — ${dateStr}`
+
     const { error } = await supabase.from("ai_outputs").insert({
       user_id: params.userId,
-      type: "daily_brief",
-      content: contentPayload,
+      tool: "daily_brief",
+      title,
+      output: markdown,
+      inputs: {
+        raw_item_count: params.rawItemCount,
+        scored_item_count: params.scoredItemCount,
+        scored_items: params.scoredItems,
+      },
       metadata: {
-        raw_items: params.rawItemCount,
-        scored_items: params.scoredItemCount,
         generated_at: new Date().toISOString(),
-        ...(params.briefDateIso ? { brief_date_iso: params.briefDateIso } : {}),
+        brief_date_iso: dateStr,
+        dashboard: contentPayload.dashboard,
       },
     })
 
@@ -150,36 +69,114 @@ export type SaveLeadInput = {
   userId: string
   company: string
   role: string
+  /** Contact / prospect name when known (optional; shown in lookalike list). */
+  contactName?: string
   url?: string
+  /** Best-known email domain for TheOrg / enrichment (e.g. acme.com). */
+  companyDomain?: string | null
   score: number
   pitchAngle: string
   source: string
+  timing?: "urgent" | "warm" | "cold"
+  budgetSignal?: "high" | "medium" | "low"
+  jobLocation?: string
+  jobSalary?: string
+  linkedinConnect?: string
+  linkedinDM?: string
+  email?: string
 }
 
-export async function saveLeadToDB(params: SaveLeadInput): Promise<void> {
+/** Persists to `cro_leads` + `ai_outputs`. Returns `cro_leads.id` when the row is created. */
+export async function saveLeadToDB(params: SaveLeadInput): Promise<string | null> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
     console.warn("[juno/delivery] saveLeadToDB: missing Supabase env — skipping")
-    return
+    return null
   }
 
   try {
     const supabase = getServiceClient()
-    const { error } = await supabase.from("ai_outputs").insert({
-      user_id: params.userId,
-      type: "lead_discovered",
-      content: {
+
+    let croLeadId: string | null = null
+    const { data: croRow, error: croError } = await supabase
+      .from("cro_leads")
+      .insert({
+        user_id: params.userId,
         company: params.company,
         role: params.role,
+        url: params.url ?? null,
+        icp_fit: params.score,
+        pitch_angle: params.pitchAngle,
+        source: params.source,
+        company_domain: params.companyDomain ?? null,
+      })
+      .select("id")
+      .single()
+
+    if (croError) {
+      console.error("[juno/delivery] cro_leads insert:", croError.message)
+    } else {
+      croLeadId = croRow?.id ?? null
+    }
+
+    const title = `Lead: ${params.company} — ${params.role}`.slice(0, 500)
+    const outreachMd = [
+      params.linkedinConnect
+        ? `### LinkedIn connection request\n${params.linkedinConnect}`
+        : "",
+      params.linkedinDM ? `### LinkedIn DM\n${params.linkedinDM}` : "",
+      params.email ? `### Cold email\n${params.email}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+
+    const output = [
+      `Score: ${params.score}/10`,
+      params.timing ? `Timing: ${params.timing}` : "",
+      params.budgetSignal ? `Budget signal: ${params.budgetSignal}` : "",
+      `Source: ${params.source}`,
+      params.jobLocation ? `Location: ${params.jobLocation}` : "",
+      params.jobSalary ? `Salary: ${params.jobSalary}` : "",
+      params.url ? `URL: ${params.url}` : "",
+      "",
+      params.pitchAngle,
+      outreachMd ? `\n---\n${outreachMd}` : "",
+    ]
+      .filter((line) => line !== "")
+      .join("\n")
+
+    const { error } = await supabase.from("ai_outputs").insert({
+      user_id: params.userId,
+      tool: "lead_discovered",
+      title,
+      output,
+      inputs: {
+        company: params.company,
+        role: params.role,
+        contactName: params.contactName?.trim() || undefined,
         url: params.url ?? "",
         score: params.score,
         pitchAngle: params.pitchAngle,
+        source: params.source,
+        timing: params.timing,
+        budgetSignal: params.budgetSignal,
+        jobLocation: params.jobLocation,
+        jobSalary: params.jobSalary,
+        linkedinConnect: params.linkedinConnect,
+        linkedinDM: params.linkedinDM,
+        email: params.email,
+        cro_lead_id: croLeadId,
       },
-      metadata: { source: params.source, discovered_at: new Date().toISOString() },
+      metadata: {
+        discovered_at: new Date().toISOString(),
+        cro_lead_id: croLeadId,
+      },
     })
 
     if (error) console.error("[juno/delivery] Failed to save lead:", error.message)
+    return croLeadId
   } catch (e) {
     console.error("[juno/delivery] saveLeadToDB:", e instanceof Error ? e.message : e)
+    return null
   }
 }
 
@@ -201,15 +198,18 @@ export async function saveContentToDB(params: SaveContentInput): Promise<string 
 
   try {
     const supabase = getServiceClient()
+    const tool = `content_${params.platform}`
+    const title = `${params.contentType} — ${params.platform}`.slice(0, 500)
     const { data, error } = await supabase
       .from("ai_outputs")
       .insert({
         user_id: params.userId,
-        type: `content_${params.platform}`,
-        content: {
+        tool,
+        title,
+        output: params.body,
+        inputs: {
           platform: params.platform,
           contentType: params.contentType,
-          body: params.body,
           status: params.status,
         },
         metadata: { created_at: new Date().toISOString() },

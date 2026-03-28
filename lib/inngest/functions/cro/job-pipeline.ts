@@ -1,8 +1,10 @@
 import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { generateOutreach, scoreLeadFit } from "@/lib/juno/ai-engine"
-import { saveContentToDB, saveLeadToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
-import { scrapeJobBoards } from "@/lib/juno/scrapers"
+import { insertContentCalendarRow } from "@/lib/content-calendar"
+import { saveContentToDB, saveLeadToDB } from "@/lib/juno/delivery"
+import { resolveDomainForTheOrgLookup } from "@/lib/juno/theorg"
+import { jackJillRowsToJobListings, mergeJobListings, scrapeJobBoards } from "@/lib/juno/scrapers"
 import { getFanOutUserIds } from "@/lib/juno/users"
 import type { JobListing, LeadDiscoveredPayload, LeadFitResult } from "@/lib/juno/types"
 
@@ -57,7 +59,14 @@ export const jobBoardScanner = inngest.createFunction(
     const { keywords } = context.extracted
     const kw = keywords.length > 0 ? keywords : ["startup", "software", "remote"]
 
-    const listings = await step.run("scan-boards", () => scrapeJobBoards({ keywords: kw }))
+    const jackJill = jackJillRowsToJobListings(context.profile.raw?.jack_jill_jobs)
+    const listings = await step.run("scan-boards", async () => {
+      const scraped = await scrapeJobBoards({
+        keywords: kw,
+        allowStub: jackJill.length === 0,
+      })
+      return mergeJobListings(jackJill, scraped)
+    })
 
     if (listings.length === 0) {
       return { userId, found: 0, qualified: 0 }
@@ -84,12 +93,13 @@ export const jobBoardScanner = inngest.createFunction(
     })
 
     for (const [i, lead] of scoredLeads.entries()) {
-      await step.run(`persist-lead-${i}`, () =>
+      const leadId = await step.run(`persist-lead-${i}`, () =>
         saveLeadToDB({
           userId,
           company: lead.company,
           role: lead.title,
           url: lead.url,
+          companyDomain: resolveDomainForTheOrgLookup(lead.company, lead.url, lead.source),
           score: lead.icpFit,
           pitchAngle: lead.pitchAngle,
           source: lead.source,
@@ -108,23 +118,26 @@ export const jobBoardScanner = inngest.createFunction(
           source: lead.source,
         } satisfies LeadDiscoveredPayload,
       })
+
+      if (typeof leadId === "string" && lead.icpFit >= 7) {
+        await step.sendEvent(`lead-qualified-${i}`, {
+          name: "juno/lead.qualified" as const,
+          data: {
+            leadId,
+            userId,
+            companyName: lead.company,
+            companyDomain: resolveDomainForTheOrgLookup(lead.company, lead.url, lead.source),
+            jobTitle: lead.title,
+            jobUrl: lead.url,
+            pitchAngle: lead.pitchAngle,
+            score: lead.icpFit,
+            source: lead.source,
+          },
+        })
+      }
     }
 
     if (scoredLeads.length > 0) {
-      await step.run("notify-new-leads", async () => {
-        const msg = [
-          `🎯 *${scoredLeads.length} new leads*`,
-          "",
-          ...scoredLeads.slice(0, 3).map(
-            (l) => `• *${l.company}* — ${l.title}\n  Fit: ${l.icpFit}/10 | ${l.pitchAngle}`,
-          ),
-        ].join("\n")
-        const r = await sendWhatsAppToUser(userId, msg)
-        if (!r.success) {
-          console.log("[CRO] New leads (no verified WhatsApp):", scoredLeads.length)
-        }
-      })
-
       await step.run("write-leads-to-vault", async () => {
         const { writeVaultFile } = await import("@/lib/juno/vault")
         const date = new Date().toISOString().split("T")[0]
@@ -193,7 +206,7 @@ export const leadOutreach = inngest.createFunction(
       }),
     )
 
-    await step.run("save-outreach", () =>
+    const outreachContentId = await step.run("save-outreach", () =>
       saveContentToDB({
         userId,
         platform: "linkedin",
@@ -202,6 +215,21 @@ export const leadOutreach = inngest.createFunction(
         status: "pending_approval",
       }),
     )
+
+    await step.run("calendar-outreach", async () => {
+      await insertContentCalendarRow({
+        userId,
+        title: `Outreach: ${company} — ${role}`,
+        body: JSON.stringify(outreach),
+        channel: "linkedin",
+        contentType: "outreach",
+        scheduledDate: new Date().toISOString().split("T")[0],
+        status: "draft",
+        source: "cro_outreach",
+        sourceRef: outreachContentId ?? undefined,
+        targetAudience: `${role} at ${company}`,
+      })
+    })
 
     return { userId, company, generated: true as const }
   },

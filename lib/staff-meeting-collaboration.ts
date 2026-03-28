@@ -46,6 +46,7 @@ type BriefItem = {
   source?: string
   relevance?: string
   summary?: string
+  whyItMatters?: string
 }
 
 type BriefDashboard = {
@@ -101,7 +102,7 @@ function briefItemToCard(item: BriefItem): { title: string; source: string; why:
   return {
     title: item.headline ?? item.title ?? "Untitled",
     source: item.source ?? "",
-    why: item.relevance ?? item.summary ?? "",
+    why: item.whyItMatters ?? item.relevance ?? item.summary ?? "",
   }
 }
 

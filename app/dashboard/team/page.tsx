@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { OrgChart } from "@/components/dashboard/org-chart"
 import { AgentStatusDot } from "@/components/dashboard/agent-status-dot"
-import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/paperclip"
+import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/agent-roles"
 import Link from "next/link"
 
 const roleIcons: Record<string, React.ElementType> = {

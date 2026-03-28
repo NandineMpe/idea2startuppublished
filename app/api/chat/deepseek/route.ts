@@ -1,5 +1,6 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { streamText } from "ai"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 export async function POST(req: Request) {
   const { messages } = await req.json()
@@ -13,6 +14,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: anthropic("claude-sonnet-4-20250514"),
+    system: mergeSystemWithWritingRules(""),
     messages: messages.map((m: any) => ({
       role: m.role as "user" | "assistant",
       content: m.content,

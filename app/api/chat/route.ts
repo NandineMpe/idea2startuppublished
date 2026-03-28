@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 import { addToMemory, queryMemory } from "@/lib/supermemory"
 import { getCompanyContext } from "@/lib/company-context"
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
 
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
-      system: systemPrompt,
+      system: mergeSystemWithWritingRules(systemPrompt),
       messages: conversationMessages,
       maxTokens: 1000,
     })

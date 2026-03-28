@@ -22,6 +22,13 @@ type BriefItem = {
   relevance?: string
   summary?: string
   score?: number
+  /** Strategic intelligence layers (daily brief scoring) */
+  whyItMatters?: string
+  strategicImplication?: string
+  suggestedAction?: string
+  connectionToRoadmap?: string | null
+  urgency?: string
+  category?: string
 }
 
 type BriefDashboard = {
@@ -60,7 +67,12 @@ function FeedItem({ item }: { item: BriefItem }) {
   const headline = item.headline ?? item.title ?? "Untitled"
   const url = item.url
   const source = item.source ?? ""
-  const relevance = item.relevance ?? item.summary
+  const score = typeof item.score === "number" ? item.score : null
+  const why = item.whyItMatters ?? item.relevance ?? item.summary
+  const strategic = item.strategicImplication
+  const action = item.suggestedAction
+  const roadmap = item.connectionToRoadmap
+  const hideAction = !action || (typeof action === "string" && action.includes("No immediate"))
 
   const handleClick = () => {
     if (url) window.open(url, "_blank", "noopener,noreferrer")
@@ -80,9 +92,33 @@ function FeedItem({ item }: { item: BriefItem }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-medium text-foreground leading-snug">{headline}</p>
-          {relevance && (
-            <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{relevance}</p>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="text-[13px] font-medium text-foreground leading-snug">{headline}</p>
+            {score != null && (
+              <span className="text-[11px] font-medium text-muted-foreground tabular-nums shrink-0">
+                {score}/10
+              </span>
+            )}
+          </div>
+          {why && (
+            <p className="text-[12px] text-foreground/90 mt-1.5 leading-relaxed">{why}</p>
+          )}
+          {strategic && (
+            <p className="text-[12px] text-muted-foreground mt-1.5 leading-relaxed border-l-2 border-primary/25 pl-2">
+              <span className="font-medium text-foreground/80">Strategic: </span>
+              {strategic}
+            </p>
+          )}
+          {!hideAction && (
+            <div className="text-[12px] text-primary/95 mt-1.5 font-medium leading-snug">
+              → {action}
+            </div>
+          )}
+          {roadmap && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed flex gap-1.5">
+              <span aria-hidden>📍</span>
+              <span>{roadmap}</span>
+            </p>
           )}
           {source && (
             <div className="flex items-center gap-x-2 mt-1.5">
@@ -100,9 +136,13 @@ function FeedItem({ item }: { item: BriefItem }) {
 
 type FounderDailyFeedProps = {
   className?: string
+  /** Card heading (default: Signal feed). */
+  title?: string
+  /** Replaces the default CBS brief subtitle line when set. */
+  subtitle?: string
 }
 
-export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
+export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFeedProps) {
   const [brief, setBrief] = useState<FeedRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -138,13 +178,15 @@ export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
     >
       <div className="px-4 py-3 border-b border-border bg-primary/5 shrink-0 flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Signal feed</h2>
+          <h2 className="text-base font-semibold text-foreground">{title ?? "Signal feed"}</h2>
           <p className="text-[13px] text-muted-foreground mt-0.5">
-            {hasBrief
-              ? `CBS brief · ${briefAge}`
-              : loading
-              ? "Loading…"
-              : "No brief yet — CBS pipeline runs at 05:00"}
+            {subtitle !== undefined
+              ? subtitle
+              : hasBrief
+                ? `CBS brief · ${briefAge}`
+                : loading
+                  ? "Loading…"
+                  : "No brief yet — CBS pipeline runs at 05:00"}
           </p>
         </div>
         <button
@@ -172,7 +214,7 @@ export function FounderDailyFeed({ className }: FounderDailyFeedProps) {
         ) : (
           SECTIONS.map((section) => {
             const Icon = section.icon
-            const items: BriefItem[] = dashboard[section.key] ?? []
+            const items: BriefItem[] = (dashboard[section.key] as BriefItem[] | undefined) ?? []
             return (
               <div key={section.key}>
                 <div className="flex items-center gap-2 mb-1">

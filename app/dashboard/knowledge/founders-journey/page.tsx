@@ -187,7 +187,7 @@ export default function FoundersJourneyPage() {
                 }}
               >
                 {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Sync from Digital Footprint (Exa)
+                Sync from Digital Footprint
               </Button>
             </div>
             <p className="text-gray-400">

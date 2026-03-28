@@ -5,6 +5,7 @@ import { inngest } from "@/lib/inngest/client"
 const PIPELINE_EVENTS: Record<string, string> = {
   cbs: "juno/brief.requested",
   cro: "juno/jobs.scan.requested",
+  intent: "juno/intent.scan.requested",
 }
 
 export async function POST(req: Request) {
@@ -35,8 +36,26 @@ export async function POST(req: Request) {
       }
     }
 
+    if (pipeline === "intent") {
+      const { data: profile } = await supabase
+        .from("company_profile")
+        .select("company_name")
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (!profile?.company_name?.trim()) {
+        return NextResponse.json(
+          { error: "Add your company profile under Context before running this scan." },
+          { status: 422 },
+        )
+      }
+    }
+
     await inngest.send({
-      name: eventName as "juno/brief.requested" | "juno/jobs.scan.requested",
+      name: eventName as
+        | "juno/brief.requested"
+        | "juno/jobs.scan.requested"
+        | "juno/intent.scan.requested",
       data: { userId: user.id },
     })
 

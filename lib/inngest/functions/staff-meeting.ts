@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
-import { sendWhatsAppToUser } from "@/lib/juno/delivery"
+import { loadCompetitorTrackingRecent, loadFundingTrackerRecent } from "@/lib/juno/competitor-persistence"
 import type { StaffMeetingSynthesis } from "@/lib/staff-meeting-types"
 import { supabaseAdmin } from "@/lib/supabase"
 import { inngest } from "@/lib/inngest/client"
@@ -58,7 +60,20 @@ function organiseByRole(
   return byRole
 }
 
-function buildStaffMeetingPrompt(companyContext: string, outputs: Record<string, unknown[]>): string {
+function buildStaffMeetingPrompt(
+  companyContext: string,
+  outputs: Record<string, unknown[]>,
+  persistent?: {
+    competitor: unknown[]
+    funding: unknown[]
+    security?: Array<{
+      severity: string
+      title: string
+      category: string | null
+      file_path: string | null
+    }>
+  },
+): string {
   const sections: string[] = []
 
   sections.push(`You are the Chief of Staff for a startup. You are running the daily staff meeting.
@@ -101,6 +116,34 @@ ${companyContext}`)
     }
   }
 
+  if (persistent?.competitor && persistent.competitor.length > 0) {
+    sections.push(`\n=== COMPETITIVE LANDSCAPE (persistent tracking) ===`)
+    sections.push(JSON.stringify(persistent.competitor, null, 2))
+  }
+
+  if (persistent?.funding && persistent.funding.length > 0) {
+    sections.push(`\n=== FUNDING ACTIVITY IN OUR SPACE (persistent) ===`)
+    sections.push(JSON.stringify(persistent.funding, null, 2))
+  }
+
+  if (persistent?.security && persistent.security.length > 0) {
+    const criticalHigh = persistent.security.filter(
+      (f) => f.severity === "critical" || f.severity === "high",
+    )
+    sections.push(`\n=== CTO: SECURITY FINDINGS (open) ===`)
+    sections.push(`${persistent.security.length} open finding(s); ${criticalHigh.length} critical/high.`)
+    for (const f of persistent.security.slice(0, 15)) {
+      sections.push(
+        `- [${f.severity}] ${f.title}${f.file_path ? ` (${f.file_path})` : ""}${f.category ? ` — ${f.category}` : ""}`,
+      )
+    }
+    if (criticalHigh.length > 0) {
+      sections.push(
+        `\nRecommend: address critical/high security findings before shipping new features where applicable.`,
+      )
+    }
+  }
+
   if (Object.values(outputs).every((arr) => (arr as unknown[]).length === 0)) {
     sections.push(`\n[No agent reports available for the last 24h]`)
   }
@@ -139,7 +182,7 @@ Synthesise all reports into a staff meeting summary. Return JSON only (no markdo
       "resolution": "Suggested way to resolve"
     }
   ],
-  "executiveSummary": "3-5 sentence summary for WhatsApp. Lead with the most important insight. End with the #1 action for today."
+  "executiveSummary": "3-5 sentence summary for the in-app feed. Lead with the most important insight. End with the #1 action for today."
 }
 
 Rules:
@@ -150,29 +193,6 @@ Rules:
 - The executive summary should sound like a trusted advisor, not a report generator`)
 
   return sections.join("\n")
-}
-
-function formatWhatsAppSummary(synthesis: StaffMeetingSynthesis): string {
-  const summary = synthesis.executiveSummary || "No synthesis available today."
-  const actionCount = synthesis.actions?.length || 0
-  const insightCount = synthesis.insights?.length || 0
-
-  let msg = `📋 *Staff Meeting — ${new Date().toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short" })}*\n\n`
-  msg += `${summary}\n\n`
-
-  if (actionCount > 0) {
-    msg += `*Top actions:*\n`
-    for (const action of (synthesis.actions || []).slice(0, 3)) {
-      const urgencyIcon = action.urgency === "today" ? "🔴" : "🟡"
-      msg += `${urgencyIcon} ${action.action}\n`
-    }
-  }
-
-  if (insightCount > 0) {
-    msg += `\n_${insightCount} cross-cutting insights on your dashboard_`
-  }
-
-  return msg
 }
 
 function formatMeetingForObsidian(
@@ -283,9 +303,9 @@ export const staffMeeting = inngest.createFunction(
 
       const { data, error } = await supabaseAdmin
         .from("ai_outputs")
-        .select("type, content, metadata, created_at")
+        .select("id, tool, title, inputs, output, metadata, created_at")
         .eq("user_id", userId)
-        .neq("type", "staff_meeting")
+        .neq("tool", "staff_meeting")
         .gte("created_at", since)
         .order("created_at", { ascending: true })
 
@@ -294,11 +314,62 @@ export const staffMeeting = inngest.createFunction(
         return []
       }
 
-      return data ?? []
+      return (data ?? []).map((r) => {
+        const legacy = toLegacyFeedRow(r as AiOutputDbRow)
+        return {
+          type: legacy.type,
+          content: legacy.content,
+          metadata: legacy.metadata,
+          created_at: legacy.created_at,
+        }
+      })
+    })
+
+    const persistent = await step.run("load-competitor-funding-security", async () => {
+      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return {
+          competitor: [] as unknown[],
+          funding: [] as unknown[],
+          security: [] as Array<{
+            severity: string
+            title: string
+            category: string | null
+            file_path: string | null
+          }>,
+        }
+      }
+      const [competitor, funding, secRes] = await Promise.all([
+        loadCompetitorTrackingRecent(userId, 20),
+        loadFundingTrackerRecent(userId, 20),
+        supabaseAdmin
+          .from("security_findings")
+          .select("severity, title, category, file_path")
+          .eq("user_id", userId)
+          .eq("status", "open"),
+      ])
+      const order: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
+      let security: Array<{
+        severity: string
+        title: string
+        category: string | null
+        file_path: string | null
+      }> = []
+      if (secRes.error) {
+        console.warn("[staff-meeting] security_findings:", secRes.error.message)
+      } else {
+        security = (secRes.data ?? []).sort(
+          (a, b) => (order[String(a.severity)] ?? 9) - (order[String(b.severity)] ?? 9),
+        )
+      }
+      return { competitor, funding, security }
     })
 
     if (agentOutputs.length === 0) {
-      return { userId, skipped: true, reason: "No agent outputs in last 24h" }
+      const critHigh =
+        persistent.security?.filter((f) => f.severity === "critical" || f.severity === "high") ?? []
+      if (critHigh.length === 0) {
+        return { userId, skipped: true, reason: "No agent outputs in last 24h" }
+      }
     }
 
     const organised = await step.run("organise-outputs", () => organiseByRole(agentOutputs))
@@ -314,12 +385,12 @@ export const staffMeeting = inngest.createFunction(
         }
       }
 
-      const prompt = buildStaffMeetingPrompt(companyBlock, organised)
+      const prompt = buildStaffMeetingPrompt(companyBlock, organised, persistent)
 
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 3000,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: appendWritingRules(prompt) }],
       })
 
       const text = extractText(response)
@@ -329,10 +400,13 @@ export const staffMeeting = inngest.createFunction(
     await step.run("save-meeting", async () => {
       if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return
 
+      const dateStr = new Date().toISOString().slice(0, 10)
       const { error } = await supabaseAdmin.from("ai_outputs").insert({
         user_id: userId,
-        type: "staff_meeting",
-        content: synthesis as unknown as Record<string, unknown>,
+        tool: "staff_meeting",
+        title: `Staff meeting — ${dateStr}`,
+        output: synthesis.executiveSummary ?? "",
+        inputs: { synthesis },
         metadata: {
           generated_at: new Date().toISOString(),
           agent_outputs_count: agentOutputs.length,
@@ -362,11 +436,6 @@ export const staffMeeting = inngest.createFunction(
       } catch (e) {
         console.warn("[staff-meeting] write-to-vault:", e instanceof Error ? e.message : e)
       }
-    })
-
-    await step.run("send-summary", async () => {
-      const summary = formatWhatsAppSummary(synthesis)
-      await sendWhatsAppToUser(userId, summary)
     })
 
     return {

@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/paperclip"
+import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/agent-roles"
 import { AgentStatusDot } from "./agent-status-dot"
 
 const roleIcons: Record<string, React.ElementType> = {

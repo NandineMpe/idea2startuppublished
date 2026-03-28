@@ -2,6 +2,8 @@
 
 Juno can read your **Obsidian vault** as markdown from a **GitHub repository**. Every agent that calls `getCompanyContext()` receives a section **“OBSIDIAN VAULT (GITHUB MARKDOWN)”** in the assembled prompt, **in addition to** your Supabase profile, uploaded assets, and Supermemory.
 
+**Juno does not use Obsidian itself** — no Obsidian install, version, or API on the server. Your vault is just a folder of markdown that you sync to GitHub (e.g. with obsidian-git); Juno reads from **GitHub only**. Any current Obsidian version is fine. The requirement is that those files exist on the GitHub repo you configure — either under **My Context → Knowledge Base** (owner/repo/branch/path on `company_profile`) **or**, for a server-only pointer, `GITHUB_VAULT_REPO` (e.g. `owner/repo`) plus `GITHUB_VAULT_TOKEN` and optional `GITHUB_VAULT_BRANCH` / `GITHUB_VAULT_PATH`.
+
 ## Flow
 
 1. **Obsidian** — You write notes locally (links, graph, folders — all stay in Obsidian).

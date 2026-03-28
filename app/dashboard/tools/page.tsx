@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
-import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/paperclip"
+import { ROLE_CONFIGS, ROLE_ORDER } from "@/lib/agent-roles"
 import { useState, useMemo } from "react"
 
 const container = {
@@ -42,15 +42,15 @@ export default function ToolsPage() {
       className="flex flex-col gap-6 p-6 lg:p-8 max-w-5xl mx-auto"
     >
       <motion.div variants={item} className="flex flex-col gap-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On-demand generation</p>
-        <h1 className="text-2xl font-semibold text-foreground">Tools &amp; Generators</h1>
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Agent workflows</p>
+        <h1 className="text-2xl font-semibold text-foreground">Tools &amp; workflows</h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Each tool calls the relevant executive agent and produces a focused deliverable. Use these when you need
-          a specific asset — for autonomous delegation, use the{" "}
+          Each link runs a focused task through the right executive agent — you drive the run and own the outcome.
+          For recurring jobs and delegation, use the{" "}
           <Link href="/dashboard/command" className="text-primary hover:underline">
             Command Center
-          </Link>
-          .
+          </Link>{" "}
+          and feed pipelines.
         </p>
       </motion.div>
 
@@ -84,7 +84,7 @@ export default function ToolsPage() {
                   </div>
                   <p className="text-[12px] text-muted-foreground leading-relaxed">{tool.description}</p>
                   <p className={`text-[11px] mt-2 font-medium ${config.color} opacity-70`}>
-                    {config.shortTitle} · on-demand
+                    {config.shortTitle} · run when you need it
                   </p>
                 </div>
               </Link>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, system-ui, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 15px; font-weight: 500; margin: 0 0 12px; }
+    label { display: block; font-size: 11px; color: #666; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .save { background: #1a1a1a; color: #fff; }
+    .scan { background: #E1F5EE; color: #085041; border: 0.5px solid #5DCAA5; }
+    .scan-apollo { background: #EEF2FF; color: #312E81; border: 0.5px solid #A5B4FC; }
+    .status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      background: #f5f5f4;
+      font-size: 12px;
+      color: #666;
+    }
+    .status-ok { background: #EAF3DE; color: #27500A; }
+    .status-err { background: #FCEBEB; color: #791F1F; }
+  </style>
+</head>
+<body>
+  <h1>Juno Lead Pipe</h1>
+  <p style="font-size: 12px; color: #666; margin: 0 0 12px;">
+    Jack &amp; Jill jobs → Juno leads. Apollo people search → personalized lookalike outreach (free Apollo tier).
+  </p>
+
+  <label>Juno import secret</label>
+  <input type="password" id="apiKey" placeholder="Same value as JUNO_LEADS_IMPORT_SECRET on the server" autocomplete="off" />
+
+  <label>Juno URL</label>
+  <input type="text" id="junoUrl" value="https://idea2startuppublished.vercel.app" />
+
+  <button class="save" id="saveBtn">Save settings</button>
+
+  <button class="scan" id="scanBtn">Scan Jack &amp; Jill (this tab)</button>
+
+  <button class="scan-apollo" id="scanApolloBtn">Scan Apollo results (this tab)</button>
+
+  <div class="status" id="status">
+    Not connected. Add your import secret above (must match server env).
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

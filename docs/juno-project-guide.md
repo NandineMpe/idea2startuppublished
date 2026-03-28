@@ -135,7 +135,7 @@ Sensitive steps (**LinkedIn post**, **outreach send**) go through **approval** (
 | LLM | `ANTHROPIC_API_KEY` |
 | Inngest | `INNGEST_SIGNING_KEY`, optional `INNGEST_EVENT_KEY` |
 | WhatsApp | Twilio — see `lib/juno/delivery.ts` |
-| Data | `EXA_API_KEY`, Crunchbase, etc. |
+| Data | Crunchbase, etc. (optional third-party feeds) |
 | App | Supabase, Supermemory (existing) |
 
 ---

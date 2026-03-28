@@ -15,8 +15,8 @@ The app is a **Next.js App Router** project. “Backend” here means **Route Ha
 | Primary database | **Supabase (PostgreSQL)** with Row Level Security (RLS) |
 | Semantic memory | **Supermemory** (HTTP API: memorize + search), namespaced per user |
 | Primary LLM | **Anthropic Claude** via **Vercel AI SDK** (`@ai-sdk/anthropic`, model `claude-sonnet-4-20250514`) |
-| Optional org layer | **Paperclip** HTTP service (reverse-proxied); delegation also calls Paperclip APIs when configured |
-| Search (founder research) | **Exa** (`lib/exa.ts`) |
+| Background jobs | **Inngest** (`/api/inngest`, `lib/inngest/functions/`) |
+| Search (founder research) | **DuckDuckGo + Wikipedia** public APIs (`lib/founder-public-search.ts`) — no paid search API |
 | Document text | **pdf-parse** for PDFs in company asset uploads |
 
 ---
@@ -108,27 +108,21 @@ Below: **method(s)** and **primary behavior**. Unless noted, routes use Supabase
 
 | Route | Methods | Description |
 |--------|---------|-------------|
-| **`/api/delegate`** | POST | Strategic goal → Claude plan (tasks per agent/tool); optional **Paperclip** goal creation via HTTP to `PAPERCLIP_URL`. |
+| **`/api/delegate`** | POST | Strategic goal → Claude plan (tasks per agent/tool). |
 
-### 5.5 Paperclip proxy
-
-| Route | Methods | Description |
-|--------|---------|-------------|
-| **`/api/paperclip/[...path]`** | GET, POST, PATCH, PUT, DELETE | Proxies to **`PAPERCLIP_URL`** (default `http://localhost:3100`), path rewritten from `/api/paperclip` → Paperclip `/api/...`. |
-
-### 5.6 Feedback
+### 5.5 Feedback
 
 | Route | Methods | Description |
 |--------|---------|-------------|
 | **`/api/feedback`** | GET, POST, DELETE | CRUD-style on **`user_feedback`** (list, create, delete by id). |
 
-### 5.7 User profile (stub)
+### 5.6 User profile (stub)
 
 | Route | Methods | Description |
 |--------|---------|-------------|
 | **`/api/user/profile`** | GET | Returns **static** JSON (placeholder user); not tied to Supabase `auth.users`. |
 
-### 5.8 Idea analysis & generation (representative)
+### 5.7 Idea analysis & generation (representative)
 
 These routes typically: validate input, **`getCompanyContext`** when user present, call **Claude** via `@ai-sdk/anthropic` + `generateText` / streaming patterns, and may persist or return JSON.
 
@@ -137,7 +131,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | **`/api/openai-idea-analysis`** | Idea analysis (uses Anthropic in implementation). |
 | **`/api/gemini-idea-analysis`** | Idea analysis (uses Anthropic in implementation). |
 | **`/api/analyze-market-simple`** | Market / consumer insights from a query. |
-| **`/api/research-founder`** | Founder research; may use **Exa** (`searchFounder`). |
+| **`/api/research-founder`** | Founder research; **DuckDuckGo + Wikipedia** snippets, then Claude (`searchFounderPublic`). |
 | **`/api/idea-to-product/competitor-analysis`** | Competitor analysis (incl. Perplexity-named file; check route for exact stack). |
 | **`/api/generate-business-model`** | Business model generation. |
 | **`/api/generate-value-proposition`** | Value proposition. |
@@ -148,7 +142,7 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | **`/api/generate-founder-story`** | Founder story. |
 | **`/api/generate-pitch-slide`** | Pitch slide content. |
 
-### 5.9 Health / test
+### 5.8 Health / test
 
 | Route | Methods | Description |
 |--------|---------|-------------|
@@ -168,8 +162,8 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 | **`github-vault.ts`** | Lists and reads **markdown** from a GitHub repo (tree + blobs) using **`GITHUB_VAULT_TOKEN`** / **`GITHUB_TOKEN`**. |
 | **`ai-tools.ts`** | Registry of agent **tools** (`TOOLS`), **`runTool`**, prompts; uses **Anthropic** Claude. |
 | **`supermemory.ts`** | **`addToMemory`**, **`queryMemory`** — Supermemory HTTP API with `containerTags: user:<userId>`. |
-| **`exa.ts`** | **`searchFounder`** — Exa neural search for founder-linked content. |
-| **`paperclip.ts`** | Types/helpers for Paperclip integration (used with proxy + delegate). |
+| **`founder-public-search.ts`** | **`searchFounderPublic`** — free public snippets for founder research. |
+| **`agent-roles.ts`** | Executive role metadata (`ROLE_CONFIGS`, `ROLE_ORDER`) for dashboard team UI. |
 | **`get-user.ts`** | Helpers to resolve user (if present). |
 | **`database.ts`** | Legacy-style user helpers (**bcrypt**, etc.); **not imported** by current `app/` API routes — treat as optional/legacy unless you wire it in. |
 
@@ -186,8 +180,6 @@ Set these in **Vercel** / **`.env.local`** as appropriate. Do **not** commit sec
 | **`SUPABASE_SERVICE_ROLE_KEY`** | Admin client (`lib/supabase.ts`); bypasses RLS — server-only. |
 | **`ANTHROPIC_API_KEY`** | Claude across chat, tools, delegate, generation routes. |
 | **`SUPERMEMORY_API_KEY`** | Supermemory memorize/search. |
-| **`EXA_API_KEY`** | Exa search (`lib/exa.ts`). |
-| **`PAPERCLIP_URL`** | Paperclip service base URL (delegate + proxy). |
 | **`GITHUB_VAULT_TOKEN`** | Optional; **Contents: Read** on the vault repo — required for **private** Obsidian mirrors. |
 | **`GITHUB_TOKEN`** | Fallback if `GITHUB_VAULT_TOKEN` unset (same role). |
 

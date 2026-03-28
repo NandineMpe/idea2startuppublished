@@ -36,6 +36,13 @@ export interface CompanyContext {
   }
 }
 
+/** Per-channel rules (LinkedIn, cold email, Reddit/HN) */
+export type BrandChannelVoice = {
+  linkedin: string
+  cold_email: string
+  reddit_hn: string
+}
+
 export interface CompanyProfile {
   id: string
   user_id: string
@@ -57,6 +64,23 @@ export interface CompanyProfile {
   keywords: string[]
   differentiators: string
   traction: string
+  /**
+   * Demonstrated founder voice: sample paragraphs (LinkedIn, email, Reddit)—not adjectives.
+   * Legacy `brand_voice` is used only if this is empty.
+   */
+  brand_voice_dna: string
+  brand_promise: string
+  brand_channel_voice: BrandChannelVoice
+  brand_words_use: string[]
+  brand_words_never: string[]
+  /** Proof lines agents weave naturally into copy */
+  brand_credibility_hooks: string[]
+  /** @deprecated single “how we sound” line; prefer brand_voice_dna */
+  brand_voice: string
+  /** @deprecated free text; prefer brand_words_never JSON */
+  brand_never_say: string
+  /** @deprecated free text; prefer brand_credibility_hooks */
+  brand_proof_points: string
   /** E.164 WhatsApp; optional — see `company_profile` migration */
   whatsapp_number?: string | null
   whatsapp_verified?: boolean | null
@@ -249,6 +273,15 @@ async function loadProfile(supabase: SupabaseClient, userId: string): Promise<Co
     keywords: parseArray(row.keywords),
     differentiators: (row.differentiators as string) || (row.unique_value as string) || "",
     traction: (row.traction as string) || "",
+    brand_voice_dna: resolveBrandVoiceDna(row),
+    brand_promise: (row.brand_promise as string) || "",
+    brand_channel_voice: parseBrandChannelVoice(row.brand_channel_voice),
+    brand_words_use: resolveBrandWordsUse(row),
+    brand_words_never: resolveBrandWordsNever(row),
+    brand_credibility_hooks: resolveBrandCredibilityHooks(row),
+    brand_voice: (row.brand_voice as string) || "",
+    brand_never_say: (row.brand_never_say as string) || "",
+    brand_proof_points: (row.brand_proof_points as string) || "",
     whatsapp_number: (row.whatsapp_number as string | null | undefined) ?? null,
     whatsapp_verified: Boolean(row.whatsapp_verified),
     raw: row as Record<string, unknown>,
@@ -345,6 +378,62 @@ function buildPromptBlock(
   if (profile.thesis) sections.push(`Thesis: ${profile.thesis}`)
   if (profile.differentiators) sections.push(`Differentiators: ${profile.differentiators}`)
   if (profile.traction) sections.push(`Traction: ${profile.traction}`)
+
+  const ch = profile.brand_channel_voice
+  const hasBrand =
+    profile.brand_voice_dna.trim() ||
+    profile.brand_promise.trim() ||
+    ch.linkedin.trim() ||
+    ch.cold_email.trim() ||
+    ch.reddit_hn.trim() ||
+    profile.brand_words_use.length > 0 ||
+    profile.brand_words_never.length > 0 ||
+    profile.brand_credibility_hooks.length > 0 ||
+    profile.brand_voice.trim() ||
+    profile.brand_never_say.trim() ||
+    profile.brand_proof_points.trim()
+
+  if (hasBrand) {
+    sections.push(`\n=== BRAND & VOICE (follow in all customer-facing copy) ===`)
+    sections.push(
+      `This is how the founder writes. Copy the rhythm, sentence length, and jargon level—do not substitute generic “brand voice” adjectives for these examples.`,
+    )
+
+    const dna = profile.brand_voice_dna.trim() || profile.brand_voice.trim()
+    if (dna) {
+      sections.push(`\n--- VOICE DNA (demonstrated examples — reproduce this pattern) ---`)
+      sections.push(dna)
+    }
+
+    if (profile.brand_promise.trim()) {
+      sections.push(`\n--- THE LINE (one sentence we stand behind) ---`)
+      sections.push(profile.brand_promise.trim())
+    }
+
+    if (ch.linkedin.trim() || ch.cold_email.trim() || ch.reddit_hn.trim()) {
+      sections.push(`\n--- CHANNEL-SPECIFIC INSTRUCTIONS ---`)
+      if (ch.linkedin.trim()) sections.push(`LinkedIn: ${ch.linkedin.trim()}`)
+      if (ch.cold_email.trim()) sections.push(`Cold email: ${ch.cold_email.trim()}`)
+      if (ch.reddit_hn.trim()) sections.push(`Reddit / Hacker News: ${ch.reddit_hn.trim()}`)
+    }
+
+    if (profile.brand_words_use.length > 0 || profile.brand_words_never.length > 0) {
+      sections.push(`\n--- VOCABULARY ---`)
+      if (profile.brand_words_use.length > 0) {
+        sections.push(`Words and phrases we USE: ${profile.brand_words_use.join(", ")}`)
+      }
+      if (profile.brand_words_never.length > 0) {
+        sections.push(`Words and phrases we NEVER use: ${profile.brand_words_never.join(", ")}`)
+      }
+    }
+
+    if (profile.brand_credibility_hooks.length > 0) {
+      sections.push(`\n--- CREDIBILITY HOOKS (weave naturally into sentences—not a bullet list in the output) ---`)
+      for (const h of profile.brand_credibility_hooks) {
+        sections.push(`• ${h}`)
+      }
+    }
+  }
 
   if (profile.founder_name) {
     sections.push(`\nFounder: ${profile.founder_name}`)
@@ -452,6 +541,82 @@ function parseArray(val: unknown): string[] {
         .map((s) => s.trim())
         .filter(Boolean)
     }
+  }
+  return []
+}
+
+function parseJsonStringArray(val: unknown): string[] {
+  if (!val) return []
+  if (Array.isArray(val)) {
+    return val
+      .filter((x): x is string => typeof x === "string")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((x): x is string => typeof x === "string")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      }
+    } catch {
+      return val
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    }
+  }
+  return []
+}
+
+function parseBrandChannelVoice(val: unknown): BrandChannelVoice {
+  const empty: BrandChannelVoice = { linkedin: "", cold_email: "", reddit_hn: "" }
+  if (!val || typeof val !== "object" || Array.isArray(val)) return empty
+  const o = val as Record<string, unknown>
+  return {
+    linkedin: String(o.linkedin ?? "").trim(),
+    cold_email: String(o.cold_email ?? "").trim(),
+    reddit_hn: String(o.reddit_hn ?? o.reddit ?? "").trim(),
+  }
+}
+
+function resolveBrandVoiceDna(row: Record<string, unknown>): string {
+  const dna = (row.brand_voice_dna as string)?.trim()
+  if (dna) return dna
+  return (row.brand_voice as string) || ""
+}
+
+function resolveBrandWordsUse(row: Record<string, unknown>): string[] {
+  const fromJson = parseJsonStringArray(row.brand_words_use)
+  if (fromJson.length > 0) return fromJson
+  return []
+}
+
+function resolveBrandWordsNever(row: Record<string, unknown>): string[] {
+  const fromJson = parseJsonStringArray(row.brand_words_never)
+  if (fromJson.length > 0) return fromJson
+  const legacy = (row.brand_never_say as string)?.trim()
+  if (legacy) {
+    return legacy
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
+function resolveBrandCredibilityHooks(row: Record<string, unknown>): string[] {
+  const fromJson = parseJsonStringArray(row.brand_credibility_hooks)
+  if (fromJson.length > 0) return fromJson
+  const legacy = (row.brand_proof_points as string)?.trim()
+  if (legacy) {
+    return legacy
+      .split(/[\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
   return []
 }

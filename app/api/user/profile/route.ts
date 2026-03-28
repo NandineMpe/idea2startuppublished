@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 export async function GET() {
   return NextResponse.json({
     id: "static-founder",
-    name: "Founder Extraordinaire",
+    name: "Founder",
     email: "founder@ideatostartup.io",
     image: "/placeholder.svg",
   })

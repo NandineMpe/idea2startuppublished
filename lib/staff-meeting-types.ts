@@ -1,4 +1,4 @@
-/** Shared shape for daily staff meeting JSON (Inngest synthesis + `ai_outputs` row `content`). */
+/** Shared shape for daily staff meeting JSON (Inngest synthesis; persisted under `ai_outputs.inputs.synthesis`). */
 
 export type StaffMeetingSynthesis = {
   insights: Array<{

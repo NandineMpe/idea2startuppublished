@@ -4,13 +4,16 @@ import type React from "react"
 import {
   Radio,
   Target,
-  UsersRound,
   Wrench,
   Layers,
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
   Zap,
+  Share2,
+  UserCircle,
+  Plug,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -27,9 +30,10 @@ type NavItem = {
 const navItems: NavItem[] = [
   { title: "Intelligence Feed", href: "/dashboard", icon: Radio, exact: true },
   { title: "Command Center", href: "/dashboard/command", icon: Target },
-  { title: "My Team", href: "/dashboard/team", icon: UsersRound },
-  { title: "Tools & Generators", href: "/dashboard/tools", icon: Wrench },
-  { title: "My Context", href: "/dashboard/context", icon: Layers },
+  { title: "Security updates", href: "/dashboard/security-updates", icon: Shield },
+  { title: "GTM", href: "/dashboard/distribution", icon: Share2 },
+  { title: "Founder brand", href: "/dashboard/founder-brand", icon: UserCircle },
+  { title: "Tools & workflows", href: "/dashboard/tools", icon: Wrench },
 ]
 
 const SidebarContext = createContext<{
@@ -122,6 +126,35 @@ export function DashboardSidebar() {
               <PanelLeftOpen size={15} />
             </button>
           )}
+          <div className="space-y-px">
+          <Link
+            href="/dashboard/context"
+            className={cn(
+              "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
+              expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+              pathname === "/dashboard/context" || pathname.startsWith("/dashboard/context/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+            )}
+            title={expanded ? undefined : "Context"}
+          >
+            <Layers className={cn("shrink-0", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
+            {expanded && <span>Context</span>}
+          </Link>
+          <Link
+            href="/dashboard/integrations"
+            className={cn(
+              "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
+              expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+              pathname === "/dashboard/integrations" || pathname.startsWith("/dashboard/integrations/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+            )}
+            title={expanded ? undefined : "Integrations"}
+          >
+            <Plug className={cn("shrink-0", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
+            {expanded && <span>Integrations</span>}
+          </Link>
           <Link
             href="/dashboard/settings"
             className={cn(
@@ -131,10 +164,12 @@ export function DashboardSidebar() {
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent",
             )}
+            title={expanded ? undefined : "Settings"}
           >
             <Settings className={cn("shrink-0", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
             {expanded && <span>Settings</span>}
           </Link>
+          </div>
         </div>
       </aside>
     </SidebarContext.Provider>

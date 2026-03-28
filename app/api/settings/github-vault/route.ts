@@ -18,7 +18,9 @@ export async function GET() {
 
     const { data } = await supabase
       .from("company_profile")
-      .select("github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path")
+      .select(
+        "github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path, github_vault_last_verified_at, github_vault_last_probe_file_count, github_vault_last_probe_error",
+      )
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -27,6 +29,9 @@ export async function GET() {
       repo: data?.github_vault_repo ?? null,
       branch: data?.github_vault_branch ?? "main",
       path: data?.github_vault_path ?? "",
+      lastVerifiedAt: data?.github_vault_last_verified_at ?? null,
+      lastProbeFileCount: data?.github_vault_last_probe_file_count ?? null,
+      lastProbeError: data?.github_vault_last_probe_error ?? null,
     })
   } catch (e) {
     console.error("github-vault GET:", e)
@@ -65,6 +70,9 @@ export async function POST(request: Request) {
           github_vault_repo: null,
           github_vault_branch: "main",
           github_vault_path: "",
+          github_vault_last_verified_at: null,
+          github_vault_last_probe_file_count: null,
+          github_vault_last_probe_error: null,
         },
         { onConflict: "user_id" },
       )
@@ -80,29 +88,21 @@ export async function POST(request: Request) {
       })
     }
 
-    const { error: upErr } = await supabase.from("company_profile").upsert(
-      {
-        user_id: user.id,
-        github_vault_owner: owner,
-        github_vault_repo: repo,
-        github_vault_branch: branch,
-        github_vault_path: pathVal,
-      },
-      { onConflict: "user_id" },
-    )
+    const { data: existing } = await supabase
+      .from("company_profile")
+      .select("github_vault_last_verified_at, github_vault_last_probe_file_count, github_vault_last_probe_error")
+      .eq("user_id", user.id)
+      .maybeSingle()
 
-    if (upErr) {
-      return NextResponse.json({ error: upErr.message }, { status: 500 })
+    const row = {
+      github_vault_owner: owner,
+      github_vault_repo: repo,
+      github_vault_branch: branch,
+      github_vault_path: pathVal,
     }
 
     let probe = { fileCount: 0, error: null as string | null, samplePaths: [] as string[] }
     if (body.probe !== false) {
-      const row = {
-        github_vault_owner: owner,
-        github_vault_repo: repo,
-        github_vault_branch: branch,
-        github_vault_path: pathVal,
-      }
       const result = await fetchGithubVaultFromProfileFields(row)
       probe = {
         fileCount: result.files.length,
@@ -111,7 +111,30 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ saved: true, probe })
+    const verifiedAt = new Date().toISOString()
+    const { error: upErr } = await supabase.from("company_profile").upsert(
+      {
+        user_id: user.id,
+        ...row,
+        github_vault_last_verified_at:
+          body.probe !== false ? verifiedAt : (existing?.github_vault_last_verified_at ?? null),
+        github_vault_last_probe_file_count:
+          body.probe !== false ? probe.fileCount : (existing?.github_vault_last_probe_file_count ?? null),
+        github_vault_last_probe_error:
+          body.probe !== false ? probe.error : (existing?.github_vault_last_probe_error ?? null),
+      },
+      { onConflict: "user_id" },
+    )
+
+    if (upErr) {
+      return NextResponse.json({ error: upErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      saved: true,
+      probe,
+      lastVerifiedAt: body.probe !== false ? verifiedAt : (existing?.github_vault_last_verified_at ?? null),
+    })
   } catch (e) {
     console.error("github-vault POST:", e)
     return NextResponse.json({ error: "Failed to save" }, { status: 500 })

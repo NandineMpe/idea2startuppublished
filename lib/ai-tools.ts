@@ -6,6 +6,7 @@
 
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 // ─── Tool field descriptors ──────────────────────────────────────────────────
 
@@ -445,7 +446,7 @@ export async function runTool(
 
   const { text } = await generateText({
     model: anthropic("claude-sonnet-4-20250514"),
-    system: tool.systemPrompt,
+    system: mergeSystemWithWritingRules(tool.systemPrompt),
     prompt,
     maxTokens: 6000,
     temperature: 0.4,

@@ -1,5 +1,6 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 export async function generateCompetitorAnalysis(query: string) {
   const systemPrompt = `Competitor Analysis Engine
@@ -127,7 +128,7 @@ Use bullet points for clarity where appropriate`
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
       prompt: `Provide a comprehensive competitor analysis for: ${query}`,
-      system: systemPrompt,
+      system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 4000,
     })
 

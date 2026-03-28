@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { ROLE_CONFIGS } from "@/lib/paperclip"
+import { ROLE_CONFIGS } from "@/lib/agent-roles"
 import { RolePage } from "@/components/dashboard/role-page"
 import { motion } from "framer-motion"
 import Link from "next/link"

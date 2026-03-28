@@ -144,8 +144,6 @@ RLS: same as today (`user_id` = `auth.uid()`).
 
 2. **Auth in background jobs** — Inngest functions are server-side; use **`userId` in event data** (from cron fan-out or DB query). Never trust client-sent userId without session — scheduled jobs load `user_id` from Supabase service role or a signed event payload.
 
-3. **Paperclip** — optional step after delegate: POST goal via existing `PAPERCLIP_URL` pattern.
-
 ---
 
 ## Deployment checklist

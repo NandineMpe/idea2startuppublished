@@ -1,4 +1,4 @@
-// Context engine (THE BRAIN — every agent starts here)
+// Shared company context (used by agents)
 export { getCompanyContext, getCompanyContextLight, getActiveUserIds } from "../company-context"
 export type { CompanyContext, CompanyProfile, CompanyAsset } from "../company-context"
 
@@ -10,8 +10,17 @@ export {
   scrapeProductHunt,
   scrapeJobBoards,
   scrapeRegulation,
+  scrapeCBSSources,
+  scrapeCTOSources,
+  scrapeCROJobSources,
+  dedupeByUrl,
+  filterToLast24Hours,
+  cutoffMs24HoursAgo,
 } from "./scrapers"
 export type { JobListing, RawItem } from "./scrapers"
+
+export { SOURCES, getSourcesForAgent, getSourcesByCategory } from "./sources"
+export type { Source } from "./sources"
 
 // Scoring
 export { scoreItems } from "./scoring"
@@ -27,17 +36,10 @@ export {
 } from "./ai-engine"
 
 // Formatting
-export { formatBrief } from "./brief-formatter"
+export { formatBrief, formatBriefForVault, formatDashboardItem } from "./brief-formatter"
 
 // Delivery
-export {
-  sendWhatsApp,
-  sendWhatsAppToUser,
-  getUserWhatsAppNumber,
-  saveBriefToDB,
-  saveLeadToDB,
-  saveContentToDB,
-} from "./delivery"
+export { saveBriefToDB, saveLeadToDB, saveContentToDB } from "./delivery"
 
 // Obsidian vault (GitHub API)
 export {

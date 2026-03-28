@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
 import { streamText } from "ai"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
 
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: anthropic("claude-sonnet-4-20250514"),
-      system: systemPrompt,
+      system: mergeSystemWithWritingRules(systemPrompt),
       messages: [{ role: "user", content: userMessage }],
       maxTokens: 500,
       temperature: 0.7,

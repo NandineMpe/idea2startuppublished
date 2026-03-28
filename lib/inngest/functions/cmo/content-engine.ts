@@ -1,7 +1,9 @@
 import { inngest } from "@/lib/inngest/client"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
 import { generateComments, generateLinkedInPost } from "@/lib/juno/ai-engine"
-import { saveContentToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
+import { loadDismissalFeedbackPromptSection } from "@/lib/content-preferences"
+import { insertContentCalendarRow } from "@/lib/content-calendar"
+import { saveContentToDB } from "@/lib/juno/delivery"
 import type { ScoredItem } from "@/lib/juno/scoring"
 import type { DailyBriefPayload } from "@/lib/juno/types"
 
@@ -55,6 +57,22 @@ export const contentEngine = inngest.createFunction(
       }),
     )
 
+    await step.run("add-to-calendar", async () => {
+      if (!contentId) return
+      await insertContentCalendarRow({
+        userId,
+        title: linkedinPost.angle,
+        body: linkedinPost.post,
+        channel: "linkedin",
+        contentType: "post",
+        scheduledDate: new Date().toISOString().split("T")[0],
+        status: "draft",
+        source: "cmo_agent",
+        sourceRef: contentId,
+        angle: linkedinPost.angle,
+      })
+    })
+
     await step.run("write-draft-to-vault", async () => {
       const { writeVaultFile } = await import("@/lib/juno/vault")
       const date = new Date().toISOString().split("T")[0]
@@ -74,22 +92,6 @@ export const contentEngine = inngest.createFunction(
       const r = await writeVaultFile(`juno/content/${date}-linkedin.md`, md, `Juno: LinkedIn draft ${date}`, userId)
       if (!r.success && r.error) {
         console.warn("[CMO] vault write:", r.error)
-      }
-    })
-
-    await step.run("notify-approval", async () => {
-      const msg = [
-        `📝 *LinkedIn post ready*`,
-        `Angle: ${linkedinPost.angle}`,
-        "",
-        `"${linkedinPost.post.substring(0, 200)}..."`,
-        "",
-        `Reply: ✅ Approve | ⏭️ Skip`,
-      ].join("\n")
-
-      const r = await sendWhatsAppToUser(userId, msg)
-      if (!r.success) {
-        console.log("[CMO] (no verified WhatsApp)", linkedinPost.post?.slice(0, 400))
       }
     })
 
@@ -174,11 +176,15 @@ export const relationshipTracker = inngest.createFunction(
       }
 
       const { supabaseAdmin } = await import("@/lib/supabase")
+      const at = new Date().toISOString()
       const { error } = await supabaseAdmin.from("ai_outputs").insert({
         user_id: userId,
-        type: "relationship_interaction",
-        content: { ...payload, date: new Date().toISOString() },
-      });
+        tool: "relationship_interaction",
+        title: "Relationship interaction",
+        output: "",
+        inputs: { ...payload, date: at },
+        metadata: { tracked_at: at },
+      })
       if (error) console.error("[CMO] relationshipTracker:", error.message)
     })
 

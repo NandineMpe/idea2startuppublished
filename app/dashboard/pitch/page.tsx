@@ -67,7 +67,7 @@ export default function PitchVaultPage() {
           </Button>
           <Button className="bg-primary hover:bg-primary/90 text-black font-bold rounded-full px-8 shadow-[0_0_20px_rgba(39,174,96,0.3)]">
             <Zap className="mr-2 h-4 w-4" />
-            Generate with Juno
+            Run with Juno
           </Button>
         </div>
       </motion.div>

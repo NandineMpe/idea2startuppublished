@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { AgentStatus } from "@/types/paperclip"
+import type { AgentStatus } from "@/types/agent-roles"
 
 interface AgentStatusDotProps {
   status: AgentStatus

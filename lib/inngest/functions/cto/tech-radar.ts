@@ -1,8 +1,15 @@
 import { inngest } from "@/lib/inngest/client"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
 import { analyzeTechTrends } from "@/lib/juno/ai-engine"
-import { saveContentToDB, sendWhatsAppToUser } from "@/lib/juno/delivery"
-import { scrapeArxiv, scrapeHackerNews } from "@/lib/juno/scrapers"
+import { insertContentCalendarRow } from "@/lib/content-calendar"
+import { saveContentToDB } from "@/lib/juno/delivery"
+import {
+  dedupeByUrl,
+  filterToLast24Hours,
+  scrapeArxiv,
+  scrapeCTOSources,
+  scrapeHackerNews,
+} from "@/lib/juno/scrapers"
 import type { RawItem } from "@/lib/juno/types"
 
 function toTechItems(items: RawItem[]): Array<{ title: string; source: string; description: string }> {
@@ -36,14 +43,15 @@ export const techRadar = inngest.createFunction(
 
       const baseKw = context.extracted.keywords.length > 0 ? context.extracted.keywords : ["AI", "software", "startup"]
 
-      const [arxiv, hn] = await Promise.all([
+      const [ctoItems, arxiv, hn] = await Promise.all([
+        step.run(`scrape-cto-rss-${i}`, () => scrapeCTOSources(baseKw)),
         step.run(`arxiv-${i}`, () =>
           scrapeArxiv([...baseKw, "language model", "transformer", "agent"]),
         ),
         step.run(`hn-${i}`, () => scrapeHackerNews([...baseKw, "AI", "LLM", "typescript", "nextjs"])),
       ])
 
-      const allTech = [...arxiv, ...hn]
+      const allTech = filterToLast24Hours(dedupeByUrl([...ctoItems, ...arxiv, ...hn]))
       if (allTech.length === 0) continue
 
       const analysis = await step.run(`analyze-${i}`, () =>
@@ -59,10 +67,18 @@ export const techRadar = inngest.createFunction(
           return
         }
         const { supabaseAdmin } = await import("@/lib/supabase")
+        const dateStr = new Date().toISOString().slice(0, 10)
+        const trends = analysis.trends || []
+        const mdPreview = trends
+          .slice(0, 5)
+          .map((t) => `## ${t.trend}\n${t.relevance}\n→ ${t.action}`)
+          .join("\n\n")
         const { error } = await supabaseAdmin.from("ai_outputs").insert({
           user_id: userId,
-          type: "tech_radar",
-          content: {
+          tool: "tech_radar",
+          title: `Tech radar — ${dateStr}`,
+          output: mdPreview || `Tech radar — ${dateStr} (${allTech.length} sources scanned)`,
+          inputs: {
             trends: analysis.trends,
             postSuggestions: analysis.postSuggestions,
             sourcesScanned: allTech.length,
@@ -94,30 +110,24 @@ export const techRadar = inngest.createFunction(
       })
 
       for (const [si, suggestion] of (analysis.postSuggestions || []).entries()) {
-        await step.run(`post-suggestion-${i}-${si}`, () =>
-          saveContentToDB({
+        await step.run(`post-suggestion-${i}-${si}`, async () => {
+          const cId = await saveContentToDB({
             userId,
             platform: "technical",
             contentType: "post_suggestion",
             body: suggestion,
             status: "draft",
-          }),
-        )
-      }
-
-      if (analysis.trends?.length > 0) {
-        await step.run(`notify-${i}`, async () => {
-          const msg = [
-            `🔬 *Tech Radar*`,
-            "",
-            ...analysis.trends.slice(0, 3).map(
-              (t) => `• *${t.trend}*\n  ${t.relevance}\n  → ${t.action}`,
-            ),
-          ].join("\n")
-          const r = await sendWhatsAppToUser(userId, msg)
-          if (!r.success) {
-            console.log("[CTO techRadar] trends (no verified WhatsApp):", analysis.trends?.slice(0, 2))
-          }
+          })
+          await insertContentCalendarRow({
+            userId,
+            title: suggestion.slice(0, 200),
+            body: suggestion,
+            channel: "hn",
+            contentType: "post",
+            scheduledDate: null,
+            source: "cto_radar",
+            sourceRef: cId ?? undefined,
+          })
         })
       }
     }
@@ -158,10 +168,22 @@ export const platformPoster = inngest.createFunction(
         return
       }
       const { supabaseAdmin } = await import("@/lib/supabase")
+      const { data: row, error: fetchErr } = await supabaseAdmin
+        .from("ai_outputs")
+        .select("inputs")
+        .eq("id", contentId)
+        .single()
+
+      if (fetchErr) {
+        console.error("[CTO platformPoster] load row:", fetchErr.message)
+        return
+      }
+
+      const prev = (row?.inputs as Record<string, unknown> | null) ?? {}
       const { error } = await supabaseAdmin
         .from("ai_outputs")
         .update({
-          content: { ...data, status: "ready_to_post" },
+          inputs: { ...prev, status: "ready_to_post" },
         })
         .eq("id", contentId)
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
-import { searchFounder } from "@/lib/exa"
+import { searchFounderPublic } from "@/lib/founder-public-search"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
+import { appendWritingRules } from "@/lib/copy-writing-rules"
 
 export async function POST(req: Request) {
   try {
@@ -16,17 +17,17 @@ export async function POST(req: Request) {
     }
 
     const query = linkedinUrl || `Founder ${name}`
-    const searchResults = await searchFounder(query)
+    const searchResults = await searchFounderPublic(query)
 
     if (!searchResults || searchResults.length === 0) {
       return NextResponse.json({ error: "No public information found" }, { status: 404 })
     }
 
-    const context = searchResults.map((r: any) => r.text).join("\n\n")
+    const context = searchResults.map((r) => r.text).join("\n\n")
 
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
-      prompt: `Based on the following public search results about a founder:
+      prompt: appendWritingRules(`Based on the following public search results about a founder:
       
 ${context}
       
@@ -37,7 +38,7 @@ Extract and structure the following information in JSON format:
 
 Keep it concise but detailed enough to be useful for a "Founder Story" generator.
 
-Return only valid JSON, no markdown code blocks.`,
+Return only valid JSON, no markdown code blocks.`),
       maxTokens: 1500,
     })
 

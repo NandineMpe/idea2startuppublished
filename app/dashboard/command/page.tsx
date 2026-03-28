@@ -38,7 +38,6 @@ interface Plan {
   goal: string
   breakdown: string
   tasks: PlannedTask[]
-  paperclipGoalId?: string
 }
 
 type TaskState = "pending" | "running" | "done" | "error"
@@ -306,7 +305,7 @@ export default function CommandPage() {
           <div>
             <p className="text-[13px] font-medium text-foreground mb-1">How this works</p>
             <p className="text-[12px] text-muted-foreground leading-relaxed">
-              You set a strategic goal. The AI chief of staff breaks it into specific tasks and routes each one to the right executive — CBS, CRO, CMO, CFO, or COO. Each agent brings their own expertise and tools. Paperclip records the goal in your org&apos;s work log. You get a full set of deliverables in one run.
+              Enter a goal, get a plan split across roles (CBS, CRO, CMO, CFO, COO), and receive deliverables in one run.
             </p>
           </div>
         </div>
@@ -344,7 +343,7 @@ export default function CommandPage() {
               Strategic goal <span className="text-red-400">*</span>
             </label>
             <p className="text-[11px] text-muted-foreground -mt-0.5">
-              Planning uses your saved company profile and context — keep those up to date under Company and My Context.
+              Uses your saved company profile and context (Context in the sidebar).
             </p>
             <Textarea
               placeholder="e.g. We want to raise a $2M seed round in the next 6 months. Help us prepare."
@@ -403,11 +402,6 @@ export default function CommandPage() {
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-1">Your Goal</p>
                 <p className="text-[13px] text-foreground font-medium">{plan.goal}</p>
               </div>
-              {plan.paperclipGoalId && (
-                <span className="shrink-0 text-[11px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  Logged in Paperclip
-                </span>
-              )}
             </div>
             <div className="pt-2 border-t border-border">
               <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-1.5">Team Briefing</p>

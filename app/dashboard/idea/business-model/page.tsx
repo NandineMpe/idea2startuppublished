@@ -94,9 +94,11 @@ export default function BusinessModelPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <FileText className="h-6 w-6 text-yellow-400" />
-          Business Model Generator
+          Business model workflow
         </h1>
-        <p className="text-muted-foreground mt-1">Design your business model using the Business Model Canvas and Lean Canvas frameworks.</p>
+        <p className="text-muted-foreground mt-1">
+          Step through Business Model / Lean Canvas with Juno — refine and export what you will actually run.
+        </p>
       </div>
 
       {/* Input Form */}
@@ -151,9 +153,9 @@ export default function BusinessModelPage() {
             className="w-full bg-primary text-black font-semibold hover:bg-primary/90 h-11"
           >
             {isGenerating ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Business Model...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Running workflow…</>
             ) : (
-              <><Sparkles className="mr-2 h-4 w-4" /> Generate Business Model</>
+              <><Sparkles className="mr-2 h-4 w-4" /> Run workflow</>
             )}
           </Button>
         </CardContent>

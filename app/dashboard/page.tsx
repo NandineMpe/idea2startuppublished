@@ -5,6 +5,7 @@ import { BookOpen, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
+import { IntentSignalsPanel } from "@/components/dashboard/intent-signals-panel"
 import { ContentQueue } from "@/components/dashboard/content-queue"
 
 const container = {
@@ -32,13 +33,13 @@ export default function DashboardPage() {
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Intelligence overview
         </p>
-        <h1 className="text-2xl font-semibold text-foreground">What Juno is watching for you</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Scheduled pipelines run against your{" "}
+          Agents run against your saved{" "}
           <Link href="/dashboard/context" className="text-primary hover:underline">
             company context
-          </Link>{" "}
-          and surface briefs, leads, and content drafts here automatically.
+          </Link>
+          . Briefs, leads, and drafts show up here for you to review, approve, and ship — on the schedule you set.
         </p>
       </motion.div>
 
@@ -47,6 +48,10 @@ export default function DashboardPage() {
         <div className="order-2 lg:order-1 flex-1 min-w-0 flex flex-col gap-8">
           <motion.div variants={item}>
             <IntelligencePipelines />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <IntentSignalsPanel />
           </motion.div>
 
           <motion.div variants={item}>
@@ -60,10 +65,10 @@ export default function DashboardPage() {
                   <BookOpen className="h-4 w-4 text-primary" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-medium text-foreground">On-demand tools</p>
+                  <p className="text-[13px] font-medium text-foreground">One-off runs</p>
                   <p className="text-[12px] text-muted-foreground mt-0.5 max-w-xl">
-                    Pitch decks, market analysers, and GTM generators are available under{" "}
-                    <strong className="text-foreground/90">Tools &amp; generators</strong> in the sidebar.
+                    Pitch, market, and GTM workflows you trigger when you need them — under{" "}
+                    <strong className="text-foreground/90">Tools &amp; workflows</strong> in the sidebar.
                   </p>
                 </div>
               </div>

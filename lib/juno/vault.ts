@@ -282,6 +282,11 @@ export async function getVaultContext(
     sections.push(`=== KEY DECISIONS ===\n${decisions.content}`)
   }
 
+  const competitors = await readVaultFile("juno/competitors.md", userId)
+  if (competitors) {
+    sections.push(`=== COMPETITOR LANDSCAPE (Obsidian, juno/competitors.md) ===\n${competitors.content}`)
+  }
+
   const companyNotes = await readVaultFolder("company", { maxFiles: 10, maxCharsPerFile: 3000 }, userId)
   if (companyNotes) {
     sections.push(`=== COMPANY STRATEGY NOTES (from Obsidian) ===\n${companyNotes}`)

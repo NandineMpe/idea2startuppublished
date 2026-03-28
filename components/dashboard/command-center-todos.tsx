@@ -14,6 +14,7 @@ import {
   Plus,
   Trash2,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 const STORAGE_KEY = "idea2startup-command-todos-v1"
+const CHECKLIST_COLLAPSED_KEY = "idea2startup-command-checklist-collapsed-v1"
 const STORAGE_VERSION = 1 as const
 
 type TemplateTodo = {
@@ -37,42 +39,42 @@ const TEMPLATE_TODOS: TemplateTodo[] = [
   {
     id: "ctx-company",
     title: "Anchor your company context",
-    hint: "Name, problem, market — Juno personalizes every brief and agent from this.",
+    hint: "Company name, problem, and market are included in agent prompts.",
     href: "/dashboard/company",
     icon: Building2,
   },
   {
     id: "ctx-knowledge",
     title: "Add knowledge Juno can reuse",
-    hint: "Upload notes or docs so answers match how you actually work.",
+    hint: "Upload notes or documents for retrieval in chat and tools.",
     href: "/dashboard/knowledge",
     icon: BookOpen,
   },
   {
     id: "intel-feed",
     title: "Scan the Intelligence Feed",
-    hint: "One place for briefs, leads, content queue, and radar — daily rhythm.",
+    hint: "Briefs, leads, content queue, and radar on the home feed.",
     href: "/dashboard",
     icon: Radio,
   },
   {
     id: "team-outputs",
     title: "Review My Team outputs",
-    hint: "CBS / CRO / CMO / CTO — approve content and act on leads.",
+    hint: "CBS, CRO, CMO, CTO: review outputs and approve where needed.",
     href: "/dashboard/team",
     icon: UsersRound,
   },
   {
-    id: "whatsapp",
-    title: "Optional: WhatsApp alerts",
-    hint: "Get the daily brief on your phone when Twilio is set up.",
-    href: "/dashboard/settings",
+    id: "signal-feed",
+    title: "Use the Signal feed for alerts",
+    hint: "Open the dashboard feed for briefs, leads, and drafts.",
+    href: "/dashboard",
     icon: MessageCircle,
   },
   {
     id: "delegate-goal",
     title: "Run a strategic goal below",
-    hint: "Delegate once — your virtual exec team plans and executes in sequence.",
+    hint: "Delegation runs agents in sequence and returns deliverables.",
     href: "/dashboard/command",
     anchor: "strategic-command-input",
     icon: Sparkles,
@@ -80,7 +82,7 @@ const TEMPLATE_TODOS: TemplateTodo[] = [
   {
     id: "tools-pitch",
     title: "Sharpen pitch & customer story",
-    hint: "Generators for investor pitch, value prop, and narrative consistency.",
+    hint: "Workflows for investor pitch, value prop, and narrative consistency — you run and own the output.",
     href: "/dashboard/tools",
     icon: Wrench,
   },
@@ -126,15 +128,29 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
   const [custom, setCustom] = useState<CustomTodo[]>([])
   const [newTitle, setNewTitle] = useState("")
   const [hydrated, setHydrated] = useState(false)
+  const [checklistCollapsed, setChecklistCollapsed] = useState(false)
   const [profileHint, setProfileHint] = useState<"loading" | "empty" | "ok">("loading")
-  const [whatsappOk, setWhatsappOk] = useState<boolean | null>(null)
 
   useEffect(() => {
     const s = loadStored()
     setChecked(s.checked)
     setCustom(s.custom)
+    try {
+      setChecklistCollapsed(localStorage.getItem(CHECKLIST_COLLAPSED_KEY) === "1")
+    } catch {
+      /* ignore */
+    }
     setHydrated(true)
   }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      localStorage.setItem(CHECKLIST_COLLAPSED_KEY, checklistCollapsed ? "1" : "0")
+    } catch {
+      /* ignore */
+    }
+  }, [checklistCollapsed, hydrated])
 
   useEffect(() => {
     if (!hydrated) return
@@ -145,13 +161,9 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
     let cancelled = false
     ;(async () => {
       try {
-        const [prRes, waRes] = await Promise.all([
-          fetch("/api/company/profile"),
-          fetch("/api/settings/whatsapp"),
-        ])
+        const prRes = await fetch("/api/company/profile")
         if (cancelled) return
         const pr = prRes.ok ? await prRes.json() : { profile: null }
-        const wa = waRes.ok ? await waRes.json() : null
         const p = pr?.profile
         if (!p) setProfileHint("empty")
         else {
@@ -162,13 +174,9 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
           )
           setProfileHint(hasCore ? "ok" : "empty")
         }
-        if (wa?.verified) setWhatsappOk(true)
-        else if (wa?.whatsappNumber) setWhatsappOk(false)
-        else setWhatsappOk(null)
       } catch {
         if (!cancelled) {
           setProfileHint("empty")
-          setWhatsappOk(null)
         }
       }
     })()
@@ -221,13 +229,31 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
         className,
       )}
     >
-      <div className="p-4 border-b border-border bg-primary/[0.06]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[14px] font-semibold text-foreground tracking-tight">Operating checklist</h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-              What serious founders do here — context first, then intelligence, then action.
-            </p>
+      <div className={cn("p-4 bg-primary/[0.06]", !checklistCollapsed && "border-b border-border")}>
+        <button
+          type="button"
+          onClick={() => setChecklistCollapsed((c) => !c)}
+          className="flex w-full items-start justify-between gap-3 text-left rounded-lg -m-1 p-1 hover:bg-primary/5 transition-colors"
+          aria-expanded={!checklistCollapsed}
+          aria-controls="command-center-checklist-body"
+          aria-label={checklistCollapsed ? "Expand operating checklist" : "Collapse operating checklist"}
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 shrink-0 mt-0.5 text-muted-foreground transition-transform duration-200",
+                checklistCollapsed && "-rotate-90",
+              )}
+              aria-hidden
+            />
+            <div>
+              <h2 className="text-[14px] font-semibold text-foreground tracking-tight">Operating checklist</h2>
+              {!checklistCollapsed && (
+                <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                  Setup steps and daily habits for this workspace.
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span className="text-[20px] font-semibold tabular-nums text-primary">{pct}%</span>
@@ -235,29 +261,40 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
               {doneSlots}/{totalSlots || TEMPLATE_TODOS.length}
             </span>
           </div>
-        </div>
-        <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden">
-          <motion.div
-            className="h-full rounded-full bg-primary"
-            initial={false}
-            animate={{ width: `${pct}%` }}
-            transition={{ type: "spring", stiffness: 300, damping: 28 }}
-          />
-        </div>
+        </button>
+        {!checklistCollapsed && (
+          <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-primary"
+              initial={false}
+              animate={{ width: `${pct}%` }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            />
+          </div>
+        )}
       </div>
 
-      {profileHint === "empty" && (
-        <div className="px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed">
-          <strong className="text-amber-100">Tip:</strong> Finish your company profile first — without it, briefs and agents lack signal.
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {!checklistCollapsed && (
+          <motion.div
+            id="command-center-checklist-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            {profileHint === "empty" && (
+              <div className="px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-[11px] text-amber-200/90 leading-relaxed">
+                <strong className="text-amber-100">Note:</strong> Add at least company name and problem so briefs have
+                enough context.
+              </div>
+            )}
 
-      <ul className="p-2 space-y-0.5 max-h-[min(70vh,520px)] overflow-y-auto">
+            <ul className="p-2 space-y-0.5 max-h-[min(70vh,520px)] overflow-y-auto border-b border-border">
         {TEMPLATE_TODOS.map((t) => {
           const Icon = t.icon
           const isDone = Boolean(checked[t.id])
-          const waExtra = t.id === "whatsapp" && whatsappOk === true
-
           return (
             <li
               key={t.id}
@@ -286,11 +323,6 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
                   >
                     {t.title}
                   </span>
-                  {waExtra && (
-                    <span className="text-[9px] px-1.5 py-px rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
-                      Connected
-                    </span>
-                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{t.hint}</p>
                 <Link
@@ -350,7 +382,10 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
             </motion.li>
           ))}
         </AnimatePresence>
-      </ul>
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="p-3 border-t border-border bg-muted/20">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 font-medium">Your tasks</p>

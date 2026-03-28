@@ -3,6 +3,7 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
 const fallbackStory = `I noticed a significant problem in my industry that wasn't being addressed effectively. Drawing on my background and expertise, I decided to create a solution that would make a real difference. 
 
@@ -80,7 +81,7 @@ Write in a natural, confident tone. Include 1-2 relevant industry statistics. Cr
       const { text } = await generateText({
         model: anthropic("claude-sonnet-4-20250514"),
         prompt: JSON.stringify(formattedInput),
-        system: systemPrompt,
+        system: mergeSystemWithWritingRules(systemPrompt),
         maxTokens: 2000,
       })
 

@@ -1,11 +1,35 @@
+import { getSourcesByCategory, getSourcesForAgent, type Source } from "./sources"
 import type { JobListing, RawItem, ScrapedItem } from "./types"
 
 export type { JobListing, RawItem } from "./types"
 
+const MS_24H = 24 * 60 * 60 * 1000
+
+/** Cutoff: items must be strictly newer than this (last 24 hours from now). */
+export function cutoffMs24HoursAgo(): number {
+  return Date.now() - MS_24H
+}
+
+/**
+ * Keep items whose `publishedAt` parses to a time within the last 24 hours.
+ * Drops missing/invalid dates (never treat unknown dates as "now").
+ */
+export function filterToLast24Hours(items: RawItem[]): RawItem[] {
+  const min = cutoffMs24HoursAgo()
+  return items.filter((item) => {
+    const t = Date.parse(item.publishedAt)
+    if (Number.isNaN(t)) return false
+    return t >= min
+  })
+}
+
+function publishedIso(raw: string | undefined): string {
+  if (!raw?.trim()) return ""
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString()
+}
+
 // ─── Data Source Scrapers ────────────────────────────────────────
-// Real implementations where APIs exist, structured stubs where
-// they need API keys. Each returns normalised RawItem[] (jobs: JobListing[]).
-// ─────────────────────────────────────────────────────────────────
 
 /** Map legacy `ScrapedItem` rows into `scoreItems` input. */
 export function scrapedItemsToRawItems(items: ScrapedItem[]): RawItem[] {
@@ -40,6 +64,18 @@ export function keywordsToArxivQuery(keywords: string[]): string {
   return k.map((term) => `all:"${encodeURIComponent(term)}"`).join("+OR+")
 }
 
+export function dedupeByUrl(items: RawItem[]): RawItem[] {
+  const seen = new Set<string>()
+  const out: RawItem[] = []
+  for (const it of items) {
+    const key = (it.url || "").trim() || `${it.source}:${it.title}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(it)
+  }
+  return out
+}
+
 // ─── ArXiv (FREE, no API key) ────────────────────────────────────
 
 export async function scrapeArxiv(
@@ -71,7 +107,7 @@ export async function scrapeArxiv(
     const response = await fetch(url, { signal: AbortSignal.timeout(25_000) })
     if (!response.ok) return []
     const xml = await response.text()
-    return parseArxivXml(xml)
+    return filterToLast24Hours(parseArxivXml(xml))
   } catch (e) {
     console.error("ArXiv scrape failed:", e)
     return []
@@ -111,7 +147,7 @@ function parseArxivXml(xml: string): RawItem[] {
         title,
         description: summary?.substring(0, 500) || "",
         url: absUrl,
-        publishedAt: published || new Date().toISOString(),
+        publishedAt: publishedIso(published),
         source: "arxiv",
         metadata: { authors: authors.slice(0, 5), categories },
       })
@@ -162,7 +198,7 @@ export async function scrapeHackerNews(keywords: string[]): Promise<RawItem[]> {
       description: String((s as { text?: string }).text ?? "").substring(0, 500),
       url: (s as { url?: string }).url || `https://news.ycombinator.com/item?id=${s.id}`,
       publishedAt:
-        typeof s.time === "number" ? new Date(s.time * 1000).toISOString() : new Date().toISOString(),
+        typeof s.time === "number" ? new Date(s.time * 1000).toISOString() : "",
       source: "hackernews",
       metadata: {
         score: (s as { score?: number }).score,
@@ -171,7 +207,7 @@ export async function scrapeHackerNews(keywords: string[]): Promise<RawItem[]> {
     })
 
     if (lowerKeywords.length === 0) {
-      return withTitle.slice(0, 15).map(mapStory)
+      return filterToLast24Hours(withTitle.slice(0, 15).map(mapStory))
     }
 
     const filtered = withTitle.filter((s) => {
@@ -180,182 +216,198 @@ export async function scrapeHackerNews(keywords: string[]): Promise<RawItem[]> {
     })
 
     const out = filtered.length > 0 ? filtered : withTitle.slice(0, 15)
-    return out.map(mapStory)
+    return filterToLast24Hours(out.map(mapStory))
   } catch (e) {
     console.error("HN scrape failed:", e)
     return []
   }
 }
 
-// ─── Product Hunt (FREE — public feed) ───────────────────────────
+// ─── Generic RSS (registry-backed) ───────────────────────────────
 
-export async function scrapeProductHunt(keywords: string[]): Promise<RawItem[]> {
-  try {
-    const res = await fetch("https://www.producthunt.com/feed?category=undefined", {
-      headers: { "User-Agent": "Juno.ai/1.0" },
-      signal: AbortSignal.timeout(10_000),
-    })
+/**
+ * Parse RSS XML into RawItem[].
+ * Handles both <item> (RSS 2.0) and <entry> (Atom) formats.
+ */
+function parseRSSFeedXml(xml: string, sourceName: string): RawItem[] {
+  const items: RawItem[] = []
 
-    if (!res.ok) return []
-    const text = await res.text()
-
-    const items: RawItem[] = []
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g
-    let match
-
-    while ((match = itemRegex.exec(text)) !== null) {
-      const entry = match[1]
-      const title = extractTag(entry, "title")
-      const link = extractTag(entry, "link")
-      const desc = extractTag(entry, "description")
-      const pubDate = extractTag(entry, "pubDate")
-
-      if (title) {
-        items.push({
-          title: title.replace(/<!\[CDATA\[|\]\]>/g, ""),
-          description: desc?.replace(/<[^>]*>/g, "").substring(0, 500) || "",
-          url: link || "",
-          publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-          source: "producthunt",
-        })
-      }
-    }
-
-    if (items.length > 0 && keywords.length > 0) {
-      const lowerKeywords = keywords.map((k) => k.toLowerCase())
-      const filtered = items.filter((item) => {
-        const t = `${item.title} ${item.description}`.toLowerCase()
-        return lowerKeywords.some((k) => t.includes(k))
-      })
-      return (filtered.length > 0 ? filtered : items).slice(0, 10)
-    }
-
-    return items.slice(0, 10)
-  } catch (e) {
-    console.error("ProductHunt scrape failed:", e)
-    return []
-  }
-}
-
-// ─── News via RSS feeds (FREE) ───────────────────────────────────
-
-const NEWS_FEEDS = [
-  { url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: "TechCrunch AI" },
-  { url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", name: "The Verge AI" },
-  { url: "https://blog.google/technology/ai/rss/", name: "Google AI Blog" },
-]
-
-export async function scrapeNews(params: {
-  competitors: string[]
-  keywords: string[]
-}): Promise<RawItem[]> {
-  const allItems: RawItem[] = []
-
-  await Promise.all(
-    NEWS_FEEDS.map(async (feed) => {
-      try {
-        const res = await fetch(feed.url, {
-          headers: { "User-Agent": "Juno.ai/1.0" },
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (!res.ok) return
-        const xml = await res.text()
-        allItems.push(...parseRssItems(xml, feed.name))
-      } catch (e) {
-        console.error(`RSS fetch failed for ${feed.name}:`, e)
-      }
-    }),
-  )
-
-  const cutoff = Date.now() - 48 * 60 * 60 * 1000
-  const recent = allItems.filter((item) => new Date(item.publishedAt).getTime() > cutoff)
-
-  const lowerKeywords = [...params.keywords, ...params.competitors].map((k) => k.toLowerCase())
-
-  if (lowerKeywords.length === 0) return recent.slice(0, 20)
-
-  const relevant = recent.filter((item) => {
-    const text = `${item.title} ${item.description}`.toLowerCase()
-    return lowerKeywords.some((k) => text.includes(k))
-  })
-
-  return relevant.length > 0 ? relevant : recent.slice(0, 10)
-}
-
-function parseRssItems(xml: string, sourceName: string): RawItem[] {
-  const out: RawItem[] = []
-  const itemRegex = /<item>([\s\S]*?)<\/item>/gi
-  let im: RegExpExecArray | null
-  while ((im = itemRegex.exec(xml)) !== null) {
-    const entry = im[1]
-    const title = extractTag(entry, "title")?.replace(/<!\[CDATA\[|\]\]>/g, "")
-    const link = extractTag(entry, "link")?.replace(/<!\[CDATA\[|\]\]>/g, "").trim()
-    const desc = extractTag(entry, "description")?.replace(/<[^>]*>/g, "")
+  const rssRegex = /<item>([\s\S]*?)<\/item>/gi
+  let match
+  while ((match = rssRegex.exec(xml)) !== null) {
+    const entry = match[1]
+    const title = extractTag(entry, "title")?.replace(/<!\[CDATA\[|\]\]>/g, "").trim()
+    const link =
+      extractTag(entry, "link")?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ||
+      extractTag(entry, "guid")?.replace(/<!\[CDATA\[|\]\]>/g, "").trim()
+    const desc = extractTag(entry, "description")
+      ?.replace(/<!\[CDATA\[|\]\]>/g, "")
+      .replace(/<[^>]*>/g, "")
+      .trim()
     const pubDate = extractTag(entry, "pubDate")
+
     if (title) {
-      out.push({
+      const pubIso = pubDate ? publishedIso(pubDate) : ""
+      items.push({
         title,
         description: desc?.substring(0, 500) || "",
         url: link || "",
-        publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+        publishedAt: pubIso || new Date().toISOString(),
         source: sourceName,
       })
     }
   }
 
-  // Atom (e.g. some Google feeds)
-  if (out.length === 0) {
-    const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi
-    let em: RegExpExecArray | null
-    while ((em = entryRegex.exec(xml)) !== null) {
-      const entry = em[1]
-      const title = extractTag(entry, "title")?.replace(/<!\[CDATA\[|\]\]>/g, "")
-      const link =
-        extractTag(entry, "link") ||
-        entry.match(/<link[^>]+href="([^"]+)"/i)?.[1] ||
-        ""
-      const summary =
-        extractTag(entry, "summary") || extractTag(entry, "content") || extractTag(entry, "subtitle")
-      const updated = extractTag(entry, "updated") || extractTag(entry, "published")
-      const cleaned = summary?.replace(/<[^>]*>/g, "") || ""
+  if (items.length === 0) {
+    const atomRegex = /<entry>([\s\S]*?)<\/entry>/gi
+    while ((match = atomRegex.exec(xml)) !== null) {
+      const entry = match[1]
+      const title = extractTag(entry, "title")?.replace(/<!\[CDATA\[|\]\]>/g, "").trim()
+      const linkMatch =
+        entry.match(/<link[^>]+href="([^"]+)"[^>]*\/?>/i) ||
+        entry.match(/<link[^>]*>([^<]*)<\/link>/i)
+      const link = linkMatch?.[1]?.trim() || ""
+      const desc =
+        extractTag(entry, "summary")?.replace(/<[^>]*>/g, "").trim() ||
+        extractTag(entry, "content")?.replace(/<[^>]*>/g, "").trim()
+      const pubDate = extractTag(entry, "published") || extractTag(entry, "updated")
+
       if (title) {
-        out.push({
+        const pubIso = pubDate ? publishedIso(pubDate) : ""
+        items.push({
           title,
-          description: cleaned.substring(0, 500),
-          url: link.trim(),
-          publishedAt: updated ? new Date(updated).toISOString() : new Date().toISOString(),
+          description: desc?.substring(0, 500) || "",
+          url: link,
+          publishedAt: pubIso || new Date().toISOString(),
           source: sourceName,
         })
       }
     }
   }
 
-  return out
+  return items
 }
 
-// ─── Regulation Monitor (RSS) ────────────────────────────────────
+/**
+ * Fetch and parse a single RSS feed.
+ * Returns normalised RawItem[] with 24-hour cutoff applied.
+ */
+async function fetchRSS(source: Source): Promise<RawItem[]> {
+  try {
+    const res = await fetch(source.url, {
+      headers: { "User-Agent": "Juno.ai/1.0" },
+      signal: AbortSignal.timeout(12_000),
+    })
 
-const REG_FEEDS = [{ url: "https://artificialintelligenceact.eu/feed/", name: "EU AI Act" }]
-
-export async function scrapeRegulation(): Promise<RawItem[]> {
-  const items: RawItem[] = []
-
-  for (const feed of REG_FEEDS) {
-    try {
-      const res = await fetch(feed.url, {
-        headers: { "User-Agent": "Juno.ai/1.0" },
-        signal: AbortSignal.timeout(10_000),
-      })
-      if (!res.ok) continue
-      const xml = await res.text()
-      items.push(...parseRssItems(xml, feed.name))
-    } catch (e) {
-      console.error(`Regulation feed failed for ${feed.name}:`, e)
+    if (!res.ok) {
+      console.warn(`[Scraper] ${source.name} returned ${res.status}`)
+      return []
     }
+
+    const xml = await res.text()
+    const items = parseRSSFeedXml(xml, source.name)
+
+    const min = cutoffMs24HoursAgo()
+    return items.filter((item) => {
+      const pubTime = Date.parse(item.publishedAt)
+      if (Number.isNaN(pubTime)) return true
+      return pubTime >= min
+    })
+  } catch (e) {
+    console.warn(`[Scraper] ${source.name} failed:`, e)
+    return []
+  }
+}
+
+export async function scrapeCBSSources(keywords: string[], competitors: string[]): Promise<RawItem[]> {
+  const cbsSources = getSourcesForAgent("cbs")
+
+  const results = await Promise.all(cbsSources.map((source) => fetchRSS(source)))
+
+  const allItems = results.flat()
+
+  if (keywords.length === 0 && competitors.length === 0) {
+    return allItems.slice(0, 50)
   }
 
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  return items.filter((i) => new Date(i.publishedAt).getTime() > cutoff)
+  const lowerKeywords = [...keywords, ...competitors].map((k) => k.toLowerCase())
+  const relevant = allItems.filter((item) => {
+    const text = `${item.title} ${item.description}`.toLowerCase()
+    return lowerKeywords.some((k) => text.includes(k))
+  })
+
+  if (relevant.length < 10) {
+    const relUrls = new Set(relevant.map((r) => r.url))
+    const extra = allItems
+      .filter((item) => !relUrls.has(item.url))
+      .slice(0, 10 - relevant.length)
+    return [...relevant, ...extra].slice(0, 50)
+  }
+
+  return relevant.slice(0, 50)
+}
+
+export async function scrapeCTOSources(_keywords: string[]): Promise<RawItem[]> {
+  const ctoSources = getSourcesForAgent("cto")
+
+  const results = await Promise.all(ctoSources.map((source) => fetchRSS(source)))
+
+  return results.flat().slice(0, 40)
+}
+
+export async function scrapeCROJobSources(keywords: string[]): Promise<RawItem[]> {
+  const jobSources = getSourcesByCategory("jobs")
+
+  const results = await Promise.all(jobSources.map((source) => fetchRSS(source)))
+
+  const allJobs = results.flat()
+
+  if (keywords.length === 0) return allJobs.slice(0, 30)
+
+  const lowerKeywords = keywords.map((k) => k.toLowerCase())
+  return allJobs
+    .filter((item) => {
+      const text = `${item.title} ${item.description}`.toLowerCase()
+      return lowerKeywords.some((k) => text.includes(k))
+    })
+    .slice(0, 30)
+}
+
+// ─── Product Hunt (registry feed) ────────────────────────────────
+
+export async function scrapeProductHunt(keywords: string[]): Promise<RawItem[]> {
+  const ph = getSourcesForAgent("cbs").find((s) => s.name === "Product Hunt")
+  if (!ph) return []
+  try {
+    const items = await fetchRSS(ph)
+    if (keywords.length === 0) return items.slice(0, 10)
+    const lowerKeywords = keywords.map((k) => k.toLowerCase())
+    const filtered = items.filter((item) => {
+      const t = `${item.title} ${item.description}`.toLowerCase()
+      return lowerKeywords.some((k) => t.includes(k))
+    })
+    return (filtered.length > 0 ? filtered : items).slice(0, 10)
+  } catch (e) {
+    console.error("ProductHunt scrape failed:", e)
+    return []
+  }
+}
+
+// ─── News (legacy — delegates to CBS registry) ───────────────────
+
+export async function scrapeNews(params: {
+  competitors: string[]
+  keywords: string[]
+}): Promise<RawItem[]> {
+  return scrapeCBSSources(params.keywords, params.competitors)
+}
+
+// ─── Regulation Monitor (RSS via registry) ─────────────────────────
+
+export async function scrapeRegulation(): Promise<RawItem[]> {
+  const feeds = getSourcesByCategory("regulation")
+  const results = await Promise.all(feeds.map((s) => fetchRSS(s)))
+  return results.flat()
 }
 
 // ─── Crunchbase (stub — needs API key) ───────────────────────────
@@ -504,29 +556,101 @@ function extractLocation(text: string): string {
   return ""
 }
 
+function remotiveRssItemsToJobListings(items: RawItem[]): JobListing[] {
+  return items.map((r) => ({
+    company: r.title.split(/\s*[–—-]\s*/)[0]?.trim() || "Unknown",
+    title: r.title.trim(),
+    location: "Remote",
+    description: r.description.slice(0, 3000),
+    url: r.url,
+    postedAt: r.publishedAt,
+    source: "remotive-feed",
+  }))
+}
+
+/** Curated rows that are J&J UI chrome (saved by mistake) — skip in CRO merge. */
+function isJunkJackJillCuratedRow(company: string, title: string): boolean {
+  const c = company.toLowerCase().trim()
+  const t = title.toLowerCase().trim()
+  if (/^(not for me|skip|interested|job post)$/.test(t) || /\bnot for me\b/.test(t)) return true
+  if (/^(home|jobs|profile)$/.test(c) && (t === "not for me" || t === "skip")) return true
+  return false
+}
+
+/** Curated jobs from Context (e.g. Jack & Jill digest) — merged first in CRO scan. */
+export function jackJillRowsToJobListings(raw: unknown): JobListing[] {
+  if (!Array.isArray(raw)) return []
+  const out: JobListing[] = []
+  for (const x of raw) {
+    if (!x || typeof x !== "object" || Array.isArray(x)) continue
+    const r = x as Record<string, unknown>
+    const company = String(r.company ?? "").trim()
+    const title = String(r.title ?? "").trim()
+    if (!company || !title) continue
+    if (isJunkJackJillCuratedRow(company, title)) continue
+    const urlRaw = typeof r.url === "string" ? r.url.trim() : ""
+    const url =
+      urlRaw.startsWith("http://") || urlRaw.startsWith("https://")
+        ? urlRaw
+        : `https://jack-jill.placeholder/listing#${encodeURIComponent(`${company}|${title}`)}`
+    const description = typeof r.description === "string" ? r.description.trim().slice(0, 3000) : ""
+    out.push({
+      company,
+      title,
+      location: "—",
+      description: description || `Curated listing (Jack & Jill) — ${company}`,
+      url,
+      postedAt: new Date().toISOString(),
+      source: "jack_and_jill",
+    })
+  }
+  return out
+}
+
+function dedupeJobListings(jobs: JobListing[]): JobListing[] {
+  const seen = new Set<string>()
+  const merged: JobListing[] = []
+  for (const j of jobs) {
+    const key = `${j.company.toLowerCase()}|${j.title.toLowerCase()}|${j.url}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(j)
+  }
+  return merged
+}
+
+/** Prefer `importedFirst` (Jack & Jill), then scraped boards. */
+export function mergeJobListings(importedFirst: JobListing[], scraped: JobListing[]): JobListing[] {
+  return dedupeJobListings([...importedFirst, ...scraped])
+}
+
 /**
- * Job boards — HN Who's Hiring (Algolia + Firebase) + Remotive.
- * Extend with LinkedIn/Indeed when API keys exist.
+ * Job boards — HN Who's Hiring (Algolia + Firebase) + Remotive API + Remotive RSS.
+ * @param allowStub When false, returns [] if nothing found (use when Jack & Jill already supplied rows).
  */
 export async function scrapeJobBoards(params: {
   keywords: string[]
   roles?: string[]
+  allowStub?: boolean
 }): Promise<JobListing[]> {
-  const [hnJobs, remotive] = await Promise.all([
+  const allowStub = params.allowStub !== false
+
+  const [hnJobs, remotiveApi, rssJobs] = await Promise.all([
     scrapeHNJobs(params.keywords),
     scrapeRemotiveJobs(params.keywords, params.roles),
+    scrapeCROJobSources(params.keywords).then(remotiveRssItemsToJobListings),
   ])
 
   const seen = new Set<string>()
   const merged: JobListing[] = []
-  for (const j of [...hnJobs, ...remotive]) {
+  for (const j of [...hnJobs, ...remotiveApi, ...rssJobs]) {
     if (!seen.has(j.url)) {
       seen.add(j.url)
       merged.push(j)
     }
   }
 
-  if (merged.length === 0) return stubJobListings()
+  if (merged.length === 0 && allowStub) return stubJobListings()
   return merged.slice(0, 40)
 }
 
@@ -536,15 +660,12 @@ export async function scrapeJobBoardsStub(): Promise<RawItem[]> {
 }
 
 /**
- * Legacy: single arXiv query + stubs (kept for older callers).
+ * Legacy: arXiv + CBS RSS registry (single lane).
  */
 export async function fetchAllBriefSources(arxivQuery?: string): Promise<ScrapedItem[]> {
-  const [arxiv, rss, ph, crunch, jobs] = await Promise.all([
+  const [arxiv, cbs] = await Promise.all([
     scrapeArxiv(arxivQuery || "cat:cs.AI+OR+all:startup+funding").catch(() => []),
-    scrapeNews({ competitors: [], keywords: [] }).catch(() => []),
-    scrapeProductHunt([]),
-    scrapeCrunchbaseStub(),
-    scrapeJobBoardsStub(),
+    scrapeCBSSources([], []).catch(() => []),
   ])
-  return rawItemsToScrapedItems([...arxiv, ...rss, ...ph, ...crunch, ...jobs])
+  return rawItemsToScrapedItems([...arxiv, ...cbs])
 }

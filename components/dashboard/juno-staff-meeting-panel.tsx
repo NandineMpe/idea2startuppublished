@@ -709,7 +709,7 @@ export function JunoStaffMeetingPanel() {
                   {d.content.post.preview.length >= 280 ? "…" : ""}&rdquo;
                 </p>
               ) : (
-                <EmptyHint>No LinkedIn draft waiting — CMO generates after the daily brief.</EmptyHint>
+                <EmptyHint>No LinkedIn draft waiting — CMO runs after the daily brief.</EmptyHint>
               )}
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button

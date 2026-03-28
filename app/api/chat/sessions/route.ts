@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+type Channel = "sidekick" | "context"
+
+function parseChannel(searchParams: URLSearchParams): Channel | null {
+  const c = searchParams.get("channel")
+  if (c === "context" || c === "sidekick") return c
+  return null
+}
+
 // GET /api/chat/sessions — list user's chat sessions (newest first)
-export async function GET() {
+// Query: ?channel=sidekick | ?channel=context — omit to list all channels
+// Response includes `authenticated` so the client can show accurate empty states.
+export async function GET(req: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -10,26 +20,30 @@ export async function GET() {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ sessions: [] })
+      return NextResponse.json({ authenticated: false, sessions: [] })
     }
 
-    const { data: sessions, error } = await supabase
+    const channel = parseChannel(new URL(req.url).searchParams)
+    let q = supabase
       .from("chat_sessions")
-      .select("id, title, created_at, updated_at")
+      .select("id, title, created_at, updated_at, channel")
       .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-      .limit(20)
+    if (channel) {
+      q = q.eq("channel", channel)
+    }
+    const { data: sessions, error } = await q.order("updated_at", { ascending: false }).limit(30)
 
     if (error) throw error
 
-    return NextResponse.json({ sessions: sessions || [] })
+    return NextResponse.json({ authenticated: true, sessions: sessions || [] })
   } catch (error) {
     console.error("Error fetching chat sessions:", error)
-    return NextResponse.json({ sessions: [] })
+    return NextResponse.json({ authenticated: false, sessions: [] })
   }
 }
 
 // POST /api/chat/sessions — create a new chat session
+// Body: { title?: string, channel?: "sidekick" | "context" }
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
@@ -38,15 +52,21 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json({ session: null })
+      return NextResponse.json({ session: null, error: "Unauthorized" }, { status: 401 })
     }
 
-    const { title } = await req.json().catch(() => ({ title: "New conversation" }))
+    const body = await req.json().catch(() => ({})) as {
+      title?: string
+      channel?: string
+    }
+    const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "New conversation"
+    const channel: Channel =
+      body.channel === "context" ? "context" : "sidekick"
 
     const { data: session, error } = await supabase
       .from("chat_sessions")
-      .insert({ user_id: user.id, title: title || "New conversation" })
-      .select("id, title, created_at, updated_at")
+      .insert({ user_id: user.id, title, channel })
+      .select("id, title, created_at, updated_at, channel")
       .single()
 
     if (error) throw error
@@ -54,7 +74,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ session })
   } catch (error) {
     console.error("Error creating chat session:", error)
-    return NextResponse.json({ session: null }, { status: 500 })
+    return NextResponse.json({ session: null, error: "Failed to create session" }, { status: 500 })
   }
 }
 

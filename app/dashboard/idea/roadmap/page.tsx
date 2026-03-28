@@ -87,9 +87,11 @@ export default function RoadmapPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <GitBranch className="h-6 w-6 text-purple-400" />
-          Product Roadmap Builder
+          Product roadmap workflow
         </h1>
-        <p className="text-muted-foreground mt-1">Generate a phased development plan with milestones, tasks, and success metrics.</p>
+        <p className="text-muted-foreground mt-1">
+          Build a phased plan with milestones and metrics — edit and own the timeline you will execute.
+        </p>
       </div>
 
       {/* Input Form */}
@@ -149,9 +151,9 @@ export default function RoadmapPage() {
             className="w-full bg-primary text-black font-semibold hover:bg-primary/90 h-11"
           >
             {isGenerating ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Building Roadmap...</>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Running workflow…</>
             ) : (
-              <><Sparkles className="mr-2 h-4 w-4" /> Generate Roadmap</>
+              <><Sparkles className="mr-2 h-4 w-4" /> Run workflow</>
             )}
           </Button>
         </CardContent>

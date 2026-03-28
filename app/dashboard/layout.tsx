@@ -1,6 +1,7 @@
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
 import FloatingJuno from "@/components/floating-juno"
+import { OnboardingGate } from "@/components/dashboard/onboarding-gate"
 
 export default function DashboardLayout({
   children,
@@ -13,7 +14,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopNavbar />
         <main className="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar">
-          {children}
+          <OnboardingGate>{children}</OnboardingGate>
         </main>
       </div>
       <FloatingJuno />

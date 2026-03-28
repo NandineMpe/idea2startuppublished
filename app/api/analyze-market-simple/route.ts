@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
+import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
 
@@ -131,7 +132,7 @@ IMPORTANT: Do not deviate from the exact section headings provided above. The fr
     const { text } = await generateText({
       model: anthropic("claude-sonnet-4-20250514"),
       prompt: `${companyBlock}Provide a comprehensive market analysis for the following business idea: ${query}`,
-      system: systemPrompt,
+      system: mergeSystemWithWritingRules(systemPrompt),
       temperature: 0.2,
       topP: 0.95,
       maxTokens: 4000,

@@ -2,7 +2,14 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useCallback } from "react"
-import { Toast } from "./toast"
+import {
+  ToastProvider as RadixToastProvider,
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  ToastClose,
+  ToastViewport,
+} from "./toast"
 
 type ToastType = {
   id: string
@@ -30,11 +37,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }: { title: string; description?: string; variant?: "default" | "destructive" }) => {
       const id = Math.random().toString(36).substring(2, 9)
       setToasts((prev) => [...prev, { id, title, description, variant }])
-
-      // Auto dismiss after 5 seconds
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((toast) => toast.id !== id))
-      }, 5000)
     },
     [],
   )
@@ -44,20 +46,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <ToastContext.Provider value={{ toasts, toast, dismiss }}>
-      {children}
-      <div className="fixed bottom-0 right-0 z-50 flex flex-col gap-2 p-4">
+    <RadixToastProvider>
+      <ToastContext.Provider value={{ toasts, toast, dismiss }}>
+        {children}
         {toasts.map((t) => (
           <Toast
             key={t.id}
-            title={t.title}
-            description={t.description}
             variant={t.variant}
-            onClose={() => dismiss(t.id)}
-          />
+            duration={5000}
+            onOpenChange={(open) => {
+              if (!open) dismiss(t.id)
+            }}
+          >
+            <ToastTitle>{t.title}</ToastTitle>
+            {t.description ? <ToastDescription>{t.description}</ToastDescription> : null}
+            <ToastClose />
+          </Toast>
         ))}
-      </div>
-    </ToastContext.Provider>
+        <ToastViewport />
+      </ToastContext.Provider>
+    </RadixToastProvider>
   )
 }
 
@@ -70,6 +78,5 @@ export const useToast = () => {
 }
 
 export const toast = (props: { title: string; description?: string; variant?: "default" | "destructive" }) => {
-  // This is a fallback for when the hook can't be used
   console.log("Toast:", props.title, props.description)
 }

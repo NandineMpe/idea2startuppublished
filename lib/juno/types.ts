@@ -17,12 +17,29 @@ export type RawItem = {
   metadata?: Record<string, unknown>
 }
 
+/** Extracted when an item is a competitor move or funding event (persistent tracking). */
+export type CompetitorEvent = {
+  companyName: string
+  eventType: string
+  fundingAmount?: string | null
+  fundingRound?: string | null
+  leadInvestor?: string | null
+  threatLevel?: string | null
+  suggestedResponse?: string | null
+  competitorUrl?: string | null
+}
+
 /** After Claude scores against full CompanyContext.promptBlock. */
 export type ScoredItem = RawItem & {
   relevanceScore: number
   urgency: "breaking" | "today" | "this_week"
   category: "competitor" | "funding" | "regulation" | "research" | "tool" | "opportunity"
   whyItMatters: string
+  strategicImplication: string
+  suggestedAction: string
+  connectionToRoadmap: string | null
+  /** When set, persisted to `competitor_tracking` (+ `funding_tracker` for funding). */
+  competitorEvent?: CompetitorEvent | null
 }
 
 export type DailyBriefPayload = {
@@ -53,6 +70,19 @@ export type LeadDiscoveredPayload = {
   url: string
   score: number
   pitchAngle: string
+  source?: string
+}
+
+/** Emitted when a lead hits the GTM Motion threshold (ICP 7+); includes `cro_leads.id`. */
+export type LeadQualifiedPayload = {
+  leadId: string
+  userId: string
+  companyName: string
+  companyDomain: string | null
+  jobTitle: string
+  jobUrl?: string
+  pitchAngle?: string
+  score?: number
   source?: string
 }
 

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
+
+const OUT_FIELDS = "id, tool, title, inputs, output, metadata, created_at"
 
 export async function GET() {
   try {
@@ -10,56 +13,49 @@ export async function GET() {
     // Latest daily brief
     const { data: briefRows } = await supabase
       .from("ai_outputs")
-      .select("id, type, content, metadata, created_at")
+      .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .eq("type", "daily_brief")
+      .eq("tool", "daily_brief")
       .order("created_at", { ascending: false })
       .limit(1)
 
-    // Latest leads (last 7 days)
+    // Latest leads (CRO job pipeline)
     const { data: leadRows } = await supabase
       .from("ai_outputs")
-      .select("id, type, content, metadata, created_at")
+      .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .eq("type", "lead_discovered")
+      .eq("tool", "lead_discovered")
       .order("created_at", { ascending: false })
       .limit(15)
 
     // Content queue — pending approval + drafts
     const { data: contentRows } = await supabase
       .from("ai_outputs")
-      .select("id, type, content, metadata, created_at")
+      .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .in("type", ["content_linkedin", "content_technical"])
+      .in("tool", ["content_linkedin", "content_technical"])
       .order("created_at", { ascending: false })
       .limit(30)
 
     // Latest tech radar
     const { data: radarRows } = await supabase
       .from("ai_outputs")
-      .select("id, type, content, metadata, created_at")
+      .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .eq("type", "tech_radar")
+      .eq("tool", "tech_radar")
       .order("created_at", { ascending: false })
       .limit(1)
 
     // Latest staff meeting synthesis (agent collaboration)
     const { data: staffMeetingRows } = await supabase
       .from("ai_outputs")
-      .select("id, type, content, metadata, created_at")
+      .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .eq("type", "staff_meeting")
+      .eq("tool", "staff_meeting")
       .order("created_at", { ascending: false })
       .limit(1)
 
     // Pipeline status — last run per type
-    const typeMap: Record<string, string> = {
-      daily_brief: "cbs",
-      lead_discovered: "cro",
-      content_linkedin: "cmo",
-      tech_radar: "cto",
-    }
-
     const pipelineStatus: Record<string, string | null> = {
       cbs: null,
       cro: null,
@@ -70,13 +66,15 @@ export async function GET() {
     if (briefRows?.[0]) pipelineStatus.cbs = briefRows[0].created_at
     if (leadRows?.[0]) pipelineStatus.cro = leadRows[0].created_at
 
+    const contentRowsNorm = (contentRows ?? []).map((r) => toLegacyFeedRow(r as AiOutputDbRow))
+
     const latestLinkedinPost =
-      contentRows?.find(
+      contentRowsNorm.find(
         (r) =>
           r.type === "content_linkedin" &&
           (r.content as { contentType?: string } | undefined)?.contentType === "post",
       ) ??
-      contentRows?.find(
+      contentRowsNorm.find(
         (r) =>
           r.type === "content_linkedin" &&
           (r.content as { contentType?: string } | undefined)?.contentType !== "comment",
@@ -86,12 +84,12 @@ export async function GET() {
     if (radarRows?.[0]) pipelineStatus.cto = radarRows[0].created_at
 
     // Filter content queue: only pending_approval and draft
-    const contentQueue = (contentRows ?? []).filter((r) => {
+    const contentQueue = contentRowsNorm.filter((r) => {
       const status = r.content?.status
       return status === "pending_approval" || status === "draft"
     })
 
-    const commentDraftCount = (contentRows ?? []).filter((r) => {
+    const commentDraftCount = contentRowsNorm.filter((r) => {
       const c = r.content as { contentType?: string; status?: string } | undefined
       return (
         c?.contentType === "comment" &&
@@ -100,12 +98,14 @@ export async function GET() {
     }).length
 
     return NextResponse.json({
-      brief: briefRows?.[0] ?? null,
-      leads: leadRows ?? [],
+      brief: briefRows?.[0] ? toLegacyFeedRow(briefRows[0] as AiOutputDbRow) : null,
+      leads: (leadRows ?? []).map((r) => toLegacyFeedRow(r as AiOutputDbRow)),
       contentQueue,
-      radar: radarRows?.[0] ?? null,
+      radar: radarRows?.[0] ? toLegacyFeedRow(radarRows[0] as AiOutputDbRow) : null,
       pipelineStatus,
-      staffMeeting: staffMeetingRows?.[0] ?? null,
+      staffMeeting: staffMeetingRows?.[0]
+        ? toLegacyFeedRow(staffMeetingRows[0] as AiOutputDbRow)
+        : null,
       commentDraftCount,
     })
   } catch (err) {

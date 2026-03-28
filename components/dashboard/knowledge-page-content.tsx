@@ -26,7 +26,7 @@ type MemoryHit = { content?: string }
 const hubLinks = [
   {
     title: "Domain documents",
-    description: "Industry reports, research, decks — stored as company assets and semantic memory.",
+    description: "Industry reports, research, and decks saved as company assets and semantic memory.",
     href: "/dashboard/knowledge/domain",
     icon: BookOpen,
   },
@@ -137,7 +137,7 @@ export function KnowledgePageContent() {
 
       {assetCount !== null && (
         <p className="text-[13px] text-muted-foreground">
-          {assetCount} saved document{assetCount === 1 ? "" : "s"} / assets on file — add more from the{" "}
+          {assetCount} saved document{assetCount === 1 ? "" : "s"} / assets on file. Add more from the{" "}
           <button onClick={() => {}} className="text-primary hover:underline">Company &amp; Founder</button> tab or Domain documents below.
         </p>
       )}
@@ -180,7 +180,7 @@ export function KnowledgePageContent() {
             </div>
             {showContext ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
           </button>
-          <CardDescription>Profile, documents, scraped pages, and semantic memory — combined for chat and tools.</CardDescription>
+          <CardDescription>Profile, documents, scraped pages, and semantic memory merged for chat and tools.</CardDescription>
         </CardHeader>
         {showContext && (
           <CardContent>

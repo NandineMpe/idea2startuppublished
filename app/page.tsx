@@ -21,12 +21,10 @@ export default function Home() {
       id: 0,
       position: { left: "75.47%", top: "39.84%" }, // Moved 10% to the left from 85.47%
       name: "Juno",
-      project: "Your Startup Sidekick",
-      product: "Personal startup companion.",
+      project: "Juno",
+      product: "Company context, briefs, and agent workflows.",
       description: `I'm Juno.
-I'm your intelligence layer — not a generic writing bot. I watch your market, competitors, and pipeline using your company profile, then report what matters: briefs, leads, and signals you can act on.
-
-You stay in control; I surface the story the data is telling.`,
+I use your company profile for briefs, lead scans, and scheduled pipelines. You choose what to run and what to ship.`,
       color: "cyan",
       opacity: 1,
       isJuno: true,
@@ -112,7 +110,7 @@ You stay in control; I surface the story the data is telling.`,
             onClick={handleDashboardClick}
             className="bg-background/40 backdrop-blur-md border border-primary/30 text-foreground hover:bg-primary/20 hover:border-primary transition-all duration-300 rounded-md px-6 py-2 text-sm font-medium"
           >
-            Launch Terminal
+            Dashboard
           </Button>
         </motion.div>
       </div>
@@ -152,14 +150,11 @@ You stay in control; I surface the story the data is telling.`,
             transition={{ duration: 1, delay: 0.5 }}
           >
             <h1 className="text-4xl md:text-6xl font-light text-foreground mb-6 tracking-tight leading-tight">
-              Hey, <span className="text-primary font-normal">Founder Extraordinaire</span>.
-              <br />
-              We've Been Expecting You.
+              Idea to startup
             </h1>
 
             <p className="text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto mb-12 font-light leading-relaxed">
-              Your idea is the ticket and it deserves to be in motion. Hop on and join other founders enroute to
-              building the future — with the right intelligence, at the right time.
+              Company context, briefs, and agent workflows in one workspace.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-8">
@@ -176,7 +171,7 @@ You stay in control; I surface the story the data is telling.`,
                   onMouseLeave={() => setIsHovered(false)}
                 >
                   <span className="relative z-10 flex items-center">
-                    {isHovered ? "Yes, Let's Go" : "Hop On?"}
+                    {isHovered ? "Open dashboard" : "Dashboard"}
                     {isHovered && (
                       <motion.span
                         className="ml-2 text-primary"
@@ -200,7 +195,7 @@ You stay in control; I surface the story the data is telling.`,
             transition={{ delay: 1.5, duration: 1 }}
           >
             <p className="text-muted-foreground text-sm mb-3">
-              Click on the founders on the train, and Juno, to learn more about their stories.
+              Click the dots on the image for short examples. Juno opens the product workspace.
             </p>
           </motion.div>
         </motion.div>

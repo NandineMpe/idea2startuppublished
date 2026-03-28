@@ -37,7 +37,7 @@ type View = "chat" | "history"
 const WELCOME: Message = {
   role: "assistant",
   content:
-    "Hi — I'm Juno. Ask questions about your company, market, or what the briefs mean. I can also help you think through next steps; scheduled intel runs in the background.",
+    "Hi. Ask about your company, market, or recent briefs. Scheduled jobs still run on their own.",
 }
 
 function formatRelativeTime(dateStr: string) {
@@ -61,6 +61,7 @@ export default function FloatingJuno() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [chatAuthenticated, setChatAuthenticated] = useState<boolean | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = useCallback(() => {
@@ -76,11 +77,13 @@ export default function FloatingJuno() {
   const fetchSessions = useCallback(async () => {
     setLoadingSessions(true)
     try {
-      const res = await fetch("/api/chat/sessions")
-      const data = await res.json()
+      const res = await fetch("/api/chat/sessions?channel=sidekick", { credentials: "include" })
+      const data = (await res.json()) as { authenticated?: boolean; sessions?: ChatSession[] }
+      setChatAuthenticated(data.authenticated === true)
       setSessions(data.sessions || [])
     } catch {
-      // Silent — user might not be logged in
+      setChatAuthenticated(false)
+      setSessions([])
     } finally {
       setLoadingSessions(false)
     }
@@ -93,7 +96,7 @@ export default function FloatingJuno() {
 
   const loadSession = useCallback(async (session: ChatSession) => {
     try {
-      const res = await fetch(`/api/chat/sessions/${session.id}`)
+      const res = await fetch(`/api/chat/sessions/${session.id}`, { credentials: "include" })
       const data = await res.json()
       const loaded: Message[] = (data.messages || []).map(
         (m: { role: string; content: string }) => ({
@@ -113,7 +116,7 @@ export default function FloatingJuno() {
     async (e: React.MouseEvent, sessionId: string) => {
       e.stopPropagation()
       try {
-        await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE" })
+        await fetch(`/api/chat/sessions/${sessionId}`, { method: "DELETE", credentials: "include" })
         setSessions((prev) => prev.filter((s) => s.id !== sessionId))
       } catch {
         // Silent
@@ -135,7 +138,8 @@ export default function FloatingJuno() {
       const res = await fetch("/api/chat/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
+        credentials: "include",
+        body: JSON.stringify({ title, channel: "sidekick" }),
       })
       const data = await res.json()
       if (data.session?.id) {
@@ -168,6 +172,7 @@ export default function FloatingJuno() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           messages: [...messages, userMessage],
           sessionId: activeSessionId,
@@ -217,12 +222,19 @@ export default function FloatingJuno() {
                     <Sparkles className="h-3.5 w-3.5 text-primary" />
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground">
-                    {view === "history" ? "Conversation History" : "Juno"}
+                    {view === "history" ? "Chat history" : "Juno"}
                   </p>
                   {view === "chat" && (
-                    <p className="text-[10px] text-muted-foreground leading-none">AI Sidekick</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Sidebar only · not Context page
+                    </p>
+                  )}
+                  {view === "history" && (
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 pr-2">
+                      Only chats started from this button
+                    </p>
                   )}
                 </div>
               </div>
@@ -243,7 +255,7 @@ export default function FloatingJuno() {
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={openHistory}
-                      title="Chat history"
+                      title="History for this floating chat (not Context page)"
                     >
                       <History size={13} />
                     </Button>
@@ -273,7 +285,12 @@ export default function FloatingJuno() {
                 {/* History View */}
                 {view === "history" && (
                   <div className="flex flex-col flex-1 overflow-hidden">
-                    <div className="p-3 border-b border-border shrink-0">
+                    <div className="p-3 border-b border-border shrink-0 space-y-2">
+                      <p className="text-[10px] text-muted-foreground leading-snug px-0.5">
+                        <span className="font-medium text-foreground/90">Different from Context:</span> chats on{" "}
+                        <span className="whitespace-nowrap">Context → Update context</span> are saved under the clock icon in
+                        that dialog, not here.
+                      </p>
                       <Button
                         variant="outline"
                         size="sm"
@@ -291,10 +308,23 @@ export default function FloatingJuno() {
                         </div>
                       ) : sessions.length === 0 ? (
                         <div className="p-6 text-center">
-                          <p className="text-[12px] text-muted-foreground">No saved conversations yet.</p>
-                          <p className="text-[11px] text-muted-foreground mt-1">
-                            Sign in to save your chat history.
-                          </p>
+                          {chatAuthenticated === false ? (
+                            <>
+                              <p className="text-[12px] text-muted-foreground">No saved conversations yet.</p>
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                Sign in to save your chat history.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-[12px] text-muted-foreground">No chats yet.</p>
+                              <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                                Send a message in this sidebar to create a thread here. Chats from{" "}
+                                <span className="font-medium text-foreground/80">Context → Update context</span> appear only
+                                there (clock icon in that dialog).
+                              </p>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <div className="p-2 space-y-1">
