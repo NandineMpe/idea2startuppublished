@@ -23,6 +23,7 @@ export default async function IntegrationsPage() {
         userId={user.id}
         pipedreamReady={pipedreamReady}
         pipedreamProjectEnvironment={pipedreamReady ? getPipedreamProjectEnvironment() : undefined}
+        githubOauthAppId={process.env.PIPEDREAM_GITHUB_OAUTH_APP_ID || undefined}
       />
     </div>
   )

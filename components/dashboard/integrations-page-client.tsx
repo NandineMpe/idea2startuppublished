@@ -127,7 +127,7 @@ async function syncAccountsAfterConnect(
 
 // ─── Main Card ────────────────────────────────────────────────────────────────
 
-function GithubPipedreamCard({ userId }: { userId: string }) {
+function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; githubOauthAppId?: string }) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const client = useFrontendClient()
@@ -251,6 +251,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
     try {
       await client.connectAccount({
         app: "github",
+        ...(githubOauthAppId ? { oauthAppId: githubOauthAppId } : {}),
         onSuccess: () => {
           toast({ title: "GitHub authorized", description: "Finishing up…" })
         },
@@ -587,10 +588,12 @@ export function IntegrationsPageClient({
   userId,
   pipedreamReady,
   pipedreamProjectEnvironment,
+  githubOauthAppId,
 }: {
   userId: string
   pipedreamReady: boolean
   pipedreamProjectEnvironment?: "development" | "production"
+  githubOauthAppId?: string
 }) {
   const queryClient = useMemo(
     () =>
@@ -640,7 +643,7 @@ export function IntegrationsPageClient({
       {pipedreamReady && pdClient ? (
         <QueryClientProvider client={queryClient}>
           <FrontendClientProvider client={pdClient}>
-            <GithubPipedreamCard userId={userId} />
+            <GithubPipedreamCard userId={userId} githubOauthAppId={githubOauthAppId} />
           </FrontendClientProvider>
         </QueryClientProvider>
       ) : (
