@@ -19,8 +19,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "github_repo is required (owner/repo)." }, { status: 400 })
   }
 
-  if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) {
-    return NextResponse.json({ error: "Invalid repo format. Use owner/repo." }, { status: 400 })
+  const parts = repo.split("/").filter(Boolean)
+  if (parts.length !== 2 || parts[0].length > 200 || parts[1].length > 200) {
+    return NextResponse.json(
+      { error: "Use two segments: owner/repo (e.g. your-org/your-repo)." },
+      { status: 400 },
+    )
   }
 
   const branch = (body.github_branch?.trim() || "main").slice(0, 200)

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import {
-  getGithubAccountId,
-  githubProxyGetJsonResult,
-  githubProxyListUserRepos,
-} from "@/lib/juno/pipedream-github"
+import { githubProxyListUserReposMerged } from "@/lib/juno/pipedream-github"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
+
+type RepoItem = { full_name: string; default_branch: string; private: boolean }
+
+/** Pipedream + GitHub proxy can be slow when many accounts are linked. */
+export const maxDuration = 60
 
 export async function GET() {
   const supabase = await createClient()
@@ -36,39 +37,48 @@ export async function GET() {
 
   const explicitRepo = (profile?.github_repo as string | null)?.trim() || null
 
-  const accountId = await getGithubAccountId(user.id)
-  if (!accountId) {
+  const vaultOwner = (profile?.github_vault_owner as string | null)?.trim() || null
+  const vaultName = (profile?.github_vault_repo as string | null)?.trim() || null
+  const vaultRepo = vaultOwner && vaultName ? `${vaultOwner}/${vaultName}` : null
+  const vaultBranch = (profile?.github_vault_branch as string | null)?.trim() || "main"
+
+  const merged = await githubProxyListUserReposMerged(user.id)
+
+  const payloadBase = {
+    selectedRepo: resolved?.repo ?? null,
+    selectedBranch: resolved?.branch ?? null,
+    selectionSource: explicitRepo ? ("explicit" as const) : resolved ? ("vault" as const) : null,
+    /** From Integrations → Obsidian vault (always returned when owner+repo are set). Use when GitHub list is empty. */
+    vaultRepo,
+    vaultBranch,
+  }
+
+  if (merged.accountIdsTried === 0) {
     return NextResponse.json({
       pipedreamConfigured,
       connected: false,
       githubLogin: null as string | null,
       repos: [] as RepoItem[],
-      selectedRepo: resolved?.repo ?? null,
-      selectedBranch: resolved?.branch ?? null,
-      selectionSource: explicitRepo ? ("explicit" as const) : resolved ? ("vault" as const) : null,
+      reposFetchError: merged.fetchError ?? null,
+      repoListErrors: merged.repoListErrors ?? [],
+      githubAccountsTried: 0,
+      reposEmptyLikelyScope: false,
+      ...payloadBase,
     })
   }
-
-  const [userRes, listRes] = await Promise.all([
-    githubProxyGetJsonResult<{ login?: string }>(user.id, accountId, "https://api.github.com/user"),
-    githubProxyListUserRepos(user.id, accountId),
-  ])
-
-  const githubLogin =
-    userRes.ok && userRes.data && typeof (userRes.data as { login?: string }).login === "string"
-      ? (userRes.data as { login: string }).login
-      : null
 
   return NextResponse.json({
     pipedreamConfigured,
     connected: true,
-    githubLogin,
-    repos: listRes.repos,
-    reposFetchError: listRes.fetchError ?? null,
+    githubLogin: merged.githubLogin,
+    repos: merged.repos,
+    reposFetchError: merged.fetchError ?? null,
+    repoListErrors: merged.repoListErrors ?? [],
+    githubAccountsTried: merged.accountIdsTried,
     /** True when listing succeeded but returned zero repos (often missing `repo` OAuth scope for private repos). */
-    reposEmptyLikelyScope: Boolean(!listRes.fetchError && listRes.repos.length === 0),
-    selectedRepo: resolved?.repo ?? null,
-    selectedBranch: resolved?.branch ?? null,
-    selectionSource: explicitRepo ? ("explicit" as const) : resolved ? ("vault" as const) : null,
+    reposEmptyLikelyScope: Boolean(
+      !merged.fetchError && merged.repoListErrors.length === 0 && merged.repos.length === 0,
+    ),
+    ...payloadBase,
   })
 }

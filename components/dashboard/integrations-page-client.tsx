@@ -51,6 +51,41 @@ function formatDate(iso: string | null | undefined): string {
   }
 }
 
+/** Best-effort timestamp for “most recently touched” account (Pipedream). */
+function accountActivityMs(a: PdAccount): number {
+  const candidates = [a.lastRefreshedAt, a.updatedAt, a.createdAt].filter(Boolean) as string[]
+  let best = 0
+  for (const s of candidates) {
+    const t = Date.parse(s)
+    if (!Number.isNaN(t) && t > best) best = t
+  }
+  return best
+}
+
+/**
+ * Pipedream often returns multiple rows for the same GitHub user (reconnects).
+ * Pick one primary account per identity (name), then the latest among those for the UI.
+ */
+function pickPrimaryGithubAccount(accounts: PdAccount[]): { primary: PdAccount; duplicateRows: number } {
+  if (accounts.length === 0) {
+    throw new Error("pickPrimaryGithubAccount: empty")
+  }
+  const byName = new Map<string, PdAccount[]>()
+  for (const a of accounts) {
+    const key = a.name?.trim() ? a.name.trim().toLowerCase() : `__id_${a.id}`
+    const arr = byName.get(key) ?? []
+    arr.push(a)
+    byName.set(key, arr)
+  }
+  const bestPerIdentity: PdAccount[] = []
+  for (const group of byName.values()) {
+    bestPerIdentity.push(group.reduce((x, y) => (accountActivityMs(y) > accountActivityMs(x) ? y : x)))
+  }
+  const primary = bestPerIdentity.reduce((x, y) => (accountActivityMs(y) > accountActivityMs(x) ? y : x))
+  const duplicateRows = Math.max(0, accounts.length - bestPerIdentity.length)
+  return { primary, duplicateRows }
+}
+
 function AccountHealthBadge({ account }: { account: PdAccount }) {
   if (account.dead) {
     return (
@@ -151,6 +186,11 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
   const hasUnhealthy = accounts.some((a) => a.dead || a.healthy === false)
   const allDead = accounts.length > 0 && accounts.every((a) => a.dead)
   const pipedreamLastActivity = latestPipedreamActivityIso(accounts)
+
+  const { primary: primaryAccount, duplicateRows } = useMemo(() => {
+    if (accounts.length === 0) return { primary: null as PdAccount | null, duplicateRows: 0 }
+    return pickPrimaryGithubAccount(accounts)
+  }, [accounts])
 
   const runLiveVerify = useCallback(async () => {
     setVerifying(true)
@@ -278,10 +318,18 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
               )}
               {allDead
-                ? `${accounts.length} GitHub ${accounts.length === 1 ? "account" : "accounts"} on file — all tokens expired. Reconnect below.`
+                ? "GitHub link on file — token(s) expired. Reconnect below."
                 : hasUnhealthy
-                  ? `${accounts.length} GitHub ${accounts.length === 1 ? "account" : "accounts"} on file — some need reconnecting.`
-                  : `Connected — ${accounts.length} GitHub ${accounts.length === 1 ? "account" : "accounts"} on file for this workspace.`}
+                  ? "Connection needs attention — reconnect below to refresh OAuth."
+                  : primaryAccount?.name
+                    ? `Connected as @${primaryAccount.name}.`
+                    : "GitHub connected for this workspace."}
+              {duplicateRows > 0 && !allDead && (
+                <span className="block mt-1 text-xs font-normal text-muted-foreground">
+                  {duplicateRows} duplicate Pipedream connection{duplicateRows === 1 ? "" : "s"} hidden — showing the
+                  latest only.
+                </span>
+              )}
             </span>
           )}
           {!connected && isLoading && <span>Checking existing connection…</span>}
@@ -302,40 +350,35 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
           )}
         </div>
 
-        {/* ── Account list ── */}
-        {connected && !isLoading && accounts.length > 0 && (
+        {/* ── Single status card (latest connection; duplicates merged) ── */}
+        {connected && !isLoading && primaryAccount && (
           <div className="space-y-2">
-            {accounts.map((account) => (
-              <div
-                key={account.id}
-                className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm"
-              >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="font-medium text-foreground">
-                    {account.name ? `@${account.name}` : `Account ${account.id.slice(0, 8)}…`}
-                  </span>
-                  <AccountHealthBadge account={account} />
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                  {account.createdAt && <div>First linked: {formatDate(account.createdAt)}</div>}
-                  {account.updatedAt && <div>Last updated (Pipedream): {formatDate(account.updatedAt)}</div>}
-                  {account.lastRefreshedAt && (
-                    <div>Credentials last refreshed: {formatDate(account.lastRefreshedAt)}</div>
-                  )}
-                  {account.nextRefreshAt && (
-                    <div>Next credential refresh: {formatDate(account.nextRefreshAt)}</div>
-                  )}
-                  {account.expiresAt && <div>Access refresh by: {formatDate(account.expiresAt)}</div>}
-                  {account.error && (
-                    <div className="text-destructive">Pipedream: {account.error}</div>
-                  )}
-                </div>
+            <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5 text-sm">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="font-medium text-foreground">
+                  {primaryAccount.name ? `@${primaryAccount.name}` : `Account ${primaryAccount.id.slice(0, 8)}…`}
+                </span>
+                <AccountHealthBadge account={primaryAccount} />
               </div>
-            ))}
+              <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                {primaryAccount.updatedAt && (
+                  <div>Last updated (Pipedream): {formatDate(primaryAccount.updatedAt)}</div>
+                )}
+                {primaryAccount.lastRefreshedAt && (
+                  <div>Credentials last refreshed: {formatDate(primaryAccount.lastRefreshedAt)}</div>
+                )}
+                {primaryAccount.expiresAt && (
+                  <div>Access refresh by: {formatDate(primaryAccount.expiresAt)}</div>
+                )}
+                {primaryAccount.error && (
+                  <div className="text-destructive">Pipedream: {primaryAccount.error}</div>
+                )}
+              </div>
+            </div>
             {pipedreamLastActivity && (
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 shrink-0" />
-                Latest Pipedream activity:{" "}
+                Latest activity:{" "}
                 <span className="font-medium text-foreground">{formatDate(pipedreamLastActivity)}</span>
               </p>
             )}

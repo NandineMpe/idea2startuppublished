@@ -18,16 +18,27 @@ export async function GET(req: NextRequest) {
   }
   const { data: findings, error: fErr } = await q.order("created_at", { ascending: false })
 
+  let findingRows = findings ?? []
   if (fErr) {
-    console.error("[api/security GET]", fErr.message)
-    return NextResponse.json({ error: "Failed to load findings" }, { status: 500 })
+    console.error("[api/security GET] findings", fErr.message)
+    const msg = (fErr.message ?? "").toLowerCase()
+    const missingTable =
+      msg.includes("does not exist") || msg.includes("schema cache") || msg.includes("could not find")
+    if (!missingTable) {
+      return NextResponse.json({ error: "Failed to load findings" }, { status: 500 })
+    }
+    findingRows = []
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileErr } = await supabase
     .from("company_profile")
     .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
     .eq("user_id", user.id)
     .maybeSingle()
+
+  if (profileErr) {
+    console.error("[api/security GET] company_profile", profileErr.message)
+  }
 
   const resolved = profile
     ? resolveGithubRepoFromProfile({
@@ -39,7 +50,7 @@ export async function GET(req: NextRequest) {
       })
     : null
 
-  const { data: lastScan } = await supabase
+  const { data: lastScan, error: scanErr } = await supabase
     .from("security_scans")
     .select("created_at, status, new_findings, resolved_count, files_scanned, total_findings, error_message")
     .eq("user_id", user.id)
@@ -47,8 +58,12 @@ export async function GET(req: NextRequest) {
     .limit(1)
     .maybeSingle()
 
+  if (scanErr) {
+    console.error("[api/security GET] security_scans", scanErr.message)
+  }
+
   const counts = { critical: 0, high: 0, medium: 0, low: 0, total: 0 }
-  for (const row of findings ?? []) {
+  for (const row of findingRows) {
     const s = String(row.severity || "").toLowerCase()
     if (s === "critical") counts.critical++
     else if (s === "high") counts.high++
@@ -58,10 +73,10 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    findings: findings ?? [],
+    findings: findingRows,
     counts,
     repo: resolved?.repo ?? null,
     branch: resolved?.branch ?? null,
-    lastScan: lastScan ?? null,
+    lastScan: scanErr ? null : lastScan ?? null,
   })
 }

@@ -26,10 +26,73 @@ type GithubContext = {
   githubLogin: string | null
   repos: GithubRepoOption[]
   reposFetchError?: string | null
+  /** Distinct errors from GitHub/proxy when no repos were returned (helps distinguish API errors vs OAuth scope). */
+  repoListErrors?: string[]
   reposEmptyLikelyScope?: boolean
+  /** How many Pipedream GitHub connections were queried when building the repo list */
+  githubAccountsTried?: number
   selectedRepo: string | null
   selectedBranch: string | null
   selectionSource: "explicit" | "vault" | null
+  /** Obsidian vault owner/repo from company profile — use when GitHub API returns no list (OAuth scope). */
+  vaultRepo: string | null
+  vaultBranch: string | null
+}
+
+/** Avoids render crashes if the API omits fields or returns an unexpected shape. */
+function normalizeGithubContext(raw: unknown): GithubContext {
+  if (!raw || typeof raw !== "object") {
+    return {
+      pipedreamConfigured: false,
+      connected: false,
+      githubLogin: null,
+      repos: [],
+      selectedRepo: null,
+      selectedBranch: null,
+      selectionSource: null,
+      vaultRepo: null,
+      vaultBranch: null,
+    }
+  }
+  const o = raw as Record<string, unknown>
+  const reposRaw = o.repos
+  const repos: GithubRepoOption[] = Array.isArray(reposRaw)
+    ? reposRaw.filter(
+        (x): x is GithubRepoOption =>
+          Boolean(x) &&
+          typeof x === "object" &&
+          typeof (x as GithubRepoOption).full_name === "string",
+      )
+    : []
+  const errRaw = o.repoListErrors
+  const repoListErrors = Array.isArray(errRaw) ? errRaw.filter((e): e is string => typeof e === "string") : []
+  const src = o.selectionSource
+  return {
+    pipedreamConfigured: Boolean(o.pipedreamConfigured),
+    connected: Boolean(o.connected),
+    githubLogin: typeof o.githubLogin === "string" ? o.githubLogin : null,
+    repos,
+    reposFetchError: typeof o.reposFetchError === "string" ? o.reposFetchError : null,
+    repoListErrors,
+    reposEmptyLikelyScope: Boolean(o.reposEmptyLikelyScope),
+    githubAccountsTried: typeof o.githubAccountsTried === "number" ? o.githubAccountsTried : undefined,
+    selectedRepo: typeof o.selectedRepo === "string" ? o.selectedRepo : null,
+    selectedBranch: typeof o.selectedBranch === "string" ? o.selectedBranch : null,
+    selectionSource: src === "explicit" || src === "vault" ? src : null,
+    vaultRepo: typeof o.vaultRepo === "string" ? o.vaultRepo : null,
+    vaultBranch: typeof o.vaultBranch === "string" ? o.vaultBranch : null,
+  }
+}
+
+function isValidOwnerRepo(s: string): boolean {
+  const parts = s.trim().split("/").filter(Boolean)
+  return (
+    parts.length === 2 &&
+    parts[0].length > 0 &&
+    parts[1].length > 0 &&
+    parts[0].length <= 200 &&
+    parts[1].length <= 200
+  )
 }
 
 type FindingRow = {
@@ -97,21 +160,55 @@ export function SecurityUpdatesPage() {
   const [severityFilter, setSeverityFilter] = useState<string>("all")
   const [gh, setGh] = useState<GithubContext | null>(null)
   const [ghLoading, setGhLoading] = useState(true)
+  const [githubLoadError, setGithubLoadError] = useState<string | null>(null)
   const [savingRepo, setSavingRepo] = useState(false)
   const [branchDraft, setBranchDraft] = useState("")
   const [manualRepo, setManualRepo] = useState("")
 
   const loadGithub = useCallback(async () => {
     setGhLoading(true)
+    setGithubLoadError(null)
+    const controller = new AbortController()
+    /** Stay under typical Vercel function limits; server lists repos in parallel to finish faster. */
+    const timeoutMs = 55_000
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      const res = await fetch("/api/security/github/repos")
-      if (!res.ok) throw new Error("github")
-      const data = (await res.json()) as GithubContext
-      setGh(data)
-      setBranchDraft(data.selectedBranch ?? "")
-    } catch {
+      const res = await fetch("/api/security/github/repos", { signal: controller.signal })
+      let parsed: unknown
+      try {
+        parsed = await res.json()
+      } catch {
+        setGh(null)
+        setGithubLoadError("Invalid response from server when loading GitHub status.")
+        return
+      }
+      const body = parsed as GithubContext & { error?: string }
+      if (!res.ok) {
+        setGh(null)
+        setGithubLoadError(
+          typeof body.error === "string" ? body.error : `Could not load GitHub status (${res.status}).`,
+        )
+        return
+      }
+      const n = normalizeGithubContext(body)
+      setGh(n)
+      setBranchDraft(
+        typeof body.selectedBranch === "string" && body.selectedBranch.trim()
+          ? body.selectedBranch
+          : n.vaultBranch || "",
+      )
+      setManualRepo((prev) => (prev.trim() ? prev : n.vaultRepo || ""))
+    } catch (e) {
       setGh(null)
+      if (e instanceof Error && e.name === "AbortError") {
+        setGithubLoadError(
+          `Loading GitHub status timed out after ${Math.round(timeoutMs / 1000)}s. Try again, or open Integrations to verify Pipedream.`,
+        )
+      } else {
+        setGithubLoadError("Could not load GitHub connection status.")
+      }
     } finally {
+      clearTimeout(timer)
       setGhLoading(false)
     }
   }, [])
@@ -195,11 +292,31 @@ export function SecurityUpdatesPage() {
 
   function saveManualRepo() {
     const r = manualRepo.trim()
-    if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(r)) {
-      toast({ title: "Use owner/repo", description: "Example: acme/web-app", variant: "destructive" })
+    if (!isValidOwnerRepo(r)) {
+      toast({
+        title: "Use owner/repo",
+        description: "Two segments separated by a slash, e.g. my-org/my-repository",
+        variant: "destructive",
+      })
       return
     }
     void saveRepoSelection(r, branchDraft.trim() || "main")
+  }
+
+  function useVaultRepoForScans() {
+    const r = gh?.vaultRepo?.trim()
+    const b = gh?.vaultBranch?.trim() || "main"
+    if (!r || !isValidOwnerRepo(r)) {
+      toast({
+        title: "Configure vault first",
+        description: "Set Obsidian vault owner and repo under Integrations, then try again.",
+        variant: "destructive",
+      })
+      return
+    }
+    setManualRepo(r)
+    setBranchDraft(b)
+    void saveRepoSelection(r, b)
   }
 
   async function runScan(mode: "daily" | "comprehensive") {
@@ -303,6 +420,13 @@ export function SecurityUpdatesPage() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Checking Pipedream / GitHub…
             </div>
+          ) : githubLoadError ? (
+            <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <p className="text-sm text-destructive">{githubLoadError}</p>
+              <Button type="button" size="sm" variant="secondary" onClick={() => void loadGithub()}>
+                Retry
+              </Button>
+            </div>
           ) : !gh?.pipedreamConfigured ? (
             <p className="text-sm text-muted-foreground">
               Pipedream is not configured on the server. Set Pipedream env vars to list repositories.
@@ -322,8 +446,17 @@ export function SecurityUpdatesPage() {
           ) : (
             <>
               <p className="text-sm">
-                <span className="text-muted-foreground">Connected as</span>{" "}
-                <span className="font-medium text-foreground">@{gh.githubLogin ?? "github"}</span>
+                {gh.githubLogin ? (
+                  <>
+                    <span className="text-muted-foreground">Connected as</span>{" "}
+                    <span className="font-mono font-medium text-foreground">@{gh.githubLogin}</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">
+                    GitHub is linked via Pipedream (we couldn&apos;t read your username from the API — listing may
+                    still work).
+                  </span>
+                )}
                 {gh.selectionSource === "vault" && gh.selectedRepo && (
                   <span className="text-muted-foreground text-xs ml-2">
                     (selection also inferred from Obsidian vault until you pick a repo)
@@ -344,6 +477,11 @@ export function SecurityUpdatesPage() {
                       <SelectValue placeholder="Choose a repository…" />
                     </SelectTrigger>
                     <SelectContent className="max-h-[min(280px,50vh)]">
+                      {gh.vaultRepo && !gh.repos.some((r) => r.full_name === gh.vaultRepo) && (
+                        <SelectItem value={gh.vaultRepo} className="font-mono text-xs">
+                          {gh.vaultRepo} · Obsidian vault
+                        </SelectItem>
+                      )}
                       {gh.repos.map((r) => (
                         <SelectItem key={r.full_name} value={r.full_name} className="font-mono text-xs">
                           {r.full_name}
@@ -382,32 +520,56 @@ export function SecurityUpdatesPage() {
                   {savingRepo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Apply branch"}
                 </Button>
               </div>
-              {(gh.reposFetchError || gh.repos.length === 0) && (
+              {(gh.reposFetchError ||
+                (gh.repoListErrors && gh.repoListErrors.length > 0) ||
+                gh.repos.length === 0) && (
                 <div className="space-y-3 rounded-md border border-border/80 bg-muted/20 p-3">
+                  {gh.vaultRepo && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8"
+                        disabled={savingRepo}
+                        onClick={() => useVaultRepoForScans()}
+                      >
+                        Use Obsidian vault repo for scans
+                      </Button>
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {gh.vaultRepo} · {gh.vaultBranch || "main"}
+                      </span>
+                    </div>
+                  )}
                   {gh.reposFetchError && (
                     <p className="text-xs text-destructive">
                       GitHub list failed: {gh.reposFetchError}
                     </p>
                   )}
+                  {gh.repoListErrors && gh.repoListErrors.length > 0 && (
+                    <ul className="text-xs text-destructive list-disc pl-4 space-y-0.5">
+                      {gh.repoListErrors.map((err) => (
+                        <li key={err}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
                   {!gh.reposFetchError && gh.reposEmptyLikelyScope && (
                     <p className="text-xs text-muted-foreground">
-                      The list is empty even though you are connected. For <strong>private</strong> repositories, the
-                      GitHub connection in Pipedream must include the <strong>repo</strong> OAuth scope. Open your
-                      Pipedream project → Connect → GitHub, ensure full repo access is requested, then reconnect under{" "}
-                      <Link href="/dashboard/integrations" className="underline font-medium">
-                        Integrations
-                      </Link>
-                      .
+                      GitHub did not return any repos (private repos need the <strong>repo</strong> OAuth scope in
+                      Pipedream).{" "}
+                      <Link href="/dashboard/integrations" className="underline font-medium text-foreground">
+                        Reconnect GitHub
+                      </Link>{" "}
+                      or use your vault / manual entry below.
                     </p>
                   )}
-                  {!gh.reposFetchError && !gh.reposEmptyLikelyScope && gh.repos.length === 0 && (
+                  {!gh.reposFetchError && !gh.reposEmptyLikelyScope && gh.repos.length === 0 && !gh.vaultRepo && (
                     <p className="text-xs text-muted-foreground">
-                      No repositories returned. You can still enter a repository below if you know the owner and name.
+                      No repositories returned. Enter owner/repo below (two parts separated by &quot;/&quot;).
                     </p>
                   )}
                   <div className="space-y-1.5">
                     <Label htmlFor="sec-repo-manual" className="text-xs">
-                      Enter repository manually (owner/repo)
+                      Or type repository (owner/repo)
                     </Label>
                     <div className="flex flex-wrap gap-2 items-end">
                       <Input
