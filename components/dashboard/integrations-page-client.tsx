@@ -1,7 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query"
+import { createFrontendClient } from "@pipedream/sdk/browser"
+import type { CreateTokenResponse } from "@pipedream/sdk"
+import { FrontendClientProvider, useFrontendClient } from "@pipedream/connect-react"
 import {
   Activity,
   AlertCircle,
@@ -127,20 +130,9 @@ async function syncAccountsAfterConnect(
 function GithubPipedreamCard({ userId }: { userId: string }) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const client = useFrontendClient()
   const [connecting, setConnecting] = useState(false)
   const [syncingAfterConnect, setSyncingAfterConnect] = useState(false)
-  const popupRef = useRef<Window | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const closeCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Clean up popup + timers on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-      if (closeCheckRef.current) clearInterval(closeCheckRef.current)
-      popupRef.current?.close()
-    }
-  }, [])
   const [reposExpanded, setReposExpanded] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [liveVerify, setLiveVerify] = useState<{
@@ -253,104 +245,30 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
     }
   }, [queryClient, refetch, toast])
 
-  // ── OAuth connect flow (popup-based, avoids SDK iframe protocol issues) ──────
+  // ── OAuth connect flow ──────────────────────────────────────────────────────
   const connect = async () => {
-    if (connecting) return
     setConnecting(true)
-
-    // Clear any previous intervals
-    if (pollRef.current) clearInterval(pollRef.current)
-    if (closeCheckRef.current) clearInterval(closeCheckRef.current)
-
-    let tokenData: { token?: string; connectLinkUrl?: string; error?: string } = {}
     try {
-      const res = await fetch("/api/pipedream/connect-token", { method: "POST" })
-      tokenData = (await res.json().catch(() => ({}))) as typeof tokenData
-      if (!res.ok) {
-        toast({
-          title: "Could not open connect window",
-          description: tokenData.error ?? `Token request failed (${res.status})`,
-          variant: "destructive",
-        })
-        setConnecting(false)
-        return
-      }
-    } catch {
-      toast({ title: "Network error", description: "Could not reach the server.", variant: "destructive" })
-      setConnecting(false)
-      return
-    }
-
-    // Build the Pipedream Connect URL — open as a popup, not an SDK-managed iframe
-    // This avoids the `tabs:outgoing.message.ready` messaging protocol mismatch in SDK v2.4.x
-    const connectUrl = tokenData.token
-      ? `https://pipedream.com/_static/connect.html?token=${encodeURIComponent(tokenData.token)}&app=github`
-      : tokenData.connectLinkUrl
-
-    if (!connectUrl) {
-      toast({ title: "Missing connect URL", description: "Token response was incomplete.", variant: "destructive" })
-      setConnecting(false)
-      return
-    }
-
-    const popup = window.open(
-      connectUrl,
-      "pipedream-connect",
-      "width=620,height=700,toolbar=0,menubar=0,location=0,status=0,scrollbars=1,resizable=1",
-    )
-
-    if (!popup) {
-      toast({
-        title: "Popup blocked",
-        description: "Allow popups for this site and try again.",
-        variant: "destructive",
-      })
-      setConnecting(false)
-      return
-    }
-
-    popupRef.current = popup
-    let knownCount = 0
-
-    // Poll accounts to detect when OAuth completes
-    pollRef.current = setInterval(async () => {
-      try {
-        const r = await fetch("/api/pipedream/accounts?app=github")
-        if (!r.ok) return
-        const b = (await r.json()) as { accounts?: PdAccount[] }
-        const n = b.accounts?.length ?? 0
-        if (n > knownCount) {
-          knownCount = n
-          clearInterval(pollRef.current!)
-          clearInterval(closeCheckRef.current!)
-          popupRef.current?.close()
-          toast({ title: "GitHub linked", description: "Finishing up…" })
-          void runPostConnectSync()
-        }
-      } catch {
-        /* keep polling */
-      }
-    }, 2_000)
-
-    // Detect popup closed without connecting
-    closeCheckRef.current = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(pollRef.current!)
-        clearInterval(closeCheckRef.current!)
-        setConnecting(false)
-        // Do a final accounts check in case OAuth completed just before close
-        void (async () => {
-          const r = await fetch("/api/pipedream/accounts?app=github").catch(() => null)
-          if (!r?.ok) return
-          const b = (await r.json()) as { accounts?: PdAccount[] }
-          if ((b.accounts?.length ?? 0) > 0) {
+      await client.connectAccount({
+        app: "github",
+        onSuccess: () => {
+          toast({ title: "GitHub authorized", description: "Finishing up…" })
+        },
+        onError: (err) => {
+          toast({ title: "Connection issue", description: err.message, variant: "destructive" })
+        },
+        onClose: (status) => {
+          setConnecting(false)
+          if (status.successful) {
             void runPostConnectSync()
-          } else {
-            toast({ title: "Window closed", description: "GitHub was not connected.", variant: "default" })
+          } else if (status.completed && !status.successful) {
+            toast({ title: "Not connected", description: "Window closed before finishing." })
           }
-        })()
-      }
-    }, 800)
+        },
+      })
+    } catch {
+      setConnecting(false)
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -684,6 +602,32 @@ export function IntegrationsPageClient({
     [],
   )
 
+  const pdClient = useMemo(() => {
+    if (!pipedreamReady) return null
+    return createFrontendClient({
+      externalUserId: userId,
+      projectEnvironment:
+        pipedreamProjectEnvironment ?? (process.env.NODE_ENV === "production" ? "production" : "development"),
+      tokenCallback: async (): Promise<CreateTokenResponse> => {
+        const res = await fetch("/api/pipedream/connect-token", { method: "POST" })
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(body.error || "Could not create Connect token")
+        }
+        const data = (await res.json()) as {
+          token: string
+          expiresAt: string
+          connectLinkUrl: string
+        }
+        return {
+          token: data.token,
+          connectLinkUrl: data.connectLinkUrl,
+          expiresAt: new Date(data.expiresAt),
+        }
+      },
+    })
+  }, [userId, pipedreamReady, pipedreamProjectEnvironment])
+
   return (
     <div className="flex flex-col gap-8 max-w-3xl">
       <div className="space-y-1">
@@ -693,9 +637,11 @@ export function IntegrationsPageClient({
         </p>
       </div>
 
-      {pipedreamReady ? (
+      {pipedreamReady && pdClient ? (
         <QueryClientProvider client={queryClient}>
-          <GithubPipedreamCard userId={userId} />
+          <FrontendClientProvider client={pdClient}>
+            <GithubPipedreamCard userId={userId} />
+          </FrontendClientProvider>
         </QueryClientProvider>
       ) : (
         <Card className={cn("glass-card border-border border-dashed")}>
