@@ -513,7 +513,7 @@ export function OfficeHoursPageContent() {
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true)
     try {
-      const res = await fetch("/api/office-hours/sessions")
+      const res = await fetch("/api/office-hours/sessions", { credentials: "include" })
       const data = (await res.json()) as { sessions: SessionSummary[] }
       setSessions(data.sessions ?? [])
     } catch {
@@ -564,6 +564,7 @@ export function OfficeHoursPageContent() {
       }
 
       if (!res.ok) {
+        console.warn("[office-hours] POST /api/office-hours/sessions failed", res.status, data)
         const parts = [data.hint, data.details].filter(
           (s): s is string => typeof s === "string" && s.length > 0,
         )
@@ -574,7 +575,7 @@ export function OfficeHoursPageContent() {
               ? parts.join(" ")
               : data.error ??
                 (res.status >= 500
-                  ? "Server error. Apply Supabase migrations 031 and 032 so channel office-hours is allowed, then try again."
+                  ? "Server error. Apply Supabase migrations 032 or 033 (channel office-hours). See supabase/migrations/033_office_hours_complete.sql."
                   : `Request failed (${res.status}).`),
           variant: "destructive",
         })
@@ -666,8 +667,10 @@ export function OfficeHoursPageContent() {
                 key={s.id}
                 onClick={() => {
                   setActiveSessionId(s.id)
+                  const fromTitle = s.title.includes("Builder") ? "builder" : "startup"
+                  const docMode = s.designDoc?.mode
                   setActiveMode(
-                    s.designDoc?.mode === "builder" ? "builder" : "startup",
+                    docMode === "builder" || docMode === "startup" ? docMode : fromTitle,
                   )
                   setViewingDocId(null)
                   setViewingDoc(null)

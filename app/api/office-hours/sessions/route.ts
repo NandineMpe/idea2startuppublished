@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: sessions, error } = await supabase
     .from("chat_sessions")
-    .select("id, title, created_at, updated_at")
+    .select("id, title, created_at, updated_at, channel")
     .eq("user_id", user.id)
     .eq("channel", "office-hours")
     .order("updated_at", { ascending: false })
@@ -61,28 +61,33 @@ export async function POST(req: Request) {
   const mode = body.mode === "builder" ? "builder" : "startup"
   const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
 
-  // Use admin to bypass channel check in case constraint not yet migrated
+  // Do not require chat_sessions.mode column: mode is encoded in title and returned in JSON for the client.
   const { data: session, error } = await supabaseAdmin
     .from("chat_sessions")
     .insert({ user_id: user.id, title, channel: "office-hours" })
     .select("id, title, created_at, updated_at, channel")
     .single()
 
-  if (error) {
-    console.error("[office-hours/sessions POST]", error.code, error.message)
+  if (error || !session) {
+    console.error("[office-hours/sessions POST]", error?.code, error?.message)
     const channelViolation =
-      error.code === "23514" ||
-      (typeof error.message === "string" &&
+      error?.code === "23514" ||
+      (typeof error?.message === "string" &&
         (error.message.includes("chat_sessions_channel_check") ||
           error.message.includes("violates check constraint")))
+    const missingChannelColumn =
+      typeof error?.message === "string" &&
+      error.message.includes("channel") &&
+      error.message.includes("does not exist")
     return NextResponse.json(
       {
         error: "Failed to create session",
-        details: error.message,
-        code: error.code,
-        hint: channelViolation
-          ? 'Database must allow channel "office-hours". Run migration 031 (design_docs.sql) or 032 in Supabase SQL, or: npm run db:migrate with DATABASE_URL set.'
-          : undefined,
+        details: error?.message ?? "No row returned",
+        code: error?.code,
+        hint:
+          missingChannelColumn || channelViolation
+            ? "Run migration 032 or 033 in Supabase SQL editor: supabase/migrations/033_office_hours_complete.sql"
+            : undefined,
       },
       { status: 500 },
     )
