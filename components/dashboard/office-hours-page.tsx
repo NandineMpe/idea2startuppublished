@@ -2,6 +2,7 @@
 
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
+import { useRouter } from "next/navigation"
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { Coffee, Plus, ChevronRight, CheckCircle2, Clock, Send, ArrowLeft, FileText, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { OfficeHoursMode } from "@/lib/juno/office-hours-prompt"
 import { extractPhase } from "@/lib/juno/office-hours-prompt"
+import { ToastAction } from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -72,7 +75,15 @@ function phaseIndex(phase: string | null): number {
 
 // ─── Mode picker ──────────────────────────────────────────────────
 
-function ModePicker({ onSelect }: { onSelect: (mode: OfficeHoursMode) => void }) {
+function ModePicker({
+  onSelect,
+  startingMode,
+}: {
+  onSelect: (mode: OfficeHoursMode) => void
+  startingMode: OfficeHoursMode | null
+}) {
+  const busy = startingMode !== null
+
   return (
     <div className="flex flex-col items-center justify-center gap-6 h-full py-16">
       <div className="text-center">
@@ -85,10 +96,15 @@ function ModePicker({ onSelect }: { onSelect: (mode: OfficeHoursMode) => void })
 
       <div className="grid w-full max-w-lg grid-cols-1 gap-4 sm:grid-cols-2">
         <button
+          type="button"
+          disabled={busy}
           onClick={() => onSelect("startup")}
-          className="group rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-primary/50 hover:shadow-sm"
+          className="group rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
         >
-          <div className="mb-3 text-2xl">🔬</div>
+          <div className="mb-3 flex items-center gap-2 text-2xl">
+            🔬
+            {startingMode === "startup" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
           <h3 className="mb-1.5 font-semibold text-foreground group-hover:text-primary">Startup Mode</h3>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             Stress-test demand, find the specific user who needs this most, and discover the narrowest wedge you can ship for money.
@@ -96,10 +112,15 @@ function ModePicker({ onSelect }: { onSelect: (mode: OfficeHoursMode) => void })
         </button>
 
         <button
+          type="button"
+          disabled={busy}
           onClick={() => onSelect("builder")}
-          className="group rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-primary/50 hover:shadow-sm"
+          className="group rounded-xl border border-border bg-card p-5 text-left transition-all hover:border-primary/50 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
         >
-          <div className="mb-3 text-2xl">🛠</div>
+          <div className="mb-3 flex items-center gap-2 text-2xl">
+            🛠
+            {startingMode === "builder" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
           <h3 className="mb-1.5 font-semibold text-foreground group-hover:text-primary">Builder Mode</h3>
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             Explore the coolest version, find what makes someone say &ldquo;whoa&rdquo;, and find the fastest path to something real.
@@ -478,6 +499,8 @@ function ConversationPane({
 // ─── Main page ────────────────────────────────────────────────────
 
 export function OfficeHoursPageContent() {
+  const { toast } = useToast()
+  const router = useRouter()
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
@@ -485,6 +508,7 @@ export function OfficeHoursPageContent() {
   const [viewingDocId, setViewingDocId] = useState<string | null>(null)
   const [viewingDoc, setViewingDoc] = useState<DesignDoc | null>(null)
   const [loadingDoc, setLoadingDoc] = useState(false)
+  const [startingMode, setStartingMode] = useState<OfficeHoursMode | null>(null)
 
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true)
@@ -504,18 +528,70 @@ export function OfficeHoursPageContent() {
   }, [loadSessions])
 
   async function startSession(mode: OfficeHoursMode) {
-    const res = await fetch("/api/office-hours/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode }),
-    })
-    const data = (await res.json()) as { session: { id: string }; mode: OfficeHoursMode }
-    if (data.session) {
-      setActiveSessionId(data.session.id)
-      setActiveMode(mode)
-      setViewingDocId(null)
-      setViewingDoc(null)
-      void loadSessions()
+    setStartingMode(mode)
+    try {
+      const res = await fetch("/api/office-hours/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mode }),
+      })
+      let data: { session?: { id: string }; mode?: OfficeHoursMode; error?: string } = {}
+      try {
+        data = (await res.json()) as typeof data
+      } catch {
+        // non-JSON body
+      }
+
+      if (res.status === 401) {
+        toast({
+          title: "Sign in required",
+          description: "Your session expired or you are not logged in to the app.",
+          variant: "destructive",
+          action: (
+            <ToastAction altText="Log in" onClick={() => router.push("/login")}>
+              Log in
+            </ToastAction>
+          ),
+        })
+        return
+      }
+
+      if (!res.ok) {
+        toast({
+          title: "Could not start Office Hours",
+          description:
+            data.error ??
+            (res.status >= 500
+              ? "Server error. If this persists, the database may need migration 031 (office-hours channel)."
+              : `Request failed (${res.status}).`),
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (data.session?.id) {
+        setActiveSessionId(data.session.id)
+        setActiveMode(mode)
+        setViewingDocId(null)
+        setViewingDoc(null)
+        void loadSessions()
+        return
+      }
+
+      toast({
+        title: "Could not start session",
+        description: "No session was created. Try again or contact support.",
+        variant: "destructive",
+      })
+    } catch (e) {
+      toast({
+        title: "Network error",
+        description: e instanceof Error ? e.message : "Check your connection and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setStartingMode(null)
     }
   }
 
@@ -612,7 +688,7 @@ export function OfficeHoursPageContent() {
       <div className="flex-1 overflow-hidden">
         {/* No active session — mode picker */}
         {!activeSessionId && (
-          <ModePicker onSelect={startSession} />
+          <ModePicker onSelect={startSession} startingMode={startingMode} />
         )}
 
         {/* Viewing design doc */}
