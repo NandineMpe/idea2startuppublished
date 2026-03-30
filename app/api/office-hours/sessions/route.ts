@@ -69,8 +69,23 @@ export async function POST(req: Request) {
     .single()
 
   if (error) {
-    console.error("[office-hours/sessions POST]", error.message)
-    return NextResponse.json({ error: "Failed to create session" }, { status: 500 })
+    console.error("[office-hours/sessions POST]", error.code, error.message)
+    const channelViolation =
+      error.code === "23514" ||
+      (typeof error.message === "string" &&
+        (error.message.includes("chat_sessions_channel_check") ||
+          error.message.includes("violates check constraint")))
+    return NextResponse.json(
+      {
+        error: "Failed to create session",
+        details: error.message,
+        code: error.code,
+        hint: channelViolation
+          ? 'Database must allow channel "office-hours". Run migration 031 (design_docs.sql) or 032 in Supabase SQL, or: npm run db:migrate with DATABASE_URL set.'
+          : undefined,
+      },
+      { status: 500 },
+    )
   }
 
   return NextResponse.json({ session, mode })

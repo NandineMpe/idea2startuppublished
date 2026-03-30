@@ -536,7 +536,13 @@ export function OfficeHoursPageContent() {
         credentials: "include",
         body: JSON.stringify({ mode }),
       })
-      let data: { session?: { id: string }; mode?: OfficeHoursMode; error?: string } = {}
+      let data: {
+        session?: { id: string }
+        mode?: OfficeHoursMode
+        error?: string
+        details?: string
+        hint?: string
+      } = {}
       try {
         data = (await res.json()) as typeof data
       } catch {
@@ -558,13 +564,18 @@ export function OfficeHoursPageContent() {
       }
 
       if (!res.ok) {
+        const parts = [data.hint, data.details].filter(
+          (s): s is string => typeof s === "string" && s.length > 0,
+        )
         toast({
           title: "Could not start Office Hours",
           description:
-            data.error ??
-            (res.status >= 500
-              ? "Server error. If this persists, the database may need migration 031 (office-hours channel)."
-              : `Request failed (${res.status}).`),
+            parts.length > 0
+              ? parts.join(" ")
+              : data.error ??
+                (res.status >= 500
+                  ? "Server error. Apply Supabase migrations 031 and 032 so channel office-hours is allowed, then try again."
+                  : `Request failed (${res.status}).`),
           variant: "destructive",
         })
         return
