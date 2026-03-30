@@ -2,7 +2,6 @@ import { anthropic } from "@ai-sdk/anthropic"
 import { convertToModelMessages, streamText, type UIMessage } from "ai"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { supabaseAdmin } from "@/lib/supabase"
 import { getCompanyContext } from "@/lib/company-context"
 import { buildOfficeHoursSystemPrompt, extractDesignDoc, type OfficeHoursMode } from "@/lib/juno/office-hours-prompt"
 import { jsonApiError } from "@/lib/api-error-response"
@@ -37,9 +36,9 @@ export async function POST(req: Request) {
     const lastUser = [...messages].reverse().find((m) => m.role === "user")
     const lastMessage = lastUser ? textFromUIMessage(lastUser) : ""
 
-    // Persist user message
+    // Persist user message (RLS; no service role required)
     if (sessionId) {
-      supabaseAdmin
+      supabase
         .from("chat_messages")
         .insert({ session_id: sessionId, user_id: user.id, role: "user", content: lastMessage })
         .then(({ error }) => {
@@ -61,26 +60,24 @@ export async function POST(req: Request) {
       messages: modelMessages,
       maxOutputTokens: 2000,
       onFinish: async ({ text }) => {
-        // Persist assistant response
         if (sessionId) {
-          await supabaseAdmin
+          await supabase
             .from("chat_messages")
             .insert({ session_id: sessionId, user_id: user.id, role: "assistant", content: text })
             .then(({ error }) => {
               if (error) console.error("[office-hours] save assistant msg:", error.message)
             })
 
-          // Update session timestamp
-          await supabaseAdmin
+          await supabase
             .from("chat_sessions")
             .update({ updated_at: new Date().toISOString() })
             .eq("id", sessionId)
+            .eq("user_id", user.id)
             .then(() => {})
 
-          // Check for design doc completion
           const doc = extractDesignDoc(text)
           if (doc) {
-            await supabaseAdmin
+            await supabase
               .from("design_docs")
               .insert({
                 user_id: user.id,

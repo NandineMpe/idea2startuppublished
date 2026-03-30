@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { supabaseAdmin } from "@/lib/supabase"
+import { jsonApiError } from "@/lib/api-error-response"
 
 // GET /api/office-hours/sessions — list user's office-hours sessions with completion status
 export async function GET() {
@@ -50,48 +50,52 @@ export async function GET() {
 
 // POST /api/office-hours/sessions — create a new office-hours session
 export async function POST(req: Request) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = (await req.json().catch(() => ({}))) as { mode?: string }
-  const mode = body.mode === "builder" ? "builder" : "startup"
-  const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
+    const body = (await req.json().catch(() => ({}))) as { mode?: string }
+    const mode = body.mode === "builder" ? "builder" : "startup"
+    const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
 
-  // Do not require chat_sessions.mode column: mode is encoded in title and returned in JSON for the client.
-  const { data: session, error } = await supabaseAdmin
-    .from("chat_sessions")
-    .insert({ user_id: user.id, title, channel: "office-hours" })
-    .select("id, title, created_at, updated_at, channel")
-    .single()
+    // Use the user session client (RLS), not service role — avoids hard failure when SUPABASE_SERVICE_ROLE_KEY is unset.
+    const { data: session, error } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: user.id, title, channel: "office-hours" })
+      .select("id, title, created_at, updated_at, channel")
+      .single()
 
-  if (error || !session) {
-    console.error("[office-hours/sessions POST]", error?.code, error?.message)
-    const channelViolation =
-      error?.code === "23514" ||
-      (typeof error?.message === "string" &&
-        (error.message.includes("chat_sessions_channel_check") ||
-          error.message.includes("violates check constraint")))
-    const missingChannelColumn =
-      typeof error?.message === "string" &&
-      error.message.includes("channel") &&
-      error.message.includes("does not exist")
-    return NextResponse.json(
-      {
-        error: "Failed to create session",
-        details: error?.message ?? "No row returned",
-        code: error?.code,
-        hint:
-          missingChannelColumn || channelViolation
-            ? "Run migration 032 or 033 in Supabase SQL editor: supabase/migrations/033_office_hours_complete.sql"
-            : undefined,
-      },
-      { status: 500 },
-    )
+    if (error || !session) {
+      console.error("[office-hours/sessions POST]", error?.code, error?.message)
+      const channelViolation =
+        error?.code === "23514" ||
+        (typeof error?.message === "string" &&
+          (error.message.includes("chat_sessions_channel_check") ||
+            error.message.includes("violates check constraint")))
+      const missingChannelColumn =
+        typeof error?.message === "string" &&
+        error.message.includes("channel") &&
+        error.message.includes("does not exist")
+      return NextResponse.json(
+        {
+          error: "Failed to create session",
+          details: error?.message ?? "No row returned",
+          code: error?.code,
+          hint:
+            missingChannelColumn || channelViolation
+              ? "Run migration 032 or 033 in Supabase SQL editor: supabase/migrations/033_office_hours_complete.sql"
+              : undefined,
+        },
+        { status: 500 },
+      )
+    }
+
+    return NextResponse.json({ session, mode })
+  } catch (e: unknown) {
+    return jsonApiError(500, e, "office-hours/sessions POST")
   }
-
-  return NextResponse.json({ session, mode })
 }
