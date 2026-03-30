@@ -14,6 +14,7 @@ import {
   UserCircle,
   Plug,
   Shield,
+  Coffee,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { title: "Intelligence Feed", href: "/dashboard", icon: Radio, exact: true },
   { title: "Command Center", href: "/dashboard/command", icon: Target },
   { title: "Security updates", href: "/dashboard/security-updates", icon: Shield },
+  { title: "Office Hours", href: "/dashboard/office-hours", icon: Coffee },
   { title: "GTM", href: "/dashboard/distribution", icon: Share2 },
   { title: "Founder brand", href: "/dashboard/founder-brand", icon: UserCircle },
   { title: "Tools & workflows", href: "/dashboard/tools", icon: Wrench },

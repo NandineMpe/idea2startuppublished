@@ -1,0 +1,77 @@
+import { NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
+import { supabaseAdmin } from "@/lib/supabase"
+
+// GET /api/office-hours/sessions — list user's office-hours sessions with completion status
+export async function GET() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ authenticated: false, sessions: [] })
+
+  const { data: sessions, error } = await supabase
+    .from("chat_sessions")
+    .select("id, title, created_at, updated_at")
+    .eq("user_id", user.id)
+    .eq("channel", "office-hours")
+    .order("updated_at", { ascending: false })
+    .limit(20)
+
+  if (error) {
+    console.error("[office-hours/sessions GET]", error.message)
+    return NextResponse.json({ authenticated: true, sessions: [] })
+  }
+
+  // Join design docs to show completion status
+  const sessionIds = (sessions ?? []).map((s) => s.id)
+  let docsBySession: Record<string, { id: string; mode: string; status: string }> = {}
+
+  if (sessionIds.length > 0) {
+    const { data: docs } = await supabase
+      .from("design_docs")
+      .select("id, session_id, mode, status")
+      .eq("user_id", user.id)
+      .in("session_id", sessionIds)
+
+    for (const doc of docs ?? []) {
+      if (doc.session_id) docsBySession[doc.session_id] = doc
+    }
+  }
+
+  const enriched = (sessions ?? []).map((s) => ({
+    ...s,
+    designDoc: docsBySession[s.id] ?? null,
+  }))
+
+  return NextResponse.json({ authenticated: true, sessions: enriched })
+}
+
+// POST /api/office-hours/sessions — create a new office-hours session
+export async function POST(req: Request) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = (await req.json().catch(() => ({}))) as { mode?: string }
+  const mode = body.mode === "builder" ? "builder" : "startup"
+  const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
+
+  // Use admin to bypass channel check in case constraint not yet migrated
+  const { data: session, error } = await supabaseAdmin
+    .from("chat_sessions")
+    .insert({ user_id: user.id, title, channel: "office-hours" })
+    .select("id, title, created_at, updated_at, channel")
+    .single()
+
+  if (error) {
+    console.error("[office-hours/sessions POST]", error.message)
+    return NextResponse.json({ error: "Failed to create session" }, { status: 500 })
+  }
+
+  return NextResponse.json({ session, mode })
+}

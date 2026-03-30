@@ -1,12 +1,21 @@
 "use client"
 
-import { useState } from "react"
-import { useChat } from "ai/react"
+import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
+import { useMemo, useState } from "react"
 import { ModelSelector, type ModelInfo } from "./model-selector"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
+import type { UIMessage } from "ai"
+
+function getMessageText(message: UIMessage): string {
+  return message.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("")
+}
 
 export function ChatWithModels() {
   const [selectedModel, setSelectedModel] = useState<ModelInfo>({
@@ -15,9 +24,14 @@ export function ChatWithModels() {
     apiRoute: "/api/chat/openai",
   })
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: selectedModel.apiRoute,
-  })
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: selectedModel.apiRoute }),
+    [selectedModel.apiRoute],
+  )
+
+  const { messages, sendMessage, status } = useChat({ transport })
+  const [input, setInput] = useState("")
+  const isLoading = status === "submitted" || status === "streaming"
 
   const handleModelChange = (model: ModelInfo) => {
     setSelectedModel(model)
@@ -42,7 +56,7 @@ export function ChatWithModels() {
             }`}
           >
             <p className="text-sm font-medium mb-1">{message.role === "user" ? "You" : selectedModel.label}</p>
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            <p className="text-sm whitespace-pre-wrap">{getMessageText(message)}</p>
           </div>
         ))}
         {isLoading && (
@@ -52,10 +66,19 @@ export function ChatWithModels() {
         )}
       </CardContent>
       <CardFooter>
-        <form onSubmit={handleSubmit} className="w-full flex gap-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!input.trim() || isLoading) return
+            const t = input.trim()
+            setInput("")
+            void sendMessage({ text: t })
+          }}
+          className="w-full flex gap-2"
+        >
           <Textarea
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 min-h-[60px] max-h-[120px] bg-black/50 border-gray-800 focus:border-primary"
           />

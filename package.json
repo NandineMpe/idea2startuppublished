@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",
+    "@ai-sdk/react": "^3.0.143",
     "@anthropic-ai/sdk": "^0.80.0",
     "@emotion/is-prop-valid": "latest",
     "@fontsource/inter": "^5.2.8",

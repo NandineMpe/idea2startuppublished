@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { UserCircle, AlertTriangle, Zap, Target, TrendingUp, Clock, RefreshCw } from "lucide-react"
+import { UserCircle, AlertTriangle, Zap, Target, TrendingUp, Clock, RefreshCw, FileText, Coffee } from "lucide-react"
+import Link from "next/link"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -333,6 +334,98 @@ function CeoReviewPanel() {
   )
 }
 
+// ─── Design Docs panel ───────────────────────────────────────────
+
+type DesignDocSummary = {
+  id: string
+  mode: string
+  title: string
+  doc_data: { theAssignment?: string; recommendedApproach?: string }
+  status: string
+  created_at: string
+}
+
+function DesignDocsPanel() {
+  const [docs, setDocs] = useState<DesignDocSummary[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/office-hours/design-doc?all=true")
+      .then((r) => r.json())
+      .then((data: { docs?: DesignDocSummary[] }) => setDocs(data.docs ?? []))
+      .catch(() => setDocs([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+    )
+  }
+
+  if (docs.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-12 text-center">
+        <Coffee className="h-6 w-6 text-muted-foreground" />
+        <div>
+          <p className="font-medium text-foreground">No design docs yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Complete an Office Hours session to generate your first.
+          </p>
+        </div>
+        <Link href="/dashboard/office-hours">
+          <Button variant="outline" size="sm">
+            <FileText className="mr-2 h-3.5 w-3.5" />
+            Start Office Hours →
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {docs.map((doc) => (
+        <Card key={doc.id} className="border-border">
+          <CardContent className="py-4">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[13px] font-medium text-foreground">{doc.title}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    doc.mode === "builder"
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                  }`}>
+                    {doc.mode === "builder" ? "🛠 Builder" : "🔬 Startup"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {new Date(doc.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <Link href="/dashboard/office-hours">
+                <Button variant="ghost" size="sm" className="h-7 text-[12px]">
+                  View →
+                </Button>
+              </Link>
+            </div>
+            {doc.doc_data.theAssignment && (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-900/10">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Assignment</p>
+                <p className="mt-0.5 text-[12px] text-foreground">{doc.doc_data.theAssignment}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────
 
 export function FounderBrandPageContent() {
@@ -376,6 +469,12 @@ export function FounderBrandPageContent() {
               {TAB_HINT[key].title}
             </TabsTrigger>
           ))}
+          <TabsTrigger
+            value="designDocs"
+            className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]"
+          >
+            Design Docs
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="strategicReview" className="mt-4 focus-visible:outline-none">
@@ -411,6 +510,10 @@ export function FounderBrandPageContent() {
             )}
           </TabsContent>
         ))}
+
+        <TabsContent value="designDocs" className="mt-4 focus-visible:outline-none">
+          <DesignDocsPanel />
+        </TabsContent>
       </Tabs>
     </div>
   )
