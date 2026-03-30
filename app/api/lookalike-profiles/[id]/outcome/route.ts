@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { recordLookalikeOutreachOutcome } from "@/lib/lookalike/record-outreach-outcome"
 import type { OutreachOutcomeType } from "@/types/lookalike"
@@ -78,6 +79,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   } catch (e) {
     const msg = e instanceof Error ? e.message : "failed"
     const status = msg === "Profile not found" ? 404 : 500
+    if (status === 500) {
+      return jsonApiError(500, e, "lookalike-profiles outcome POST")
+    }
     return NextResponse.json({ error: msg }, { status })
   }
 }

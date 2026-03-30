@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 import { addToMemory, queryMemory } from "@/lib/supermemory"
@@ -97,8 +98,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text })
   } catch (error: unknown) {
-    console.error("Chat error:", error)
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonApiError(500, error, "chat POST")
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { fetchGithubVaultFromProfileFields } from "@/lib/github-vault"
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
       )
 
       if (clearErr) {
-        return NextResponse.json({ error: clearErr.message }, { status: 500 })
+        return jsonApiError(500, clearErr, "github-vault POST clear")
       }
 
       return NextResponse.json({
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     )
 
     if (upErr) {
-      return NextResponse.json({ error: upErr.message }, { status: 500 })
+      return jsonApiError(500, upErr, "github-vault POST upsert")
     }
 
     return NextResponse.json({

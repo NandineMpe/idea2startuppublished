@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 
@@ -54,10 +55,6 @@ No preamble outside the markdown.`),
 
     return NextResponse.json({ digest: text.trim(), generatedAt: new Date().toISOString() })
   } catch (e) {
-    console.error("[tiktok-digest]", e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Digest failed" },
-      { status: 500 },
-    )
+    return jsonApiError(500, e, "tiktok-digest POST")
   }
 }

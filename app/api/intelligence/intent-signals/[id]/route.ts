@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
 export async function PATCH(
@@ -41,8 +42,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error("intent-signals PATCH:", error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonApiError(500, error, "intent-signals PATCH")
     }
 
     return NextResponse.json(data)

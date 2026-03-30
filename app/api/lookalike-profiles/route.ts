@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase"
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     .limit(50)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonApiError(500, error, "lookalike-profiles GET")
   }
 
   return NextResponse.json({ profiles: data ?? [] })

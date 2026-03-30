@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { githubProxyListUserReposMerged } from "@/lib/juno/pipedream-github"
+import { githubProxyListUserReposForLatestAccount } from "@/lib/juno/pipedream-github"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
 
 type RepoItem = { full_name: string; default_branch: string; private: boolean }
 
-/** Pipedream + GitHub proxy can be slow when many accounts are linked. */
+/** Pipedream + GitHub proxy can be slow on large repo lists. */
 export const maxDuration = 60
 
 export async function GET() {
@@ -42,7 +42,7 @@ export async function GET() {
   const vaultRepo = vaultOwner && vaultName ? `${vaultOwner}/${vaultName}` : null
   const vaultBranch = (profile?.github_vault_branch as string | null)?.trim() || "main"
 
-  const merged = await githubProxyListUserReposMerged(user.id)
+  const latest = await githubProxyListUserReposForLatestAccount(user.id)
 
   const payloadBase = {
     selectedRepo: resolved?.repo ?? null,
@@ -53,14 +53,14 @@ export async function GET() {
     vaultBranch,
   }
 
-  if (merged.accountIdsTried === 0) {
+  if (latest.accountIdsTried === 0) {
     return NextResponse.json({
       pipedreamConfigured,
       connected: false,
       githubLogin: null as string | null,
       repos: [] as RepoItem[],
-      reposFetchError: merged.fetchError ?? null,
-      repoListErrors: merged.repoListErrors ?? [],
+      reposFetchError: latest.fetchError ?? null,
+      repoListErrors: latest.repoListErrors ?? [],
       githubAccountsTried: 0,
       reposEmptyLikelyScope: false,
       ...payloadBase,
@@ -70,14 +70,14 @@ export async function GET() {
   return NextResponse.json({
     pipedreamConfigured,
     connected: true,
-    githubLogin: merged.githubLogin,
-    repos: merged.repos,
-    reposFetchError: merged.fetchError ?? null,
-    repoListErrors: merged.repoListErrors ?? [],
-    githubAccountsTried: merged.accountIdsTried,
+    githubLogin: latest.githubLogin,
+    repos: latest.repos,
+    reposFetchError: latest.fetchError ?? null,
+    repoListErrors: latest.repoListErrors ?? [],
+    githubAccountsTried: latest.accountIdsTried,
     /** True when listing succeeded but returned zero repos (often missing `repo` OAuth scope for private repos). */
     reposEmptyLikelyScope: Boolean(
-      !merged.fetchError && merged.repoListErrors.length === 0 && merged.repos.length === 0,
+      !latest.fetchError && latest.repoListErrors.length === 0 && latest.repos.length === 0,
     ),
     ...payloadBase,
   })

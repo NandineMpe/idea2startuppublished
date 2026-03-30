@@ -1,3 +1,4 @@
+import type { Account } from "@pipedream/sdk"
 import { PipedreamClient } from "@pipedream/sdk"
 import { getPipedreamProjectEnvironment } from "@/lib/pipedream-connect-env"
 
@@ -14,7 +15,40 @@ function getClient(): PipedreamClient | null {
   })
 }
 
-/** First healthy connected GitHub account for this external user (Connect). Falls back to first account if none are healthy. */
+/** Prefer createdAt; fallback updatedAt so older API rows still sort sensibly. */
+function accountCreatedMs(a: Account): number {
+  const t = a.createdAt ?? a.updatedAt
+  if (t instanceof Date) return t.getTime()
+  if (typeof t === "string") {
+    const ms = Date.parse(t)
+    return Number.isNaN(ms) ? 0 : ms
+  }
+  return 0
+}
+
+/**
+ * Picks the **most recently created** GitHub Connect account when Pipedream returns multiple rows.
+ * Sort: `createdAt` descending; tie-breaker `updatedAt` descending.
+ */
+export function pickMostRecentGithubAccount(accounts: Account[]): Account | null {
+  if (accounts.length === 0) return null
+  const sorted = [...accounts].sort((a, b) => {
+    const dc = accountCreatedMs(b) - accountCreatedMs(a)
+    if (dc !== 0) return dc
+    const ua = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0
+    const ub = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0
+    return ub - ua
+  })
+  return sorted[0] ?? null
+}
+
+export function pickMostRecentGithubAccountId(accounts: Account[]): string | null {
+  return pickMostRecentGithubAccount(accounts)?.id ?? null
+}
+
+export const GITHUB_ACCOUNTS_LIST_LIMIT = 100
+
+/** Most recently created GitHub Connect account for this external user. */
 export async function getGithubAccountId(externalUserId: string): Promise<string | null> {
   const client = getClient()
   if (!client) return null
@@ -22,16 +56,51 @@ export async function getGithubAccountId(externalUserId: string): Promise<string
     const page = await client.accounts.list({
       externalUserId,
       app: "github",
-      limit: 10,
+      limit: GITHUB_ACCOUNTS_LIST_LIMIT,
     })
-    const accounts = page.data ?? []
-    // Prefer a healthy, non-dead account over a stale/dead one
-    const healthy = accounts.find((a) => !a.dead && a.healthy !== false)
-    const fallback = accounts.find((a) => !a.dead)
-    const chosen = healthy ?? fallback ?? accounts[0]
-    return chosen?.id ?? null
+    return pickMostRecentGithubAccountId(page.data ?? [])
   } catch (e) {
     console.error("[pipedream-github] accounts.list:", e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
+/**
+ * Same as {@link getGithubAccountId} but logs the raw Connect account list for Inngest / Vercel logs.
+ */
+export async function resolveGithubAccountForSecurityScan(userId: string): Promise<string | null> {
+  const client = getClient()
+  if (!client) {
+    console.log("[Security Scan] Pipedream accounts for user:", userId, JSON.stringify([]))
+    return null
+  }
+  try {
+    const page = await client.accounts.list({
+      externalUserId: userId,
+      app: "github",
+      limit: GITHUB_ACCOUNTS_LIST_LIMIT,
+    })
+    const accounts = page.data ?? []
+    let accountsJson: string
+    try {
+      accountsJson = JSON.stringify(accounts)
+    } catch {
+      accountsJson = JSON.stringify(
+        accounts.map((a) => ({ id: a.id, name: a.name, dead: a.dead, healthy: a.healthy })),
+      )
+    }
+    console.log("[Security Scan] Pipedream accounts for user:", userId, accountsJson)
+    const selectedId = pickMostRecentGithubAccountId(accounts)
+    console.log(
+      "[Security Scan] Selected GitHub Connect account:",
+      selectedId ?? "none",
+      "| total accounts:",
+      accounts.length,
+    )
+    return selectedId
+  } catch (e) {
+    console.error("[pipedream-github] accounts.list:", e instanceof Error ? e.message : e)
+    console.log("[Security Scan] Pipedream accounts for user:", userId, JSON.stringify({ error: String(e) }))
     return null
   }
 }
@@ -262,21 +331,19 @@ export async function githubProxyListUserRepos(
   return { repos: [], fetchError: lastError }
 }
 
-/**
- * List repos using every non-dead GitHub Connect account, merging unique repos by full_name.
- * Fixes empty dropdowns when the first account is stale but another connection still works.
- */
 function looksLikeGithubLogin(s: string): boolean {
   const t = s.trim()
   return t.length > 0 && t.length <= 39 && /^[a-zA-Z0-9]([a-zA-Z0-9]|-(?=[a-zA-Z0-9]))*$/.test(t)
 }
 
-export async function githubProxyListUserReposMerged(
+/**
+ * Lists repos for the **latest** GitHub Connect account only (newest `createdAt`).
+ */
+export async function githubProxyListUserReposForLatestAccount(
   externalUserId: string,
 ): Promise<{
   repos: GithubRepoListItem[]
   fetchError?: string
-  /** Distinct GitHub/proxy error strings from accounts that returned no repos (for debugging). */
   repoListErrors: string[]
   githubLogin: string | null
   accountIdsTried: number
@@ -297,92 +364,47 @@ export async function githubProxyListUserReposMerged(
     page = await client.accounts.list({
       externalUserId,
       app: "github",
-      limit: 50,
+      limit: GITHUB_ACCOUNTS_LIST_LIMIT,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    console.error("[pipedream-github] accounts.list (merged repos):", msg)
+    console.error("[pipedream-github] accounts.list (repos for latest):", msg)
     return { repos: [], githubLogin: null, accountIdsTried: 0, fetchError: msg, repoListErrors: [] }
   }
 
-  const rawAccounts = page.data ?? []
-  // Sort: healthy + non-dead first, then by most recently updated
-  const sorted = [...rawAccounts].sort((a, b) => {
-    const aScore = (a.dead ? 0 : 1) * 2 + (a.healthy === false ? 0 : 1)
-    const bScore = (b.dead ? 0 : 1) * 2 + (b.healthy === false ? 0 : 1)
-    if (bScore !== aScore) return bScore - aScore
-    const aT = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0
-    const bT = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0
-    return bT - aT
-  })
-  // Deduplicate by GitHub identity (name) — keep the best-ranked per identity, cap at 3
-  const seenIdentity = new Set<string>()
-  const accounts = sorted.filter((a) => {
-    const key = a.name?.trim().toLowerCase() || `__id_${a.id}`
-    if (seenIdentity.has(key)) return false
-    seenIdentity.add(key)
-    return true
-  }).slice(0, 3)
-
-  if (accounts.length === 0) {
+  const latest = pickMostRecentGithubAccount(page.data ?? [])
+  if (!latest) {
     return { repos: [], githubLogin: null, accountIdsTried: 0, repoListErrors: [] }
   }
 
-  const parallel = await Promise.allSettled(
-    accounts.map(async (acc) => {
-      const [listRes, userRes] = await Promise.all([
-        githubProxyListUserRepos(externalUserId, acc.id),
-        githubProxyGetJsonResult<{ login?: string }>(
-          externalUserId,
-          acc.id,
-          "https://api.github.com/user",
-        ),
-      ])
-      return { acc, listRes, userRes }
-    }),
+  const listRes = await githubProxyListUserRepos(externalUserId, latest.id)
+  const userRes = await githubProxyGetJsonResult<{ login?: string }>(
+    externalUserId,
+    latest.id,
+    "https://api.github.com/user",
   )
 
-  const byName = new Map<string, GithubRepoListItem>()
-  let lastListError: string | undefined
   let githubLogin: string | null = null
-  const repoListErrors: string[] = []
-
-  for (const settled of parallel) {
-    if (settled.status === "rejected") {
-      const msg = settled.reason instanceof Error ? settled.reason.message : String(settled.reason)
-      repoListErrors.push(msg)
-      lastListError = msg
-      continue
-    }
-    const { acc, listRes, userRes } = settled.value
-    if (listRes.fetchError) {
-      lastListError = listRes.fetchError
-      repoListErrors.push(listRes.fetchError)
-    }
-    for (const r of listRes.repos) {
-      byName.set(r.full_name, r)
-    }
-    if (
-      !githubLogin &&
-      userRes.ok &&
-      userRes.data &&
-      typeof (userRes.data as { login?: string }).login === "string"
-    ) {
-      githubLogin = (userRes.data as { login: string }).login
-    }
-    if (!githubLogin && acc.name && looksLikeGithubLogin(acc.name)) {
-      githubLogin = acc.name.trim()
-    }
+  if (
+    userRes.ok &&
+    userRes.data &&
+    typeof (userRes.data as { login?: string }).login === "string"
+  ) {
+    githubLogin = (userRes.data as { login: string }).login
+  }
+  if (!githubLogin && latest.name && looksLikeGithubLogin(latest.name)) {
+    githubLogin = latest.name.trim()
   }
 
-  const repos = Array.from(byName.values()).sort((a, b) => a.full_name.localeCompare(b.full_name))
-  const uniqueErrors = [...new Set(repoListErrors)]
+  const repos = listRes.repos.sort((a, b) => a.full_name.localeCompare(b.full_name))
+  const repoListErrors = listRes.fetchError ? [listRes.fetchError] : []
+
   return {
     repos,
     githubLogin,
-    accountIdsTried: accounts.length,
-    fetchError: repos.length === 0 ? lastListError : undefined,
-    repoListErrors: repos.length === 0 ? uniqueErrors : [],
+    accountIdsTried: 1,
+    fetchError: repos.length === 0 ? listRes.fetchError : undefined,
+    repoListErrors: repos.length === 0 ? repoListErrors : [],
   }
 }
 

@@ -7,6 +7,7 @@ import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
 import { IntentSignalsPanel } from "@/components/dashboard/intent-signals-panel"
 import { ContentQueue } from "@/components/dashboard/content-queue"
+import { SecurityAlertsSummary } from "@/components/dashboard/security-alerts-summary"
 
 const container = {
   hidden: { opacity: 0 },
@@ -46,6 +47,10 @@ export default function DashboardPage() {
       <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
         {/* Main column */}
         <div className="order-2 lg:order-1 flex-1 min-w-0 flex flex-col gap-8">
+          <motion.div variants={item}>
+            <SecurityAlertsSummary />
+          </motion.div>
+
           <motion.div variants={item}>
             <IntelligencePipelines />
           </motion.div>

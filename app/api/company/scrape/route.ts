@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { addToMemory } from "@/lib/supermemory"
 import { convert } from "html-to-text"
@@ -58,10 +59,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, asset })
   } catch (error) {
-    console.error("Scrape error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to scrape URL" },
-      { status: 500 },
-    )
+    return jsonApiError(500, error, "company scrape POST")
   }
 }

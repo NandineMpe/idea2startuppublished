@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { INTERNAL_ERROR_MESSAGE, isProduction, jsonApiError, logApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase"
 import { inngest } from "@/lib/inngest/client"
@@ -74,9 +75,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error("Content approve error:", err)
-    const msg = err instanceof Error ? err.message : "Internal error"
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return jsonApiError(500, err, "content approve POST")
   }
 }
 
@@ -187,26 +186,17 @@ export async function DELETE(
     }
 
     if (prefErr) {
-      console.error("content_preferences insert:", prefErr.message, prefErr)
+      logApiError("content_preferences insert", prefErr)
+      const hint =
+        "Could not save dismissal. Apply Supabase migrations 016–017 (content_preferences + dismissal_reason)."
       return NextResponse.json(
-        {
-          error:
-            prefErr.message ||
-            "Could not save dismissal. Apply Supabase migrations 016–017 (content_preferences + dismissal_reason).",
-        },
+        { error: isProduction() ? INTERNAL_ERROR_MESSAGE : prefErr.message || hint },
         { status: 500 },
       )
     }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error("Content dismiss error:", err)
-    const msg =
-      err && typeof err === "object" && "message" in err
-        ? String((err as { message: string }).message)
-        : err instanceof Error
-          ? err.message
-          : "Internal error"
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return jsonApiError(500, err, "content approve DELETE")
   }
 }

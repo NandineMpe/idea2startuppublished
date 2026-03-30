@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { getRecentCommits, getRepoTree, readRepoFile } from "@/lib/juno/github-repo"
-import { getGithubAccountId } from "@/lib/juno/pipedream-github"
+import {
+  getRecentCommits,
+  getRepoTreeWithDiagnostics,
+  readRepoFile,
+  splitGithubRepo,
+  treeEntriesFromGithubTreeRaw,
+} from "@/lib/juno/github-repo"
+import { resolveGithubAccountForSecurityScan } from "@/lib/juno/pipedream-github"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
 import {
   buildSecurityScanPrompt,
@@ -9,6 +15,7 @@ import {
   selectFiles,
   type RawSecurityFinding,
 } from "@/lib/juno/security-scanner"
+import { JUNO_SECURITY_SCAN_REQUESTED } from "@/lib/inngest/event-names"
 import { inngest } from "@/lib/inngest/client"
 import { supabaseAdmin } from "@/lib/supabase"
 
@@ -60,7 +67,7 @@ export const securityScanFanOut = inngest.createFunction(
       await step.sendEvent(
         "fan-out-security-scan",
         rows.map((u) => ({
-          name: "juno/security-scan.requested" as const,
+          name: JUNO_SECURITY_SCAN_REQUESTED,
           data: {
             userId: u.user_id,
             repo: u.repo,
@@ -81,13 +88,19 @@ export const securityScan = inngest.createFunction(
     name: "CTO: Security Scan",
     retries: 1,
     concurrency: { limit: 2 },
-    triggers: [{ event: "juno/security-scan.requested" }],
+    triggers: [{ event: JUNO_SECURITY_SCAN_REQUESTED }],
   },
   async ({ event, step }) => {
     const { userId, repo, branch, mode = "daily" } = event.data as ScanEvent
     const scanId = crypto.randomUUID()
 
-    const accountId = await step.run("resolve-github-account", () => getGithubAccountId(userId))
+    const accountId = await step.run("resolve-github-account", async () => {
+      if (process.env.GITHUB_PAT?.trim()) {
+        console.log("[Security Scan] GITHUB_PAT set — using direct GitHub API for tree/files/commits (skipping Pipedream for those calls)")
+        return "__github_pat__"
+      }
+      return resolveGithubAccountForSecurityScan(userId)
+    })
     if (!accountId) {
       await step.run("record-failed-no-account", async () => {
         await supabaseAdmin.from("security_scans").insert({
@@ -97,14 +110,87 @@ export const securityScan = inngest.createFunction(
           branch,
           mode,
           status: "failed",
-          error_message: "No GitHub account linked in Pipedream Connect. Connect GitHub under Integrations.",
+          error_message:
+            "No GitHub account linked in Pipedream Connect. Connect under Integrations, or set GITHUB_PAT (classic token with repo scope) on the server as a temporary fallback.",
         })
       })
       return { scanId, status: "failed", reason: "no_github_account" }
     }
 
-    const tree = await step.run("get-tree", () => getRepoTree(userId, accountId, repo, branch))
+    const treeResult = await step.run("get-tree", async () => {
+      const pat = process.env.GITHUB_PAT?.trim()
+      if (pat) {
+        console.log("[Security Scan] Using GITHUB_PAT directly, prefix:", pat.substring(0, 10))
+        const parsed = splitGithubRepo(repo)
+        if (parsed) {
+          const { owner, name } = parsed
+          const base = `https://api.github.com/repos/${owner}/${name}`
+          const refUrl = `${base}/git/ref/heads/${encodeURIComponent(branch)}`
+          const res = await fetch(refUrl, {
+            headers: {
+              Accept: "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              Authorization: `token ${pat}`,
+            },
+          })
+          console.log("[Security Scan] GitHub response status:", res.status)
+          if (res.ok) {
+            const data = (await res.json()) as { object?: { sha?: string } }
+            const commitSha = data?.object?.sha
+            if (commitSha) {
+              const commitRes = await fetch(`${base}/git/commits/${commitSha}`, {
+                headers: {
+                  Accept: "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  Authorization: `token ${pat}`,
+                },
+              })
+              console.log("[Security Scan] GitHub commit response status:", commitRes.status)
+              if (commitRes.ok) {
+                const commitData = (await commitRes.json()) as { tree?: { sha?: string } }
+                const treeSha = commitData?.tree?.sha
+                if (treeSha) {
+                  const treeRes = await fetch(`${base}/git/trees/${treeSha}?recursive=1`, {
+                    headers: {
+                      Accept: "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      Authorization: `token ${pat}`,
+                    },
+                  })
+                  console.log("[Security Scan] GitHub tree response status:", treeRes.status)
+                  if (treeRes.ok) {
+                    const treeData = (await treeRes.json()) as {
+                      tree?: Array<{ path?: string; size?: number; type?: string }>
+                    }
+                    const raw = treeData.tree ?? []
+                    const shaped = treeEntriesFromGithubTreeRaw(raw, repo, branch)
+                    console.log(
+                      "[Security Scan] Tree response:",
+                      JSON.stringify(shaped).substring(0, 500),
+                    )
+                    return shaped
+                  }
+                  const body = await treeRes.text()
+                  console.log("[Security Scan] GitHub error:", body.substring(0, 200))
+                }
+              }
+            }
+          } else {
+            const body = await res.text()
+            console.log("[Security Scan] GitHub error:", body.substring(0, 200))
+          }
+        }
+      }
+
+      const result = await getRepoTreeWithDiagnostics(userId, accountId, repo, branch)
+      console.log("[Security Scan] Tree response:", JSON.stringify(result).substring(0, 500))
+      return result
+    })
+    const { entries: tree, diagnostic } = treeResult
     if (tree.length === 0) {
+      const msg =
+        diagnostic ??
+        "Empty repo tree (check repo name, branch, or GitHub access via Pipedream Connect)."
       await step.run("record-failed-empty-tree", async () => {
         await supabaseAdmin.from("security_scans").insert({
           user_id: userId,
@@ -113,7 +199,7 @@ export const securityScan = inngest.createFunction(
           branch,
           mode,
           status: "failed",
-          error_message: "Empty repo tree (check repo name, branch, or GitHub access).",
+          error_message: msg,
         })
       })
       return { scanId, status: "failed", reason: "empty_tree" }

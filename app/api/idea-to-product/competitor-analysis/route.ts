@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateCompetitorAnalysis } from "./perplexity"
 
 export async function POST(request: Request) {
@@ -23,10 +24,6 @@ export async function POST(request: Request) {
     const result = await generateCompetitorAnalysis(query)
     return NextResponse.json({ result })
   } catch (error) {
-    console.error("Error in competitor analysis route:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
-      { status: 500 },
-    )
+    return jsonApiError(500, error, "competitor-analysis POST")
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -17,8 +18,7 @@ export async function GET() {
       .limit(40)
 
     if (error) {
-      console.error("intent-signals GET:", error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonApiError(500, error, "intent-signals GET")
     }
 
     return NextResponse.json({ signals: data ?? [] })

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
+import { logApiError, safeErrorMessageForClient } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 
@@ -113,7 +114,8 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode("data: [DONE]\n\n"))
         controller.close()
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Stream error"
+        logApiError("onboarding conversation stream", e)
+        const msg = safeErrorMessageForClient(e, "Stream error")
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`))
         controller.close()
       }

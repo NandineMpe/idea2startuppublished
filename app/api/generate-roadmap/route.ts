@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
@@ -96,10 +97,6 @@ ${timeline ? `Timeline Preference: ${timeline}` : ""}`
 
     return NextResponse.json({ sections, raw: text })
   } catch (error) {
-    console.error("Roadmap generation error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate roadmap" },
-      { status: 500 }
-    )
+    return jsonApiError(500, error, "generate-roadmap POST")
   }
 }

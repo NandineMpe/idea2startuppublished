@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
 function weekRangeISO(): { start: string; end: string } {
@@ -49,8 +50,7 @@ export async function GET(req: NextRequest) {
 
     const { data: scheduled, error: schedErr } = await scheduledQuery
     if (schedErr) {
-      console.error("content-calendar GET scheduled:", schedErr.message)
-      return NextResponse.json({ error: schedErr.message }, { status: 500 })
+      return jsonApiError(500, schedErr, "content-calendar GET scheduled")
     }
 
     let unscheduledQuery = supabase
@@ -65,8 +65,7 @@ export async function GET(req: NextRequest) {
 
     const { data: unscheduled, error: unsErr } = await unscheduledQuery
     if (unsErr) {
-      console.error("content-calendar GET unscheduled:", unsErr.message)
-      return NextResponse.json({ error: unsErr.message }, { status: 500 })
+      return jsonApiError(500, unsErr, "content-calendar GET unscheduled")
     }
 
     return NextResponse.json({
@@ -123,8 +122,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error) {
-      console.error("content-calendar POST:", error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonApiError(500, error, "content-calendar POST")
     }
 
     return NextResponse.json(data)

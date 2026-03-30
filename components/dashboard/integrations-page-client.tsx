@@ -51,41 +51,6 @@ function formatDate(iso: string | null | undefined): string {
   }
 }
 
-/** Best-effort timestamp for “most recently touched” account (Pipedream). */
-function accountActivityMs(a: PdAccount): number {
-  const candidates = [a.lastRefreshedAt, a.updatedAt, a.createdAt].filter(Boolean) as string[]
-  let best = 0
-  for (const s of candidates) {
-    const t = Date.parse(s)
-    if (!Number.isNaN(t) && t > best) best = t
-  }
-  return best
-}
-
-/**
- * Pipedream often returns multiple rows for the same GitHub user (reconnects).
- * Pick one primary account per identity (name), then the latest among those for the UI.
- */
-function pickPrimaryGithubAccount(accounts: PdAccount[]): { primary: PdAccount; duplicateRows: number } {
-  if (accounts.length === 0) {
-    throw new Error("pickPrimaryGithubAccount: empty")
-  }
-  const byName = new Map<string, PdAccount[]>()
-  for (const a of accounts) {
-    const key = a.name?.trim() ? a.name.trim().toLowerCase() : `__id_${a.id}`
-    const arr = byName.get(key) ?? []
-    arr.push(a)
-    byName.set(key, arr)
-  }
-  const bestPerIdentity: PdAccount[] = []
-  for (const group of byName.values()) {
-    bestPerIdentity.push(group.reduce((x, y) => (accountActivityMs(y) > accountActivityMs(x) ? y : x)))
-  }
-  const primary = bestPerIdentity.reduce((x, y) => (accountActivityMs(y) > accountActivityMs(x) ? y : x))
-  const duplicateRows = Math.max(0, accounts.length - bestPerIdentity.length)
-  return { primary, duplicateRows }
-}
-
 function AccountHealthBadge({ account }: { account: PdAccount }) {
   if (account.dead) {
     return (
@@ -153,7 +118,7 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
   } = useQuery<PdAccount[]>({
     queryKey: ["pipedream-accounts", userId],
     queryFn: async () => {
-      const res = await fetch("/api/pipedream/accounts?app=github")
+      const res = await fetch("/api/pipedream/accounts?app=github", { credentials: "include" })
       const body = (await res.json().catch(() => ({}))) as { accounts?: PdAccount[]; error?: string }
       if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`)
       return (body.accounts ?? []) as PdAccount[]
@@ -181,16 +146,12 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
     staleTime: 60_000,
   })
 
-  // ── Derived state ───────────────────────────────────────────────────────────
-  const connected = accounts.length > 0
-  const hasUnhealthy = accounts.some((a) => a.dead || a.healthy === false)
-  const allDead = accounts.length > 0 && accounts.every((a) => a.dead)
-  const pipedreamLastActivity = latestPipedreamActivityIso(accounts)
-
-  const { primary: primaryAccount, duplicateRows } = useMemo(() => {
-    if (accounts.length === 0) return { primary: null as PdAccount | null, duplicateRows: 0 }
-    return pickPrimaryGithubAccount(accounts)
-  }, [accounts])
+  // ── Derived state (API returns at most one row: latest Connect account) ─────
+  const primaryAccount = accounts[0] ?? null
+  const connected = Boolean(primaryAccount)
+  const hasUnhealthy = Boolean(primaryAccount && (primaryAccount.dead || primaryAccount.healthy === false))
+  const allDead = Boolean(primaryAccount?.dead)
+  const pipedreamLastActivity = latestPipedreamActivityIso(primaryAccount ? [primaryAccount] : [])
 
   const runLiveVerify = useCallback(async () => {
     setVerifying(true)
@@ -281,8 +242,9 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
           <CardTitle className="text-foreground">GitHub (Pipedream Connect)</CardTitle>
         </div>
         <CardDescription className="text-muted-foreground">
-          Connect your GitHub account through Pipedream. Juno can use this for workflows and tools
-          you enable in Pipedream.
+          Use <span className="font-medium text-foreground">Connect GitHub</span> below so the account is tied to your
+          Juno login (Pipedream <code className="text-xs">external_user_id</code>). OAuth connections made only inside
+          the Pipedream workspace are not linked to your user here.
         </CardDescription>
       </CardHeader>
 
@@ -325,12 +287,6 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
                   : primaryAccount?.name
                     ? `Connected as @${primaryAccount.name}.`
                     : "GitHub connected for this workspace."}
-              {duplicateRows > 0 && !allDead && (
-                <span className="block mt-1 text-xs font-normal text-muted-foreground">
-                  {duplicateRows} duplicate Pipedream connection{duplicateRows === 1 ? "" : "s"} hidden — showing the
-                  latest only.
-                </span>
-              )}
             </span>
           )}
           {!connected && isLoading && <span>Checking existing connection…</span>}
@@ -351,7 +307,7 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
           )}
         </div>
 
-        {/* ── Single status card (latest connection; duplicates merged) ── */}
+        {/* ── Single status card (latest Connect account) ── */}
         {connected && !isLoading && primaryAccount && (
           <div className="space-y-2">
             <div className="rounded-md border border-border bg-muted/20 px-3 py-2.5 text-sm">
@@ -611,8 +567,17 @@ export function IntegrationsPageClient({
       externalUserId: userId,
       projectEnvironment:
         pipedreamProjectEnvironment ?? (process.env.NODE_ENV === "production" ? "production" : "development"),
-      tokenCallback: async (): Promise<CreateTokenResponse> => {
-        const res = await fetch("/api/pipedream/connect-token", { method: "POST" })
+      /**
+       * SDK passes the same `externalUserId` as in `createFrontendClient`; we forward it to the API
+       * so the minted Connect token is explicitly scoped to that ID (must match the signed-in user).
+       */
+      tokenCallback: async ({ externalUserId }): Promise<CreateTokenResponse> => {
+        const res = await fetch("/api/pipedream/connect-token", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ externalUserId }),
+        })
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string }
           throw new Error(body.error || "Could not create Connect token")
@@ -621,6 +586,10 @@ export function IntegrationsPageClient({
           token: string
           expiresAt: string
           connectLinkUrl: string
+          externalUserId?: string
+        }
+        if (data.externalUserId && data.externalUserId !== externalUserId) {
+          throw new Error("Connect token user mismatch. Sign out and back in, then try again.")
         }
         return {
           token: data.token,

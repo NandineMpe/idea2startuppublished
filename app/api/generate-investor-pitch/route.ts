@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
@@ -146,10 +147,6 @@ Return the response as a JSON object with the following structure:
       })
     }
   } catch (error) {
-    console.error("Error generating investor pitch:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
-      { status: 500 },
-    )
+    return jsonApiError(500, error, "generate-investor-pitch POST")
   }
 }

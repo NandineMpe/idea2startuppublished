@@ -35,6 +35,8 @@ export async function updateSession(request: NextRequest) {
         request.nextUrl.pathname.startsWith('/_next') ||
         request.nextUrl.pathname.startsWith('/api/inngest') ||
         request.nextUrl.pathname.startsWith('/api/webhooks') ||
+        request.nextUrl.pathname.startsWith('/api/gaap-analysis') ||
+        request.nextUrl.pathname.startsWith('/api/comparable-companies') ||
         request.nextUrl.pathname.includes('.')
     ) {
         return supabaseResponse

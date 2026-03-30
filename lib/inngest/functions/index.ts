@@ -5,6 +5,7 @@
 
 // CBS — Chief Business Strategist
 export { dailyBrief, dailyBriefFanOut } from "./cbs-daily-brief"
+export { cbsCeoReview, cbsCeoReviewFanOut } from "./cbs-ceo-review"
 
 // CRO — Chief Research Officer
 export { jobBoardScanner, jobScanFanOut, leadOutreach } from "./cro-lead-pipeline"
@@ -25,6 +26,7 @@ export { junoPing } from "./ping"
 
 import { commentEngine, contentEngine, relationshipTracker } from "./cmo-content-engine"
 import { dailyBrief, dailyBriefFanOut } from "./cbs-daily-brief"
+import { cbsCeoReview, cbsCeoReviewFanOut } from "./cbs-ceo-review"
 import { jobBoardScanner, jobScanFanOut, leadOutreach } from "./cro-lead-pipeline"
 import { gtmMotion } from "./gtm-motion"
 import { intentScanFanOut, intentScanner } from "./cro/intent-scanner"
@@ -38,6 +40,8 @@ export const inngestFunctions = [
   junoPing,
   dailyBriefFanOut,
   dailyBrief,
+  cbsCeoReviewFanOut,
+  cbsCeoReview,
   contentEngine,
   commentEngine,
   relationshipTracker,

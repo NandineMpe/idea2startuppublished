@@ -1,4 +1,23 @@
 -- Security scanner: repo pointer + findings + scan audit trail
+--
+-- PREREQUISITES (run in order if you apply files manually in the SQL Editor):
+--   1. 001_initial_schema.sql  — defines update_updated_at() used by company_profile trigger
+--   2. 002_company_profile.sql  — creates public.company_profile
+--   3. (this file) 026_security_updates.sql
+-- Or: node scripts/apply-all-supabase-migrations.cjs — applies every migration in sorted order.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'company_profile'
+  ) THEN
+    RAISE EXCEPTION
+      'Table company_profile does not exist. Run 001_initial_schema.sql then 002_company_profile.sql first (see comment at top of this file).';
+  END IF;
+END $$;
+
 ALTER TABLE company_profile
   ADD COLUMN IF NOT EXISTS github_repo TEXT,
   ADD COLUMN IF NOT EXISTS github_branch TEXT DEFAULT 'main';

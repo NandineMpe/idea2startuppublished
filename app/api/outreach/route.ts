@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
 export const maxDuration = 30
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await q.order("created_at", { ascending: false }).limit(80)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonApiError(500, error, "outreach GET")
   }
 
   return NextResponse.json(

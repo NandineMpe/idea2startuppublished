@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { sendOutreachEmailForUser } from "@/lib/juno/outreach-send-ops"
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const result = await sendOutreachEmailForUser(auth.supabase, auth.userId, id)
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status })
+    return jsonApiError(result.status, result.error, "outreach send POST")
   }
 
   return NextResponse.json({ ok: true, messageId: result.messageId })

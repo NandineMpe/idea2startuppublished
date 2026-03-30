@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
+import {
+  jsonApiError,
+  logApiError,
+  safeErrorMessageForClient,
+} from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { sendOutreachEmailForUser } from "@/lib/juno/outreach-send-ops"
 import { recordLookalikeOutreachOutcome } from "@/lib/lookalike/record-outreach-outcome"
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   const result = await sendOutreachEmailForUser(auth.supabase, auth.userId, id)
   if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: result.status })
+    return jsonApiError(result.status, result.error, "outreach POST send")
   }
 
   return NextResponse.json({ ok: true, messageId: result.messageId })
@@ -164,7 +169,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .maybeSingle()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return jsonApiError(500, error, "outreach PATCH")
   }
   if (!data) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -200,8 +205,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         refinementNote: result.refinementNote,
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "lookalike sync failed"
-      return NextResponse.json({ error: msg, ok: false }, { status: 500 })
+      logApiError("outreach PATCH lookalike sync", e)
+      return NextResponse.json(
+        { error: safeErrorMessageForClient(e, "lookalike sync failed"), ok: false },
+        { status: 500 },
+      )
     }
   }
 

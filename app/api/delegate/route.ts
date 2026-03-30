@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { TOOLS, AGENT_LABELS } from "@/lib/ai-tools"
@@ -159,10 +160,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error("Delegation planning error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to plan delegation" },
-      { status: 500 },
-    )
+    return jsonApiError(500, error, "delegate POST")
   }
 }

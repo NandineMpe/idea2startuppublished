@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
+import { safeErrorMessageForClient } from "@/lib/api-error-response"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import { convert } from "html-to-text"
 import { createClient } from "@/lib/supabase/server"
@@ -91,7 +92,13 @@ ${slice}`),
       rawText: slice.substring(0, 3000),
     })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Scrape failed"
-    return NextResponse.json({ error: message, scraped: null, rawText: null }, { status: 200 })
+    return NextResponse.json(
+      {
+        error: safeErrorMessageForClient(e, "Scrape failed"),
+        scraped: null,
+        rawText: null,
+      },
+      { status: 200 },
+    )
   }
 }

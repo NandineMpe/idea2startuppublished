@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
@@ -106,11 +107,7 @@ Make reasonable assumptions about the target audience, pain points, and market t
       })
     }
   } catch (error) {
-    console.error("Error generating customer pitch:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
-      { status: 500 },
-    )
+    return jsonApiError(500, error, "generate-customer-pitch POST")
   }
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { PipedreamClient } from "@pipedream/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { getPipedreamProjectEnvironment } from "@/lib/pipedream-connect-env"
@@ -24,13 +25,35 @@ function allowedOrigins(): string[] {
   return [...new Set(out)]
 }
 
-export async function POST() {
+type Body = {
+  externalUserId?: string
+  external_user_id?: string
+}
+
+/**
+ * Mints a Connect token for the **signed-in** Supabase user.
+ * Body may include `externalUserId` (or `external_user_id`) — it must match `user.id`
+ * so the token is scoped to the same ID the browser SDK uses in `createFrontendClient`.
+ */
+export async function POST(req: Request) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const body = (await req.json().catch(() => ({}))) as Body
+  const requestedExternalId = (body.externalUserId ?? body.external_user_id)?.trim()
+  if (requestedExternalId && requestedExternalId !== user.id) {
+    return NextResponse.json(
+      {
+        error:
+          "externalUserId does not match the signed-in user. Refresh the page and try Connect again.",
+      },
+      { status: 403 },
+    )
   }
 
   const clientId = process.env.PIPEDREAM_CLIENT_ID
@@ -55,14 +78,17 @@ export async function POST() {
       externalUserId: user.id,
       allowedOrigins: allowedOrigins(),
     })
+    /** When set, Connect must use your BYO GitHub OAuth client (Pipedream → Accounts → OAuth Clients). */
+    const githubOauthAppId = process.env.PIPEDREAM_GITHUB_OAUTH_APP_ID?.trim() || undefined
+
     return NextResponse.json({
       token: created.token,
       expiresAt: created.expiresAt instanceof Date ? created.expiresAt.toISOString() : created.expiresAt,
       connectLinkUrl: created.connectLinkUrl,
+      githubOauthAppId,
+      externalUserId: user.id,
     })
   } catch (e) {
-    console.error("[pipedream connect-token]", e)
-    const message = e instanceof Error ? e.message : "Token creation failed"
-    return NextResponse.json({ error: message }, { status: 502 })
+    return jsonApiError(502, e, "pipedream connect-token POST")
   }
 }

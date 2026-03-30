@@ -9,9 +9,12 @@
     "build": "next build",
     "deploy": "npx vercel deploy --prod --yes",
     "db:apply:024": "node scripts/apply-024-lookalike-migration.cjs",
+    "db:migrate": "node scripts/apply-all-supabase-migrations.cjs",
     "start": "next start",
     "lint": "next lint",
     "pd": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1",
+    "pipedream:login": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 login",
+    "pipedream:logout": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 logout",
     "pipedream:init": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 init connect"
   },
   "dependencies": {
@@ -94,6 +97,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
+    "pg": "^8.20.0",
     "postcss": "^8.5.4",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.8.3"

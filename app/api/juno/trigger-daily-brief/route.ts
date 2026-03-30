@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { inngest } from "@/lib/inngest/client"
 
 /**
@@ -46,7 +47,6 @@ export async function POST(req: NextRequest) {
       event: "juno/brief.requested",
     })
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonApiError(500, e, "trigger-daily-brief POST")
   }
 }

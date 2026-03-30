@@ -164,6 +164,8 @@ export function SecurityUpdatesPage() {
   const [savingRepo, setSavingRepo] = useState(false)
   const [branchDraft, setBranchDraft] = useState("")
   const [manualRepo, setManualRepo] = useState("")
+  /** Server has `GITHUB_PAT` — scans work without Pipedream Connect. */
+  const [patFallbackAvailable, setPatFallbackAvailable] = useState(false)
 
   const loadGithub = useCallback(async () => {
     setGhLoading(true)
@@ -173,7 +175,10 @@ export function SecurityUpdatesPage() {
     const timeoutMs = 55_000
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      const res = await fetch("/api/security/github/repos", { signal: controller.signal })
+      const res = await fetch("/api/security/github/repos", {
+        signal: controller.signal,
+        credentials: "include",
+      })
       let parsed: unknown
       try {
         parsed = await res.json()
@@ -221,7 +226,10 @@ export function SecurityUpdatesPage() {
     setLoading(true)
     try {
       const q = statusFilter === "all" ? "all" : statusFilter
-      const res = await fetch(`/api/security?status=${encodeURIComponent(q)}`)
+      const res = await fetch(`/api/security?status=${encodeURIComponent(q)}`, {
+        credentials: "include",
+        cache: "no-store",
+      })
       if (!res.ok) throw new Error("Failed to load")
       const data = await res.json()
       setFindings(data.findings ?? [])
@@ -229,6 +237,7 @@ export function SecurityUpdatesPage() {
       setRepo(data.repo ?? null)
       setBranch(data.branch ?? null)
       setLastScan(data.lastScan ?? null)
+      setPatFallbackAvailable(Boolean(data.patFallbackAvailable))
     } catch {
       toast({ title: "Could not load security findings.", variant: "destructive" })
     } finally {
@@ -256,6 +265,7 @@ export function SecurityUpdatesPage() {
     try {
       const res = await fetch("/api/security/github/repo", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ github_repo: nextRepo, github_branch: nextBranch }),
       })
@@ -324,10 +334,17 @@ export function SecurityUpdatesPage() {
     try {
       const res = await fetch("/api/security/scan", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode }),
       })
-      const data = await res.json().catch(() => ({}))
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        ok?: boolean
+        repo?: string
+        branch?: string
+        eventIds?: string[]
+      }
       if (!res.ok) {
         toast({
           title: typeof data.error === "string" ? data.error : "Scan could not be queued.",
@@ -335,9 +352,19 @@ export function SecurityUpdatesPage() {
         })
         return
       }
+      if (data.ok !== true) {
+        toast({
+          title: "Unexpected response from server.",
+          description: "Scan may not have been queued. Check Inngest Events for juno/security-scan.requested.",
+          variant: "destructive",
+        })
+        return
+      }
+      const where =
+        data.repo && data.branch ? `${data.repo} (${data.branch})` : (data.repo ?? "your repo")
       toast({
         title: "Scan queued",
-        description: `Security scan queued for ${data.repo ?? "repo"}. Results appear after the run completes.`,
+        description: `Security scan queued for ${where}. Results appear after the run completes.`,
       })
     } catch {
       toast({ title: "Network error.", variant: "destructive" })
@@ -350,6 +377,7 @@ export function SecurityUpdatesPage() {
     try {
       const res = await fetch(`/api/security/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       })
@@ -369,6 +397,8 @@ export function SecurityUpdatesPage() {
       ? `${lastScan.new_findings ?? 0} new · ${lastScan.resolved_count ?? 0} resolved`
       : null
 
+  const canRunScan = Boolean(repo && (gh?.connected || patFallbackAvailable))
+
   return (
     <div className="mx-auto max-w-[960px] space-y-6">
       <div className="flex flex-col gap-1">
@@ -382,7 +412,11 @@ export function SecurityUpdatesPage() {
           Integrations). Claude analyses selected files server-side — no local clone.
         </p>
         <p className="text-xs text-muted-foreground">
-          {repo && gh?.connected ? (
+          {ghLoading ? (
+            <>Loading GitHub connection status (this can take up to a minute)…</>
+          ) : githubLoadError ? (
+            <>GitHub status could not be loaded. Use Retry in the card below.</>
+          ) : repo && gh?.connected ? (
             <>
               <span className="font-medium text-foreground">{repo}</span>
               {branch ? ` · ${branch}` : ""}
@@ -392,10 +426,16 @@ export function SecurityUpdatesPage() {
                 <> · No scan yet</>
               )}
             </>
-          ) : repo && !gh?.connected ? (
+          ) : repo && gh && !gh.connected && patFallbackAvailable ? (
+            <>
+              Profile points at <span className="font-medium text-foreground">{repo}</span>
+              {branch ? ` · ${branch}` : ""}. Server-side GitHub access is configured — you can run scans without
+              Pipedream.
+            </>
+          ) : repo && gh && !gh.connected ? (
             <>
               Profile points at <span className="font-medium text-foreground">{repo}</span> — connect GitHub via
-              Pipedream below to run scans.
+              Pipedream below to run scans, or set <span className="font-mono">GITHUB_PAT</span> on the server.
             </>
           ) : (
             <>Choose a repository below after connecting GitHub.</>
@@ -418,7 +458,7 @@ export function SecurityUpdatesPage() {
           {ghLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Checking Pipedream / GitHub…
+              Loading repo list from Pipedream / GitHub (slow if many repos)…
             </div>
           ) : githubLoadError ? (
             <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
@@ -605,7 +645,7 @@ export function SecurityUpdatesPage() {
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
-          disabled={scanning || !repo || !gh?.connected}
+          disabled={scanning || ghLoading || !canRunScan}
           onClick={() => void runScan("daily")}
           className="gap-1.5"
         >
@@ -615,7 +655,7 @@ export function SecurityUpdatesPage() {
         <Button
           size="sm"
           variant="outline"
-          disabled={scanning || !repo || !gh?.connected}
+          disabled={scanning || ghLoading || !canRunScan}
           onClick={() => void runScan("comprehensive")}
         >
           Scan comprehensive
@@ -624,9 +664,17 @@ export function SecurityUpdatesPage() {
       </div>
 
       {lastScan?.status === "failed" && lastScan.error_message && (
-        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>{lastScan.error_message}</span>
+        <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2.5 text-sm text-foreground">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1 min-w-0">
+            <p className="font-medium text-foreground">Last scan failed</p>
+            <p className="text-muted-foreground text-xs leading-relaxed">{lastScan.error_message}</p>
+            {!ghLoading && gh?.connected && (
+              <p className="text-xs text-muted-foreground">
+                Fix branch/repo access above, then run <span className="font-medium">Scan now</span> again.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -684,9 +732,19 @@ export function SecurityUpdatesPage() {
           Loading…
         </div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8">
-          No findings for this filter. Run a scan or check back after the daily job (7:00 UTC).
-        </p>
+        <div className="space-y-3 py-8 text-sm text-muted-foreground">
+          <p>No findings for this filter. Run a scan or check back after the daily job (7:00 UTC).</p>
+          {lastScan?.status === "completed" &&
+            (lastScan.new_findings ?? 0) > 0 &&
+            statusFilter === "open" &&
+            counts.total === 0 && (
+              <p className="text-amber-700 dark:text-amber-400/90 text-xs leading-relaxed max-w-xl">
+                The last run saved {(lastScan.new_findings ?? 0) as number} new finding(s), but this list is empty.
+                Confirm you&apos;re logged in as the same Supabase user the scan ran for, then hit Refresh. If you
+                invoked the scan from another environment, use the same project URL and account here.
+              </p>
+            )}
+        </div>
       ) : (
         <div className="space-y-4">
           {filtered.map((f) => {

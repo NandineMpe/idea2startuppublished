@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
+import { JUNO_SECURITY_SCAN_REQUESTED } from "@/lib/inngest/event-names"
 import { inngest } from "@/lib/inngest/client"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
 
@@ -39,9 +41,19 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { mode?: "daily" | "comprehensive" }
   const mode = body.mode === "comprehensive" ? "comprehensive" : "daily"
 
+  if (!process.env.INNGEST_EVENT_KEY) {
+    return NextResponse.json(
+      {
+        error:
+          `INNGEST_EVENT_KEY not set — add from Inngest dashboard (Keys) so the app can send ${JUNO_SECURITY_SCAN_REQUESTED}.`,
+      },
+      { status: 501 },
+    )
+  }
+
   try {
-    await inngest.send({
-      name: "juno/security-scan.requested",
+    const { ids } = await inngest.send({
+      name: JUNO_SECURITY_SCAN_REQUESTED,
       data: {
         userId: user.id,
         repo: resolved.repo,
@@ -49,13 +61,16 @@ export async function POST(req: Request) {
         mode,
       },
     })
+    return NextResponse.json({
+      ok: true,
+      triggered: true,
+      eventName: JUNO_SECURITY_SCAN_REQUESTED,
+      eventIds: ids,
+      repo: resolved.repo,
+      branch: resolved.branch,
+      mode,
+    })
   } catch (e) {
-    console.error("[api/security/scan]", e)
-    return NextResponse.json(
-      { error: "Could not queue scan. Set INNGEST_EVENT_KEY for server-triggered Inngest events." },
-      { status: 503 },
-    )
+    return jsonApiError(503, e, "security scan POST inngest.send")
   }
-
-  return NextResponse.json({ triggered: true, repo: resolved.repo, branch: resolved.branch, mode })
 }

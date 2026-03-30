@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { safeErrorMessageForClient } from "@/lib/api-error-response"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -133,7 +134,7 @@ ${geographicFocus ? `Geographic Focus: ${geographicFocus}` : ""}`
     } catch (apiError) {
       console.error("API error:", apiError)
       return NextResponse.json({
-        error: apiError instanceof Error ? apiError.message : "Unknown API error",
+        error: safeErrorMessageForClient(apiError, "Unknown API error"),
         analysis: { sections: defaultSections },
       })
     }

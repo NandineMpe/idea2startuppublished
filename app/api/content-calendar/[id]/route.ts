@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
 const ALLOWED_PATCH = new Set([
@@ -47,8 +48,7 @@ export async function PATCH(
       .single()
 
     if (error) {
-      console.error("content-calendar PATCH:", error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonApiError(500, error, "content-calendar PATCH")
     }
 
     return NextResponse.json(data)
@@ -73,8 +73,7 @@ export async function DELETE(
     const { error } = await supabase.from("content_calendar").delete().eq("id", id).eq("user_id", user.id)
 
     if (error) {
-      console.error("content-calendar DELETE:", error.message)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return jsonApiError(500, error, "content-calendar DELETE")
     }
 
     return NextResponse.json({ ok: true })

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { anthropic } from "@ai-sdk/anthropic"
+import { isProduction, logApiError } from "@/lib/api-error-response"
 import { streamText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
@@ -51,10 +52,15 @@ export async function POST(req: Request) {
 
     return result.toDataStreamResponse()
   } catch (error) {
-    console.error("Error in pitch slide generation:", error)
+    logApiError("generate-pitch-slide POST", error)
     return NextResponse.json(
-      { error: "Failed to generate pitch slide content", details: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      {
+        error: "Failed to generate pitch slide content",
+        ...(!isProduction()
+          ? { details: error instanceof Error ? error.message : "Unknown error" }
+          : {}),
+      },
+      { status: 500 },
     )
   }
 }

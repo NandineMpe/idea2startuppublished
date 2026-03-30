@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { jsonApiError } from "@/lib/api-error-response"
 import { PipedreamClient } from "@pipedream/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { getPipedreamProjectEnvironment } from "@/lib/pipedream-connect-env"
+import { pickMostRecentGithubAccount, GITHUB_ACCOUNTS_LIST_LIMIT } from "@/lib/juno/pipedream-github"
 import { serializePipedreamAccount } from "@/lib/pipedream-serialize-account"
 
 function getServerClient(): PipedreamClient | null {
@@ -18,8 +20,7 @@ function getServerClient(): PipedreamClient | null {
 }
 
 /**
- * Lists Pipedream Connect accounts for the signed-in user (server-side, correct project id).
- * The browser SDK hardcodes an empty projectId for accounts.list, which returns 404 — use this instead.
+ * Returns the **latest** Connect account for the app (by createdAt), not the full duplicate history.
  */
 export async function GET(req: Request) {
   const supabase = await createClient()
@@ -42,13 +43,12 @@ export async function GET(req: Request) {
     const page = await pd.accounts.list({
       externalUserId: user.id,
       app,
-      limit: 50,
+      limit: GITHUB_ACCOUNTS_LIST_LIMIT,
     })
-    const accounts = (page.data ?? []).map((a) => serializePipedreamAccount(a))
+    const latest = pickMostRecentGithubAccount(page.data ?? [])
+    const accounts = latest ? [serializePipedreamAccount(latest)] : []
     return NextResponse.json({ accounts })
   } catch (e) {
-    console.error("[pipedream accounts]", e)
-    const message = e instanceof Error ? e.message : "accounts.list failed"
-    return NextResponse.json({ error: message }, { status: 502 })
+    return jsonApiError(502, e, "pipedream accounts GET")
   }
 }
