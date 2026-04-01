@@ -13,7 +13,7 @@ The app is a **Next.js App Router** project. “Backend” here means **Route Ha
 | Runtime | Node.js (Next.js server / Route Handlers) |
 | Auth | **Supabase Auth** (sessions via cookies; OAuth code exchange in `app/auth/callback`) |
 | Primary database | **Supabase (PostgreSQL)** with Row Level Security (RLS) |
-| Semantic memory | **Supermemory** (HTTP API: memorize + search), namespaced per user |
+| Knowledge source | **Obsidian vault via GitHub** (markdown read/write + vault search), scoped per user |
 | Primary LLM | **Anthropic Claude** via **Vercel AI SDK** (`@ai-sdk/anthropic`, model `claude-sonnet-4-20250514`) |
 | Background jobs | **Inngest** (`/api/inngest`, `lib/inngest/functions/`) |
 | Search (founder research) | **DuckDuckGo + Wikipedia** public APIs (`lib/founder-public-search.ts`) — no paid search API |
@@ -82,7 +82,7 @@ Below: **method(s)** and **primary behavior**. Unless noted, routes use Supabase
 
 | Route | Methods | Description |
 |--------|---------|-------------|
-| **`/api/chat`** | POST | Juno chat: loads Supermemory context, **company context**, calls **Claude** (`generateText`), saves messages to `chat_messages` / updates session when `sessionId` + user present. |
+| **`/api/chat`** | POST | Juno chat: loads vault-backed **company context**, calls **Claude** (`generateText`), saves messages to `chat_messages` / updates session when `sessionId` + user present. |
 | **`/api/chat/deepseek`** | POST | Alternate chat entry (still uses Anthropic in code; name is legacy). |
 | **`/api/chat/sessions`** | GET, POST | List sessions (newest first); create session. |
 | **`/api/chat/sessions/[id]`** | GET, DELETE | Load messages for session; delete session (cascades messages via FK). |
@@ -92,11 +92,11 @@ Below: **method(s)** and **primary behavior**. Unless noted, routes use Supabase
 | Route | Methods | Description |
 |--------|---------|-------------|
 | **`/api/company/profile`** | GET, PUT | Read/update `company_profile` (including founder fields after migration 003). |
-| **`/api/company/assets`** | GET, POST | List assets; upload file → extract text (PDF via **pdf-parse**, text types as UTF-8), store in `company_assets`, optional Supermemory sync. |
-| **`/api/company/scrape`** | POST | `fetch` URL + **html-to-text**, save as `scraped_url` asset, trim content, fire-and-forget Supermemory. |
-| **`/api/company/context`** | GET | Returns aggregated string from **`getCompanyContext(userId)`** (profile + assets + Supermemory). |
-| **`/api/save-knowledge`** | POST | JSON body → **`addToMemory`** (Supermemory) with optional `userId`. |
-| **`/api/knowledge`** | GET, POST | **GET** `?q=` — semantic **search** over Supermemory for the signed-in user. **POST** `{ content }` — **add** a memory snippet (same user scope). Powers the Company Knowledge Base UI. |
+| **`/api/company/assets`** | GET, POST | List assets; upload file → extract text (PDF via **pdf-parse**, text types as UTF-8), sync the extracted content into the Obsidian/GitHub vault, then store the asset row in `company_assets`. |
+| **`/api/company/scrape`** | POST | `fetch` URL + **html-to-text**, sync the scraped text into the Obsidian/GitHub vault, then store the `scraped_url` asset row. |
+| **`/api/company/context`** | GET | Returns aggregated string from **`getCompanyContext(userId)`** (profile + vault-backed context). |
+| **`/api/save-knowledge`** | POST | JSON body → save a note into the configured Obsidian/GitHub vault for the current user. |
+| **`/api/knowledge`** | GET, POST | **GET** `?q=` — search the connected Obsidian/GitHub vault. **POST** `{ content }` — add a captured note to the vault. Powers the Company Knowledge Base UI. |
 
 ### 5.3 Unified AI tool execution
 
@@ -158,10 +158,10 @@ These routes typically: validate input, **`getCompanyContext`** when user presen
 
 | Module | Role |
 |--------|------|
-| **`company-context.ts`** | **`getCompanyContext(userId)`** — builds text from `company_profile`, `company_assets` (pitch deck + docs/scrapes), optional **GitHub Obsidian vault** (`.md` via `github-vault.ts`), **Supermemory** search. Used by chat, delegate, ai-tool, Inngest agents, and many generate routes. |
+| **`company-context.ts`** | **`getCompanyContext(userId)`** — builds text from `company_profile`, asset metadata, and the connected **GitHub Obsidian vault** (`.md` via `github-vault.ts` plus vault search). Used by chat, delegate, ai-tool, Inngest agents, and many generate routes. |
 | **`github-vault.ts`** | Lists and reads **markdown** from a GitHub repo (tree + blobs) using **`GITHUB_VAULT_TOKEN`** / **`GITHUB_TOKEN`**. |
 | **`ai-tools.ts`** | Registry of agent **tools** (`TOOLS`), **`runTool`**, prompts; uses **Anthropic** Claude. |
-| **`supermemory.ts`** | **`addToMemory`**, **`queryMemory`** — Supermemory HTTP API with `containerTags: user:<userId>`. |
+| **`vault-knowledge.ts`** | **`saveVaultKnowledgeEntry`**, **`searchVaultKnowledge`** — vault-backed note persistence and lexical search over GitHub-synced Obsidian markdown. |
 | **`founder-public-search.ts`** | **`searchFounderPublic`** — free public snippets for founder research. |
 | **`agent-roles.ts`** | Executive role metadata (`ROLE_CONFIGS`, `ROLE_ORDER`) for dashboard team UI. |
 | **`get-user.ts`** | Helpers to resolve user (if present). |
@@ -179,7 +179,6 @@ Set these in **Vercel** / **`.env.local`** as appropriate. Do **not** commit sec
 | **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** | Supabase anon key (browser + server SSR). |
 | **`SUPABASE_SERVICE_ROLE_KEY`** | Admin client (`lib/supabase.ts`); bypasses RLS — server-only. |
 | **`ANTHROPIC_API_KEY`** | Claude across chat, tools, delegate, generation routes. |
-| **`SUPERMEMORY_API_KEY`** | Supermemory memorize/search. |
 | **`GITHUB_VAULT_TOKEN`** | Optional; **Contents: Read** on the vault repo — required for **private** Obsidian mirrors. |
 | **`GITHUB_TOKEN`** | Fallback if `GITHUB_VAULT_TOKEN` unset (same role). |
 

@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast"
 type SessionSummary = {
   id: string
   title: string
+  /** Present after migration 034 */
+  mode?: string | null
   created_at: string
   designDoc: { id: string; mode: string; status: string } | null
 }
@@ -575,7 +577,7 @@ export function OfficeHoursPageContent() {
               ? parts.join(" ")
               : data.error ??
                 (res.status >= 500
-                  ? "Server error. Apply Supabase migrations 032 or 033 (channel office-hours). See supabase/migrations/033_office_hours_complete.sql."
+                  ? "Server error. Paste supabase/migrations/034_office_hours_live.sql in Supabase SQL (same project as NEXT_PUBLIC_SUPABASE_URL). Then 035_design_docs_office_hours_rls.sql if completion storage fails."
                   : `Request failed (${res.status}).`),
           variant: "destructive",
         })
@@ -669,8 +671,13 @@ export function OfficeHoursPageContent() {
                   setActiveSessionId(s.id)
                   const fromTitle = s.title.includes("Builder") ? "builder" : "startup"
                   const docMode = s.designDoc?.mode
+                  const rowMode = s.mode
                   setActiveMode(
-                    docMode === "builder" || docMode === "startup" ? docMode : fromTitle,
+                    docMode === "builder" || docMode === "startup"
+                      ? docMode
+                      : rowMode === "builder" || rowMode === "startup"
+                        ? rowMode
+                        : fromTitle,
                   )
                   setViewingDocId(null)
                   setViewingDoc(null)

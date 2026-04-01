@@ -41,5 +41,5 @@ export async function POST(req: NextRequest) {
     return jsonApiError(result.status, result.error, "outreach send POST")
   }
 
-  return NextResponse.json({ ok: true, messageId: result.messageId })
+  return NextResponse.json({ ok: true, provider: result.provider, messageId: result.messageId, threadId: result.threadId })
 }

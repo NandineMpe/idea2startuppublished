@@ -18,6 +18,42 @@ export type VaultFile = {
   content: string
 }
 
+export function splitGithubRepoRef(repoRef: string | null | undefined): { owner: string; repo: string } | null {
+  const stripped = (repoRef?.trim() ?? "")
+    .replace(/^https?:\/\/(www\.)?github\.com\//, "")
+    .replace(/\.git$/, "")
+    .replace(/^\/+|\/+$/g, "")
+  const parts = stripped.split("/").filter(Boolean)
+  if (parts.length !== 2) return null
+  return { owner: parts[0], repo: parts[1] }
+}
+
+export function resolveGithubVaultRepoParts(row: Record<string, unknown>): {
+  owner: string
+  repo: string
+  repoRef: string
+} | null {
+  const repoField = (row.github_vault_repo as string | undefined)?.trim()
+  const direct = splitGithubRepoRef(repoField)
+  if (direct) {
+    return {
+      owner: direct.owner,
+      repo: direct.repo,
+      repoRef: `${direct.owner}/${direct.repo}`,
+    }
+  }
+
+  const owner = (row.github_vault_owner as string | undefined)?.trim()
+  const repo = repoField?.replace(/^\/+|\/+$/g, "")
+  if (!owner || !repo) return null
+
+  return {
+    owner,
+    repo,
+    repoRef: `${owner}/${repo}`,
+  }
+}
+
 const GITHUB_API = "https://api.github.com"
 
 function decodeBase64Utf8(b64: string): string {
@@ -32,7 +68,12 @@ function decodeBase64Utf8(b64: string): string {
 }
 
 function getToken(): string | undefined {
-  return process.env.GITHUB_VAULT_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim() || undefined
+  return (
+    process.env.GITHUB_VAULT_TOKEN?.trim()
+    || process.env.GITHUB_TOKEN?.trim()
+    || process.env.GITHUB_PAT?.trim()
+    || undefined
+  )
 }
 
 function headers(token?: string): HeadersInit {
@@ -40,8 +81,47 @@ function headers(token?: string): HeadersInit {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
   }
-  if (token) h.Authorization = `Bearer ${token}`
+  if (token) {
+    h.Authorization = process.env.GITHUB_PAT?.trim() === token ? `token ${token}` : `Bearer ${token}`
+  }
   return h
+}
+
+async function getRepoMetadata(
+  base: string,
+  token?: string,
+): Promise<{ found: boolean; defaultBranch?: string }> {
+  try {
+    const res = await fetch(base, { headers: headers(token) })
+    if (!res.ok) return { found: false }
+    const json = (await res.json()) as { default_branch?: string }
+    return {
+      found: true,
+      defaultBranch: typeof json.default_branch === "string" ? json.default_branch : undefined,
+    }
+  } catch {
+    return { found: false }
+  }
+}
+
+async function describeRepoOrBranchError(
+  base: string,
+  token: string | undefined,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string> {
+  const meta = await getRepoMetadata(base, token)
+  if (meta.found) {
+    if (meta.defaultBranch && meta.defaultBranch !== branch) {
+      return `Branch "${branch}" not found for ${owner}/${repo}. Try "${meta.defaultBranch}" instead.`
+    }
+    return `Branch "${branch}" not found for ${owner}/${repo}.`
+  }
+
+  return token
+    ? `Repo "${owner}/${repo}" was not found, or the configured server token cannot access it.`
+    : `Repo "${owner}/${repo}" was not found. For a private vault, connect GitHub or set a server GitHub token.`
 }
 
 function normalizePrefix(prefix: string | undefined): string {
@@ -100,9 +180,7 @@ export async function fetchGithubVaultMarkdown(
       if (branchRes.status === 404) {
         return {
           files: [],
-          error: token
-            ? "Repo or branch not found, or token cannot access this repository."
-            : "Repo or branch not found. For a private vault, set GITHUB_VAULT_TOKEN on the server.",
+          error: await describeRepoOrBranchError(base, token, owner, repo, branch),
         }
       }
       return { files: [], error: `GitHub ${branchRes.status}: ${errText.slice(0, 200)}` }
@@ -216,7 +294,10 @@ export async function listGithubVaultMarkdownPaths(
       const errText = await branchRes.text().catch(() => "")
       return {
         entries: [],
-        error: branchRes.status === 404 ? "Repo or branch not found" : `GitHub ${branchRes.status}: ${errText.slice(0, 200)}`,
+        error:
+          branchRes.status === 404
+            ? await describeRepoOrBranchError(base, token, owner, repo, branch)
+            : `GitHub ${branchRes.status}: ${errText.slice(0, 200)}`,
       }
     }
 
@@ -282,9 +363,8 @@ export async function fetchGithubVaultFromProfileFields(row: Record<string, unkn
   files: VaultFile[]
   error?: string
 }> {
-  const owner = (row.github_vault_owner as string | undefined)?.trim()
-  const repo = (row.github_vault_repo as string | undefined)?.trim()
-  if (!owner || !repo) {
+  const repoParts = resolveGithubVaultRepoParts(row)
+  if (!repoParts) {
     return { files: [] }
   }
 
@@ -292,8 +372,8 @@ export async function fetchGithubVaultFromProfileFields(row: Record<string, unkn
   const pathPrefix = (row.github_vault_path as string | undefined) ?? ""
 
   return fetchGithubVaultMarkdown({
-    owner,
-    repo,
+    owner: repoParts.owner,
+    repo: repoParts.repo,
     branch,
     pathPrefix: pathPrefix || undefined,
   })

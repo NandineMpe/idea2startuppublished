@@ -1,3 +1,5 @@
+import { splitGithubRepoRef } from "@/lib/github-vault"
+
 /** Resolve owner/repo + branch for security scans from company_profile. */
 
 export type CompanyProfileRepoRow = {
@@ -16,11 +18,18 @@ export function resolveGithubRepoFromProfile(row: CompanyProfileRepoRow): Resolv
     const branch = row.github_branch?.trim() || "main"
     return { repo: r.replace(/^\/+|\/+$/g, ""), branch }
   }
-  const o = row.github_vault_owner?.trim()
-  const n = row.github_vault_repo?.trim()
-  if (o && n) {
+
+  const directVaultRepo = splitGithubRepoRef(row.github_vault_repo)
+  if (directVaultRepo) {
     const branch = row.github_vault_branch?.trim() || "main"
-    return { repo: `${o}/${n}`, branch }
+    return { repo: `${directVaultRepo.owner}/${directVaultRepo.repo}`, branch }
+  }
+
+  const legacyOwner = row.github_vault_owner?.trim()
+  const legacyRepo = row.github_vault_repo?.trim()
+  if (legacyOwner && legacyRepo) {
+    const branch = row.github_vault_branch?.trim() || "main"
+    return { repo: `${legacyOwner}/${legacyRepo}`, branch }
   }
   return null
 }

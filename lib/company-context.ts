@@ -1,30 +1,30 @@
 /**
- * Company Context Engine — the BRAIN.
- * Every agent calls getCompanyContext() before scrapers or Claude.
+ * Company Context Engine - the BRAIN.
+ * Every agent calls getCompanyContext() before scrapers or model calls.
  *
  * Layers (in order):
  *   1. Structured profile (company_profile)
- *   2. Assets (company_assets: pitch deck, docs, scrapes)
- *   3. Semantic memory (Supermemory)
- *   4. Obsidian vault (GitHub): structured excerpts + full markdown scan
+ *   2. Primary markdown knowledge base (company_profile.knowledge_base_md)
+ *   3. Cached Obsidian vault digest (company_profile.vault_context_cache)
  *
  * Output: structured CompanyContext + promptBlock for system prompts.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchGithubVaultMarkdown } from "@/lib/github-vault"
-import { getVaultContext, resolveGithubVaultConfig } from "@/lib/juno/vault"
-import { queryMemory } from "@/lib/supermemory"
-
-// ─── Types ───────────────────────────────────────────────────────
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 export interface CompanyContext {
   userId: string
+  scope?: "owner" | "workspace"
+  workspaceId?: string | null
+  workspaceSlug?: string | null
+  workspaceDisplayName?: string | null
   profile: CompanyProfile
   assets: CompanyAsset[]
-  /** Markdown from GitHub-backed Obsidian vault when configured */
+  /** Deprecated live GitHub reads; preserved as an empty array for compatibility. */
   vaultFiles: Array<{ path: string; content: string }>
-  memoryHits: string[]
+  /** Deprecated live vault search hits; preserved as an empty array for compatibility. */
+  knowledgeHits: string[]
   /** Pre-formatted block for Claude / Gemini system prompts */
   promptBlock: string
   extracted: {
@@ -36,7 +36,6 @@ export interface CompanyContext {
   }
 }
 
-/** Per-channel rules (LinkedIn, cold email, Reddit/HN) */
 export type BrandChannelVoice = {
   linkedin: string
   cold_email: string
@@ -64,27 +63,26 @@ export interface CompanyProfile {
   keywords: string[]
   differentiators: string
   traction: string
-  /**
-   * Demonstrated founder voice: sample paragraphs (LinkedIn, email, Reddit)—not adjectives.
-   * Legacy `brand_voice` is used only if this is empty.
-   */
   brand_voice_dna: string
   brand_promise: string
   brand_channel_voice: BrandChannelVoice
   brand_words_use: string[]
   brand_words_never: string[]
-  /** Proof lines agents weave naturally into copy */
   brand_credibility_hooks: string[]
-  /** @deprecated single “how we sound” line; prefer brand_voice_dna */
   brand_voice: string
-  /** @deprecated free text; prefer brand_words_never JSON */
   brand_never_say: string
-  /** @deprecated free text; prefer brand_credibility_hooks */
   brand_proof_points: string
-  /** E.164 WhatsApp; optional — see `company_profile` migration */
+  knowledge_base_md: string
+  knowledge_base_updated_at: string | null
+  github_vault_repo: string
+  github_vault_branch: string
+  vault_folders: string[]
+  vault_context_cache: string
+  vault_context_last_synced_at: string | null
+  vault_context_file_count: number
+  vault_context_sync_error: string | null
   whatsapp_number?: string | null
   whatsapp_verified?: boolean | null
-  /** Full row for forward-compat / extra columns */
   raw: Record<string, unknown>
 }
 
@@ -100,13 +98,12 @@ export interface CompanyAsset {
 }
 
 export interface GetCompanyContextOptions {
-  /** Hint for Supermemory search (e.g. "competitors funding" for CBS) */
   queryHint?: string
   maxAssets?: number
   maxAssetChars?: number
+  workspaceId?: string | null
+  useCookieWorkspace?: boolean
 }
-
-// ─── Supabase: service role when available (Inngest / API), else cookie client ─
 
 async function getSupabaseForContext(): Promise<SupabaseClient> {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -117,52 +114,40 @@ async function getSupabaseForContext(): Promise<SupabaseClient> {
   return createClient()
 }
 
-// ─── Main entry points ───────────────────────────────────────────
-
-/**
- * Full assembled context for a user. Call this first in every agent.
- */
 export async function getCompanyContext(
   userId: string | undefined,
   options: GetCompanyContextOptions = {},
 ): Promise<CompanyContext | null> {
   if (!userId) return null
 
-  const { queryHint, maxAssets = 5, maxAssetChars = 3000 } = options
+  const { maxAssets = 5, maxAssetChars = 3000 } = options
+  void options.queryHint
 
   try {
     const supabase = await getSupabaseForContext()
-
-    const profile = await loadProfile(supabase, userId)
-    const assets = await loadAssets(supabase, userId, maxAssets, maxAssetChars)
-
-    let vaultFiles: Array<{ path: string; content: string }> = []
-    const vaultConfig = await resolveGithubVaultConfig(userId)
-    if (vaultConfig) {
-      const vaultResult = await fetchGithubVaultMarkdown(vaultConfig, {
-        maxFiles: 35,
-        maxTotalChars: 72_000,
-        maxPerFileChars: 14_000,
-      })
-      if (vaultResult.error) {
-        console.warn("[company-context] GitHub vault:", vaultResult.error)
-      }
-      vaultFiles = vaultResult.files ?? []
-    }
-
-    const memoryHits = await queryMemoryLayer(userId, queryHint, profile)
-    const vaultNarrative = await getVaultContext(userId, { queryHint })
-
+    const workspace = await resolveWorkspaceSelection(userId, {
+      workspaceId: options.workspaceId,
+      useCookieWorkspace: options.useCookieWorkspace,
+    })
+    const profile = workspace
+      ? await loadWorkspaceProfile(supabase, userId, workspace.id)
+      : await loadProfile(supabase, userId)
+    const assets = workspace
+      ? await loadWorkspaceAssets(supabase, userId, workspace.id, maxAssets, maxAssetChars)
+      : await loadAssets(supabase, userId, maxAssets, maxAssetChars)
     const extracted = extractIntelligence(profile)
-    const promptBlock = buildPromptBlock(profile, assets, vaultFiles, memoryHits, vaultNarrative)
 
     return {
       userId,
+      scope: workspace ? "workspace" : "owner",
+      workspaceId: workspace?.id ?? null,
+      workspaceSlug: workspace?.slug ?? null,
+      workspaceDisplayName: workspace?.displayName ?? null,
       profile,
       assets,
-      vaultFiles,
-      memoryHits,
-      promptBlock,
+      vaultFiles: [],
+      knowledgeHits: [],
+      promptBlock: buildPromptBlock(profile),
       extracted,
     }
   } catch (e) {
@@ -171,9 +156,6 @@ export async function getCompanyContext(
   }
 }
 
-/**
- * Convenience: prompt string only (backward compatible with older string-only APIs).
- */
 export async function getCompanyContextPrompt(
   userId: string | undefined,
   options: GetCompanyContextOptions = {},
@@ -182,15 +164,19 @@ export async function getCompanyContextPrompt(
   return ctx?.promptBlock ?? ""
 }
 
-/**
- * Profile + extracted fields only (no assets / memory / prompt block).
- */
 export async function getCompanyContextLight(
   userId: string,
+  options: Pick<GetCompanyContextOptions, "workspaceId" | "useCookieWorkspace"> = {},
 ): Promise<{ profile: CompanyProfile; extracted: CompanyContext["extracted"] } | null> {
   try {
     const supabase = await getSupabaseForContext()
-    const profile = await loadProfile(supabase, userId)
+    const workspace = await resolveWorkspaceSelection(userId, {
+      workspaceId: options.workspaceId,
+      useCookieWorkspace: options.useCookieWorkspace,
+    })
+    const profile = workspace
+      ? await loadWorkspaceProfile(supabase, userId, workspace.id)
+      : await loadProfile(supabase, userId)
     const extracted = extractIntelligence(profile)
     return { profile, extracted }
   } catch (e) {
@@ -199,9 +185,6 @@ export async function getCompanyContextLight(
   }
 }
 
-/**
- * Fan-out: user IDs that have a non-empty company name.
- */
 export async function getActiveUserIds(): Promise<string[]> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn("getActiveUserIds: missing SUPABASE_SERVICE_ROLE_KEY")
@@ -226,8 +209,6 @@ export async function getActiveUserIds(): Promise<string[]> {
   }
 }
 
-// ─── Layer 1: Profile ────────────────────────────────────────────
-
 async function loadProfile(supabase: SupabaseClient, userId: string): Promise<CompanyProfile> {
   const { data, error } = await supabase.from("company_profile").select("*").eq("user_id", userId).single()
 
@@ -237,8 +218,31 @@ async function loadProfile(supabase: SupabaseClient, userId: string): Promise<Co
     )
   }
 
-  const row = data as Record<string, unknown>
+  return mapRowToCompanyProfile(data as Record<string, unknown>, userId)
+}
 
+async function loadWorkspaceProfile(
+  supabase: SupabaseClient,
+  userId: string,
+  workspaceId: string,
+): Promise<CompanyProfile> {
+  const { data, error } = await supabase
+    .from("client_workspace_profiles")
+    .select("*")
+    .eq("owner_user_id", userId)
+    .eq("workspace_id", workspaceId)
+    .single()
+
+  if (error || !data) {
+    throw new Error(
+      `No workspace profile for workspace ${workspaceId}. The contact still needs to submit their context.`,
+    )
+  }
+
+  return mapRowToCompanyProfile(data as Record<string, unknown>, userId)
+}
+
+function mapRowToCompanyProfile(row: Record<string, unknown>, userId: string): CompanyProfile {
   const companyName = (row.company_name as string) || (row.name as string) || ""
   const tagline = (row.tagline as string) || ""
   const problem = (row.problem as string) || (row.problem_statement as string) || ""
@@ -249,12 +253,12 @@ async function loadProfile(supabase: SupabaseClient, userId: string): Promise<Co
   const description =
     (row.description as string) ||
     (row.company_description as string) ||
-    [tagline, problem].filter(Boolean).join(" — ").slice(0, 2000) ||
+    [tagline, problem].filter(Boolean).join(" - ").slice(0, 2000) ||
     ""
 
   return {
     id: String(row.id),
-    user_id: String(row.user_id),
+    user_id: String(row.user_id ?? userId),
     name: companyName,
     description,
     problem,
@@ -282,13 +286,20 @@ async function loadProfile(supabase: SupabaseClient, userId: string): Promise<Co
     brand_voice: (row.brand_voice as string) || "",
     brand_never_say: (row.brand_never_say as string) || "",
     brand_proof_points: (row.brand_proof_points as string) || "",
+    knowledge_base_md: (row.knowledge_base_md as string) || "",
+    knowledge_base_updated_at: (row.knowledge_base_updated_at as string | null | undefined) ?? null,
+    github_vault_repo: (row.github_vault_repo as string) || "",
+    github_vault_branch: (row.github_vault_branch as string) || "main",
+    vault_folders: parseArray(row.vault_folders),
+    vault_context_cache: (row.vault_context_cache as string) || "",
+    vault_context_last_synced_at: (row.vault_context_last_synced_at as string | null | undefined) ?? null,
+    vault_context_file_count: Number(row.vault_context_file_count ?? 0) || 0,
+    vault_context_sync_error: (row.vault_context_sync_error as string | null | undefined) ?? null,
     whatsapp_number: (row.whatsapp_number as string | null | undefined) ?? null,
     whatsapp_verified: Boolean(row.whatsapp_verified),
-    raw: row as Record<string, unknown>,
+    raw: row,
   }
 }
-
-// ─── Layer 2: Assets ─────────────────────────────────────────────
 
 async function loadAssets(
   supabase: SupabaseClient,
@@ -322,176 +333,99 @@ async function loadAssets(
   }))
 }
 
+async function loadWorkspaceAssets(
+  supabase: SupabaseClient,
+  userId: string,
+  workspaceId: string,
+  maxAssets: number,
+  maxChars: number,
+): Promise<CompanyAsset[]> {
+  const { data, error } = await supabase
+    .from("client_workspace_assets")
+    .select("id, type, title, source_url, content, created_at")
+    .eq("owner_user_id", userId)
+    .eq("workspace_id", workspaceId)
+    .not("content", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(maxAssets + 8)
+
+  if (error || !data?.length) return []
+
+  const sorted = [...data].sort((a, b) => {
+    if (a.type === "pitch_deck" && b.type !== "pitch_deck") return -1
+    if (b.type === "pitch_deck" && a.type !== "pitch_deck") return 1
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
+  return sorted.slice(0, maxAssets).map((a) => ({
+    id: a.id,
+    type: normalizeAssetType(a.type),
+    name: a.title || "Untitled",
+    content: truncate(a.content || "", maxChars),
+    created_at: a.created_at,
+    source_url: a.source_url,
+  }))
+}
+
 function normalizeAssetType(t: string | null): CompanyAssetType {
   if (t === "pitch_deck" || t === "document") return t
   if (t === "scraped_url") return "scrape"
   return "other"
 }
 
-// ─── Layer 3: Supermemory ────────────────────────────────────────
+function buildPromptBlock(profile: CompanyProfile): string {
+  const structuredLines: string[] = []
+  const channelVoice = profile.brand_channel_voice
 
-async function queryMemoryLayer(
-  userId: string,
-  queryHint: string | undefined,
-  profile: CompanyProfile,
-): Promise<string[]> {
-  const query =
-    queryHint?.trim() ||
-    `${profile.name} ${profile.vertical || profile.industry} ${profile.market} product strategy competitors`
+  if (profile.name) structuredLines.push(`Company: ${profile.name}`)
+  if (profile.description) structuredLines.push(`Description: ${profile.description}`)
+  if (profile.problem) structuredLines.push(`Problem: ${profile.problem}`)
+  if (profile.solution) structuredLines.push(`Solution: ${profile.solution}`)
+  if (profile.market) structuredLines.push(`Market: ${profile.market}`)
+  if (profile.vertical || profile.industry) structuredLines.push(`Vertical/Industry: ${profile.vertical || profile.industry}`)
+  if (profile.stage) structuredLines.push(`Stage: ${profile.stage}`)
+  if (profile.business_model) structuredLines.push(`Business model: ${profile.business_model}`)
+  if (profile.thesis) structuredLines.push(`Thesis: ${profile.thesis}`)
+  if (profile.differentiators) structuredLines.push(`Differentiators: ${profile.differentiators}`)
+  if (profile.traction) structuredLines.push(`Traction: ${profile.traction}`)
+  if (profile.founder_name) structuredLines.push(`Founder: ${profile.founder_name}`)
+  if (profile.founder_location) structuredLines.push(`Founder location: ${profile.founder_location}`)
+  if (profile.founder_background) structuredLines.push(`Founder background: ${profile.founder_background}`)
+  if (profile.icp.length > 0) structuredLines.push(`ICP: ${profile.icp.join(", ")}`)
+  if (profile.competitors.length > 0) structuredLines.push(`Competitors: ${profile.competitors.join(", ")}`)
+  if (profile.keywords.length > 0) structuredLines.push(`Keywords: ${profile.keywords.join(", ")}`)
 
-  try {
-    const results = await queryMemory(query, userId, 5)
-    const list = Array.isArray(results) ? results : []
-    return list
-      .map((r: { content?: string; text?: string }) => r.content || r.text || "")
-      .filter((s: string) => s.length > 20)
-      .slice(0, 3)
-  } catch (e) {
-    console.warn("[Supermemory] Query failed (non-fatal):", e)
-    return []
+  const voiceDna = profile.brand_voice_dna.trim() || profile.brand_voice.trim()
+  if (voiceDna) structuredLines.push(`Brand voice DNA:\n${voiceDna}`)
+  if (profile.brand_promise.trim()) structuredLines.push(`Brand promise: ${profile.brand_promise.trim()}`)
+  if (channelVoice.linkedin.trim()) structuredLines.push(`LinkedIn voice: ${channelVoice.linkedin.trim()}`)
+  if (channelVoice.cold_email.trim()) structuredLines.push(`Cold email voice: ${channelVoice.cold_email.trim()}`)
+  if (channelVoice.reddit_hn.trim()) structuredLines.push(`Reddit/HN voice: ${channelVoice.reddit_hn.trim()}`)
+  if (profile.brand_words_use.length > 0) structuredLines.push(`Words to use: ${profile.brand_words_use.join(", ")}`)
+  if (profile.brand_words_never.length > 0) structuredLines.push(`Words to avoid: ${profile.brand_words_never.join(", ")}`)
+  if (profile.brand_credibility_hooks.length > 0) {
+    structuredLines.push(`Credibility hooks:\n${profile.brand_credibility_hooks.map((hook) => `- ${hook}`).join("\n")}`)
   }
+
+  const structuredBlock = structuredLines.length > 0 ? structuredLines.join("\n") : "No structured company profile saved yet."
+  const knowledgeBaseBlock = profile.knowledge_base_md.trim() || "No knowledge base document saved yet."
+  const vaultContextBlock =
+    profile.vault_context_cache.trim()
+    || (profile.github_vault_repo.trim()
+      ? "Vault connected but no cached context is available yet. Run a sync from /dashboard/context."
+      : "No Obsidian vault connected.")
+
+  return [
+    "=== COMPANY PROFILE ===",
+    structuredBlock,
+    "",
+    "=== KNOWLEDGE BASE ===",
+    knowledgeBaseBlock,
+    "",
+    "=== VAULT CONTEXT ===",
+    vaultContextBlock,
+  ].join("\n")
 }
-
-// ─── Prompt block ─────────────────────────────────────────────────
-
-function buildPromptBlock(
-  profile: CompanyProfile,
-  assets: CompanyAsset[],
-  vaultFiles: Array<{ path: string; content: string }>,
-  memoryHits: string[],
-  vaultNarrative: string,
-): string {
-  const sections: string[] = []
-
-  sections.push(`=== COMPANY CONTEXT ===`)
-
-  if (profile.name) sections.push(`Company: ${profile.name}`)
-  if (profile.description) sections.push(`Description: ${profile.description}`)
-  if (profile.problem) sections.push(`Problem: ${profile.problem}`)
-  if (profile.solution) sections.push(`Solution: ${profile.solution}`)
-  if (profile.market) sections.push(`Market: ${profile.market}`)
-  if (profile.vertical || profile.industry) {
-    sections.push(`Vertical/Industry: ${profile.vertical || profile.industry}`)
-  }
-  if (profile.stage) sections.push(`Stage: ${profile.stage}`)
-  if (profile.business_model) sections.push(`Business model: ${profile.business_model}`)
-  if (profile.thesis) sections.push(`Thesis: ${profile.thesis}`)
-  if (profile.differentiators) sections.push(`Differentiators: ${profile.differentiators}`)
-  if (profile.traction) sections.push(`Traction: ${profile.traction}`)
-
-  const ch = profile.brand_channel_voice
-  const hasBrand =
-    profile.brand_voice_dna.trim() ||
-    profile.brand_promise.trim() ||
-    ch.linkedin.trim() ||
-    ch.cold_email.trim() ||
-    ch.reddit_hn.trim() ||
-    profile.brand_words_use.length > 0 ||
-    profile.brand_words_never.length > 0 ||
-    profile.brand_credibility_hooks.length > 0 ||
-    profile.brand_voice.trim() ||
-    profile.brand_never_say.trim() ||
-    profile.brand_proof_points.trim()
-
-  if (hasBrand) {
-    sections.push(`\n=== BRAND & VOICE (follow in all customer-facing copy) ===`)
-    sections.push(
-      `This is how the founder writes. Copy the rhythm, sentence length, and jargon level—do not substitute generic “brand voice” adjectives for these examples.`,
-    )
-
-    const dna = profile.brand_voice_dna.trim() || profile.brand_voice.trim()
-    if (dna) {
-      sections.push(`\n--- VOICE DNA (demonstrated examples — reproduce this pattern) ---`)
-      sections.push(dna)
-    }
-
-    if (profile.brand_promise.trim()) {
-      sections.push(`\n--- THE LINE (one sentence we stand behind) ---`)
-      sections.push(profile.brand_promise.trim())
-    }
-
-    if (ch.linkedin.trim() || ch.cold_email.trim() || ch.reddit_hn.trim()) {
-      sections.push(`\n--- CHANNEL-SPECIFIC INSTRUCTIONS ---`)
-      if (ch.linkedin.trim()) sections.push(`LinkedIn: ${ch.linkedin.trim()}`)
-      if (ch.cold_email.trim()) sections.push(`Cold email: ${ch.cold_email.trim()}`)
-      if (ch.reddit_hn.trim()) sections.push(`Reddit / Hacker News: ${ch.reddit_hn.trim()}`)
-    }
-
-    if (profile.brand_words_use.length > 0 || profile.brand_words_never.length > 0) {
-      sections.push(`\n--- VOCABULARY ---`)
-      if (profile.brand_words_use.length > 0) {
-        sections.push(`Words and phrases we USE: ${profile.brand_words_use.join(", ")}`)
-      }
-      if (profile.brand_words_never.length > 0) {
-        sections.push(`Words and phrases we NEVER use: ${profile.brand_words_never.join(", ")}`)
-      }
-    }
-
-    if (profile.brand_credibility_hooks.length > 0) {
-      sections.push(`\n--- CREDIBILITY HOOKS (weave naturally into sentences—not a bullet list in the output) ---`)
-      for (const h of profile.brand_credibility_hooks) {
-        sections.push(`• ${h}`)
-      }
-    }
-  }
-
-  if (profile.founder_name) {
-    sections.push(`\nFounder: ${profile.founder_name}`)
-    if (profile.founder_location) sections.push(`Location: ${profile.founder_location}`)
-    if (profile.founder_background) sections.push(`Background: ${profile.founder_background}`)
-  }
-
-  if (profile.competitors.length > 0) {
-    sections.push(`\nCompetitors: ${profile.competitors.join(", ")}`)
-  }
-  if (profile.icp.length > 0) {
-    sections.push(`Ideal customers: ${profile.icp.join(", ")}`)
-  }
-  if (profile.keywords.length > 0) {
-    sections.push(`Keywords/topics: ${profile.keywords.join(", ")}`)
-  }
-
-  if (assets.length > 0) {
-    sections.push(`\n=== COMPANY DOCUMENTS ===`)
-    for (const asset of assets) {
-      const label = asset.source_url ? `${asset.name} (${asset.type}) — ${asset.source_url}` : `${asset.name} (${asset.type})`
-      sections.push(`\n--- ${label} ---`)
-      sections.push(asset.content)
-    }
-  }
-
-  if (memoryHits.length > 0) {
-    sections.push(`\n=== ADDITIONAL CONTEXT FROM KNOWLEDGE BASE ===`)
-    for (const hit of memoryHits) {
-      sections.push(hit)
-    }
-  }
-
-  if (vaultNarrative.trim()) {
-    sections.push(`\n=== OBSIDIAN VAULT (PRIORITY NOTES) ===`)
-    sections.push(
-      "Structured excerpts: roadmap, decisions, company strategy, competitors, research — from the founder's vault.",
-    )
-    sections.push(vaultNarrative.trim())
-  }
-
-  if (vaultFiles.length > 0) {
-    sections.push(`\n=== OBSIDIAN VAULT (FULL MARKDOWN SCAN) ===`)
-    sections.push(
-      "Additional markdown from the GitHub-backed vault. Treat linked ideas and headings as long-form context.",
-    )
-    for (const vf of vaultFiles) {
-      sections.push(`\n--- file: ${vf.path} ---`)
-      sections.push(vf.content)
-    }
-  }
-
-  sections.push(`\n=== END COMPANY CONTEXT ===`)
-
-  return sections.join("\n")
-}
-
-// ─── Extracted intelligence ───────────────────────────────────────
 
 function extractIntelligence(profile: CompanyProfile): CompanyContext["extracted"] {
   let competitors = [...profile.competitors]
@@ -525,8 +459,6 @@ function extractIntelligence(profile: CompanyProfile): CompanyContext["extracted
     stage: profile.stage || "unknown",
   }
 }
-
-// ─── Helpers ───────────────────────────────────────────────────────
 
 function parseArray(val: unknown): string[] {
   if (!val) return []

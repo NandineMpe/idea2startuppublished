@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function isStringArray(val: unknown): val is string[] {
   return Array.isArray(val) && val.every((x) => typeof x === "string")
@@ -22,6 +24,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const workspace = await resolveWorkspaceSelection(user.id)
     const body = await request.json()
     const {
       brand_voice_dna,
@@ -55,9 +58,8 @@ export async function PATCH(request: Request) {
       )
     }
 
-    const { data, error } = await supabase
-      .from("company_profile")
-      .update({
+    const table = workspace ? "client_workspace_profiles" : "company_profile"
+    const query = supabaseAdmin.from(table).update({
         brand_voice_dna: brand_voice_dna.trim() ? brand_voice_dna : null,
         brand_promise: brand_promise.trim() ? brand_promise : null,
         brand_channel_voice: {
@@ -69,13 +71,22 @@ export async function PATCH(request: Request) {
         brand_words_never: normalizeStringArray(brand_words_never),
         brand_credibility_hooks: normalizeStringArray(brand_credibility_hooks),
       })
-      .eq("user_id", user.id)
-      .select()
-      .single()
+
+    const { data, error } = workspace
+      ? await query
+          .eq("owner_user_id", user.id)
+          .eq("workspace_id", workspace.id)
+          .select()
+          .single()
+      : await query.eq("user_id", user.id).select().single()
 
     if (error) throw error
 
-    return NextResponse.json({ profile: data })
+    return NextResponse.json({
+      profile: data,
+      scope: workspace ? "workspace" : "owner",
+      workspace: workspace ?? null,
+    })
   } catch (error) {
     console.error("Company profile branding PATCH error:", error)
     return NextResponse.json({ error: "Failed to save branding" }, { status: 500 })

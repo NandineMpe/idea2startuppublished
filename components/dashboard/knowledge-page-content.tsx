@@ -1,32 +1,37 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import {
   BookOpen,
-  MessageSquare,
-  TrendingUp,
-  Loader2,
-  Plus,
-  Search,
   ChevronDown,
   ChevronUp,
   Eye,
   FileText,
+  Loader2,
+  MessageSquare,
+  Plus,
+  Search,
+  TrendingUp,
 } from "lucide-react"
+import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 
-type MemoryHit = { content?: string }
+type KnowledgeHit = {
+  content?: string
+  excerpt?: string
+  path?: string
+  title?: string
+}
 
 const hubLinks = [
   {
     title: "Domain documents",
-    description: "Industry reports, research, and decks saved as company assets and semantic memory.",
+    description: "Industry reports, research, and decks stored in your document library and mirrored into the vault.",
     href: "/dashboard/knowledge/domain",
     icon: BookOpen,
   },
@@ -48,7 +53,7 @@ export function KnowledgePageContent() {
   const { toast } = useToast()
   const [searchQuery, setSearchQuery] = useState("")
   const [inputContent, setInputContent] = useState("")
-  const [memories, setMemories] = useState<MemoryHit[]>([])
+  const [results, setResults] = useState<KnowledgeHit[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [contextPreview, setContextPreview] = useState("")
@@ -75,22 +80,25 @@ export function KnowledgePageContent() {
     }
   }, [])
 
-  const handleSearch = async () => {
-    setIsSearching(true)
-    try {
-      const q = encodeURIComponent(searchQuery || "company startup")
-      const res = await fetch(`/api/knowledge?q=${q}`)
-      const data = await res.json()
-      const raw = data.results
-      const list = Array.isArray(raw) ? raw : raw?.results ?? []
-      setMemories(Array.isArray(list) ? list : [])
-    } catch {
-      setMemories([])
-      toast({ title: "Search failed", variant: "destructive" })
-    } finally {
-      setIsSearching(false)
-    }
-  }
+  const runSearch = useCallback(
+    async (query: string) => {
+      setIsSearching(true)
+      try {
+        const q = encodeURIComponent(query || "company startup")
+        const res = await fetch(`/api/knowledge?q=${q}`)
+        const data = await res.json()
+        const raw = data.results
+        const list = Array.isArray(raw) ? raw : raw?.results ?? []
+        setResults(Array.isArray(list) ? list : [])
+      } catch {
+        setResults([])
+        toast({ title: "Search failed", variant: "destructive" })
+      } finally {
+        setIsSearching(false)
+      }
+    },
+    [toast],
+  )
 
   const handleAdd = async () => {
     if (!inputContent.trim()) return
@@ -99,17 +107,21 @@ export function KnowledgePageContent() {
       const res = await fetch("/api/knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: inputContent.trim() }),
+        body: JSON.stringify({ content: inputContent.trim(), title: "Quick capture" }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error ?? "Failed")
       }
-      toast({ title: "Saved to knowledge base", description: "Agents can use this in context." })
+      toast({ title: "Saved to vault", description: "Agents will pull this from your Obsidian knowledge layer." })
       setInputContent("")
-      handleSearch()
-    } catch (e) {
-      toast({ title: "Could not save", description: e instanceof Error ? e.message : "Try again", variant: "destructive" })
+      void runSearch(searchQuery || "company startup")
+    } catch (error) {
+      toast({
+        title: "Could not save",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      })
     } finally {
       setIsAdding(false)
     }
@@ -117,19 +129,8 @@ export function KnowledgePageContent() {
 
   useEffect(() => {
     void loadAssets()
-    void (async () => {
-      setIsSearching(true)
-      try {
-        const res = await fetch(`/api/knowledge?q=${encodeURIComponent("company startup")}`)
-        const data = await res.json()
-        const raw = data.results
-        const list = Array.isArray(raw) ? raw : raw?.results ?? []
-        setMemories(Array.isArray(list) ? list : [])
-      } finally {
-        setIsSearching(false)
-      }
-    })()
-  }, [loadAssets])
+    void runSearch("company startup")
+  }, [loadAssets, runSearch])
 
   return (
     <div className="flex flex-col gap-6">
@@ -137,20 +138,19 @@ export function KnowledgePageContent() {
 
       {assetCount !== null && (
         <p className="text-[13px] text-muted-foreground">
-          {assetCount} saved document{assetCount === 1 ? "" : "s"} / assets on file. Add more from the{" "}
-          <button onClick={() => {}} className="text-primary hover:underline">Company &amp; Founder</button> tab or Domain documents below.
+          {assetCount} saved document{assetCount === 1 ? "" : "s"} / assets on file. New uploads are synced into the vault before agents use them.
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {hubLinks.map((item) => {
           const Icon = item.icon
           return (
             <Link key={item.href} href={item.href} className="group block">
-              <Card className="h-full border-border bg-card hover:border-primary/40 transition-colors">
+              <Card className="h-full border-border bg-card transition-colors hover:border-primary/40">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-[15px] flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary shrink-0" />
+                  <CardTitle className="flex items-center gap-2 text-[15px]">
+                    <Icon className="h-4 w-4 shrink-0 text-primary" />
                     {item.title}
                   </CardTitle>
                   <CardDescription className="text-[13px] leading-relaxed">{item.description}</CardDescription>
@@ -166,13 +166,13 @@ export function KnowledgePageContent() {
           <button
             type="button"
             onClick={() => {
-              setShowContext((v) => {
-                const next = !v
-                if (next) loadContext()
+              setShowContext((value) => {
+                const next = !value
+                if (next) void loadContext()
                 return next
               })
             }}
-            className="flex w-full items-center justify-between text-left gap-2"
+            className="flex w-full items-center justify-between gap-2 text-left"
           >
             <div className="flex items-center gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
@@ -180,72 +180,76 @@ export function KnowledgePageContent() {
             </div>
             {showContext ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
           </button>
-          <CardDescription>Profile, documents, scraped pages, and semantic memory merged for chat and tools.</CardDescription>
+          <CardDescription>Profile plus the connected Obsidian vault, merged for chat and tools.</CardDescription>
         </CardHeader>
         {showContext && (
           <CardContent>
-            <pre className="text-[12px] text-muted-foreground whitespace-pre-wrap bg-muted/40 p-4 rounded-lg max-h-[320px] overflow-y-auto font-sans border border-border">
-              {contextPreview || <Loader2 className="h-4 w-4 animate-spin inline" />}
+            <pre className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-muted/40 p-4 font-sans text-[12px] whitespace-pre-wrap text-muted-foreground">
+              {contextPreview || <Loader2 className="inline h-4 w-4 animate-spin" />}
             </pre>
-            <Button variant="outline" size="sm" className="mt-3" onClick={loadContext}>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => void loadContext()}>
               Refresh preview
             </Button>
           </CardContent>
         )}
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="border-border bg-card">
           <CardHeader>
             <CardTitle className="text-[15px]">Quick capture</CardTitle>
-            <CardDescription>Short note or insight — stored in your knowledge base for retrieval.</CardDescription>
+            <CardDescription>Short note or insight saved directly into the vault-backed knowledge base.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
-              placeholder="e.g. Competitor launched feature X…"
+              placeholder="e.g. Competitor launched feature X..."
               value={inputContent}
-              onChange={(e) => setInputContent(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              onChange={(event) => setInputContent(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleAdd()}
               className="bg-background"
             />
             <Button onClick={handleAdd} disabled={isAdding || !inputContent.trim()} className="gap-2">
               {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Save to knowledge base
+              Save to vault
             </Button>
           </CardContent>
         </Card>
 
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-[15px]">Search memories</CardTitle>
-            <CardDescription>Semantic search over saved snippets (same pool agents query).</CardDescription>
+            <CardTitle className="text-[15px]">Search vault notes</CardTitle>
+            <CardDescription>Find the same Obsidian-backed notes and documents the agents search.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  className="pl-9 bg-background"
-                  placeholder="Search…"
+                  className="bg-background pl-9"
+                  placeholder="Search..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && void runSearch(searchQuery)}
                 />
               </div>
-              <Button variant="secondary" onClick={handleSearch} disabled={isSearching}>
+              <Button variant="secondary" onClick={() => void runSearch(searchQuery)} disabled={isSearching}>
                 {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
               </Button>
             </div>
-            <div className="space-y-2 max-h-[220px] overflow-y-auto">
-              {memories.length === 0 && !isSearching && (
-                <p className="text-[13px] text-muted-foreground">No results yet — add content or broaden your search.</p>
+            <div className="max-h-[220px] space-y-2 overflow-y-auto">
+              {results.length === 0 && !isSearching && (
+                <p className="text-[13px] text-muted-foreground">No results yet - add content or broaden your search.</p>
               )}
-              {memories.map((m, i) => (
+              {results.map((result, index) => (
                 <div
-                  key={i}
-                  className={cn("text-[13px] text-foreground/90 p-3 rounded-md border border-border bg-muted/20", "line-clamp-4")}
+                  key={`${result.path || "result"}-${index}`}
+                  className={cn(
+                    "rounded-md border border-border bg-muted/20 p-3 text-[13px] text-foreground/90",
+                    "space-y-1",
+                  )}
                 >
-                  {typeof m.content === "string" ? m.content : JSON.stringify(m)}
+                  {result.path && <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{result.path}</p>}
+                  <p className="line-clamp-4">{result.excerpt || result.content || JSON.stringify(result)}</p>
                 </div>
               ))}
             </div>
@@ -253,9 +257,9 @@ export function KnowledgePageContent() {
         </Card>
       </div>
 
-      <p className="text-[12px] text-muted-foreground flex items-center gap-2">
+      <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
         <FileText className="h-3.5 w-3.5" />
-        Large files: upload on the Company &amp; Founder tab or Domain documents — text is extracted and included in agent context.
+        Large files still upload through the document flows, but agents ground on the vault copy after sync.
       </p>
     </div>
   )

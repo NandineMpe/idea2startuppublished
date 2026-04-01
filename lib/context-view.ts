@@ -11,6 +11,19 @@ export type JackJillJobRow = {
 }
 
 export interface ContextData {
+  knowledge: {
+    markdown: string
+    updatedAt: string | null
+  }
+  vault: {
+    repo: string
+    branch: string
+    folders: string[]
+    connected: boolean
+    lastSyncedAt: string | null
+    fileCount: number
+    syncError: string | null
+  }
   company: {
     name: string
     description: string
@@ -55,6 +68,19 @@ export interface ContextData {
 
 export function emptyContextData(): ContextData {
   return {
+    knowledge: {
+      markdown: "",
+      updatedAt: null,
+    },
+    vault: {
+      repo: "",
+      branch: "main",
+      folders: [],
+      connected: false,
+      lastSyncedAt: null,
+      fileCount: 0,
+      syncError: null,
+    },
     company: {
       name: "",
       description: "",
@@ -159,6 +185,7 @@ export function parseJackJillJobs(val: unknown): JackJillJobRow[] {
 
 export function calcCompleteness(d: ContextData): number {
   const fields = [
+    d.knowledge.markdown,
     d.company.name,
     d.company.description,
     d.company.problem,

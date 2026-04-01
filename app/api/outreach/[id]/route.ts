@@ -34,7 +34,7 @@ type PatchBody = {
   lookalike_outcome?: OutreachOutcomeType
   /** Override profile when the outreach row has no `lookalike_profile_id`. */
   lookalike_profile_id?: string
-  /** Set status to `sent` with `sent_at` now — use when you emailed from your own client (no Resend). */
+  /** Set status to `sent` with `sent_at` now — use when you emailed from your own client. */
   mark_sent_manually?: boolean
 }
 
@@ -54,7 +54,7 @@ type PostBody = {
 }
 
 /**
- * POST /api/outreach/[id] — `{ "action": "send" }` sends via Resend (same as POST /api/outreach/send).
+ * POST /api/outreach/[id] — `{ "action": "send" }` sends via the configured outbound provider.
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const auth = await resolveUser(req)
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return jsonApiError(result.status, result.error, "outreach POST send")
   }
 
-  return NextResponse.json({ ok: true, messageId: result.messageId })
+  return NextResponse.json({ ok: true, provider: result.provider, messageId: result.messageId, threadId: result.threadId })
 }
 
 /**

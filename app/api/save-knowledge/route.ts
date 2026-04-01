@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { addToMemory } from "@/lib/supermemory"
+import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
 
 export async function POST(req: Request) {
   try {
@@ -16,13 +16,19 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     const structuredContent = `Source: ${fileName || "Uploaded Document"}\n\n${content}`
-    const result = await addToMemory(structuredContent, user?.id)
+    const result = await saveVaultKnowledgeEntry({
+      content: structuredContent,
+      title: fileName || "Uploaded Document",
+      userId: user?.id,
+      folder: "sources/manual",
+      noteType: "manual_import",
+    })
 
-    if (!result) {
-      return NextResponse.json({ error: "Failed to store in memory" }, { status: 500 })
+    if (!result.success) {
+      return NextResponse.json({ error: result.error ?? "Failed to store in vault" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, memoryId: result.id })
+    return NextResponse.json({ success: true, memoryId: result.path, path: result.path })
   } catch (error) {
     console.error("Save knowledge error:", error)
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })

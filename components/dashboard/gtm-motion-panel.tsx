@@ -60,6 +60,10 @@ export type OutreachRow = {
   status: string
   sent_at: string | null
   resend_message_id: string | null
+  provider: string | null
+  provider_message_id: string | null
+  provider_thread_id: string | null
+  provider_inbox_id: string | null
   opened_at: string | null
   clicked_at: string | null
   replied_at: string | null
@@ -83,6 +87,7 @@ function outreachBadgeClass(status: string): string {
     case "approved":
       return "bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
     case "sent":
+    case "delivered":
       return "bg-blue-100 text-blue-900 dark:bg-blue-950/80 dark:text-blue-200"
     case "opened":
     case "clicked":
@@ -91,6 +96,7 @@ function outreachBadgeClass(status: string): string {
       return "bg-violet-100 text-violet-900 dark:bg-violet-950/80 dark:text-violet-200"
     case "bounced":
     case "complained":
+    case "rejected":
       return "bg-red-100 text-red-900 dark:bg-red-950/80 dark:text-red-200"
     case "skipped":
       return "bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200"
@@ -159,7 +165,7 @@ export function GtmMotionPanel() {
     () =>
       items.filter(
         (i) =>
-          ["sent", "opened", "clicked"].includes(i.status) &&
+          ["sent", "delivered", "opened", "clicked"].includes(i.status) &&
           !i.outcome?.trim(),
       ),
     [items],
@@ -362,8 +368,8 @@ export function GtmMotionPanel() {
             Outreach queue
           </p>
           <p className="text-sm text-muted-foreground">
-            {"Jack & Jill"} leads (7+ ICP) → TheOrg org chart + Claude drafts. Copy and send from your inbox; Resend
-            in-app send is optional.
+            {"Jack & Jill"} leads (7+ ICP) → TheOrg org chart + Claude drafts. Copy and send from your inbox; in-app
+            sending uses the configured provider.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -501,7 +507,7 @@ export function GtmMotionPanel() {
                   className="text-muted-foreground"
                   onClick={() => void sendOne(row.id)}
                   disabled={sendingId === row.id || editingId === row.id}
-                  title="Requires RESEND_API_KEY and RESEND_FROM_EMAIL"
+                  title="Requires AGENTMAIL_API_KEY + AGENTMAIL_INBOX_ID (AgentMail inbox ID), or legacy Resend envs"
                 >
                   {sendingId === row.id ? (
                     <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />

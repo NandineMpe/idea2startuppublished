@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { addToMemory, queryMemory } from "@/lib/supermemory"
+import { saveVaultKnowledgeEntry, searchVaultKnowledge } from "@/lib/vault-knowledge"
 
 /**
- * Company-wide semantic memory (Supermemory), scoped per authenticated user.
- * GET ?q= — search memories
- * POST { content: string } — add a memory snippet
+ * Company-wide knowledge layer backed by the configured Obsidian vault.
+ * GET ?q= - search vault notes
+ * POST { content: string } - add a captured note
  */
 export async function GET(request: Request) {
   try {
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get("q")?.trim() || "startup company product strategy"
 
-    const results = await queryMemory(q, user?.id)
+    const results = await searchVaultKnowledge(q, user?.id)
 
     return NextResponse.json({
       results: Array.isArray(results) ? results : [],
@@ -37,16 +37,23 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}))
     const content = typeof body.content === "string" ? body.content.trim() : ""
+    const title = typeof body.title === "string" ? body.title.trim() : "Quick capture"
     if (!content) {
       return NextResponse.json({ error: "content is required" }, { status: 400 })
     }
 
-    const result = await addToMemory(content, user?.id)
-    if (!result) {
-      return NextResponse.json({ error: "Failed to store memory" }, { status: 500 })
+    const result = await saveVaultKnowledgeEntry({
+      content,
+      title,
+      userId: user?.id,
+      folder: "juno/knowledge",
+      noteType: "quick_capture",
+    })
+    if (!result.success) {
+      return NextResponse.json({ error: result.error ?? "Failed to store note in vault" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, id: (result as { id?: string }).id })
+    return NextResponse.json({ success: true, id: result.path, path: result.path })
   } catch (error) {
     console.error("Knowledge POST error:", error)
     return NextResponse.json({ error: "Internal error" }, { status: 500 })

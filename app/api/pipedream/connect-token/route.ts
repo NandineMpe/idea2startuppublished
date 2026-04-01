@@ -4,25 +4,51 @@ import { PipedreamClient } from "@pipedream/sdk"
 import { createClient } from "@/lib/supabase/server"
 import { getPipedreamProjectEnvironment } from "@/lib/pipedream-connect-env"
 
-function allowedOrigins(): string[] {
+function pushOrigin(into: Set<string>, value: string | null | undefined) {
+  if (!value) return
+  try {
+    const origin = new URL(value).origin
+    if (origin.startsWith("http://") || origin.startsWith("https://")) {
+      into.add(origin)
+    }
+  } catch {
+    /* ignore invalid origins */
+  }
+}
+
+function allowedOrigins(req: Request): string[] {
+  const out = new Set<string>()
   const raw = process.env.PIPEDREAM_ALLOWED_ORIGINS?.trim()
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
-        return parsed
+        for (const value of parsed) {
+          pushOrigin(out, value)
+        }
       }
     } catch {
       /* use fallbacks */
     }
   }
-  const out: string[] = []
-  const app = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
-  if (app) out.push(app)
+
+  pushOrigin(out, process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, ""))
+
   const vercel = process.env.VERCEL_URL
-  if (vercel) out.push(`https://${vercel}`)
-  out.push("http://localhost:3000")
-  return [...new Set(out)]
+  if (vercel) pushOrigin(out, `https://${vercel}`)
+
+  const requestOrigin = new URL(req.url).origin
+  pushOrigin(out, requestOrigin)
+  pushOrigin(out, req.headers.get("origin"))
+
+  const forwardedHost = req.headers.get("x-forwarded-host")
+  const forwardedProto = req.headers.get("x-forwarded-proto")
+  if (forwardedHost && forwardedProto) {
+    pushOrigin(out, `${forwardedProto}://${forwardedHost}`)
+  }
+
+  pushOrigin(out, "http://localhost:3000")
+  return [...out]
 }
 
 type Body = {
@@ -76,7 +102,7 @@ export async function POST(req: Request) {
   try {
     const created = await client.tokens.create({
       externalUserId: user.id,
-      allowedOrigins: allowedOrigins(),
+      allowedOrigins: allowedOrigins(req),
     })
     /** When set, Connect must use your BYO GitHub OAuth client (Pipedream → Accounts → OAuth Clients). */
     const githubOauthAppId = process.env.PIPEDREAM_GITHUB_OAUTH_APP_ID?.trim() || undefined

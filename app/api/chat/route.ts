@@ -3,9 +3,8 @@ import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
-import { createClient } from "@/lib/supabase/server"
-import { addToMemory, queryMemory } from "@/lib/supermemory"
 import { getCompanyContext } from "@/lib/company-context"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
   try {
@@ -15,7 +14,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing ANTHROPIC_API_KEY" }, { status: 500 })
     }
 
-    // Resolve authenticated user (optional — works without auth too)
     const supabase = await createClient()
     const {
       data: { user },
@@ -24,23 +22,6 @@ export async function POST(req: Request) {
     const userId = user?.id
     const lastMessage = messages[messages.length - 1]?.content ?? ""
 
-    // Retrieve per-user semantic context from Supermemory
-    let context = ""
-    try {
-      const memories = await queryMemory(lastMessage, userId)
-      if (memories?.length > 0) {
-        context = memories.map((m: { content?: string }) => m.content ?? "").join("\n---\n")
-      }
-    } catch {
-      // Non-fatal — continue without context
-    }
-
-    // Fire-and-forget: save user message to Supermemory
-    if (lastMessage) {
-      addToMemory(lastMessage, userId).catch(() => {})
-    }
-
-    // Persist user message to Supabase chat_messages (if user is logged in and has a session)
     if (userId && sessionId) {
       supabase
         .from("chat_messages")
@@ -58,11 +39,10 @@ export async function POST(req: Request) {
         ? `# COMPANY CONTEXT (what we know about this startup)\n${companyCtx.promptBlock}\n\n`
         : ""
 
-    const promptWithContext = companyBlock + (context
-      ? `Context from previous conversations:\n${context}\n\nUser Question: ${lastMessage}`
-      : lastMessage)
+    const promptWithContext = companyBlock + lastMessage
 
-    const systemPrompt = `You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader — you challenge assumptions and push for clarity. Be concise, insightful, and actionable.`
+    const systemPrompt =
+      "You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader - you challenge assumptions and push for clarity. Be concise, insightful, and actionable."
 
     const conversationMessages = [
       ...messages.slice(0, -1).map((m: { role: string; content: string }) => ({
@@ -79,7 +59,6 @@ export async function POST(req: Request) {
       maxTokens: 1000,
     })
 
-    // Persist assistant response to Supabase
     if (userId && sessionId && text) {
       supabase
         .from("chat_messages")
@@ -88,7 +67,6 @@ export async function POST(req: Request) {
           if (error) console.error("Failed to save assistant message:", error.message)
         })
 
-      // Update session's updated_at so it bubbles to top of history
       supabase
         .from("chat_sessions")
         .update({ updated_at: new Date().toISOString() })

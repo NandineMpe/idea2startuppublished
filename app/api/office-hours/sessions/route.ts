@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { jsonApiError } from "@/lib/api-error-response"
 
+function missingModeColumn(msg: string | undefined): boolean {
+  const m = (msg ?? "").toLowerCase()
+  return m.includes("mode") && (m.includes("does not exist") || m.includes("schema cache"))
+}
+
 // GET /api/office-hours/sessions — list user's office-hours sessions with completion status
 export async function GET() {
   const supabase = await createClient()
@@ -11,13 +16,25 @@ export async function GET() {
 
   if (!user) return NextResponse.json({ authenticated: false, sessions: [] })
 
-  const { data: sessions, error } = await supabase
+  let first = await supabase
     .from("chat_sessions")
-    .select("id, title, created_at, updated_at, channel")
+    .select("id, title, mode, created_at, updated_at, channel")
     .eq("user_id", user.id)
     .eq("channel", "office-hours")
     .order("updated_at", { ascending: false })
     .limit(20)
+
+  if (first.error && missingModeColumn(first.error.message)) {
+    first = await supabase
+      .from("chat_sessions")
+      .select("id, title, created_at, updated_at, channel")
+      .eq("user_id", user.id)
+      .eq("channel", "office-hours")
+      .order("updated_at", { ascending: false })
+      .limit(20)
+  }
+
+  const { data: sessions, error } = first
 
   if (error) {
     console.error("[office-hours/sessions GET]", error.message)
@@ -63,11 +80,21 @@ export async function POST(req: Request) {
     const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
 
     // Use the user session client (RLS), not service role — avoids hard failure when SUPABASE_SERVICE_ROLE_KEY is unset.
-    const { data: session, error } = await supabase
+    let result = await supabase
       .from("chat_sessions")
-      .insert({ user_id: user.id, title, channel: "office-hours" })
-      .select("id, title, created_at, updated_at, channel")
+      .insert({ user_id: user.id, title, channel: "office-hours", mode })
+      .select("id, title, mode, created_at, updated_at, channel")
       .single()
+
+    if (result.error && missingModeColumn(result.error.message)) {
+      result = await supabase
+        .from("chat_sessions")
+        .insert({ user_id: user.id, title, channel: "office-hours" })
+        .select("id, title, created_at, updated_at, channel")
+        .single()
+    }
+
+    const { data: session, error } = result
 
     if (error || !session) {
       console.error("[office-hours/sessions POST]", error?.code, error?.message)
@@ -76,18 +103,18 @@ export async function POST(req: Request) {
         (typeof error?.message === "string" &&
           (error.message.includes("chat_sessions_channel_check") ||
             error.message.includes("violates check constraint")))
-      const missingChannelColumn =
+      const missingColumn =
         typeof error?.message === "string" &&
-        error.message.includes("channel") &&
-        error.message.includes("does not exist")
+        error.message.includes("does not exist") &&
+        (error.message.includes("column") || error.message.includes("schema cache"))
       return NextResponse.json(
         {
           error: "Failed to create session",
           details: error?.message ?? "No row returned",
           code: error?.code,
           hint:
-            missingChannelColumn || channelViolation
-              ? "Run migration 032 or 033 in Supabase SQL editor: supabase/migrations/033_office_hours_complete.sql"
+            missingColumn || channelViolation
+              ? "Run supabase/migrations/034_office_hours_live.sql in the Supabase SQL editor (unblocks channel office-hours). If you use db:migrate, run 035_design_docs_office_hours_rls.sql too for design_docs."
               : undefined,
         },
         { status: 500 },

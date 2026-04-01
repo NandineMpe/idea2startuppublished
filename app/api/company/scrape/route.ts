@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
+import { convert } from "html-to-text"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
-import { addToMemory } from "@/lib/supermemory"
-import { convert } from "html-to-text"
+import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +40,21 @@ export async function POST(request: Request) {
     })
 
     const title = new URL(trimmed).hostname + " - " + trimmed.slice(0, 60)
+    const vaultWrite = await saveVaultKnowledgeEntry({
+      content: text,
+      title,
+      sourceUrl: trimmed,
+      userId: user.id,
+      folder: "sources/scrapes",
+      noteType: "scraped_source",
+    })
+
+    if (!vaultWrite.success) {
+      return NextResponse.json(
+        { error: vaultWrite.error ?? "Obsidian vault sync failed. Connect the vault before saving scrapes." },
+        { status: 500 },
+      )
+    }
 
     const { data: asset, error } = await supabase
       .from("company_assets")
@@ -55,9 +70,7 @@ export async function POST(request: Request) {
 
     if (error) throw error
 
-    addToMemory(`Source: ${trimmed}\n\n${text.slice(0, 8000)}`, user.id).catch(() => {})
-
-    return NextResponse.json({ success: true, asset })
+    return NextResponse.json({ success: true, asset, vaultPath: vaultWrite.path })
   } catch (error) {
     return jsonApiError(500, error, "company scrape POST")
   }

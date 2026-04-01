@@ -1,13 +1,15 @@
 # GTM Motion pipeline (spec)
 
-End-to-end flow from qualified leads to drafted cold emails, optional Resend send, and webhook updates.
+End-to-end flow from qualified leads to drafted cold emails, optional AgentMail send, and webhook updates.
 
 ## Environment
 
 - `THEORG_API_KEY` — TheOrg Company / Chart / Position APIs (`lib/juno/theorg.ts`).
 - `ANTHROPIC_API_KEY` — Research + drafting (`lib/juno/gtm-outreach.ts`).
-- `RESEND_API_KEY`, `RESEND_FROM_EMAIL` — Outbound mail (`lib/juno/email-sender.ts`).
-- `RESEND_WEBHOOK_SECRET` — Optional Svix verification for `app/api/webhooks/resend/route.ts`.
+- `AGENTMAIL_API_KEY`, `AGENTMAIL_INBOX_ID` — Preferred outbound mail + AgentMail inbox identity (`lib/juno/email-sender.ts`).
+- `AGENTMAIL_WEBHOOK_SECRET` — Svix verification for `app/api/webhooks/agentmail/route.ts`.
+- `RESEND_API_KEY`, `RESEND_FROM_EMAIL` — Legacy fallback sender.
+- `RESEND_WEBHOOK_SECRET` — Legacy Resend webhook verification for older deployments.
 
 ## Inngest
 
@@ -21,9 +23,10 @@ End-to-end flow from qualified leads to drafted cold emails, optional Resend sen
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/outreach` | Queue; default `status=drafted`. Use `?status=all` for full history. |
-| POST | `/api/outreach/[id]` | `{ "action": "send" }` — Resend send + row update. |
+| POST | `/api/outreach/[id]` | `{ "action": "send" }` — outbound provider send + row update. |
 | POST | `/api/outreach/send` | Legacy alias: `{ "id": "uuid" }`. |
 | PATCH | `/api/outreach/[id]` | Edit subject/body, skip, schedule, lookalike sync, mark sent manually. |
+| POST | `/api/webhooks/agentmail` | AgentMail events → `outreach_log` (sent, delivered, bounced, complained, replied). |
 | POST | `/api/webhooks/resend` | Resend events → `outreach_log` (opens, clicks, bounces, complaints). |
 
 ## UI

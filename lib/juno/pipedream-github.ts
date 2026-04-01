@@ -207,11 +207,29 @@ function parseGraphqlRepoList(raw: unknown): GithubRepoListItem[] {
   return out
 }
 
-export async function githubProxyGetJsonResult<T>(
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** Pipedream proxy or GitHub edge sometimes returns 502/503 HTML; worth retrying. */
+function isTransientProxyError(message: string): boolean {
+  const u = message.toLowerCase()
+  return (
+    /\b502\b|\b503\b|\b504\b/.test(u) ||
+    u.includes("bad gateway") ||
+    u.includes("gateway timeout") ||
+    u.includes("service unavailable") ||
+    u.includes("timed out") ||
+    u.includes("econnreset") ||
+    u.includes("socket hang up")
+  )
+}
+
+async function githubProxyGetJsonResultOnce<T>(
   externalUserId: string,
   accountId: string,
   url: string,
-  timeoutMs = 20_000,
+  timeoutMs: number,
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   const client = getClient()
   if (!client) return { ok: false, error: "Pipedream is not configured" }
@@ -231,7 +249,29 @@ export async function githubProxyGetJsonResult<T>(
   }
 }
 
-export async function githubProxyPostJsonResult<T>(
+const PROXY_GET_RETRIES = 3
+
+export async function githubProxyGetJsonResult<T>(
+  externalUserId: string,
+  accountId: string,
+  url: string,
+  timeoutMs = 20_000,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  let last: { ok: true; data: T } | { ok: false; error: string } | null = null
+  for (let attempt = 1; attempt <= PROXY_GET_RETRIES; attempt++) {
+    const r = await githubProxyGetJsonResultOnce<T>(externalUserId, accountId, url, timeoutMs)
+    if (r.ok) return r
+    last = r
+    if (attempt < PROXY_GET_RETRIES && isTransientProxyError(r.error)) {
+      await sleep(400 * attempt * attempt)
+      continue
+    }
+    return r
+  }
+  return last ?? { ok: false, error: "Unknown proxy error" }
+}
+
+async function githubProxyPostJsonResultOnce<T>(
   externalUserId: string,
   accountId: string,
   url: string,
@@ -258,6 +298,26 @@ export async function githubProxyPostJsonResult<T>(
     console.error("[pipedream-github] proxy.post", url, msg)
     return { ok: false, error: msg }
   }
+}
+
+export async function githubProxyPostJsonResult<T>(
+  externalUserId: string,
+  accountId: string,
+  url: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  let last: { ok: true; data: T } | { ok: false; error: string } | null = null
+  for (let attempt = 1; attempt <= PROXY_GET_RETRIES; attempt++) {
+    const r = await githubProxyPostJsonResultOnce<T>(externalUserId, accountId, url, body)
+    if (r.ok) return r
+    last = r
+    if (attempt < PROXY_GET_RETRIES && isTransientProxyError(r.error)) {
+      await sleep(400 * attempt * attempt)
+      continue
+    }
+    return r
+  }
+  return last ?? { ok: false, error: "Unknown proxy error" }
 }
 
 const GITHUB_GRAPHQL_REPOS = `query RepoList($first: Int!) {

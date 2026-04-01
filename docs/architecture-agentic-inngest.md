@@ -55,7 +55,7 @@ Downstream functions register with `triggers: [{ event: "juno/lead.discovered" }
 |-------|--------|
 | UI | Dashboard, role pages, floating Juno chat |
 | Sync AI | `/api/chat`, `/api/ai-tool`, `/api/delegate`, many `/api/generate-*` |
-| Context | `getCompanyContext()` (Supabase profile + assets + Supermemory) |
+| Context | `getCompanyContext()` (Supabase profile + assets + Obsidian vault) |
 | Org (optional) | Paperclip proxy + delegate creates goals when online |
 | Persistence | Supabase: `chat_*`, `ai_outputs`, `company_*`, feedback |
 

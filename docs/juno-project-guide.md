@@ -39,7 +39,7 @@ lib/inngest/                          # orchestration (Inngest)
     └── enrichment.ts                 # company data (e.g. BuiltWith-style)
 
 lib/                                  # shared app logic (already exists)
-├── company-context.ts                # assembled agent context (profile + assets + memory)
+├── company-context.ts                # assembled agent context (profile + assets + vault knowledge)
 ├── scoring.ts                        # scoreItems(RawItem[], CompanyContext) — Claude 0–10 + category/urgency
 ├── ai-engine.ts                     # LinkedIn post, lead fit, outreach, tech trends, comments (@anthropic-ai/sdk)
 └── brief-formatter.ts                # WhatsApp / email / dashboard formatting — to add
@@ -136,7 +136,7 @@ Sensitive steps (**LinkedIn post**, **outreach send**) go through **approval** (
 | Inngest | `INNGEST_SIGNING_KEY`, optional `INNGEST_EVENT_KEY` |
 | WhatsApp | Twilio — see `lib/juno/delivery.ts` |
 | Data | Crunchbase, etc. (optional third-party feeds) |
-| App | Supabase, Supermemory (existing) |
+| App | Supabase, Obsidian vault via GitHub |
 
 ---
 

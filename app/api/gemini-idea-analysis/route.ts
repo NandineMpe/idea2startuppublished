@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server"
-import { safeErrorMessageForClient } from "@/lib/api-error-response"
 import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
-import { createClient } from "@/lib/supabase/server"
-import { getCompanyContextPrompt } from "@/lib/company-context"
+import { NextResponse } from "next/server"
+import { safeErrorMessageForClient } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import { getCompanyContextPrompt } from "@/lib/company-context"
+import { createClient } from "@/lib/supabase/server"
 
 const defaultSections = [
   { title: "1. PROBLEM DEFINITION & HYPOTHESIS VALIDATION", content: "Analysis not available due to an error. Please try again later." },
@@ -30,11 +30,11 @@ The user will provide the following:
 You are a multi-disciplinary startup analyst trained in venture strategy, behavioral economics, AI technology trends, global commerce, and market validation frameworks.
 
 You must apply the following principles:
-• Depth Over Brevity: All sections must exceed 1500 characters and offer in-depth, multi-layered insight.
-• Chain-of-Thought Reasoning: Work step-by-step through the logic.
-• Step-Back Prompting: Begin each section with general reflection, then narrow to case-specific analysis.
-• Source Evaluation: Use only reputable, up-to-date sources.
-• Critical Evaluation: Ask what assumptions are being made and what might be missing.
+- Depth Over Brevity: All sections must exceed 1500 characters and offer in-depth, multi-layered insight.
+- Chain-of-Thought Reasoning: Work step-by-step through the logic.
+- Step-Back Prompting: Begin each section with general reflection, then narrow to case-specific analysis.
+- Source Evaluation: Use only reputable, up-to-date sources.
+- Critical Evaluation: Ask what assumptions are being made and what might be missing.
 
 Do not write like a chatbot. Write like a senior analyst preparing a due diligence report.
 
@@ -85,27 +85,15 @@ export async function POST(request: Request) {
       })
     }
 
-    let memoryContext = ""
-    try {
-      const { queryMemory } = await import("@/lib/supermemory")
-      const memories = await queryMemory(ideaDescription)
-      if (memories && memories.length > 0) {
-        memoryContext = memories.map((m: any) => m.content || JSON.stringify(m)).join("\n\n")
-      }
-    } catch {
-      // Continue without context
-    }
-
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContextPrompt(user?.id)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const companyContext = await getCompanyContextPrompt(user?.id, { queryHint: ideaDescription })
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const prompt = `
-${companyBlock}# FOUNDER'S SUPER BRAIN CONTEXT
-${memoryContext || "No specific domain documents found."}
-
-# USER INPUT
+${companyBlock}# USER INPUT
 Idea Description: ${ideaDescription}
 ${proposedSolution ? `Proposed Solution: ${proposedSolution}` : ""}
 ${intendedUsers ? `Intended Users: ${intendedUsers}` : ""}
@@ -126,7 +114,7 @@ ${geographicFocus ? `Geographic Focus: ${geographicFocus}` : ""}`
 
       if (!analysis || !analysis.sections || analysis.sections.length === 0) {
         return NextResponse.json({
-          analysis: { sections: defaultSections.map((s) => ({ ...s, content: text })) },
+          analysis: { sections: defaultSections.map((section) => ({ ...section, content: text })) },
         })
       }
 

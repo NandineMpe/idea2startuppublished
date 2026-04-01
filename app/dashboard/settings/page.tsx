@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, ChevronRight, Palette, Shield, User } from "lucide-react"
+import { Bell, Building2, ChevronRight, Palette, Shield, User } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { WorkspaceManager } from "@/components/dashboard/workspace-manager"
 
 export default function SettingsPage() {
   const [name, setName] = useState("Alex Johnson")
@@ -55,6 +56,13 @@ export default function SettingsPage() {
           >
             <Shield className="h-4 w-4 mr-2" />
             Security
+          </TabsTrigger>
+          <TabsTrigger
+            value="workspaces"
+            className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-foreground"
+          >
+            <Building2 className="h-4 w-4 mr-2" />
+            Workspaces
           </TabsTrigger>
         </TabsList>
 
@@ -302,6 +310,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="workspaces" className="space-y-6">
+          <WorkspaceManager />
         </TabsContent>
       </Tabs>
     </div>

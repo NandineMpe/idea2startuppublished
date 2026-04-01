@@ -2,3 +2,4 @@
 
 export const JUNO_SECURITY_SCAN_REQUESTED = "juno/security-scan.requested" as const
 export const JUNO_CEO_REVIEW_REQUESTED = "juno/ceo-review.requested" as const
+export const CONTEXT_VAULT_SYNC_REQUESTED = "context/vault-sync.requested" as const

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase"
-import { addToMemory } from "@/lib/supermemory"
+import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
 
 const anthropic = new Anthropic()
 
@@ -238,21 +238,6 @@ Return a JSON object with these fields (use null for anything not discussed):
     },
   })
 
-  const memories = [
-    companyName && `Company: ${companyName}. ${companyDescription ?? ""}`,
-    asString(company.problem) && `Problem: ${asString(company.problem)}`,
-    asStringArray(strategy.icp).length && `ICP: ${asStringArray(strategy.icp).join(", ")}`,
-    asStringArray(strategy.competitors).length &&
-      `Competitors: ${asStringArray(strategy.competitors).join(", ")}`,
-    asString(strategy.thesis) && `Thesis: ${asString(strategy.thesis)}`,
-    priorities90.length && `90-day priorities: ${priorities90.join(", ")}`,
-    risksList.length && `Risks: ${risksList.join(", ")}`,
-  ].filter((m): m is string => Boolean(m))
-
-  for (const memory of memories) {
-    addToMemory(memory, user.id).catch(() => {})
-  }
-
   const vaultToken = process.env.GITHUB_VAULT_TOKEN
   const vaultRepo = process.env.GITHUB_VAULT_REPO
   if (vaultToken && vaultRepo) {
@@ -308,9 +293,51 @@ Return a JSON object with these fields (use null for anything not discussed):
     }).catch(() => {})
   }
 
+  const vaultWrite = await saveVaultKnowledgeEntry({
+    content: [
+      `Founder: ${(asString(founder.name) ?? founderName) || "unknown"}`,
+      `Company: ${companyName ?? "unknown"}`,
+      "",
+      "## Company",
+      companyDescription ?? "",
+      "",
+      "## Problem",
+      asString(company.problem) ?? "",
+      "",
+      "## Solution",
+      asString(company.solution) ?? "",
+      "",
+      "## ICP",
+      ...asStringArray(strategy.icp).map((item) => `- ${item}`),
+      "",
+      "## Competitors",
+      ...asStringArray(strategy.competitors).map((item) => `- ${item}`),
+      "",
+      "## Thesis",
+      asString(strategy.thesis) ?? "",
+      "",
+      "## 90-day priorities",
+      ...priorities90.map((item) => `- ${item}`),
+      "",
+      "## Risks",
+      ...risksList.map((item) => `- ${item}`),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    title: `Onboarding Summary - ${companyName ?? "Company"}`,
+    userId: user.id,
+    path: process.env.GITHUB_VAULT_ONBOARDING_PATH?.trim() || "company/onboarding-summary.md",
+    noteType: "onboarding_summary",
+  }).catch((error) => ({
+    success: false as const,
+    error: error instanceof Error ? error.message : String(error),
+  }))
+
   return NextResponse.json({
     success: true,
     extracted,
     profileSaved: !profileError,
+    vaultSynced: Boolean(vaultWrite?.success),
+    vaultError: vaultWrite?.success ? null : (vaultWrite?.error ?? null),
   })
 }

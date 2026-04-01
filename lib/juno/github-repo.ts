@@ -1,4 +1,8 @@
-import { githubProxyGetJson, githubProxyGetJsonResult } from "@/lib/juno/pipedream-github"
+import {
+  githubProxyGetJson,
+  githubProxyGetJsonResult,
+  type GithubRepoListItem,
+} from "@/lib/juno/pipedream-github"
 
 export type RepoTreeEntry = { path: string; size: number; type: string }
 
@@ -49,6 +53,35 @@ async function githubDirectGetJsonResult<T>(url: string): Promise<{ ok: true; da
 async function githubDirectGetJson<T>(url: string): Promise<T | null> {
   const r = await githubDirectGetJsonResult<T>(url)
   return r.ok ? r.data : null
+}
+
+/**
+ * Lists repos via `GITHUB_PAT` (direct GitHub API). Used when Pipedream proxy returns 502/503
+ * or empty so Security updates can still populate the repo dropdown.
+ */
+export async function listUserReposViaPat(): Promise<{
+  repos: GithubRepoListItem[]
+  error?: string
+}> {
+  const pat = githubPat()
+  if (!pat) return { repos: [] }
+  const url =
+    "https://api.github.com/user/repos?per_page=100&sort=updated&visibility=all&affiliation=owner,collaborator,organization_member"
+  const r = await githubDirectGetJsonResult<Array<Record<string, unknown>>>(url)
+  if (!r.ok) return { repos: [], error: r.error }
+  const arr = Array.isArray(r.data) ? r.data : []
+  const repos: GithubRepoListItem[] = []
+  for (const x of arr) {
+    if (typeof x.full_name !== "string") continue
+    repos.push({
+      full_name: x.full_name,
+      default_branch: typeof x.default_branch === "string" ? x.default_branch : "main",
+      private: Boolean(x.private),
+    })
+  }
+  return {
+    repos: repos.sort((a, b) => a.full_name.localeCompare(b.full_name)),
+  }
 }
 
 /** Raw file body via Contents API (PAT path). Classic tokens use `Authorization: token …`. */

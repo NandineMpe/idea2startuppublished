@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
-import { fetchGithubVaultFromProfileFields } from "@/lib/github-vault"
+import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { syncVaultContextCacheForUser } from "@/lib/vault-context-sync"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
-/**
- * GET — current GitHub vault pointer (Obsidian → GitHub).
- * POST — save owner/repo/branch/path and optionally probe the API (returns file count).
- */
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -17,22 +15,36 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const workspace = await resolveWorkspaceSelection(user.id)
+    if (workspace) {
+      return NextResponse.json({
+        repo: null,
+        branch: "main",
+        folders: [],
+        connected: false,
+        lastSyncedAt: null,
+        fileCount: 0,
+        syncError: null,
+        unsupported: true,
+      })
+    }
+
     const { data } = await supabase
       .from("company_profile")
       .select(
-        "github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path, github_vault_last_verified_at, github_vault_last_probe_file_count, github_vault_last_probe_error",
+        "github_vault_repo, github_vault_branch, vault_folders, vault_context_last_synced_at, vault_context_file_count, vault_context_sync_error",
       )
       .eq("user_id", user.id)
       .maybeSingle()
 
     return NextResponse.json({
-      owner: data?.github_vault_owner ?? null,
       repo: data?.github_vault_repo ?? null,
       branch: data?.github_vault_branch ?? "main",
-      path: data?.github_vault_path ?? "",
-      lastVerifiedAt: data?.github_vault_last_verified_at ?? null,
-      lastProbeFileCount: data?.github_vault_last_probe_file_count ?? null,
-      lastProbeError: data?.github_vault_last_probe_error ?? null,
+      folders: normalizeVaultFolders(data?.vault_folders),
+      connected: Boolean(data?.github_vault_repo),
+      lastSyncedAt: data?.vault_context_last_synced_at ?? null,
+      fileCount: data?.vault_context_file_count ?? 0,
+      syncError: data?.vault_context_sync_error ?? null,
     })
   } catch (e) {
     console.error("github-vault GET:", e)
@@ -50,20 +62,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = await request.json().catch(() => ({})) as {
-      owner?: string | null
-      repo?: string | null
-      branch?: string | null
-      path?: string | null
-      probe?: boolean
+    const workspace = await resolveWorkspaceSelection(user.id)
+    if (workspace) {
+      return NextResponse.json(
+        { error: "GitHub vault sync is only available on your primary workspace right now." },
+        { status: 400 },
+      )
     }
 
-    const owner = typeof body.owner === "string" ? body.owner.trim() : ""
+    const body = (await request.json().catch(() => ({}))) as {
+      repo?: string | null
+      branch?: string | null
+      folders?: string[] | string | null
+      sync?: boolean
+    }
+
     const repo = typeof body.repo === "string" ? body.repo.trim() : ""
     const branch = typeof body.branch === "string" && body.branch.trim() ? body.branch.trim() : "main"
-    const pathVal = typeof body.path === "string" ? body.path.trim() : ""
+    const folders = normalizeVaultFolders(body.folders)
 
-    if (!owner || !repo) {
+    if (!repo) {
       const { error: clearErr } = await supabase.from("company_profile").upsert(
         {
           user_id: user.id,
@@ -71,9 +89,11 @@ export async function POST(request: Request) {
           github_vault_repo: null,
           github_vault_branch: "main",
           github_vault_path: "",
-          github_vault_last_verified_at: null,
-          github_vault_last_probe_file_count: null,
-          github_vault_last_probe_error: null,
+          vault_folders: folders,
+          vault_context_cache: null,
+          vault_context_last_synced_at: null,
+          vault_context_file_count: null,
+          vault_context_sync_error: null,
         },
         { onConflict: "user_id" },
       )
@@ -85,44 +105,24 @@ export async function POST(request: Request) {
       return NextResponse.json({
         saved: true,
         cleared: true,
-        probe: { fileCount: 0, error: null as string | null },
+        repo: null,
+        branch: "main",
+        folders,
+        connected: false,
+        lastSyncedAt: null,
+        fileCount: 0,
+        syncError: null,
       })
     }
 
-    const { data: existing } = await supabase
-      .from("company_profile")
-      .select("github_vault_last_verified_at, github_vault_last_probe_file_count, github_vault_last_probe_error")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    const row = {
-      github_vault_owner: owner,
-      github_vault_repo: repo,
-      github_vault_branch: branch,
-      github_vault_path: pathVal,
-    }
-
-    let probe = { fileCount: 0, error: null as string | null, samplePaths: [] as string[] }
-    if (body.probe !== false) {
-      const result = await fetchGithubVaultFromProfileFields(row)
-      probe = {
-        fileCount: result.files.length,
-        error: result.error ?? null,
-        samplePaths: result.files.slice(0, 8).map((f) => f.path),
-      }
-    }
-
-    const verifiedAt = new Date().toISOString()
     const { error: upErr } = await supabase.from("company_profile").upsert(
       {
         user_id: user.id,
-        ...row,
-        github_vault_last_verified_at:
-          body.probe !== false ? verifiedAt : (existing?.github_vault_last_verified_at ?? null),
-        github_vault_last_probe_file_count:
-          body.probe !== false ? probe.fileCount : (existing?.github_vault_last_probe_file_count ?? null),
-        github_vault_last_probe_error:
-          body.probe !== false ? probe.error : (existing?.github_vault_last_probe_error ?? null),
+        github_vault_owner: null,
+        github_vault_repo: repo,
+        github_vault_branch: branch,
+        github_vault_path: "",
+        vault_folders: folders,
       },
       { onConflict: "user_id" },
     )
@@ -131,13 +131,33 @@ export async function POST(request: Request) {
       return jsonApiError(500, upErr, "github-vault POST upsert")
     }
 
+    if (body.sync === false) {
+      return NextResponse.json({
+        saved: true,
+        cleared: false,
+        repo,
+        branch,
+        folders,
+        connected: true,
+      })
+    }
+
+    const result = await syncVaultContextCacheForUser(supabase, user.id)
     return NextResponse.json({
       saved: true,
-      probe,
-      lastVerifiedAt: body.probe !== false ? verifiedAt : (existing?.github_vault_last_verified_at ?? null),
+      cleared: false,
+      repo,
+      branch,
+      folders,
+      connected: result.connected,
+      synced: result.ok,
+      lastSyncedAt: result.lastSyncedAt,
+      fileCount: result.fileCount,
+      syncError: result.error ?? null,
+      warning: result.warning ?? null,
     })
   } catch (e) {
     console.error("github-vault POST:", e)
-    return NextResponse.json({ error: "Failed to save" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to save settings" }, { status: 500 })
   }
 }

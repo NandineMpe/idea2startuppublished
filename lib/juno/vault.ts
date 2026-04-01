@@ -7,6 +7,7 @@ import type { GithubVaultConfig } from "@/lib/github-vault"
 import {
   fetchGithubVaultMarkdown,
   listGithubVaultMarkdownPaths,
+  resolveGithubVaultRepoParts,
 } from "@/lib/github-vault"
 
 const GITHUB_API = "https://api.github.com"
@@ -18,7 +19,12 @@ export type VaultFile = {
 }
 
 function getToken(): string | undefined {
-  return process.env.GITHUB_VAULT_TOKEN?.trim() || process.env.GITHUB_TOKEN?.trim() || undefined
+  return (
+    process.env.GITHUB_VAULT_TOKEN?.trim()
+    || process.env.GITHUB_TOKEN?.trim()
+    || process.env.GITHUB_PAT?.trim()
+    || undefined
+  )
 }
 
 function headers(token: string): HeadersInit {
@@ -66,9 +72,31 @@ function decodeBase64Utf8(b64: string): string {
 }
 
 /**
- * Resolve GitHub repo for the vault: `GITHUB_VAULT_REPO` + token (env) takes precedence, else `company_profile` for `userId`.
+ * Resolve GitHub repo for the vault from `company_profile` when available,
+ * falling back to `GITHUB_VAULT_REPO` env for single-repo deployments.
  */
 export async function resolveGithubVaultConfig(userId: string | undefined): Promise<GithubVaultConfig | null> {
+  if (userId) {
+    const { supabaseAdmin } = await import("@/lib/supabase")
+    const { data: row, error } = await supabaseAdmin
+      .from("company_profile")
+      .select("github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path")
+      .eq("user_id", userId)
+      .maybeSingle()
+
+    if (!error && row) {
+      const repoParts = resolveGithubVaultRepoParts(row as Record<string, unknown>)
+      if (repoParts) {
+        return {
+          owner: repoParts.owner,
+          repo: repoParts.repo,
+          branch: ((row.github_vault_branch as string | undefined)?.trim() || "main") as string,
+          pathPrefix: (row.github_vault_path as string | undefined) ?? undefined,
+        }
+      }
+    }
+  }
+
   const token = getToken()
   const repoFull = process.env.GITHUB_VAULT_REPO?.trim()
   if (token && repoFull) {
@@ -83,27 +111,7 @@ export async function resolveGithubVaultConfig(userId: string | undefined): Prom
     }
   }
 
-  if (!userId) return null
-
-  const { supabaseAdmin } = await import("@/lib/supabase")
-  const { data: row, error } = await supabaseAdmin
-    .from("company_profile")
-    .select("github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path")
-    .eq("user_id", userId)
-    .maybeSingle()
-
-  if (error || !row) return null
-
-  const owner = (row.github_vault_owner as string | undefined)?.trim()
-  const repo = (row.github_vault_repo as string | undefined)?.trim()
-  if (!owner || !repo) return null
-
-  return {
-    owner,
-    repo,
-    branch: ((row.github_vault_branch as string | undefined)?.trim() || "main") as string,
-    pathPrefix: (row.github_vault_path as string | undefined) ?? undefined,
-  }
+  return null
 }
 
 /**

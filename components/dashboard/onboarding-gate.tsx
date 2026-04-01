@@ -15,7 +15,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/company/profile", { credentials: "include" })
+        const res = await fetch("/api/company/profile?scope=owner", { credentials: "include" })
         const data = (await res.json()) as { profile?: { company_name?: string | null } | null }
         if (cancelled) return
         const name = data.profile?.company_name?.trim()

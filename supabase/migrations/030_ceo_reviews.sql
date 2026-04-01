@@ -14,6 +14,8 @@ create unique index if not exists ceo_reviews_user_date_unique on ceo_reviews(us
 
 alter table ceo_reviews enable row level security;
 
+drop policy if exists "users own their ceo reviews" on ceo_reviews;
 create policy "users own their ceo reviews"
   on ceo_reviews for all
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

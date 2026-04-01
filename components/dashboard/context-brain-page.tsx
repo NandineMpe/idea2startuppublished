@@ -1,908 +1,845 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Link from "next/link"
-import { ChevronLeft, History, Loader2, Mic, Plus, Trash2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { CheckCircle2, FileUp, Github, Loader2, RefreshCw, Save, Trash2, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import {
-  type ContextData,
-  type JackJillJobRow,
-  calcCompleteness,
-  contextDataToProfilePayload,
-  emptyContextData,
-} from "@/lib/context-view"
+import { type ContextData, emptyContextData } from "@/lib/context-view"
+import { useToast } from "@/hooks/use-toast"
+import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import type { BrainLedgerData } from "@/app/api/company/brain-ledger/route"
 
-const OPENER =
-  "What's changed since we last talked? You can tell me about a pivot, new traction, competitive developments, or anything else I should know."
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
-function setPathImmutable<T extends Record<string, unknown>>(root: T, path: string, value: unknown): T {
-  const next = JSON.parse(JSON.stringify(root)) as T
-  const parts = path.split(".")
-  let obj: Record<string, unknown> = next as Record<string, unknown>
-  for (let i = 0; i < parts.length - 1; i++) {
-    const p = parts[i]
-    if (!(p in obj) || typeof obj[p] !== "object" || obj[p] === null) {
-      obj[p] = {}
-    }
-    obj = obj[p] as Record<string, unknown>
-  }
-  obj[parts[parts.length - 1]] = value as unknown
-  return next
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "Never"
+  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 }
 
-function CompletenessBar({ pct }: { pct: number }) {
-  const color =
-    pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500"
-  const textColor =
-    pct >= 80 ? "text-emerald-600 dark:text-emerald-400" : pct >= 50 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" })
+}
+
+function toolLabel(tool: string): string {
+  const map: Record<string, string> = {
+    onboarding_extraction: "Onboarding Extraction",
+    daily_brief: "Daily Brief",
+    lead_discovered: "Lead Discovered",
+    tech_radar: "Tech Radar",
+    staff_meeting: "Staff Meeting",
+    relationship_interaction: "Relationship Interaction",
+  }
+  return map[tool] ?? tool.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function threatColor(level: string | null): string {
+  if (level === "high") return "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+  if (level === "medium") return "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+  return "text-muted-foreground bg-muted/30 border-border"
+}
+
+function signalColor(type: string): string {
+  if (type === "buying_signal") return "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200"
+  if (type === "problem_mention") return "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200"
+  return "text-muted-foreground bg-muted/30 border-border"
+}
+
+function isVaultSyncWarning(message: string | null | undefined): boolean {
+  return Boolean(message && /^No markdown files found/i.test(message))
+}
+
+// ─── sub-components ───────────────────────────────────────────────────────────
+
+function LedgerSection({ title, count, children, empty }: {
+  title: string
+  count?: number
+  children: React.ReactNode
+  empty?: string
+}) {
+  const [open, setOpen] = useState(true)
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn("h-full rounded-full transition-all duration-500", color)}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={cn("min-w-[2.25rem] text-xs font-medium tabular-nums", textColor)}>{pct}%</span>
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-semibold">{title}</span>
+          {count !== undefined && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+              {count}
+            </span>
+          )}
+        </div>
+        <span className="text-muted-foreground text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="border-t border-border px-5 pb-5 pt-4">
+          {count === 0 && empty ? (
+            <p className="text-sm text-muted-foreground">{empty}</p>
+          ) : (
+            children
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function Section({
-  title,
-  children,
-  badge,
-}: {
-  title: string
+function Field({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value?.trim()) return null
+  return (
+    <div className="mb-3.5">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
+      <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-wrap">{value}</p>
+    </div>
+  )
+}
+
+function TagList({ label, items }: { label: string; items: string[] }) {
+  if (!items.length) return null
+  return (
+    <div className="mb-3.5">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item, i) => (
+          <span key={i} className="inline-block rounded-md border border-border bg-muted/50 px-2.5 py-0.5 text-xs text-foreground">
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TimelineItem({ date, label, children }: {
+  date: string
+  label: string
   children: React.ReactNode
-  badge?: React.ReactNode
 }) {
   return (
-    <div className="mb-4 rounded-[10px] border border-border bg-card p-5 text-card-foreground shadow-sm">
-      <div className="mb-3.5 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">{title}</h3>
-        {badge}
+    <div className="relative pl-4 border-l border-border last:border-l-transparent pb-4 last:pb-0">
+      <div className="absolute -left-[5px] top-1 h-2.5 w-2.5 rounded-full border-2 border-border bg-background" />
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[11px] font-medium text-muted-foreground">{formatDate(date)}</span>
+        <span className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground/70">{label}</span>
       </div>
       {children}
     </div>
   )
 }
 
-function EditableField({
-  label,
-  value,
-  onChange,
-  multiline = false,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  multiline?: boolean
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
+// ─── Brain Ledger view ────────────────────────────────────────────────────────
+
+function BrainLedger() {
+  const [ledger, setLedger] = useState<BrainLedgerData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   useEffect(() => {
-    setDraft(value)
-  }, [value])
+    fetch("/api/company/brain-ledger", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j: { data?: BrainLedgerData }) => setLedger(j.data ?? null))
+      .catch(() => toast({ title: "Could not load ledger", variant: "destructive" }))
+      .finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus()
-  }, [editing])
-
-  if (!value && !editing) {
+  if (loading) {
     return (
-      <div className="mb-3.5">
-        <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-        <button
-          type="button"
-          onClick={() => {
-            setDraft("")
-            setEditing(true)
-          }}
-          className="rounded-md border border-dashed border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-muted/60"
-        >
-          + Add {label.toLowerCase()}
-        </button>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
+  if (!ledger) return <p className="text-sm text-muted-foreground">No data found.</p>
+
+  const p = ledger.profile
+
   return (
-    <div className="mb-3.5">
-      <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      {editing ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-          {multiline ? (
-            <Textarea
-              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={3}
-              className="min-h-[72px] flex-1 resize-y text-[13px] leading-relaxed"
-            />
-          ) : (
-            <Input
-              ref={inputRef as React.RefObject<HTMLInputElement>}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  onChange(draft)
-                  setEditing(false)
-                }
-              }}
-              className="flex-1 text-[13px]"
-            />
-          )}
-          <div className="flex shrink-0 gap-2">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                onChange(draft)
-                setEditing(false)
-              }}
-            >
-              Save
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setDraft(value)
-                setEditing(false)
-              }}
-            >
-              Cancel
-            </Button>
+    <div className="space-y-4">
+
+      {/* Company Profile */}
+      <LedgerSection title="Company Profile" count={undefined}>
+        <div className="grid gap-x-8 sm:grid-cols-2">
+          <div>
+            <Field label="Company" value={p.company_name} />
+            <Field label="Tagline" value={p.tagline} />
+            <Field label="Description" value={p.company_description} />
+            <Field label="Problem" value={p.problem} />
+            <Field label="Solution" value={p.solution} />
+            <Field label="Business Model" value={p.business_model} />
+          </div>
+          <div>
+            <Field label="Market" value={p.target_market} />
+            <Field label="Vertical / Industry" value={p.vertical || p.industry} />
+            <Field label="Stage" value={p.stage} />
+            <Field label="Traction" value={p.traction} />
+            <Field label="Thesis — Why this, why now" value={p.thesis} />
+            <Field label="Differentiators" value={p.differentiators} />
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="w-full rounded-md border border-transparent px-0 py-1 text-left text-[13px] leading-relaxed text-foreground transition-colors hover:border-border border-b border-b-transparent hover:border-b-border"
-        >
-          {value}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function EditableList({
-  label,
-  items,
-  onChange,
-}: {
-  label: string
-  items: string[]
-  onChange: (items: string[]) => void
-}) {
-  const [adding, setAdding] = useState(false)
-  const [newItem, setNewItem] = useState("")
-
-  return (
-    <div className="mb-3.5">
-      <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {items.map((item, i) => (
-          <span
-            key={`${item}-${i}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2.5 py-0.5 text-xs"
-          >
-            {item}
-            <button
-              type="button"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
-              className="text-muted-foreground hover:text-foreground"
-              aria-label="Remove"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        {adding ? (
-          <Input
-            autoFocus
-            value={newItem}
-            onChange={(e) => setNewItem(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newItem.trim()) {
-                onChange([...items, newItem.trim()])
-                setNewItem("")
-                setAdding(false)
-              }
-              if (e.key === "Escape") {
-                setAdding(false)
-                setNewItem("")
-              }
-            }}
-            className="h-8 w-[140px] text-xs"
-            placeholder={`New ${label.toLowerCase().replace(/s$/, "")}`}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="rounded-md border border-dashed border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted/50"
-          >
-            +
-          </button>
+        <TagList label="ICP — Ideal Customer Profiles" items={p.icp} />
+        <TagList label="Competitors" items={p.competitors} />
+        <TagList label="Keywords to monitor" items={p.keywords} />
+        <TagList label="90-day priorities" items={p.priorities} />
+        <TagList label="Risks" items={p.risks} />
+        {p.updated_at && (
+          <p className="text-[11px] text-muted-foreground mt-2">Last updated {formatDateTime(p.updated_at)}</p>
         )}
-      </div>
-    </div>
-  )
-}
+      </LedgerSection>
 
-function JackJillJobsEditor({
-  jobs,
-  onChange,
-}: {
-  jobs: JackJillJobRow[]
-  onChange: (next: JackJillJobRow[]) => void
-}) {
-  const updateRow = (index: number, patch: Partial<JackJillJobRow>) => {
-    const next = jobs.map((x, i) => (i === index ? { ...x, ...patch } : x))
-    onChange(next)
-  }
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Roles from your Jack &amp; Jill digest (or similar). The lead &amp; job scan scores these <strong>before</strong> HN
-        Who&apos;s Hiring and Remotive.
-      </p>
-      {jobs.length === 0 && (
-        <p className="text-[11px] text-muted-foreground">No roles yet. Add a row or paste from email.</p>
+      {/* Founder */}
+      {(p.founder_name || p.founder_background) && (
+        <LedgerSection title="Founder">
+          <Field label="Name" value={p.founder_name} />
+          <Field label="Location" value={p.founder_location} />
+          <Field label="Background" value={p.founder_background} />
+        </LedgerSection>
       )}
-      {jobs.map((row, i) => (
-        <div key={i} className="space-y-2 rounded-lg border border-border bg-muted/15 p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Company</div>
-              <Input
-                value={row.company}
-                onChange={(e) => updateRow(i, { company: e.target.value })}
-                className="mt-0.5 h-9 text-sm"
-                placeholder="Company"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Role</div>
-              <Input
-                value={row.title}
-                onChange={(e) => updateRow(i, { title: e.target.value })}
-                className="mt-0.5 h-9 text-sm"
-                placeholder="e.g. VP Engineering"
-              />
-            </div>
-          </div>
+
+      {/* Brand Voice */}
+      {(p.brand_voice_dna || p.brand_promise) && (
+        <LedgerSection title="Brand Voice & Messaging">
+          <Field label="Brand Promise" value={p.brand_promise} />
+          <Field label="Voice DNA" value={p.brand_voice_dna} />
+          <TagList label="Words to use" items={p.brand_words_use} />
+          <TagList label="Words to avoid" items={p.brand_words_never} />
+          <TagList label="Credibility hooks" items={p.brand_credibility_hooks} />
+        </LedgerSection>
+      )}
+
+      {/* Knowledge base */}
+      <LedgerSection title="Knowledge Base Document">
+        {ledger.knowledge.markdown.trim() ? (
           <div>
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Job URL (optional)</div>
-            <Input
-              value={row.url ?? ""}
-              onChange={(e) => updateRow(i, { url: e.target.value })}
-              className="mt-0.5 h-9 text-sm"
-              placeholder="https://..."
-            />
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[11px] text-muted-foreground">
+                {ledger.knowledge.word_count.toLocaleString()} words · Last saved {formatDateTime(ledger.knowledge.updated_at)}
+              </span>
+            </div>
+            <div className="rounded-lg bg-muted/30 border border-border px-4 py-3 font-mono text-[12px] leading-relaxed text-foreground/80 max-h-64 overflow-y-auto whitespace-pre-wrap">
+              {ledger.knowledge.markdown.slice(0, 2000)}{ledger.knowledge.markdown.length > 2000 ? "\n\n[...truncated — full doc saved]" : ""}
+            </div>
           </div>
-          <div>
-            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Notes (optional)</div>
-            <Textarea
-              value={row.description ?? ""}
-              onChange={(e) => updateRow(i, { description: e.target.value })}
-              className="mt-0.5 min-h-[60px] text-sm"
-              placeholder="Why this listing matters or a snippet from the digest"
-            />
+        ) : (
+          <p className="text-sm text-muted-foreground">No knowledge base document saved yet. Use the Upload / Paste tab to add one.</p>
+        )}
+      </LedgerSection>
+
+      {/* Vault */}
+      <LedgerSection title="Obsidian Vault">
+        {ledger.vault.connected ? (
+          <div className="space-y-1.5 text-[13px]">
+            <p><span className="text-muted-foreground">Repo:</span> <span className="font-mono">{ledger.vault.repo}</span></p>
+            <p><span className="text-muted-foreground">Branch:</span> <span className="font-mono">{ledger.vault.branch}</span></p>
+            <p><span className="text-muted-foreground">Files cached:</span> {ledger.vault.file_count}</p>
+            <p><span className="text-muted-foreground">Last synced:</span> {formatDateTime(ledger.vault.last_synced_at)}</p>
+            {ledger.vault.sync_error && (
+              <p className="text-red-600 dark:text-red-400 text-xs mt-1">{ledger.vault.sync_error}</p>
+            )}
           </div>
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-destructive hover:text-destructive"
-              onClick={() => onChange(jobs.filter((_, j) => j !== i))}
-            >
-              <Trash2 className="mr-1 h-3.5 w-3.5" />
-              Remove
-            </Button>
-          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No vault connected. Use the Obsidian Vault tab to connect one.</p>
+        )}
+      </LedgerSection>
+
+      {/* Assets */}
+      <LedgerSection title="Documents & Assets" count={ledger.assets.length} empty="No documents uploaded yet.">
+        <div className="space-y-2">
+          {ledger.assets.map((a) => (
+            <div key={a.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/15 px-3 py-2.5">
+              <div>
+                <p className="text-[13px] font-medium">{a.title || "Untitled"}</p>
+                {a.source_url && (
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5 truncate max-w-xs">{a.source_url}</p>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{a.type.replace(/_/g, " ")}</span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{formatDate(a.created_at)}</p>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1"
-        onClick={() => onChange([...jobs, { company: "", title: "" }])}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        Add role
-      </Button>
+      </LedgerSection>
+
+      {/* AI Agent History */}
+      <LedgerSection title="AI Agent History" count={ledger.ai_outputs.length} empty="No agent outputs yet.">
+        <div className="space-y-3">
+          {ledger.ai_outputs.map((o) => (
+            <TimelineItem key={o.id} date={o.created_at} label={toolLabel(o.tool)}>
+              {o.title && <p className="text-[13px] font-medium mb-0.5">{o.title}</p>}
+              {o.output_preview && (
+                <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-2">{o.output_preview}</p>
+              )}
+            </TimelineItem>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Competitor Intelligence */}
+      <LedgerSection title="Competitor Intelligence" count={ledger.competitor_events.length} empty="No competitor events tracked yet.">
+        <div className="space-y-3">
+          {ledger.competitor_events.map((c) => (
+            <TimelineItem key={c.id} date={c.discovered_at} label={c.event_type.replace(/_/g, " ")}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium">{c.title}</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">{c.competitor_name}</p>
+                  {c.description && <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{c.description}</p>}
+                  {c.why_it_matters && <p className="text-[12px] text-muted-foreground mt-1 italic">{c.why_it_matters}</p>}
+                  {(c.funding_amount || c.funding_round) && (
+                    <p className="text-[12px] text-foreground/80 mt-1">
+                      {[c.funding_round, c.funding_amount].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+                {c.threat_level && (
+                  <span className={cn("shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", threatColor(c.threat_level))}>
+                    {c.threat_level}
+                  </span>
+                )}
+              </div>
+            </TimelineItem>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Funding Tracker */}
+      <LedgerSection title="Funding Intelligence" count={ledger.funding_events.length} empty="No funding events tracked yet.">
+        <div className="space-y-3">
+          {ledger.funding_events.map((f) => (
+            <TimelineItem key={f.id} date={f.announced_date ?? f.discovered_at} label={f.is_competitor ? "competitor" : "market"}>
+              <p className="text-[13px] font-medium">{f.company_name}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                {[f.round_type, f.amount, f.lead_investor && `Led by ${f.lead_investor}`].filter(Boolean).join(" · ")}
+              </p>
+              {f.relevance && <p className="text-[12px] text-muted-foreground mt-1 italic">{f.relevance}</p>}
+              {f.signal && <p className="text-[12px] text-foreground/70 mt-1">{f.signal}</p>}
+            </TimelineItem>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Intent Signals */}
+      <LedgerSection title="Buyer Intent Signals" count={ledger.intent_signals.length} empty="No intent signals captured yet.">
+        <div className="space-y-3">
+          {ledger.intent_signals.map((s) => (
+            <TimelineItem key={s.id} date={s.discovered_at} label={s.platform}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <p className="text-[13px] font-medium leading-snug">{s.title}</p>
+                  {s.why_relevant && <p className="text-[12px] text-muted-foreground mt-1">{s.why_relevant}</p>}
+                  {s.matched_keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {s.matched_keywords.map((k, i) => (
+                        <span key={i} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">{k}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={cn("rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide", signalColor(s.signal_type))}>
+                    {s.signal_type.replace(/_/g, " ")}
+                  </span>
+                  {s.urgency && (
+                    <span className="text-[10px] text-muted-foreground uppercase">{s.urgency}</span>
+                  )}
+                </div>
+              </div>
+            </TimelineItem>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Outreach */}
+      <LedgerSection title="Outreach Log" count={ledger.outreach.length} empty="No outreach sent yet.">
+        <div className="space-y-2">
+          {ledger.outreach.map((o) => (
+            <div key={o.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/15 px-3 py-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium truncate">{o.subject || "(No subject)"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {[o.to_name, o.to_title, o.to_company].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <span className={cn(
+                  "text-[10px] font-semibold uppercase tracking-wide",
+                  o.outcome ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                )}>
+                  {o.outcome ?? o.status}
+                </span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{formatDate(o.sent_at ?? o.created_at)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Daily Briefs */}
+      <LedgerSection title="Daily Intelligence Briefs" count={ledger.daily_briefs.length} empty="No daily briefs generated yet.">
+        <div className="space-y-2">
+          {ledger.daily_briefs.map((b) => (
+            <div key={b.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/15 px-3 py-2.5">
+              <p className="text-[13px] font-medium">{formatDate(b.brief_date)}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {b.scored_item_count} items scored from {b.raw_item_count} raw
+              </p>
+            </div>
+          ))}
+        </div>
+      </LedgerSection>
+
+      {/* Chat Sessions */}
+      <LedgerSection title="Juno Conversations" count={ledger.chat_sessions.length} empty="No conversations yet.">
+        <div className="space-y-2">
+          {ledger.chat_sessions.map((s) => (
+            <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/15 px-3 py-2.5">
+              <div>
+                <p className="text-[13px] font-medium">{s.title || "Untitled conversation"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 capitalize">{s.channel} · {s.message_count} messages</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground shrink-0">{formatDate(s.updated_at)}</p>
+            </div>
+          ))}
+        </div>
+      </LedgerSection>
+
     </div>
   )
 }
 
-async function readSseStream(res: Response): Promise<{ text: string; sessionId?: string }> {
-  const reader = res.body?.getReader()
-  if (!reader) return { text: "" }
-  const decoder = new TextDecoder()
-  let out = ""
-  let sessionId: string | undefined
-  let carry = ""
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    carry += decoder.decode(value, { stream: true })
-    const lines = carry.split("\n")
-    carry = lines.pop() ?? ""
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue
-      const payload = line.slice(6).trim()
-      if (payload === "[DONE]") continue
-      try {
-        const parsed = JSON.parse(payload) as { text?: string; sessionId?: string; error?: string }
-        if (parsed.sessionId) sessionId = parsed.sessionId
-        if (parsed.error) throw new Error(parsed.error)
-        if (parsed.text) out += parsed.text
-      } catch (e) {
-        if (e instanceof SyntaxError) continue
-        throw e
-      }
-    }
-  }
-  if (carry.startsWith("data: ")) {
-    const payload = carry.slice(6).trim()
-    if (payload !== "[DONE]") {
-      try {
-        const parsed = JSON.parse(payload) as { text?: string; sessionId?: string }
-        if (parsed.sessionId) sessionId = parsed.sessionId
-        if (parsed.text) out += parsed.text
-      } catch {
-        /* noop */
-      }
-    }
-  }
-  return { text: out, sessionId }
-}
+// ─── Main page ────────────────────────────────────────────────────────────────
 
-function formatRelativeTime(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "Just now"
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+type Tab = "upload" | "vault" | "ledger"
 
-interface ContextChatSession {
-  id: string
-  title: string
-  created_at: string
-  updated_at: string
+type VaultMutationResponse = {
+  cleared?: boolean
+  error?: string
+  fileCount?: number
+  warning?: string | null
 }
-
-type PanelView = "chat" | "history"
 
 export function ContextBrainPage() {
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [tab, setTab] = useState<Tab>("upload")
   const [data, setData] = useState<ContextData>(emptyContextData())
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [showConversation, setShowConversation] = useState(false)
-  const [panelView, setPanelView] = useState<PanelView>("chat")
-  const [contextSessionId, setContextSessionId] = useState<string | null>(null)
-  const [contextSessions, setContextSessions] = useState<ContextChatSession[]>([])
-  const [loadingContextSessions, setLoadingContextSessions] = useState(false)
-  const [chatAuthenticated, setChatAuthenticated] = useState<boolean | null>(null)
-  const [panelMessages, setPanelMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([])
-  const [panelInput, setPanelInput] = useState("")
-  const [panelStreaming, setPanelStreaming] = useState(false)
 
-  const completeness = calcCompleteness(data)
+  const [markdown, setMarkdown] = useState("")
+  const [markdownDirty, setMarkdownDirty] = useState(false)
+  const [savingMd, setSavingMd] = useState(false)
 
-  const competitorGroups = useMemo(() => {
-    const rows = data.competitor_tracking ?? []
-    const m = new Map<string, typeof rows>()
-    for (const r of rows) {
-      const k = r.competitor_name
-      const arr = m.get(k) ?? []
-      arr.push(r)
-      m.set(k, arr)
-    }
-    return m
-  }, [data.competitor_tracking])
+  const [vaultRepo, setVaultRepo] = useState("")
+  const [vaultBranch, setVaultBranch] = useState("main")
+  const [vaultFoldersText, setVaultFoldersText] = useState("")
+  const [vaultDirty, setVaultDirty] = useState(false)
+  const [savingVault, setSavingVault] = useState(false)
+  const [syncingVault, setSyncingVault] = useState(false)
+  const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
+  const [githubLogin, setGithubLogin] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
-    setLoadError(null)
+  async function refresh() {
     try {
       const res = await fetch("/api/company/context-view", { credentials: "include" })
       if (!res.ok) throw new Error("Failed to load")
-      const json = (await res.json()) as { data: ContextData | null }
-      if (json.data) setData(json.data)
+      const json = (await res.json()) as { data: ContextData }
+      const d = json.data ?? emptyContextData()
+      setData(d)
+      setMarkdown(d.knowledge.markdown)
+      setMarkdownDirty(false)
+      setVaultRepo(d.vault.repo)
+      setVaultBranch(d.vault.branch || "main")
+      setVaultFoldersText(d.vault.folders.join("\n"))
+      setVaultDirty(false)
     } catch {
-      setLoadError("Could not load context.")
+      toast({ title: "Could not load brain data", variant: "destructive" })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    // Check Pipedream GitHub connection status
+    fetch("/api/pipedream/github-verify", { credentials: "include" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; githubLogin?: string }) => {
+        setGithubConnected(Boolean(j.ok))
+        setGithubLogin(j.githubLogin ?? null)
+      })
+      .catch(() => setGithubConnected(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const persist = useCallback(
-    async (next: ContextData) => {
-      setSaving(true)
-      try {
-        const res = await fetch("/api/company/profile", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(contextDataToProfilePayload(next)),
-        })
-        if (!res.ok) throw new Error("Failed to save")
-        await refresh()
-      } catch {
-        setLoadError("Could not save changes.")
-      } finally {
-        setSaving(false)
-      }
-    },
-    [refresh],
-  )
-
-  function updateField(path: string, value: unknown) {
-    setData((prev) => {
-      const next = setPathImmutable(prev, path, value) as ContextData
-      next.meta.completeness = calcCompleteness(next)
-      void persist(next)
-      return next
-    })
+  function normalizeRepoInput(value: string): string {
+    // Strip full GitHub URLs to just owner/repo
+    return value
+      .trim()
+      .replace(/^https?:\/\/(www\.)?github\.com\//, "")
+      .replace(/\.git$/, "")
+      .replace(/\/$/, "")
   }
 
-  const fetchContextSessions = useCallback(async () => {
-    setLoadingContextSessions(true)
+  function handleRepoChange(value: string) {
+    const normalized = normalizeRepoInput(value)
+    setVaultRepo(normalized)
+    setVaultDirty(true)
+  }
+
+  function connectGithubViaPipedream() {
+    // Redirect to integrations page where the full Pipedream Connect flow lives
+    window.location.href = "/dashboard/integrations?connect=github&return=/dashboard/context"
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file) return
+    file
+      .text()
+      .then((text) => {
+        setMarkdown(text)
+        setMarkdownDirty(true)
+        toast({ title: "File loaded", description: file.name })
+      })
+      .catch(() => toast({ title: "Could not read file", variant: "destructive" }))
+  }
+
+  async function saveMarkdown() {
+    setSavingMd(true)
     try {
-      const res = await fetch("/api/chat/sessions?channel=context", { credentials: "include" })
-      const json = (await res.json()) as { authenticated?: boolean; sessions?: ContextChatSession[] }
-      setChatAuthenticated(json.authenticated === true)
-      setContextSessions(json.sessions || [])
-    } catch {
-      setContextSessions([])
+      const res = await fetch("/api/company/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ knowledge_base_md: markdown }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(json.error || "Failed to save")
+      await refresh()
+      toast({ title: "Knowledge base saved" })
+    } catch (e) {
+      toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
     } finally {
-      setLoadingContextSessions(false)
+      setSavingMd(false)
     }
-  }, [])
+  }
 
-  const openContextHistory = useCallback(() => {
-    setPanelView("history")
-    void fetchContextSessions()
-  }, [fetchContextSessions])
+  async function persistVaultSettings(mode: "save" | "sync") {
+    const repo = vaultRepo.trim()
+    const branch = vaultBranch.trim() || "main"
+    const folders = normalizeVaultFolders(vaultFoldersText)
+    const shouldSync = Boolean(repo)
 
-  const loadContextSession = useCallback(async (session: ContextChatSession) => {
-    try {
-      const res = await fetch(`/api/chat/sessions/${session.id}`, { credentials: "include" })
-      const json = (await res.json()) as {
-        messages?: Array<{ role: string; content: string }>
-      }
-      const rows = json.messages || []
-      const loaded: { role: "user" | "assistant"; content: string }[] = rows.map((m) => ({
-        role: m.role === "user" ? "user" : "assistant",
-        content: m.content,
-      }))
-      setPanelMessages(loaded.length > 0 ? loaded : [{ role: "assistant", content: OPENER }])
-      setContextSessionId(session.id)
-      setPanelView("chat")
-    } catch {
-      setPanelView("chat")
+    if (mode === "sync" && !repo) {
+      toast({ title: "Sync failed", description: "Enter a GitHub repo first.", variant: "destructive" })
+      return
     }
-  }, [])
 
-  const deleteContextSession = useCallback(
-    async (e: React.MouseEvent, id: string) => {
-      e.stopPropagation()
-      try {
-        await fetch(`/api/chat/sessions/${id}`, { method: "DELETE", credentials: "include" })
-        setContextSessions((prev) => prev.filter((s) => s.id !== id))
-        if (contextSessionId === id) {
-          setContextSessionId(null)
-          setPanelMessages([{ role: "assistant", content: OPENER }])
-        }
-      } catch {
-        /* ignore */
-      }
-    },
-    [contextSessionId],
-  )
-
-  async function sendPanelMessage() {
-    const text = panelInput.trim()
-    if (!text || panelStreaming) return
-    setPanelInput("")
-
-    const history = [...panelMessages, { role: "user" as const, content: text }]
-    setPanelMessages(history)
-    setPanelStreaming(true)
+    if (mode === "save") setSavingVault(true)
+    else setSyncingVault(true)
 
     try {
-      const res = await fetch("/api/company/context-chat", {
+      const res = await fetch("/api/settings/github-vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          messages: history,
-          founderName: data.founder.name,
-          brainSummary: JSON.stringify(data, null, 2).slice(0, 12000),
-          sessionId: contextSessionId,
+          repo: repo || null,
+          branch,
+          folders,
+          sync: shouldSync,
         }),
       })
-      if (!res.ok) throw new Error("Chat failed")
-      const { text: reply, sessionId: sid } = await readSseStream(res)
-      if (sid) setContextSessionId(sid)
-      setPanelMessages([...history, { role: "assistant", content: reply }])
-    } catch {
-      setPanelMessages([
-        ...history,
-        { role: "assistant", content: "Sorry — something went wrong. Try again in a moment." },
-      ])
+      const json = (await res.json().catch(() => ({}))) as VaultMutationResponse
+      if (!res.ok) throw new Error(json.error || (mode === "save" ? "Failed to save vault" : "Vault sync failed"))
+
+      setVaultDirty(false)
+      await refresh()
+
+      if (json.cleared) {
+        toast({ title: "Vault disconnected" })
+        return
+      }
+
+      if (json.warning) {
+        toast({
+          title: mode === "save" ? "Connection saved with warning" : "Vault synced with warning",
+          description: json.warning,
+        })
+        return
+      }
+
+      toast({
+        title: mode === "save" ? "Vault connected" : "Vault synced",
+        description: typeof json.fileCount === "number" ? `${json.fileCount} file(s) cached` : undefined,
+      })
+    } catch (e) {
+      toast({
+        title: mode === "save" ? "Could not save vault" : "Sync failed",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      })
     } finally {
-      setPanelStreaming(false)
+      if (mode === "save") setSavingVault(false)
+      else setSyncingVault(false)
     }
+  }
+
+  async function saveVaultSettings() {
+    await persistVaultSettings("save")
+  }
+
+  async function syncVaultNow() {
+    await persistVaultSettings("sync")
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-        Loading context…
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "upload", label: "Upload / Paste" },
+    { id: "vault", label: "Obsidian Vault" },
+    { id: "ledger", label: "Brain Ledger" },
+  ]
+
   return (
-    <div className="mx-auto max-w-[760px] px-5 py-8 font-sans">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-[22px] font-medium tracking-tight">Context</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Saved company context for {data.company.name || "your company"}. Included in agent prompts.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            <Link href="/dashboard/knowledge" className="text-primary underline-offset-4 hover:underline">
-              Knowledge base &amp; documents
-            </Link>
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={() => {
-            setPanelMessages([{ role: "assistant", content: OPENER }])
-            setPanelInput("")
-            setContextSessionId(null)
-            setPanelView("chat")
-            setShowConversation(true)
-          }}
-          className="shrink-0 gap-2"
-        >
-          <Mic className="h-4 w-4" />
-          Update context
-        </Button>
+    <div className={cn("mx-auto space-y-6", tab === "ledger" ? "max-w-3xl" : "max-w-2xl")}>
+      {/* Header */}
+      <div>
+        <h1 className="text-xl font-semibold">Company Brain</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Everything Juno knows about your business — feed it, sync it, and read the full ledger.
+        </p>
       </div>
 
-      {loadError && (
-        <p className="mb-4 text-sm text-destructive">{loadError}</p>
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1 w-fit">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+              tab === t.id
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Upload / Paste tab */}
+      {tab === "upload" && (
+        <div className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Ask any AI (ChatGPT, Claude, Gemini) to generate a company overview in markdown, then paste or upload it here.
+            </p>
+            <div className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground font-mono leading-relaxed">
+              &quot;Generate everything you know about my company [name] as a detailed markdown document covering our product, market, traction, team, and strategy.&quot;
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <FileUp className="h-3.5 w-3.5" />
+              Upload .md file
+            </Button>
+            {data.knowledge.updatedAt && (
+              <span className="text-xs text-muted-foreground">Last saved {formatDateTime(data.knowledge.updatedAt)}</span>
+            )}
+            <input ref={fileInputRef} type="file" accept=".md,.txt" className="hidden" onChange={handleFileUpload} />
+          </div>
+
+          <Textarea
+            value={markdown}
+            onChange={(e) => { setMarkdown(e.target.value); setMarkdownDirty(true) }}
+            placeholder={"# My Company\n\nPaste your markdown here..."}
+            className="min-h-[320px] font-mono text-[13px] leading-relaxed resize-y"
+          />
+
+          <div className="flex items-center gap-2">
+            <Button type="button" onClick={() => void saveMarkdown()} disabled={savingMd || !markdownDirty}>
+              {savingMd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+            {markdown && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => { setMarkdown(""); setMarkdownDirty(true) }}
+                className="text-muted-foreground"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
-      <div className="mb-5 flex flex-col gap-4 rounded-[10px] border border-border bg-muted/30 p-4 sm:flex-row sm:items-center sm:gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="mb-1.5 text-xs text-muted-foreground">Profile completeness</div>
-          <CompletenessBar pct={completeness} />
-        </div>
-        <div className="text-right sm:min-w-[100px]">
-          <div className="text-[11px] text-muted-foreground">Last updated</div>
-          <div className="text-xs font-medium">{data.meta.lastUpdated}</div>
-        </div>
-        <div className="text-right sm:min-w-[100px]">
-          <div className="text-[11px] text-muted-foreground">Sources</div>
-          <div className="text-xs">{data.meta.sources.filter((s) => s !== "—").length || 0} layers</div>
-        </div>
-      </div>
+      {/* Obsidian Vault tab */}
+      {tab === "vault" && (
+        <div className="space-y-5">
 
-      {saving && <p className="mb-3 text-xs text-muted-foreground">Saving…</p>}
+          {/* GitHub account status */}
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Github className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">GitHub account</p>
+                  {githubConnected === null && (
+                    <p className="text-xs text-muted-foreground">Checking…</p>
+                  )}
+                  {githubConnected === true && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Connected{githubLogin ? ` as @${githubLogin}` : ""}
+                    </p>
+                  )}
+                  {githubConnected === false && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <XCircle className="h-3 w-3" />
+                      Not connected — required for private repos
+                    </p>
+                  )}
+                </div>
+              </div>
+              {githubConnected === false && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => connectGithubViaPipedream()}
+                >
+                  <Github className="h-3.5 w-3.5" />
+                  Connect GitHub
+                </Button>
+              )}
+            </div>
+          </div>
 
-      <Section title="Company">
-        <EditableField label="Name" value={data.company.name} onChange={(v) => updateField("company.name", v)} />
-        <EditableField
-          label="Description"
-          value={data.company.description}
-          onChange={(v) => updateField("company.description", v)}
-          multiline
-        />
-        <div className="grid gap-0 sm:grid-cols-2 sm:gap-x-5">
-          <EditableField label="Vertical" value={data.company.vertical} onChange={(v) => updateField("company.vertical", v)} />
-          <EditableField label="Stage" value={data.company.stage} onChange={(v) => updateField("company.stage", v)} />
-          <EditableField
-            label="Business model"
-            value={data.company.business_model}
-            onChange={(v) => updateField("company.business_model", v)}
-          />
-          <EditableField label="Traction" value={data.company.traction} onChange={(v) => updateField("company.traction", v)} />
-        </div>
-      </Section>
-
-      <Section title="Problem and solution">
-        <EditableField label="Problem" value={data.company.problem} onChange={(v) => updateField("company.problem", v)} multiline />
-        <EditableField label="Solution" value={data.company.solution} onChange={(v) => updateField("company.solution", v)} multiline />
-        <EditableField
-          label="Differentiators"
-          value={data.strategy.differentiators}
-          onChange={(v) => updateField("strategy.differentiators", v)}
-          multiline
-        />
-      </Section>
-
-      <Section title="Founder">
-        <EditableField label="Name" value={data.founder.name} onChange={(v) => updateField("founder.name", v)} />
-        <EditableField
-          label="Background"
-          value={data.founder.background}
-          onChange={(v) => updateField("founder.background", v)}
-          multiline
-        />
-      </Section>
-
-      <Section title="Strategy">
-        <EditableField label="Thesis" value={data.strategy.thesis} onChange={(v) => updateField("strategy.thesis", v)} multiline />
-        <EditableField label="Market" value={data.company.market} onChange={(v) => updateField("company.market", v)} multiline />
-        <EditableList label="ICP" items={data.strategy.icp} onChange={(v) => updateField("strategy.icp", v)} />
-        <EditableList label="Competitors" items={data.strategy.competitors} onChange={(v) => updateField("strategy.competitors", v)} />
-      </Section>
-
-      <Section title="Priorities and risks">
-        <EditableList label="90-day priorities" items={data.strategy.priorities} onChange={(v) => updateField("strategy.priorities", v)} />
-        <EditableList label="Risks" items={data.strategy.risks} onChange={(v) => updateField("strategy.risks", v)} />
-      </Section>
-
-      <Section
-        title="Monitoring keywords"
-        badge={<span className="text-[11px] text-muted-foreground">Keyword filters for scans</span>}
-      >
-        <EditableList label="Keywords" items={data.strategy.keywords} onChange={(v) => updateField("strategy.keywords", v)} />
-      </Section>
-
-      <Section
-        title="Jack & Jill job list"
-        badge={<span className="text-[11px] text-muted-foreground">Lead list</span>}
-      >
-        <JackJillJobsEditor
-          jobs={data.strategy.jack_jill_jobs ?? []}
-          onChange={(next) => updateField("strategy.jack_jill_jobs", next)}
-        />
-      </Section>
-
-      {competitorGroups.size > 0 && (
-        <Section
-          title="Competitor intelligence"
-          badge={
-            <span className="text-[11px] text-muted-foreground">From lead scoring</span>
-          }
-        >
-          <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
-            Moves and funding Juno detected and kept beyond the daily news window. Edit the competitor list under Strategy;
-            this timeline accumulates automatically.
-          </p>
-          <div className="space-y-4">
-            {[...competitorGroups.entries()].map(([name, events]) => (
-              <div key={name} className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-                <div className="text-sm font-medium text-foreground">{name}</div>
-                <ul className="mt-2 space-y-1.5 text-[13px] leading-relaxed">
-                  {events.slice(0, 6).map((ev, i) => (
-                    <li key={`${ev.discovered_at}-${i}`} className="text-muted-foreground">
-                      <span className="text-foreground/95">{ev.title}</span>
-                      <span className="text-xs"> · {ev.event_type.replace(/_/g, " ")}</span>
-                      {ev.threat_level ? <span className="text-xs"> · {ev.threat_level}</span> : null}
-                      <span className="text-xs tabular-nums"> · {formatRelativeTime(ev.discovered_at)}</span>
-                    </li>
-                  ))}
-                </ul>
+          {/* Sync status cards */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              {
+                label: "Vault status",
+                value: data.vault.lastSyncedAt ? "Synced" : data.vault.connected ? "Saved, needs sync" : "Not set",
+              },
+              { label: "Last synced", value: formatDateTime(data.vault.lastSyncedAt) },
+              { label: "Files cached", value: String(data.vault.fileCount) },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border border-border bg-muted/15 p-3">
+                <div className="text-[11px] text-muted-foreground">{label}</div>
+                <div className="mt-1 text-sm font-medium">{value}</div>
               </div>
             ))}
           </div>
-        </Section>
-      )}
 
-      {showConversation && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
-          role="presentation"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowConversation(false)
-          }}
-        >
-          <div
-            className="flex max-h-[80vh] w-full max-w-[680px] flex-col rounded-t-2xl bg-background shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
-              <div className="flex min-w-0 flex-1 items-start gap-2">
-                {panelView === "history" && (
-                  <button
-                    type="button"
-                    className="mt-0.5 text-muted-foreground hover:text-foreground"
-                    onClick={() => setPanelView("chat")}
-                    aria-label="Back to chat"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
+          {data.vault.connected && !data.vault.lastSyncedAt && !data.vault.syncError && (
+            <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
+              The repo is saved, but Juno has not pulled any files yet. Use <span className="font-medium">Save + verify</span> or <span className="font-medium">Sync now</span> to test the connection and cache markdown.
+            </div>
+          )}
+
+          {data.vault.syncError && (
+            <div
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm",
+                isVaultSyncWarning(data.vault.syncError)
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                  : "border-destructive/30 bg-destructive/5 text-destructive",
+              )}
+            >
+              {data.vault.syncError}
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Point Juno at your GitHub-backed Obsidian vault. Paste the full repo URL or just <span className="font-mono text-foreground/80">owner/repo</span> — it normalizes automatically.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">GitHub repo</div>
+                <Input
+                  value={vaultRepo}
+                  onChange={(e) => handleRepoChange(e.target.value)}
+                  onBlur={(e) => {
+                    const normalized = normalizeRepoInput(e.target.value)
+                    if (normalized !== vaultRepo) {
+                      setVaultRepo(normalized)
+                      setVaultDirty(true)
+                    }
+                  }}
+                  placeholder="NandineMpe/JunoAIObsidian or full GitHub URL"
+                  className="font-mono text-[13px]"
+                />
+                {vaultRepo && !vaultRepo.includes("/") && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">Enter as owner/repo — e.g. NandineMpe/JunoAIObsidian</p>
                 )}
-                <div className="min-w-0">
-                  <h3 className="text-[15px] font-medium">
-                    {panelView === "history" ? "Saved conversations" : "Update your context"}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {panelView === "history"
-                      ? "Threads started from this panel only."
-                      : "Edits here are separate from the sidebar chat."}
-                  </p>
-                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {panelView === "chat" && (
-                  <>
-                    <button
-                      type="button"
-                      className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      title="Conversation history"
-                      onClick={openContextHistory}
-                    >
-                      <History className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      title="New conversation"
-                      onClick={() => {
-                        setPanelMessages([{ role: "assistant", content: OPENER }])
-                        setContextSessionId(null)
-                        setPanelInput("")
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </>
-                )}
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowConversation(false)}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Branch</div>
+                <Input
+                  value={vaultBranch}
+                  onChange={(e) => { setVaultBranch(e.target.value); setVaultDirty(true) }}
+                  placeholder="main or master"
+                  className="font-mono text-[13px] max-w-[180px]"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Check your repo — some vaults use <span className="font-mono">master</span> instead of <span className="font-mono">main</span></p>
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Folders to sync <span className="normal-case font-normal">(one per line, leave blank to sync entire vault)</span>
+                </div>
+                <Textarea
+                  value={vaultFoldersText}
+                  onChange={(e) => { setVaultFoldersText(e.target.value); setVaultDirty(true) }}
+                  rows={3}
+                  placeholder={"Leave blank to sync all files\nor enter specific folders:\ncompany\nresearch"}
+                  className="font-mono text-[13px]"
+                />
               </div>
             </div>
-
-            {panelView === "history" && (
-              <div className="max-h-[45vh] overflow-y-auto border-b border-border px-3 py-2">
-                <p className="mb-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground leading-relaxed">
-                  <span className="font-medium text-foreground/90">Not the same as</span> the bottom-right floating Juno — that
-                  list is for quick sidebar chats only.
-                </p>
-                {loadingContextSessions ? (
-                  <div className="flex justify-center py-10 text-muted-foreground">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  </div>
-                ) : chatAuthenticated === false ? (
-                  <p className="px-2 py-6 text-center text-[13px] text-muted-foreground">
-                    Sign in to save and view context conversations.
-                  </p>
-                ) : contextSessions.length === 0 ? (
-                  <p className="px-2 py-6 text-center text-[13px] text-muted-foreground leading-relaxed">
-                    No saved threads yet. Send a message above to start one.
-                  </p>
-                ) : (
-                  <ul className="space-y-1">
-                    {contextSessions.map((s) => (
-                      <li key={s.id}>
-                        <div className="group flex items-center gap-1 rounded-lg hover:bg-muted">
-                          <button
-                            type="button"
-                            onClick={() => void loadContextSession(s)}
-                            className="min-w-0 flex-1 truncate px-3 py-2.5 text-left text-[13px] font-medium"
-                          >
-                            {s.title}
-                          </button>
-                          <span className="shrink-0 pr-1 text-[11px] text-muted-foreground tabular-nums">
-                            {formatRelativeTime(s.updated_at)}
-                          </span>
-                          <button
-                            type="button"
-                            className="p-2 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100"
-                            onClick={(e) => void deleteContextSession(e, s.id)}
-                            aria-label="Delete conversation"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <div className="min-h-[200px] flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              {panelView === "chat" && (
-                <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                  <span className="font-medium text-foreground/90">Profile cards are not auto-filled from this chat.</span> What
-                  you say is saved in this thread (clock icon above) so Juno can remember the conversation. To change what
-                  agents read, edit the fields on the Context page below the dialog, or paste into those fields.
-                </div>
-              )}
-              {panelView === "chat" &&
-                panelMessages.map((m, i) => (
-                <div key={i} className={cn("flex gap-2.5", m.role === "user" && "flex-row-reverse")}>
-                  <div
-                    className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-medium",
-                      m.role === "assistant" ? "bg-violet-500/15 text-violet-800 dark:text-violet-300" : "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-                    )}
-                  >
-                    {m.role === "assistant" ? "J" : "You"}
-                  </div>
-                  <div
-                    className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed",
-                      m.role === "assistant"
-                        ? "rounded-tl-sm border border-border bg-card"
-                        : "bg-muted text-foreground",
-                    )}
-                  >
-                    {m.content}
-                  </div>
-                </div>
-              ))}
-              {panelView === "chat" && panelStreaming && (
-                <div className="flex gap-2.5 text-sm text-muted-foreground">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-[11px] font-medium text-violet-800 dark:text-violet-300">
-                    J
-                  </div>
-                  Thinking…
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 border-t border-border px-5 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Mic className="h-4 w-4" />
-              </div>
-              <Input
-                value={panelInput}
-                onChange={(e) => setPanelInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && void sendPanelMessage()}
-                placeholder="Or type here…"
-                disabled={panelStreaming || panelView === "history"}
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                onClick={() => void sendPanelMessage()}
-                disabled={panelStreaming || !panelInput.trim() || panelView === "history"}
-              >
-                Send
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={() => void saveVaultSettings()} disabled={savingVault || !vaultDirty}>
+                {savingVault ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save + verify
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void syncVaultNow()} disabled={syncingVault || savingVault}>
+                {syncingVault ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Sync now
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Save + verify checks the repo immediately and caches matching markdown. Auto-sync still runs nightly at 4am UTC.
+            </p>
           </div>
         </div>
       )}
+
+      {/* Brain Ledger tab */}
+      {tab === "ledger" && <BrainLedger />}
     </div>
   )
 }

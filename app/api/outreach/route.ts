@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   let q = supabase
     .from("outreach_log")
     .select(
-      "id, lead_id, lookalike_profile_id, to_name, to_email, to_title, to_company, subject, body, channel, status, sent_at, resend_message_id, opened_at, clicked_at, replied_at, outcome, outcome_notes, scheduled_for, skipped_reason, created_at, updated_at",
+      "id, lead_id, lookalike_profile_id, to_name, to_email, to_title, to_company, subject, body, channel, status, sent_at, resend_message_id, provider, provider_message_id, provider_thread_id, provider_inbox_id, opened_at, clicked_at, replied_at, outcome, outcome_notes, scheduled_for, skipped_reason, created_at, updated_at",
     )
     .eq("user_id", auth.userId)
 

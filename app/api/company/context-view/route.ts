@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import {
   type ContextData,
@@ -6,6 +7,8 @@ import {
   parseJackJillJobs,
   parseStringArray,
 } from "@/lib/context-view"
+import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
@@ -26,7 +29,7 @@ function formatRelativeFromIso(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -37,31 +40,52 @@ export async function GET() {
       return NextResponse.json({ data: null, error: "Unauthorized" }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from("company_profile")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
+    const url = new URL(request.url)
+    const workspace =
+      url.searchParams.get("scope") === "owner" ? null : await resolveWorkspaceSelection(user.id)
 
-    const { data: onboardingRows } = await supabase
-      .from("ai_outputs")
-      .select("inputs, created_at")
-      .eq("user_id", user.id)
-      .eq("tool", "onboarding_extraction")
-      .order("created_at", { ascending: false })
-      .limit(1)
-
-    const { data: assets } = await supabase
-      .from("company_assets")
-      .select("type, title")
-      .eq("user_id", user.id)
-
-    const { data: competitorRows } = await supabase
-      .from("competitor_tracking")
-      .select("competitor_name, event_type, title, threat_level, discovered_at")
-      .eq("user_id", user.id)
-      .order("discovered_at", { ascending: false })
-      .limit(80)
+    const [{ data: profile }, { data: onboardingRows }, { data: assets }, { data: competitorRows }] =
+      workspace
+        ? await Promise.all([
+            supabaseAdmin
+              .from("client_workspace_profiles")
+              .select("*")
+              .eq("owner_user_id", user.id)
+              .eq("workspace_id", workspace.id)
+              .maybeSingle(),
+            Promise.resolve({
+              data: workspace.lastContextSubmittedAt
+                ? [{ created_at: workspace.lastContextSubmittedAt, inputs: null }]
+                : [],
+            }),
+            supabaseAdmin
+              .from("client_workspace_assets")
+              .select("type, title")
+              .eq("owner_user_id", user.id)
+              .eq("workspace_id", workspace.id),
+            Promise.resolve({ data: [] }),
+          ])
+        : await Promise.all([
+            supabase
+              .from("company_profile")
+              .select("*")
+              .eq("user_id", user.id)
+              .maybeSingle(),
+            supabase
+              .from("ai_outputs")
+              .select("inputs, created_at")
+              .eq("user_id", user.id)
+              .eq("tool", "onboarding_extraction")
+              .order("created_at", { ascending: false })
+              .limit(1),
+            supabase.from("company_assets").select("type, title").eq("user_id", user.id),
+            supabase
+              .from("competitor_tracking")
+              .select("competitor_name, event_type, title, threat_level, discovered_at")
+              .eq("user_id", user.id)
+              .order("discovered_at", { ascending: false })
+              .limit(80),
+          ])
 
     const rawInputs = onboardingRows?.[0]?.inputs
     const inputsObj = asRecord(rawInputs)
@@ -86,8 +110,28 @@ export async function GET() {
       ""
 
     const data: ContextData = {
+      knowledge: {
+        markdown: (typeof p?.knowledge_base_md === "string" && p.knowledge_base_md) || "",
+        updatedAt:
+          (typeof p?.knowledge_base_updated_at === "string" && p.knowledge_base_updated_at) || null,
+      },
+      vault: {
+        repo: (typeof p?.github_vault_repo === "string" && p.github_vault_repo) || "",
+        branch: (typeof p?.github_vault_branch === "string" && p.github_vault_branch) || "main",
+        folders: normalizeVaultFolders(p?.vault_folders),
+        connected: Boolean(typeof p?.github_vault_repo === "string" && p.github_vault_repo.trim()),
+        lastSyncedAt:
+          (typeof p?.vault_context_last_synced_at === "string" && p.vault_context_last_synced_at) || null,
+        fileCount:
+          typeof p?.vault_context_file_count === "number"
+            ? p.vault_context_file_count
+            : Number(p?.vault_context_file_count ?? 0) || 0,
+        syncError:
+          (typeof p?.vault_context_sync_error === "string" && p.vault_context_sync_error) || null,
+      },
       company: {
-        name: (typeof p?.company_name === "string" && p.company_name) || "",
+        name:
+          (typeof p?.company_name === "string" && p.company_name) || workspace?.companyName || "",
         description: companyDescription,
         problem: (typeof p?.problem === "string" && p.problem) || "",
         solution: (typeof p?.solution === "string" && p.solution) || "",
@@ -139,11 +183,14 @@ export async function GET() {
       if (t === "scraped_url") sources.add("website scrape")
       else if (t === "pitch_deck") sources.add("pitch deck")
       else if (t === "document") {
-        if (title.includes("Onboarding conversation")) sources.add("onboarding conversation")
+        if (title.includes("Shared intake submission")) sources.add("shared intake")
+        else if (title.includes("Onboarding conversation")) sources.add("onboarding conversation")
         else sources.add("documents")
       }
     }
-    if (onboardingRows?.length) sources.add("onboarding extraction")
+    if (data.knowledge.markdown.trim()) sources.add("knowledge base")
+    if (data.vault.connected && data.vault.lastSyncedAt) sources.add("vault cache")
+    if (!workspace && onboardingRows?.length) sources.add("onboarding extraction")
     data.meta.sources = Array.from(sources)
     if (data.meta.sources.length === 0) data.meta.sources = ["—"]
 
@@ -155,7 +202,11 @@ export async function GET() {
       discovered_at: String(r.discovered_at ?? ""),
     }))
 
-    return NextResponse.json({ data })
+    return NextResponse.json({
+      data,
+      scope: workspace ? "workspace" : "owner",
+      workspace: workspace ?? null,
+    })
   } catch (e) {
     console.error("context-view GET:", e)
     return NextResponse.json({ data: null, error: "Failed to load" }, { status: 500 })

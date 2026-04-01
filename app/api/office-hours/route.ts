@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     const companyCtx = await getCompanyContext(user.id).catch(() => null)
 
     const systemPrompt = buildOfficeHoursSystemPrompt(
-      companyCtx ?? { promptBlock: "", userId: user.id, profile: {} as never, assets: [], vaultFiles: [], memoryHits: [], extracted: { competitors: [], keywords: [], icp: [], vertical: "", stage: "" } },
+      companyCtx ?? { promptBlock: "", userId: user.id, profile: {} as never, assets: [], vaultFiles: [], knowledgeHits: [], extracted: { competitors: [], keywords: [], icp: [], vertical: "", stage: "" } },
       mode,
     )
 

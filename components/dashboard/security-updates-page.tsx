@@ -37,6 +37,8 @@ type GithubContext = {
   /** Obsidian vault owner/repo from company profile — use when GitHub API returns no list (OAuth scope). */
   vaultRepo: string | null
   vaultBranch: string | null
+  /** Repo list came from GITHUB_PAT after Pipedream proxy failed or no Connect account. */
+  reposListedViaPat?: boolean
 }
 
 /** Avoids render crashes if the API omits fields or returns an unexpected shape. */
@@ -52,6 +54,7 @@ function normalizeGithubContext(raw: unknown): GithubContext {
       selectionSource: null,
       vaultRepo: null,
       vaultBranch: null,
+      reposListedViaPat: false,
     }
   }
   const o = raw as Record<string, unknown>
@@ -81,6 +84,7 @@ function normalizeGithubContext(raw: unknown): GithubContext {
     selectionSource: src === "explicit" || src === "vault" ? src : null,
     vaultRepo: typeof o.vaultRepo === "string" ? o.vaultRepo : null,
     vaultBranch: typeof o.vaultBranch === "string" ? o.vaultBranch : null,
+    reposListedViaPat: Boolean(o.reposListedViaPat),
   }
 }
 
@@ -500,6 +504,12 @@ export function SecurityUpdatesPage() {
                 {gh.selectionSource === "vault" && gh.selectedRepo && (
                   <span className="text-muted-foreground text-xs ml-2">
                     (selection also inferred from Obsidian vault until you pick a repo)
+                  </span>
+                )}
+                {gh.reposListedViaPat && (
+                  <span className="text-muted-foreground text-xs ml-2 block mt-1">
+                    Repo list loaded via server <span className="font-mono">GITHUB_PAT</span> (bypasses Pipedream proxy
+                    when it errors or you have no Connect account).
                   </span>
                 )}
               </p>

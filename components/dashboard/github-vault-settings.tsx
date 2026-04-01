@@ -1,40 +1,35 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Github, Loader2, CheckCircle2, AlertCircle, BookMarked } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { BookMarked, Github, Loader2, RefreshCw, Unplug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { normalizeVaultFolders } from "@/lib/vault-context-shared"
 
-type VaultState = {
-  owner: string
+type VaultSettingsState = {
   repo: string
   branch: string
-  path: string
+  foldersText: string
 }
 
 export function GithubVaultSettings() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<VaultState>({
-    owner: "",
+  const [syncing, setSyncing] = useState(false)
+  const [connected, setConnected] = useState(false)
+  const [fileCount, setFileCount] = useState(0)
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [form, setForm] = useState<VaultSettingsState>({
     repo: "",
     branch: "main",
-    path: "",
+    foldersText: "company\njuno\nresearch",
   })
-  const [lastProbe, setLastProbe] = useState<{
-    fileCount: number
-    error: string | null
-    samplePaths: string[]
-  } | null>(null)
-  const [persistedVerify, setPersistedVerify] = useState<{
-    at: string | null
-    fileCount: number | null
-    error: string | null
-  }>({ at: null, fileCount: null, error: null })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,16 +38,14 @@ export function GithubVaultSettings() {
       if (!res.ok) return
       const data = await res.json()
       setForm({
-        owner: data.owner ?? "",
         repo: data.repo ?? "",
         branch: data.branch ?? "main",
-        path: data.path ?? "",
+        foldersText: Array.isArray(data.folders) ? data.folders.join("\n") : "company\njuno\nresearch",
       })
-      setPersistedVerify({
-        at: data.lastVerifiedAt ?? null,
-        fileCount: data.lastProbeFileCount ?? null,
-        error: data.lastProbeError ?? null,
-      })
+      setConnected(Boolean(data.connected))
+      setFileCount(Number(data.fileCount ?? 0))
+      setLastSyncedAt(typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : null)
+      setSyncError(typeof data.syncError === "string" ? data.syncError : null)
     } finally {
       setLoading(false)
     }
@@ -62,51 +55,68 @@ export function GithubVaultSettings() {
     void load()
   }, [load])
 
-  const save = async () => {
-    setSaving(true)
-    setLastProbe(null)
+  const save = async (syncAfterSave = false, nextForm?: Partial<VaultSettingsState>) => {
+    if (syncAfterSave) {
+      setSyncing(true)
+    } else {
+      setSaving(true)
+    }
+
     try {
+      const effectiveForm = {
+        ...form,
+        ...nextForm,
+      }
+
       const res = await fetch("/api/settings/github-vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          owner: form.owner.trim() || null,
-          repo: form.repo.trim() || null,
-          branch: form.branch.trim() || "main",
-          path: form.path.trim(),
-          probe: true,
+          repo: effectiveForm.repo.trim() || null,
+          branch: effectiveForm.branch.trim() || "main",
+          folders: normalizeVaultFolders(effectiveForm.foldersText),
+          sync: syncAfterSave,
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data.error || "Save failed")
+        throw new Error(typeof data.error === "string" ? data.error : "Save failed")
       }
-      if (data.probe) {
-        setLastProbe({
-          fileCount: data.probe.fileCount ?? 0,
-          error: data.probe.error ?? null,
-          samplePaths: data.probe.samplePaths ?? [],
-        })
-      }
-      if (data.cleared) {
-        toast({ title: "GitHub vault disconnected" })
-      } else {
-        toast({
-          title: "Saved",
-          description:
-            data.probe?.fileCount != null
-              ? `${data.probe.fileCount} markdown file(s) visible to agents.`
-              : "Vault settings updated.",
-        })
-      }
-    } catch (e) {
+
+      setConnected(Boolean(data.connected))
+      setFileCount(Number(data.fileCount ?? 0))
+      setLastSyncedAt(typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : null)
+      setSyncError(typeof data.syncError === "string" ? data.syncError : null)
+
       toast({
-        title: "Could not save",
-        description: e instanceof Error ? e.message : "Try again",
+        title:
+          typeof data.warning === "string" && data.warning
+            ? syncAfterSave
+              ? "Vault synced with warning"
+              : "Connection saved with warning"
+            : syncAfterSave
+              ? "Vault synced"
+              : data.cleared
+                ? "Vault disconnected"
+                : "Vault settings saved",
+        description:
+          typeof data.warning === "string" && data.warning
+            ? data.warning
+            : syncAfterSave && typeof data.fileCount === "number"
+              ? `${data.fileCount} markdown file(s) cached.`
+            : undefined,
+      })
+
+      await load()
+    } catch (error) {
+      toast({
+        title: syncAfterSave ? "Could not sync vault" : "Could not save vault settings",
+        description: error instanceof Error ? error.message : "Try again",
         variant: "destructive",
       })
     } finally {
       setSaving(false)
+      setSyncing(false)
     }
   }
 
@@ -114,61 +124,67 @@ export function GithubVaultSettings() {
     <Card className="border-border bg-card border-primary/15">
       <CardHeader className="pb-2">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <BookMarked className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <CardTitle className="text-[15px] flex items-center gap-2">
-              Obsidian vault (GitHub)
-            </CardTitle>
-            <CardDescription className="text-[13px] leading-relaxed mt-1">
-              Sync your vault to a repo with{" "}
-              <a
-                href="https://github.com/Vinzent03/obsidian-git"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                obsidian-git
-              </a>
-              . Juno reads <code className="text-[11px] bg-muted px-1 rounded">.md</code> files via the GitHub API and merges them into agent context together with the Supabase profile and semantic memory.
+            <CardTitle className="flex items-center gap-2 text-[15px]">Obsidian vault cache</CardTitle>
+            <CardDescription className="mt-1 text-[13px] leading-relaxed">
+              Point Juno at the GitHub repo that mirrors your Obsidian vault. The app caches markdown into
+              <code className="ml-1 rounded bg-muted px-1 py-0.5 text-[11px]">vault_context_cache</code> so agents do not hit
+              GitHub on every run.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
         {loading ? (
-          <div className="flex items-center gap-2 text-[13px] text-muted-foreground py-4">
+          <div className="flex items-center gap-2 py-4 text-[13px] text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
+            Loading...
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="gh-owner" className="text-[12px]">
-                  GitHub owner / org
-                </Label>
-                <Input
-                  id="gh-owner"
-                  placeholder="e.g. acme-corp"
-                  value={form.owner}
-                  onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
-                  className="bg-background font-mono text-[13px]"
-                />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="text-[11px] text-muted-foreground">Status</div>
+                <div className="mt-1 text-sm font-medium">{connected ? "Connected" : "Not connected"}</div>
               </div>
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="text-[11px] text-muted-foreground">Repo</div>
+                <div className="mt-1 text-sm font-medium">{form.repo || "Not set"}</div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="text-[11px] text-muted-foreground">Last synced</div>
+                <div className="mt-1 text-sm font-medium">
+                  {lastSyncedAt
+                    ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+                        new Date(lastSyncedAt),
+                      )
+                    : "Not yet"}
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/20 p-3">
+                <div className="text-[11px] text-muted-foreground">File count</div>
+                <div className="mt-1 text-sm font-medium">{fileCount}</div>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-border bg-background p-4">
               <div className="space-y-1.5">
                 <Label htmlFor="gh-repo" className="text-[12px]">
-                  Repository name
+                  GitHub vault repo
                 </Label>
                 <Input
                   id="gh-repo"
-                  placeholder="e.g. founder-brain"
+                  placeholder="e.g. NandineMpe/obsidian-vault"
                   value={form.repo}
-                  onChange={(e) => setForm((f) => ({ ...f, repo: e.target.value }))}
+                  onChange={(e) => setForm((current) => ({ ...current, repo: e.target.value }))}
                   className="bg-background font-mono text-[13px]"
                 />
               </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="gh-branch" className="text-[12px]">
                   Branch
@@ -177,107 +193,61 @@ export function GithubVaultSettings() {
                   id="gh-branch"
                   placeholder="main"
                   value={form.branch}
-                  onChange={(e) => setForm((f) => ({ ...f, branch: e.target.value }))}
+                  onChange={(e) => setForm((current) => ({ ...current, branch: e.target.value }))}
                   className="bg-background font-mono text-[13px]"
                 />
               </div>
+
               <div className="space-y-1.5">
-                <Label htmlFor="gh-path" className="text-[12px]">
-                  Path prefix <span className="text-muted-foreground font-normal">(optional)</span>
+                <Label htmlFor="gh-folders" className="text-[12px]">
+                  Vault folders
                 </Label>
-                <Input
-                  id="gh-path"
-                  placeholder="e.g. notes/ or leave empty"
-                  value={form.path}
-                  onChange={(e) => setForm((f) => ({ ...f, path: e.target.value }))}
-                  className="bg-background font-mono text-[13px]"
+                <Textarea
+                  id="gh-folders"
+                  rows={4}
+                  placeholder={"company\njuno\nresearch"}
+                  value={form.foldersText}
+                  onChange={(e) => setForm((current) => ({ ...current, foldersText: e.target.value }))}
+                  className="min-h-[110px] bg-background font-mono text-[13px]"
                 />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" onClick={() => void save(true)} disabled={saving || syncing} className="gap-2">
+                  {saving || syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
+                  Save + verify
+                </Button>
+                <Button type="button" variant="outline" onClick={() => void save(true)} disabled={saving || syncing} className="gap-2">
+                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Sync now
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    const cleared = { repo: "", branch: "main", foldersText: "company\njuno\nresearch" }
+                    setForm(cleared)
+                    void save(false, cleared)
+                  }}
+                  disabled={saving || syncing}
+                  className="gap-2"
+                >
+                  <Unplug className="h-4 w-4" />
+                  Disconnect
+                </Button>
               </div>
             </div>
 
-            {(persistedVerify.at || persistedVerify.error != null) && (
-              <p className="text-[11px] text-muted-foreground rounded-md border border-border/80 bg-muted/20 px-2.5 py-2">
-                <span className="font-medium text-foreground">Last verified: </span>
-                {persistedVerify.at
-                  ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
-                      new Date(persistedVerify.at),
-                    )
-                  : "—"}
-                {persistedVerify.fileCount != null && (
-                  <span className="text-foreground"> · {persistedVerify.fileCount} markdown file(s)</span>
-                )}
-                {persistedVerify.error && (
-                  <span className="text-amber-600 dark:text-amber-400"> · {persistedVerify.error}</span>
-                )}
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" onClick={save} disabled={saving} className="gap-2">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
-                Save &amp; test connection
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setForm({ owner: "", repo: "", branch: "main", path: "" })
-                  void (async () => {
-                    setSaving(true)
-                    try {
-                      const res = await fetch("/api/settings/github-vault", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ owner: null, repo: null, probe: false }),
-                      })
-                      if (res.ok) {
-                        toast({ title: "Vault link removed" })
-                        setLastProbe(null)
-                      }
-                    } finally {
-                      setSaving(false)
-                    }
-                  })()
-                }}
-                disabled={saving}
-              >
-                Disconnect
-              </Button>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Private repos need <code className="text-[10px] bg-muted px-1 rounded">GITHUB_VAULT_TOKEN</code> on the server
-              (Contents: Read). Full setup: <code className="text-[10px] bg-muted px-1 rounded">docs/obsidian-github-vault.md</code> in the project.
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Private repos need a server-side GitHub token. The vault sync now falls back to <code>GITHUB_PAT</code> in the
+              same spirit as the security scanner.
             </p>
 
-            {lastProbe && (
-              <div
-                className={`rounded-lg border p-3 text-[12px] ${
-                  lastProbe.error
-                    ? "border-amber-500/30 bg-amber-500/5 text-amber-100/90"
-                    : "border-emerald-500/25 bg-emerald-500/5 text-emerald-100/90"
-                }`}
-              >
-                <div className="flex items-center gap-2 font-medium">
-                  {lastProbe.error ? (
-                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                  )}
-                  {lastProbe.error
-                    ? lastProbe.error
-                    : `${lastProbe.fileCount} markdown file(s) will be included in agent context.`}
-                </div>
-                {!lastProbe.error && lastProbe.samplePaths.length > 0 && (
-                  <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-muted-foreground">
-                    {lastProbe.samplePaths.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                )}
+            {syncError ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-800 dark:text-amber-300">
+                {syncError}
               </div>
-            )}
+            ) : null}
           </>
         )}
       </CardContent>
