@@ -223,6 +223,89 @@
     animation: activity-enter 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  @keyframes resort-shadow-drift {
+    0% {
+      transform: translate3d(-2.5%, -1%, 0) scale(1.05);
+    }
+    50% {
+      transform: translate3d(1.5%, 1%, 0) scale(1.09);
+    }
+    100% {
+      transform: translate3d(-1%, 2%, 0) scale(1.06);
+    }
+  }
+
+  @keyframes resort-shadow-drift-reverse {
+    0% {
+      transform: translate3d(2%, 1%, 0) scale(1.08);
+    }
+    50% {
+      transform: translate3d(-1%, -1.5%, 0) scale(1.12);
+    }
+    100% {
+      transform: translate3d(1%, -2%, 0) scale(1.08);
+    }
+  }
+
+  @keyframes resort-cloud-drift {
+    0% {
+      transform: translate3d(-2%, 0, 0);
+      opacity: 0.28;
+    }
+    50% {
+      transform: translate3d(2%, 1.5%, 0);
+      opacity: 0.4;
+    }
+    100% {
+      transform: translate3d(-1%, -1%, 0);
+      opacity: 0.3;
+    }
+  }
+
+  @keyframes resort-cloud-drift-reverse {
+    0% {
+      transform: translate3d(2%, -1%, 0);
+      opacity: 0.2;
+    }
+    50% {
+      transform: translate3d(-2%, 1%, 0);
+      opacity: 0.34;
+    }
+    100% {
+      transform: translate3d(1%, 0, 0);
+      opacity: 0.24;
+    }
+  }
+
+  .animate-resort-shadow-drift {
+    animation: resort-shadow-drift 42s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  .animate-resort-shadow-drift-reverse {
+    animation: resort-shadow-drift-reverse 54s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  .animate-resort-cloud-drift {
+    animation: resort-cloud-drift 34s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  .animate-resort-cloud-drift-reverse {
+    animation: resort-cloud-drift-reverse 46s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-resort-shadow-drift,
+    .animate-resort-shadow-drift-reverse,
+    .animate-resort-cloud-drift,
+    .animate-resort-cloud-drift-reverse {
+      animation: none;
+    }
+  }
+
   /* Card: pure white, barely-there warm shadow */
   .glass-card {
     background: hsl(var(--card));
