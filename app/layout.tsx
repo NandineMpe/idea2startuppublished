@@ -8,11 +8,11 @@ import { Analytics } from "@vercel/analytics/react"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
-  title: "IdeaToStartup - Dashboard",
-  description: "Transform your ideas into successful startups",
+  title: "Juno AI",
+  description: "A calm operating system for company context, briefs, and founder workflows.",
   generator: "Next.js",
   icons: {
-    icon: "https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Favicons/favicon-32x32-Snr2foWGkL5oziUnbiblGmgamGwuLp.png",
+    icon: "/favicon.svg",
   },
 }
 
@@ -24,12 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link
-          rel="icon"
-          href="https://cvjdrblhcif4qupj.public.blob.vercel-storage.com/Favicons/favicon-32x32-Snr2foWGkL5oziUnbiblGmgamGwuLp.png"
-          type="image/png"
-          sizes="32x32"
-        />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
