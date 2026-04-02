@@ -9,8 +9,12 @@ let supabaseAdminInstance: SupabaseClient | null = null
 
 function getSupabase(): SupabaseClient {
   if (!supabaseInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "https://pvdpwpextjdoghfuusrd.supabase.co"
+    const key =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim() ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON?.trim() ||
+      "sb_publishable_raYAFG0lYJqSiZBtBc2Icw_26NMAJpX"
     if (!url || !key) {
       throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY")
     }
@@ -21,7 +25,7 @@ function getSupabase(): SupabaseClient {
 
 function getSupabaseAdmin(): SupabaseClient {
   if (!supabaseAdminInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "https://pvdpwpextjdoghfuusrd.supabase.co"
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
     if (!url || !key) {
       throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY")

@@ -1,110 +1,12 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { headers } from 'next/headers'
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { SubmitButton } from "./submit-button"
+import { JunoAuthPage } from "@/components/access/juno-auth-page"
 
 export default async function Login({
-    searchParams,
+  searchParams,
 }: {
-    searchParams: { message: string }
+  searchParams: Promise<{ message?: string | string[] }>
 }) {
-    const supabase = await createClient()
+  const params = await searchParams
+  const message = Array.isArray(params.message) ? params.message[0] : params.message
 
-    // If user is already logged in, redirect to dashboard
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user) {
-        return redirect("/dashboard")
-    }
-
-    const login = async (formData: FormData) => {
-        "use server"
-
-        const email = formData.get("email") as string
-        const password = formData.get("password") as string
-        const supabase = await createClient()
-
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
-
-        if (error) {
-            return redirect(`/login?message=${encodeURIComponent(error.message)}`)
-        }
-
-        return redirect("/dashboard")
-    }
-
-    const signup = async (formData: FormData) => {
-        "use server"
-
-        const origin = (await headers()).get("origin")
-        const email = formData.get("email") as string
-        const password = formData.get("password") as string
-        const supabase = await createClient()
-
-        // Ensure we don't accidentally use localhost in production if origin is missing or misconfigured
-        const redirectUrl = origin && !origin.includes("localhost")
-            ? `${origin}/auth/callback`
-            : `https://${process.env.NEXT_PUBLIC_VERCEL_URL || "idea2startuppublished.vercel.app"}/auth/callback`
-
-        const { error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: redirectUrl,
-            },
-        })
-
-        if (error) {
-            return redirect(`/login?message=${encodeURIComponent(error.message)}`)
-        }
-
-        return redirect("/login?message=Check email to continue sign in process")
-    }
-
-    return (
-        <div className="flex-1 flex flex-col w-full px-8 sm:max-w-md justify-center gap-2 h-screen mx-auto">
-            <form className="animate-in flex-1 flex flex-col w-full justify-center gap-2 text-white">
-                <h1 className="text-3xl font-bold mb-4">Idea to Startup</h1>
-                <Label className="text-md" htmlFor="email">
-                    Email
-                </Label>
-                <Input
-                    className="rounded-md px-4 py-2 bg-inherit border mb-6 text-white"
-                    name="email"
-                    placeholder="you@example.com"
-                    required
-                />
-                <Label className="text-md" htmlFor="password">
-                    Password
-                </Label>
-                <Input
-                    className="rounded-md px-4 py-2 bg-inherit border mb-6 text-white"
-                    type="password"
-                    name="password"
-                    placeholder="••••••••"
-                    required
-                />
-
-                <SubmitButton formAction={login} className="bg-primary text-black font-bold mb-2 rounded-md px-4 py-2" pendingText="Signing In...">
-                    Sign In
-                </SubmitButton>
-                <SubmitButton formAction={signup} variant="outline" className="border-white/20 text-white rounded-md px-4 py-2 hover:bg-white/10" pendingText="Signing Up...">
-                    Sign Up
-                </SubmitButton>
-                {searchParams?.message && (
-                    <p className="mt-4 p-4 bg-white/10 text-center rounded-md font-medium text-white">
-                        {searchParams.message}
-                    </p>
-                )}
-            </form>
-        </div>
-    )
+  return <JunoAuthPage pagePath="/login" message={message} />
 }

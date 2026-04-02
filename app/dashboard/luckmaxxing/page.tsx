@@ -1,173 +1,66 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
+import { useEffect, useRef, useState } from "react"
 import {
-  Briefcase,
-  Compass,
+  Brain,
   ExternalLink,
   Github,
   Loader2,
+  MessageCircle,
   Plus,
   Radio,
   RefreshCw,
-  Rocket,
-  Rss,
   Sparkles,
   Trash2,
 } from "lucide-react"
 import { REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
-import { SOURCES } from "@/lib/juno/sources"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
-}
-const item = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
-}
+const AUTO_SCAN_SESSION_KEY = "juno.luckmaxxing.reddit-auto-scan"
 
-const sections = [
-  {
-    icon: Compass,
-    title: "Ecosystem opportunities",
-    body: "Grants, accelerators, partnerships, and events worth your time. We will wire this to your context and signals.",
-  },
-  {
-    icon: Rocket,
-    title: "Applications",
-    body: "Deadlines and links for programs you care about. One place to track what you opened and what you shipped.",
-  },
-  {
-    icon: Briefcase,
-    title: "Jobs & roles",
-    body: "High-signal roles, ecosystem openings, and buyer hiring moves that match your thesis and stage.",
-  },
-  {
-    icon: Sparkles,
-    title: "Everything else",
-    body: "Hacks, intros, communities, and small bets that stack surface area. This is the luck engine.",
-  },
+const pillars = [
+  "Listen to real buyer pain from public Reddit threads.",
+  "Reconcile each thread against your saved context and vault.",
+  "Turn repeated frustrations into opportunities and product gaps.",
 ] as const
-
-const actionableSourceGroups = [
-  {
-    title: "Hiring and buyer-demand feeds",
-    description: "Open roles and public demand signals are the most directly usable luck surface here.",
-    names: [
-      ...SOURCES.filter((source) => source.category === "jobs").map((source) => source.name),
-      "Hacker News Who's Hiring",
-      "Reddit intent scan",
-      "Saved watchlist terms",
-    ],
-  },
-  {
-    title: "What counts as a real opening",
-    description: "Luckmaxxing should highlight openings you can move on, not broad market news.",
-    names: ["Hiring", "Hackathons", "Accelerators", "Grants", "Events", "Partnerships"],
-  },
-  {
-    title: "Still to wire",
-    description: "These are the next high-signal sources to add so the page gets even more useful.",
-    names: ["Accelerator deadlines", "Grant programs", "Hackathon calendars", "Startup event feeds"],
-  },
-] as const
-
-const accountIntegrations = [
-  {
-    title: "GitHub via Pipedream Connect",
-    body: "Live in the Integrations page today. Used for repo access, security scans, and vault-linked workflows.",
-  },
-  {
-    title: "Obsidian vault via GitHub",
-    body: "Live in Context. Juno reads your GitHub-backed vault and uses it to ground chat and agent work.",
-  },
-] as const
-
-const gaps = [
-  "Luckmaxxing still needs more public-source coverage for hackathons, accelerator deadlines, and local ecosystem events.",
-  "The saved watchlist should feed more scanners and sharper ranking so the best opportunities rise faster.",
-  "Luckmaxxing still needs alerts, reminders, and a tighter follow-up queue after a strong signal is found.",
-] as const
-
-const ACTIONABLE_OPENING_TYPES = ["Hiring", "Hackathons", "Accelerators", "Grants", "Events", "Partnerships"] as const
-
-type TriggerPipeline = "cbs" | "intent" | "cro"
-
-type IntelligenceFeedSnapshot = {
-  pipelineStatus?: {
-    cbs?: string | null
-    cro?: string | null
-    cmo?: string | null
-    cto?: string | null
-  }
-  brief?: {
-    created_at?: string
-    content?: {
-      markdown?: string
-      dashboard?: BriefDashboard
-    }
-  } | null
-  leads?: LeadRow[]
-}
 
 type IntentSignalRow = {
   id: string
   platform: string
   signal_type: string
   title: string
+  body: string | null
   url: string
+  subreddit: string | null
+  relevance_score: number | null
   why_relevant: string | null
   urgency: string | null
-  relevance_score: number | null
-  discovered_at: string
   matched_keywords: string[] | null
-}
-
-type BriefDashboardItem = {
-  title?: string
-  source?: string
-  url?: string
-  score?: number
-  urgency?: string
-  category?: string
-  whyItMatters?: string
-  strategicImplication?: string
-  suggestedAction?: string
-  connectionToRoadmap?: string | null
-}
-
-type BriefDashboard = {
-  breaking?: BriefDashboardItem[]
-  ai_tools?: BriefDashboardItem[]
-  research?: BriefDashboardItem[]
-  competitors?: BriefDashboardItem[]
-  funding?: BriefDashboardItem[]
-}
-
-type LeadRow = {
-  id: string
-  created_at: string
-  content?: {
-    company?: unknown
-    role?: unknown
-    url?: unknown
-    score?: unknown
-    pitchAngle?: unknown
-    body?: string
-  }
+  status: string
+  discovered_at: string
 }
 
 type WatchlistSnapshot = {
   watchTerms: string[]
   suggestions: string[]
-  xReady: boolean
   limit: number
+}
+
+type RedditReconData = {
+  companyName: string
+  conversationCount: number
+  contextSources: string[]
+  contextLastSyncedAt: string | null
+  vaultConnected: boolean
+  overview: string
+  themes: Array<{ title: string; detail: string }>
+  simulatedConversations: Array<{ speaker: string; message: string; implication: string }>
+  opportunities: string[]
+  gaps: string[]
+  nextMoves: string[]
 }
 
 function formatDateTime(iso: string | null | undefined): string {
@@ -177,246 +70,121 @@ function formatDateTime(iso: string | null | undefined): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(parsed)
 }
 
-type ActionableOpening = {
-  key: string
-  title: string
-  source: string
-  why: string
-  action: string
-  url: string | null
-  kind: string
-  scoreLabel: string
-}
-
-const ACTIONABLE_SIGNAL_RE =
-  /\b(hiring|job opening|open role|recruiting|who is hiring|hackathon|accelerator|incubator|grant|fellowship|deadline|apply|application|program|cohort|demo day|pitch competition|conference|summit|meetup|webinar|event|partnership|partner program|pilot|rfp)\b/i
-
-const NON_ACTIONABLE_NEWS_RE =
-  /\b(going public|ipo|acquisition|acquired|valuation|earnings|stock price|sec filing)\b/i
-
-function isActionableOpportunityText(text: string): boolean {
-  const normalized = text.trim()
-  if (!normalized) return false
-  if (ACTIONABLE_SIGNAL_RE.test(normalized)) return true
-  if (NON_ACTIONABLE_NEWS_RE.test(normalized)) return false
-  return false
-}
-
-function deriveActionableOpenings(snapshot: IntelligenceFeedSnapshot | null): ActionableOpening[] {
-  if (!snapshot) return []
-
-  const openings: ActionableOpening[] = []
-  const seen = new Set<string>()
-
-  for (const lead of snapshot.leads ?? []) {
-    const company = String(lead.content?.company ?? "").trim()
-    const role = String(lead.content?.role ?? "").trim()
-    const url = typeof lead.content?.url === "string" ? lead.content.url : null
-    if (!company || !role) continue
-
-    const key = `${company}\0${role}`
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    openings.push({
-      key,
-      title: `${company} is hiring for ${role}`,
-      source: "Hiring signal",
-      why:
-        String(lead.content?.pitchAngle ?? "").trim() ||
-        String(lead.content?.body ?? "").trim().slice(0, 220) ||
-        "A live role is often the clearest public signal that a company has budget and urgency in this area.",
-      action: "Review the opening and decide whether this is an intro, outreach, or customer-development target.",
-      url,
-      kind: "hiring",
-      scoreLabel:
-        typeof lead.content?.score === "number" ? `${Math.round(lead.content.score)}/10 fit` : "live role",
-    })
-  }
-
-  const dashboardItems = [
-    ...(snapshot.brief?.content?.dashboard?.breaking ?? []),
-    ...(snapshot.brief?.content?.dashboard?.ai_tools ?? []),
-    ...(snapshot.brief?.content?.dashboard?.research ?? []),
-    ...(snapshot.brief?.content?.dashboard?.competitors ?? []),
-    ...(snapshot.brief?.content?.dashboard?.funding ?? []),
-  ]
-
-  for (const item of dashboardItems) {
-    const title = String(item.title ?? "").trim()
-    const why = String(item.whyItMatters ?? "").trim()
-    const action = String(item.suggestedAction ?? "").trim()
-    const implication = String(item.strategicImplication ?? "").trim()
-    const combined = [title, why, action, implication].filter(Boolean).join("\n")
-    if (!isActionableOpportunityText(combined)) continue
-
-    const key = `${String(item.url ?? title)}\0${title}`
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    openings.push({
-      key,
-      title,
-      source: String(item.source ?? "Public signal"),
-      why: why || implication || "This looks like a public opening you can act on.",
-      action: action || "Open the source and decide whether to apply, reach out, or track the deadline.",
-      url: typeof item.url === "string" ? item.url : null,
-      kind: String(item.category ?? "opportunity"),
-      scoreLabel:
-        typeof item.score === "number"
-          ? `${Math.round(item.score)}/10`
-          : String(item.urgency ?? "actionable"),
-    })
-  }
-
-  return openings.slice(0, 8)
-}
-
 export default function LuckmaxxingPage() {
   const { toast } = useToast()
-  const [snapshot, setSnapshot] = useState<IntelligenceFeedSnapshot | null>(null)
-  const [intentSignals, setIntentSignals] = useState<IntentSignalRow[]>([])
+  const autoScanAttemptedRef = useRef(false)
+  const [signals, setSignals] = useState<IntentSignalRow[]>([])
   const [watchlist, setWatchlist] = useState<WatchlistSnapshot | null>(null)
-  const [loadingSnapshot, setLoadingSnapshot] = useState(true)
-  const [refreshingSnapshot, setRefreshingSnapshot] = useState(false)
-  const [runningPipeline, setRunningPipeline] = useState<TriggerPipeline | null>(null)
-  const [syncingAll, setSyncingAll] = useState(false)
-  const [lastQueuedLabel, setLastQueuedLabel] = useState<string | null>(null)
+  const [recon, setRecon] = useState<RedditReconData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [runningScan, setRunningScan] = useState(false)
   const [watchTermDraft, setWatchTermDraft] = useState("")
   const [savingWatchTerm, setSavingWatchTerm] = useState(false)
   const [removingWatchTerm, setRemovingWatchTerm] = useState<string | null>(null)
+  const [lastQueuedLabel, setLastQueuedLabel] = useState<string | null>(null)
 
+  const latestSignalSeenAt = signals[0]?.discovered_at ?? null
   const watchTerms = watchlist?.watchTerms ?? []
-  const xReady = Boolean(watchlist?.xReady)
-  const publicMentionCoverage = 2 + (xReady ? 1 : 0)
-  const latestSignalSeenAt = intentSignals[0]?.discovered_at ?? null
-  const actionableOpenings = deriveActionableOpenings(snapshot)
 
-  function scheduleSnapshotRefresh() {
-    window.setTimeout(() => {
-      void loadSnapshot(true)
-    }, 3500)
-
-    window.setTimeout(() => {
-      void loadSnapshot()
-    }, 12000)
+  function scheduleRefresh() {
+    window.setTimeout(() => void loadData(true), 3500)
+    window.setTimeout(() => void loadData(), 12000)
   }
 
-  async function triggerPipeline(pipeline: TriggerPipeline) {
+  async function triggerRedditScan() {
     const res = await fetch("/api/intelligence/trigger", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ pipeline }),
+      body: JSON.stringify({ pipeline: "intent" }),
     })
-
     const json = (await res.json().catch(() => ({}))) as { error?: string }
-    if (!res.ok) {
-      throw new Error(json.error || "Could not queue the scan.")
-    }
+    if (!res.ok) throw new Error(json.error || "Could not queue the Reddit scan.")
   }
 
-  async function loadSnapshot(showSpinner = false) {
-    if (showSpinner) setRefreshingSnapshot(true)
+  async function loadData(showSpinner = false) {
+    if (showSpinner) setRefreshing(true)
     try {
-      const [feedRes, signalsRes, watchlistRes] = await Promise.all([
-        fetch("/api/intelligence/feed", { credentials: "include" }),
-        fetch("/api/intelligence/intent-signals", { credentials: "include" }),
+      const [signalsRes, watchlistRes, reconRes] = await Promise.all([
+        fetch("/api/intelligence/intent-signals?platform=reddit&limit=24", { credentials: "include" }),
         fetch("/api/luckmaxxing/watchlist", { credentials: "include" }),
+        fetch("/api/luckmaxxing/reddit-recon", { credentials: "include" }),
       ])
 
-      const feedJson = (await feedRes.json().catch(() => ({}))) as IntelligenceFeedSnapshot & { error?: string }
       const signalsJson = (await signalsRes.json().catch(() => ({}))) as {
         signals?: IntentSignalRow[]
         error?: string
       }
       const watchlistJson = (await watchlistRes.json().catch(() => ({}))) as WatchlistSnapshot & { error?: string }
+      const reconJson = (await reconRes.json().catch(() => ({}))) as { data?: RedditReconData; error?: string }
 
-      if (!feedRes.ok) {
-        throw new Error(feedJson.error || "Could not load intelligence feed.")
-      }
+      if (!signalsRes.ok) throw new Error(signalsJson.error || "Could not load Reddit signals.")
+      if (!watchlistRes.ok) throw new Error(watchlistJson.error || "Could not load Reddit scan priorities.")
 
-      if (!signalsRes.ok) {
-        throw new Error(signalsJson.error || "Could not load intent signals.")
-      }
-
-      if (!watchlistRes.ok) {
-        throw new Error(watchlistJson.error || "Could not load watch terms.")
-      }
-
-      setSnapshot(feedJson)
-      setIntentSignals(Array.isArray(signalsJson.signals) ? signalsJson.signals.slice(0, 8) : [])
+      setSignals(Array.isArray(signalsJson.signals) ? signalsJson.signals : [])
       setWatchlist({
         watchTerms: Array.isArray(watchlistJson.watchTerms) ? watchlistJson.watchTerms : [],
         suggestions: Array.isArray(watchlistJson.suggestions) ? watchlistJson.suggestions : [],
-        xReady: Boolean(watchlistJson.xReady),
         limit: Number(watchlistJson.limit ?? 24) || 24,
       })
+      setRecon(reconRes.ok ? reconJson.data ?? null : null)
     } catch (error) {
       toast({
-        title: "Could not load scan results",
+        title: "Could not load Reddit research",
         description: error instanceof Error ? error.message : "Try again in a moment.",
         variant: "destructive",
       })
     } finally {
-      setLoadingSnapshot(false)
-      setRefreshingSnapshot(false)
+      setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    void loadSnapshot()
+    void loadData()
   }, [])
 
-  async function runScan(pipeline: TriggerPipeline, label: string) {
-    setRunningPipeline(pipeline)
+  useEffect(() => {
+    if (loading || autoScanAttemptedRef.current || !recon?.companyName) return
+    autoScanAttemptedRef.current = true
+
+    const latestSeenAt = latestSignalSeenAt ? new Date(latestSignalSeenAt).getTime() : Number.NaN
+    const stale = !Number.isFinite(latestSeenAt) || Date.now() - latestSeenAt > 6 * 60 * 60 * 1000
+    if (!stale || typeof window === "undefined") return
+
+    const sessionKey = `${AUTO_SCAN_SESSION_KEY}:${new Date().toISOString().slice(0, 10)}`
+    if (window.sessionStorage.getItem(sessionKey)) return
+    window.sessionStorage.setItem(sessionKey, "1")
+    void runRedditScan("Reddit sync", true)
+  }, [loading, latestSignalSeenAt, recon?.companyName])
+
+  async function runRedditScan(label: string, auto = false) {
+    setRunningScan(true)
     try {
-      await triggerPipeline(pipeline)
+      await triggerRedditScan()
       setLastQueuedLabel(label)
       toast({
-        title: `${label} queued`,
-        description: "Juno is running it now. Results on this page will refresh automatically.",
+        title: auto ? "Reddit scan started automatically" : `${label} queued`,
+        description: auto
+          ? "Luckmaxxing kicked off a fresh Reddit scan so this page can hydrate with live conversations."
+          : "Juno is scanning Reddit now and this page will refresh automatically.",
       })
-      scheduleSnapshotRefresh()
+      scheduleRefresh()
     } catch (error) {
       toast({
-        title: "Could not start scan",
+        title: "Could not start Reddit scan",
         description: error instanceof Error ? error.message : "Try again in a moment.",
         variant: "destructive",
       })
     } finally {
-      setRunningPipeline(null)
-    }
-  }
-
-  async function syncAll() {
-    setSyncingAll(true)
-    try {
-      await triggerPipeline("cbs")
-      await triggerPipeline("intent")
-      await triggerPipeline("cro")
-
-      setLastQueuedLabel("Full sync")
-      toast({
-        title: "Full sync queued",
-        description: "Ecosystem, mentions, and jobs are updating now.",
-      })
-      scheduleSnapshotRefresh()
-    } catch (error) {
-      toast({
-        title: "Could not start full sync",
-        description: error instanceof Error ? error.message : "Try again in a moment.",
-        variant: "destructive",
-      })
-    } finally {
-      setSyncingAll(false)
+      setRunningScan(false)
     }
   }
 
   async function addWatchTerm(rawTerm?: string) {
     const term = (rawTerm ?? watchTermDraft).trim()
     if (!term) return
-
     setSavingWatchTerm(true)
     try {
       const res = await fetch("/api/luckmaxxing/watchlist", {
@@ -425,26 +193,17 @@ export default function LuckmaxxingPage() {
         credentials: "include",
         body: JSON.stringify({ term }),
       })
-
       const json = (await res.json().catch(() => ({}))) as WatchlistSnapshot & { error?: string }
-      if (!res.ok) {
-        throw new Error(json.error || "Could not save the watch term.")
-      }
-
+      if (!res.ok) throw new Error(json.error || "Could not save the scan priority.")
       setWatchlist({
         watchTerms: Array.isArray(json.watchTerms) ? json.watchTerms : [],
         suggestions: Array.isArray(json.suggestions) ? json.suggestions : [],
-        xReady: Boolean(json.xReady),
         limit: Number(json.limit ?? 24) || 24,
       })
       setWatchTermDraft("")
-      toast({
-        title: "Watch term saved",
-        description: `"${term}" will be included the next time mentions are scanned.`,
-      })
     } catch (error) {
       toast({
-        title: "Could not save watch term",
+        title: "Could not save scan priority",
         description: error instanceof Error ? error.message : "Try again in a moment.",
         variant: "destructive",
       })
@@ -462,25 +221,16 @@ export default function LuckmaxxingPage() {
         credentials: "include",
         body: JSON.stringify({ term }),
       })
-
       const json = (await res.json().catch(() => ({}))) as WatchlistSnapshot & { error?: string }
-      if (!res.ok) {
-        throw new Error(json.error || "Could not remove the watch term.")
-      }
-
+      if (!res.ok) throw new Error(json.error || "Could not remove the scan priority.")
       setWatchlist({
         watchTerms: Array.isArray(json.watchTerms) ? json.watchTerms : [],
         suggestions: Array.isArray(json.suggestions) ? json.suggestions : [],
-        xReady: Boolean(json.xReady),
         limit: Number(json.limit ?? 24) || 24,
-      })
-      toast({
-        title: "Watch term removed",
-        description: `"${term}" is no longer part of the X monitoring list.`,
       })
     } catch (error) {
       toast({
-        title: "Could not remove watch term",
+        title: "Could not remove scan priority",
         description: error instanceof Error ? error.message : "Try again in a moment.",
         variant: "destructive",
       })
@@ -490,507 +240,182 @@ export default function LuckmaxxingPage() {
   }
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="show"
-      variants={container}
-      className="flex flex-col gap-6 p-6 lg:p-8 max-w-4xl mx-auto"
-    >
-      <motion.div variants={item} className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="flex flex-col gap-1">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6 lg:p-8">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Surface area</p>
           <h1 className="text-2xl font-semibold text-foreground">Luckmaxxing</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Stack the odds: ecosystem openings, applications, jobs, and other moves that increase your luck. You will
-            curate here; Juno will help fill it from your company profile and intelligence feed.
+          <p className="max-w-3xl text-sm text-muted-foreground">
+            Reddit-first customer signal board. Juno scans public Reddit conversations, reconciles them against your
+            saved context and GitHub-backed vault, then surfaces what people keep asking for, where the opportunity is,
+            and where your current product story still looks thin.
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => void syncAll()}
-          disabled={syncingAll || runningPipeline !== null || refreshingSnapshot}
-          className="gap-2 md:mt-1"
-        >
-          {syncingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Sync now
-        </Button>
-      </motion.div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => void loadData(true)} disabled={refreshing || runningScan} className="gap-2">
+            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh
+          </Button>
+          <Button type="button" onClick={() => void runRedditScan("Reddit sync")} disabled={runningScan || refreshing} className="gap-2">
+            {runningScan ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
+            Sync Reddit now
+          </Button>
+        </div>
+      </div>
 
-      <motion.section variants={item} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {pillars.map((pillar) => (
+          <div key={pillar} className="rounded-lg border border-border bg-card p-4 text-[13px] leading-relaxed text-muted-foreground shadow-sm">
+            {pillar}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm"><div className="text-[11px] text-muted-foreground">Scan priorities</div><div className="mt-1 text-sm font-medium text-foreground">{loading ? "Loading..." : `${watchTerms.length}/${watchlist?.limit ?? 24}`}</div></div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm"><div className="text-[11px] text-muted-foreground">Reddit threads loaded</div><div className="mt-1 text-sm font-medium text-foreground">{loading ? "Loading..." : `${signals.length}`}</div></div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm"><div className="text-[11px] text-muted-foreground">Latest Reddit signal</div><div className="mt-1 text-sm font-medium text-foreground">{formatDateTime(latestSignalSeenAt)}</div></div>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm"><div className="text-[11px] text-muted-foreground">Subreddits covered</div><div className="mt-1 text-sm font-medium text-foreground">{REDDIT_SUBREDDITS.length}</div></div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div className="max-w-2xl">
-            <h2 className="text-base font-semibold text-foreground">Scan Right Now</h2>
+            <h2 className="text-base font-semibold text-foreground">Reddit Scan Priorities</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Run the current pipelines on demand: ecosystem RSS, public mentions, and job signals. The mentions scan
-              always checks Reddit and Hacker News, and it also checks X when the search token is configured.
+              Add company names, pain phrases, buyer job titles, or workflow language you want Juno to prioritize when it scans Reddit.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void loadSnapshot(true)}
-            disabled={refreshingSnapshot || loadingSnapshot}
-            className="gap-2"
-          >
-            {refreshingSnapshot ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Refresh results
-          </Button>
+          <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">Reddit public read is live</div>
         </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            onClick={() => void runScan("cbs", "Ecosystem scan")}
-            disabled={runningPipeline !== null}
-            className="gap-2"
-          >
-            {runningPipeline === "cbs" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rss className="h-4 w-4" />}
-            Scan ecosystem now
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void runScan("intent", "Mentions scan")}
-            disabled={runningPipeline !== null}
-            className="gap-2"
-          >
-            {runningPipeline === "intent" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
-            Scan mentions now
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void runScan("cro", "Jobs scan")}
-            disabled={runningPipeline !== null}
-            className="gap-2"
-          >
-            {runningPipeline === "cro" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Briefcase className="h-4 w-4" />}
-            Scan jobs now
-          </Button>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-md border border-border bg-muted/20 p-3">
-            <div className="text-[11px] text-muted-foreground">Last ecosystem run</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {formatDateTime(snapshot?.pipelineStatus?.cbs ?? null)}
-            </div>
-          </div>
-          <div className="rounded-md border border-border bg-muted/20 p-3">
-            <div className="text-[11px] text-muted-foreground">Last jobs run</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {formatDateTime(snapshot?.pipelineStatus?.cro ?? null)}
-            </div>
-          </div>
-          <div className="rounded-md border border-border bg-muted/20 p-3">
-            <div className="text-[11px] text-muted-foreground">Watch terms</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {loadingSnapshot ? "Loading..." : `${watchTerms.length}/${watchlist?.limit ?? 24}`}
-            </div>
-          </div>
-          <div className="rounded-md border border-border bg-muted/20 p-3">
-            <div className="text-[11px] text-muted-foreground">Latest mention seen</div>
-            <div className="mt-1 text-sm font-medium text-foreground">
-              {formatDateTime(latestSignalSeenAt)}
-            </div>
-          </div>
-        </div>
-
-        <p className="mt-3 text-[12px] text-muted-foreground">
-          {lastQueuedLabel
-            ? `${lastQueuedLabel} was queued. If the results do not change immediately, give the worker a few seconds and refresh again.`
-            : "Manual scan buttons send work to the same Juno pipelines already used by the scheduled feed."}
-        </p>
-      </motion.section>
-
-      <motion.section variants={item} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="text-base font-semibold text-foreground">Opportunity Watchlist</h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Add the companies, products, or phrases you want Juno to prioritize as public-source coverage expands.
-              Examples: a competitor name, a product category, or a specific pain phrase like "cofounder tool."
-            </p>
-          </div>
-          <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">
-            Reusable across future source expansion
-          </div>
-        </div>
-
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              type="text"
-              value={watchTermDraft}
-              onChange={(event) => setWatchTermDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault()
-                  void addWatchTerm()
-                }
-              }}
-              placeholder='Add a company, account, or phrase to watch, e.g. "General Intelligence"'
-              className="h-10 flex-1 text-sm"
-            />
-            <Button
-              type="button"
-              onClick={() => void addWatchTerm()}
-              disabled={savingWatchTerm || !watchTermDraft.trim()}
-              className="gap-2"
-            >
+            <Input type="text" value={watchTermDraft} onChange={(event) => setWatchTermDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addWatchTerm() } }} placeholder='Add a pain phrase or company, e.g. "cofounder tool"' className="h-10 flex-1 text-sm" />
+            <Button type="button" onClick={() => void addWatchTerm()} disabled={savingWatchTerm || !watchTermDraft.trim()} className="gap-2">
               {savingWatchTerm ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Add watch term
+              Add priority
             </Button>
           </div>
-
           {watchlist?.suggestions?.length ? (
             <div className="flex flex-wrap gap-2">
-              {watchlist.suggestions
-                .filter((term) => !watchTerms.some((value) => value.toLowerCase() === term.toLowerCase()))
-                .slice(0, 6)
-                .map((term) => (
-                  <button
-                    key={term}
-                    type="button"
-                    onClick={() => void addWatchTerm(term)}
-                    disabled={savingWatchTerm}
-                    className="rounded-md border border-border bg-muted/30 px-2 py-1 text-[11px] text-foreground transition-colors hover:bg-muted"
-                  >
-                    + {term}
-                  </button>
-                ))}
-            </div>
-          ) : null}
-
-          {loadingSnapshot ? (
-            <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading watch terms...
-            </div>
-          ) : watchTerms.length === 0 ? (
-            <p className="text-[12px] leading-relaxed text-muted-foreground">
-              No saved watch terms yet. Add the companies or topics you want Luckmaxxing to monitor before you run the
-              mentions scan.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {watchTerms.map((term) => (
-                <span
-                  key={term}
-                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/20 px-2 py-1 text-[12px] text-foreground"
-                >
-                  <span>{term}</span>
-                  <button
-                    type="button"
-                    onClick={() => void removeWatchTerm(term)}
-                    disabled={removingWatchTerm === term}
-                    className="text-muted-foreground transition-colors hover:text-foreground"
-                    title={`Remove ${term}`}
-                  >
-                    {removingWatchTerm === term ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </span>
+              {watchlist.suggestions.filter((term) => !watchTerms.some((value) => value.toLowerCase() === term.toLowerCase())).slice(0, 6).map((term) => (
+                <button key={term} type="button" onClick={() => void addWatchTerm(term)} disabled={savingWatchTerm} className="rounded-md border border-border bg-muted/30 px-2 py-1 text-[11px] text-foreground transition-colors hover:bg-muted">+ {term}</button>
               ))}
             </div>
+          ) : null}
+          {!loading && watchTerms.length === 0 ? (
+            <p className="text-[12px] leading-relaxed text-muted-foreground">
+              No scan priorities saved yet. Add a few product names, buyer roles, or pain phrases and then run a fresh
+              Reddit sync.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {watchTerms.map((term) => (
+              <span key={term} className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/20 px-2 py-1 text-[12px] text-foreground">
+                <span>{term}</span>
+                <button type="button" onClick={() => void removeWatchTerm(term)} disabled={removingWatchTerm === term} className="text-muted-foreground transition-colors hover:text-foreground" title={`Remove ${term}`}>
+                  {removingWatchTerm === term ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-foreground"><Brain className="h-4 w-4 text-primary" /><h2 className="text-[13px] font-semibold">What Reddit Is Saying</h2></div>
+          <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">{recon?.overview || "Run a Reddit sync and Luckmaxxing will summarize the strongest recurring patterns here."}</p>
+          <div className="mt-3 space-y-3">
+            {(recon?.themes ?? []).map((theme) => (
+              <div key={theme.title} className="rounded-md border border-border bg-muted/15 p-3">
+                <p className="text-[12px] font-medium text-foreground">{theme.title}</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{theme.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-foreground"><MessageCircle className="h-4 w-4 text-primary" /><h2 className="text-[13px] font-semibold">Simulated Customer Conversations</h2></div>
+          <div className="mt-3 space-y-3">
+            {(recon?.simulatedConversations ?? []).map((conversation, index) => (
+              <div key={`${conversation.speaker}-${index}`} className="rounded-md border border-border bg-muted/15 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{conversation.speaker}</p>
+                <p className="mt-2 text-[12px] leading-relaxed text-foreground">{conversation.message}</p>
+                <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{conversation.implication}</p>
+              </div>
+            ))}
+            {!(recon?.simulatedConversations?.length) ? <p className="text-[12px] leading-relaxed text-muted-foreground">Once Reddit threads are loaded, Juno will synthesize them into customer-style conversations you can use to pressure-test demand.</p> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-foreground"><Sparkles className="h-4 w-4 text-primary" /><h2 className="text-[13px] font-semibold">Opportunities To Pursue</h2></div>
+          <ul className="mt-3 space-y-2">
+            {(recon?.opportunities ?? []).map((opportunity) => <li key={opportunity} className="text-[12px] leading-relaxed text-muted-foreground">{opportunity}</li>)}
+            {!(recon?.opportunities?.length) ? <li className="text-[12px] leading-relaxed text-muted-foreground">The strongest product opportunities will appear here after the next Reddit sync.</li> : null}
+          </ul>
+          {recon?.nextMoves?.length ? (
+            <div className="mt-3 rounded-md border border-border bg-muted/15 p-3">
+              <p className="text-[12px] font-medium text-foreground">What to do next</p>
+              <ul className="mt-2 space-y-2">
+                {recon.nextMoves.map((move) => <li key={move} className="text-[12px] leading-relaxed text-muted-foreground">{move}</li>)}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-foreground"><Github className="h-4 w-4 text-primary" /><h2 className="text-[13px] font-semibold">Context Gaps And Grounding</h2></div>
+          <ul className="mt-3 space-y-2">
+            {(recon?.gaps ?? []).map((gap) => <li key={gap} className="text-[12px] leading-relaxed text-muted-foreground">{gap}</li>)}
+            {!(recon?.gaps?.length) ? <li className="text-[12px] leading-relaxed text-muted-foreground">This area will call out where Reddit demand looks stronger or clearer than your current saved context.</li> : null}
+          </ul>
+          <div className="mt-3 rounded-md border border-border bg-muted/20 p-3">
+            <p className="text-[12px] font-medium text-foreground">Sources in play</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(recon?.contextSources ?? ["Company profile"]).map((source) => <span key={source} className="inline-flex rounded-md border border-border bg-background px-2 py-0.5 text-[11px] text-foreground">{source}</span>)}
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">Last context refresh: {formatDateTime(recon?.contextLastSyncedAt ?? null)}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{recon?.vaultConnected ? "Vault-backed context is connected." : "Connect the GitHub-backed vault to deepen the reconciliation."}</p>
+            <Link href="/dashboard/context" className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:text-primary/80">Open Context <ExternalLink className="h-3.5 w-3.5" /></Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-foreground"><Radio className="h-4 w-4 text-primary" /><h2 className="text-[13px] font-semibold">Latest Reddit Threads</h2></div>
+        <p className="mt-2 text-[12px] text-muted-foreground">{lastQueuedLabel ? `${lastQueuedLabel} was queued. Give the worker a few seconds if the list has not refreshed yet.` : "Luckmaxxing will auto-kick a fresh Reddit scan if your saved conversations look stale when you open this page."}</p>
+        <div className="mt-3 space-y-3">
+          {loading ? (
+            <div className="flex items-center gap-2 text-[12px] text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading Reddit threads...</div>
+          ) : signals.length === 0 ? (
+            <p className="text-[12px] leading-relaxed text-muted-foreground">No Reddit threads saved yet. Run a sync and Juno will start pulling in live customer conversations here.</p>
+          ) : (
+            signals.map((signal) => (
+              <div key={signal.id} className="rounded-md border border-border bg-muted/15 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-foreground">{signal.title}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{signal.subreddit ? `r/${signal.subreddit}` : "Reddit"} / {signal.signal_type.replace(/_/g, " ")} / {signal.relevance_score ?? "?"}/10</p>
+                  </div>
+                  <a href={signal.url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground" title="Open thread"><ExternalLink className="h-3.5 w-3.5" /></a>
+                </div>
+                {signal.body ? <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-[12px] leading-relaxed text-muted-foreground">{signal.body}</p> : null}
+                {signal.why_relevant ? <p className="mt-2 text-[12px] leading-relaxed text-foreground/90">{signal.why_relevant}</p> : null}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span>{signal.urgency ?? "monitor"}</span>
+                  <span>{formatDateTime(signal.discovered_at)}</span>
+                  {signal.matched_keywords?.slice(0, 4).map((keyword) => <span key={keyword} className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground">{keyword}</span>)}
+                </div>
+              </div>
+            ))
           )}
         </div>
-      </motion.section>
-
-      <motion.ul variants={item} className="grid gap-3 sm:grid-cols-2">
-        {sections.map(({ icon: Icon, title, body }) => (
-          <li
-            key={title}
-            className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col gap-2"
-          >
-            <div className="flex items-center gap-2 text-foreground">
-              <Icon className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold">{title}</span>
-            </div>
-            <p className="text-[13px] text-muted-foreground leading-relaxed">{body}</p>
-          </li>
-        ))}
-      </motion.ul>
-
-      <motion.section variants={item} className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold text-foreground">Signal Coverage Right Now</h2>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            This page is now biased toward openings you can act on, not broad market chatter. These are the public
-            signal lanes Luckmaxxing can use today.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-foreground">
-              <Rss className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold">Actionable filters</span>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{ACTIONABLE_OPENING_TYPES.length}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Generic startup and funding headlines are intentionally down-ranked here unless they create one of these
-              usable opening types.
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-foreground">
-              <Radio className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold">Public mention scans</span>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{publicMentionCoverage}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Active public-source lanes contributing to the mentions queue today, with room to add more over time.
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-foreground">
-              <Github className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold">Account integrations</span>
-            </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{accountIntegrations.length}</p>
-            <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              GitHub account connection and GitHub-backed Obsidian vault access are both live.
-            </p>
-          </div>
-        </div>
-      </motion.section>
-
-      <motion.section variants={item} className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Compass className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Actionable Openings</h2>
-          </div>
-          <div className="mt-3 space-y-3">
-            {loadingSnapshot ? (
-              <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading openings...
-              </div>
-            ) : actionableOpenings.length === 0 ? (
-              <p className="text-[12px] leading-relaxed text-muted-foreground">
-                No actionable openings yet. Luckmaxxing will only surface items that look usable, like hiring signals,
-                accelerators, grants, hackathons, events, or partnerships.
-              </p>
-            ) : (
-              actionableOpenings.map((opening) => (
-                <div key={opening.key} className="rounded-md border border-border bg-muted/15 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-foreground">{opening.title}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {opening.source} / {opening.kind} / {opening.scoreLabel}
-                      </p>
-                    </div>
-                    {opening.url ? (
-                      <a
-                        href={opening.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                        title="Open source"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{opening.why}</p>
-                  <p className="mt-2 text-[12px] leading-relaxed text-foreground">{opening.action}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Radio className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Latest Public Signals</h2>
-          </div>
-          <div className="mt-3 space-y-3">
-            {loadingSnapshot ? (
-              <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading public signals...
-              </div>
-            ) : intentSignals.length === 0 ? (
-              <p className="text-[12px] leading-relaxed text-muted-foreground">
-                No saved public mention signals yet. Run "Scan mentions now" to look across the live public-source
-                scans.
-              </p>
-            ) : (
-              intentSignals.map((signal) => (
-                <div key={signal.id} className="rounded-md border border-border bg-muted/15 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-foreground">{signal.title}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {signal.platform.toUpperCase()} / {signal.signal_type.replace(/_/g, " ")} /{" "}
-                        {signal.relevance_score ?? "?"}/10
-                      </p>
-                    </div>
-                    <a
-                      href={signal.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                      title="Open source"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                  {signal.why_relevant ? (
-                    <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{signal.why_relevant}</p>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>{signal.urgency ?? "monitor"}</span>
-                    <span>{formatDateTime(signal.discovered_at)}</span>
-                    {signal.matched_keywords?.slice(0, 3).map((keyword) => (
-                      <span
-                        key={keyword}
-                        className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-foreground"
-                      >
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </motion.section>
-
-      <motion.section variants={item} className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Rss className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Actionable Source Coverage</h2>
-          </div>
-          <div className="mt-3 space-y-3">
-            {actionableSourceGroups.map((group) => (
-              <div key={group.title}>
-                <p className="text-[12px] font-medium text-foreground">{group.title}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{group.description}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {group.names.map((name) => (
-                    <span
-                      key={name}
-                      className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground"
-                    >
-                      {name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Radio className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Public Ecosystem Mentions</h2>
-          </div>
-          <div className="mt-3 space-y-3">
-            <div>
-              <p className="text-[12px] font-medium text-foreground">Saved watchlist</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                The watch terms you save above give Luckmaxxing a reusable set of companies, products, and pain
-                phrases to prioritize as more public-source scanners come online.
-              </p>
-            </div>
-
-            <div>
-              <p className="text-[12px] font-medium text-foreground">Reddit intent scan</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Juno scans public Reddit search plus key subreddits for posts where someone is asking for a tool,
-                describing pain, or mentioning a competitor.
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {REDDIT_SUBREDDITS.map((subreddit) => (
-                  <span
-                    key={subreddit}
-                    className="inline-flex rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-foreground"
-                  >
-                    r/{subreddit}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[12px] font-medium text-foreground">Hacker News intent scan</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Juno scans HN stories and comments for keyword-matched buying signals and problem mentions every 6
-                hours.
-              </p>
-            </div>
-
-            <div className="rounded-md border border-border bg-muted/20 p-3">
-              <p className="text-[12px] font-medium text-foreground">What this can catch today</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Posts like "we need a better cofounder workflow tool," "what are people using for this," or "we are
-                replacing [competitor]" are now in scope across the public-source scans that are live today.
-              </p>
-            </div>
-          </div>
-        </div>
-      </motion.section>
-
-      <motion.section variants={item} className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Github className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Live Account Integrations</h2>
-          </div>
-          <div className="mt-3 space-y-3">
-            {accountIntegrations.map((integration) => (
-              <div key={integration.title}>
-                <p className="text-[12px] font-medium text-foreground">{integration.title}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{integration.body}</p>
-              </div>
-            ))}
-            <Link
-              href="/dashboard/integrations"
-              className="inline-flex text-[12px] font-medium text-primary hover:text-primary/80"
-            >
-              Open Integrations
-            </Link>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-foreground">
-            <Sparkles className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Gaps Blocking Better Luck Signals</h2>
-          </div>
-          <ul className="mt-3 space-y-2">
-            {gaps.map((gap) => (
-              <li key={gap} className="text-[12px] leading-relaxed text-muted-foreground">
-                {gap}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </motion.section>
-
-      <motion.div
-        variants={item}
-        className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center"
-      >
-        <p className="text-sm text-muted-foreground">
-          Luckmaxxing now has a real watchlist and actionable-source scans. The next useful step is turning strong
-          signals into faster follow-up with alerts and a tighter opportunity queue.
-        </p>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }

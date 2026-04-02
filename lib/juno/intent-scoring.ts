@@ -36,7 +36,7 @@ function defaultResponsePlatform(platform: IntentSignal["platform"]): ResponsePl
 }
 
 /**
- * Score a batch of intent signals with Claude and generate helpful, non-salesy reply drafts.
+ * Score a batch of Reddit intent signals with Claude and generate helpful, non-salesy reply drafts.
  */
 export async function scoreIntentSignals(
   signals: IntentSignal[],
@@ -61,7 +61,7 @@ export async function scoreIntentSignals(
   for (let i = 0; i < signals.length; i += chunkSize) {
     const chunk = signals.slice(i, i + chunkSize)
 
-    const prompt = `You are a sales intelligence analyst monitoring the internet for people who may need a product like ours.
+    const prompt = `You are a product strategy and customer research analyst monitoring Reddit conversations for people who may need a product like ours.
 
 OUR COMPANY:
 ${context.promptBlock}
@@ -86,8 +86,8 @@ For EACH signal, return one object in a JSON array with this exact shape:
 {
   "url": "same as input",
   "relevanceScore": <1-10 integer>,
-  "whyRelevant": "1-3 sentences: why this thread matters for our ICP",
-  "suggestedResponse": "Draft a helpful reply that does NOT sell. Lead with genuine insight (founder's Big Four / technical accounting background where relevant). Answer their question or validate pain. Match the platform tone (Reddit, HN, or X). Only mention our company naturally if there's a clear opening - never pitch. No 'DM me', no 'check out our product'.",
+  "whyRelevant": "1-3 sentences: what frustration or request is in the thread, why it matters for our ICP, and what it suggests about demand or product gaps",
+  "suggestedResponse": "Draft a helpful Reddit reply that does NOT sell. Lead with genuine insight, answer their question or validate pain, and only mention our company naturally if there is a clear opening. No pitch, no CTA, no 'DM me'.",
   "responsePlatform": "reddit_comment" | "hn_reply" | "linkedin_dm" | "x_reply" | "direct_email",
   "urgency": "respond_now" | "this_week" | "monitor"
 }

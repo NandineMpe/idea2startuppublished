@@ -59,7 +59,13 @@ function readSavedSignals() {
     if (!Array.isArray(parsed)) return []
 
     return parsed.filter((item): item is SavedIntentSignal => {
-      return !!item && typeof item === "object" && typeof (item as SavedIntentSignal).id === "string" && typeof (item as SavedIntentSignal).savedAt === "string"
+      return (
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as SavedIntentSignal).id === "string" &&
+        typeof (item as SavedIntentSignal).savedAt === "string" &&
+        String((item as SavedIntentSignal).platform ?? "").toLowerCase() === "reddit"
+      )
     })
   } catch {
     return []
@@ -108,7 +114,7 @@ export function IntentSignalsPanel() {
 
   const loadSilent = useCallback(async () => {
     try {
-      const res = await fetch("/api/intelligence/intent-signals", { cache: "no-store" })
+      const res = await fetch("/api/intelligence/intent-signals?platform=reddit", { cache: "no-store" })
       if (!res.ok) return
 
       const json = (await res.json()) as IntentSignalsResponse
@@ -215,7 +221,7 @@ export function IntentSignalsPanel() {
         return
       }
 
-      setScanHint("Scan queued. This page polls every 8s for up to 4 minutes.")
+      setScanHint("Reddit scan queued. This page polls every 8s for up to 4 minutes.")
 
       if (pollRef.current) clearInterval(pollRef.current)
       let ticks = 0
@@ -276,11 +282,12 @@ export function IntentSignalsPanel() {
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">CRO - Type 2</p>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <MessageCircle className="h-5 w-5 shrink-0 text-orange-500" />
-            Intent signals
+            Reddit intent signals
           </h2>
           <p className="mt-0.5 max-w-2xl text-[12px] text-muted-foreground">
-            Reddit and HN threads matched to audit and compliance keywords. Runs on a schedule (every 6 hours) and on
-            demand. Suggested replies appear here - edit, send, discard, or save for later.
+            Reddit threads matched to your saved company context. Runs on a schedule (every 6 hours) and on demand.
+            Suggested replies appear here if you want to join the conversation, but the main goal is learning what
+            buyers actually want.
           </p>
         </div>
 
@@ -294,7 +301,7 @@ export function IntentSignalsPanel() {
             className="gap-1.5"
           >
             {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-            Scan now
+            Scan Reddit now
           </Button>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
@@ -397,8 +404,8 @@ export function IntentSignalsPanel() {
       <div className="max-h-[min(70vh,720px)] space-y-4 overflow-y-auto p-4 pt-3">
         {active.length === 0 && !loading && (
           <p className="text-sm text-muted-foreground">
-            No new intent signals yet. Use <strong className="text-foreground/90">Scan now</strong> or wait for the
-            schedule. Saved posts stay pinned in the ribbon above for later follow-up. If scans never return rows,
+            No new Reddit signals yet. Use <strong className="text-foreground/90">Scan Reddit now</strong> or wait for
+            the schedule. Saved posts stay pinned in the ribbon above for later follow-up. If scans never return rows,
             confirm Inngest is receiving events (Vercel has <code className="text-[11px]">INNGEST_*</code> keys) and{" "}
             <code className="text-[11px]">ANTHROPIC_API_KEY</code> for scoring. Add audit or compliance phrases in{" "}
             <a href="/dashboard/context" className="text-primary hover:underline">

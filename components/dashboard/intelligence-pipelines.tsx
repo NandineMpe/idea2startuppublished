@@ -183,7 +183,7 @@ const LOG_LINES: Record<string, string[]> = {
     "Loading Jack & Jill roles from Context…",
     "Scraping HN Who's Hiring…",
     "Scraping Remotive job board…",
-    "Scanning Reddit & HN for intent signals…",
+    "Scanning Reddit for intent signals…",
     "Scoring leads & intent threads for ICP fit…",
     "Saving qualified leads & hot intent signals…",
     "Drafting outreach for top leads…",

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
-import { buildXWatchSuggestions, normalizeXWatchTerm, normalizeXWatchTerms, X_WATCH_TERM_LIMIT } from "@/lib/juno/x-watchlist"
-
-function isXConfigured(): boolean {
-  return Boolean(process.env.X_BEARER_TOKEN?.trim())
-}
+import {
+  buildXWatchSuggestions as buildWatchSuggestions,
+  normalizeXWatchTerm as normalizeWatchTerm,
+  normalizeXWatchTerms as normalizeWatchTerms,
+  X_WATCH_TERM_LIMIT as WATCH_TERM_LIMIT,
+} from "@/lib/juno/x-watchlist"
 
 async function getProfileKeywordsAndCompetitors(userId: string) {
   const supabase = await createClient()
@@ -26,8 +27,8 @@ async function getProfileKeywordsAndCompetitors(userId: string) {
 
   return {
     profileExists: Boolean(data),
-    keywords: normalizeXWatchTerms(keywords),
-    competitors: normalizeXWatchTerms(competitors),
+    keywords: normalizeWatchTerms(keywords),
+    competitors: normalizeWatchTerms(competitors),
   }
 }
 
@@ -43,9 +44,8 @@ export async function GET() {
 
     return NextResponse.json({
       watchTerms: keywords,
-      suggestions: buildXWatchSuggestions(keywords, competitors),
-      xReady: isXConfigured(),
-      limit: X_WATCH_TERM_LIMIT,
+      suggestions: buildWatchSuggestions(keywords, competitors),
+      limit: WATCH_TERM_LIMIT,
     })
   } catch (error) {
     return jsonApiError(500, error, "luckmaxxing watchlist GET")
@@ -61,9 +61,9 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = (await req.json().catch(() => ({}))) as { term?: string }
-    const term = normalizeXWatchTerm(body.term ?? "")
+    const term = normalizeWatchTerm(body.term ?? "")
     if (!term) {
-      return NextResponse.json({ error: "Add a company, keyword, or phrase to watch." }, { status: 400 })
+      return NextResponse.json({ error: "Add a company, keyword, or phrase to prioritize in Reddit scans." }, { status: 400 })
     }
 
     const { profileExists, keywords, competitors } = await getProfileKeywordsAndCompetitors(user.id)
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         { status: 422 },
       )
     }
-    const nextKeywords = normalizeXWatchTerms([...keywords, term]).slice(0, X_WATCH_TERM_LIMIT)
+    const nextKeywords = normalizeWatchTerms([...keywords, term]).slice(0, WATCH_TERM_LIMIT)
 
     const { error } = await supabase
       .from("company_profile")
@@ -87,9 +87,8 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       watchTerms: nextKeywords,
-      suggestions: buildXWatchSuggestions(nextKeywords, competitors),
-      xReady: isXConfigured(),
-      limit: X_WATCH_TERM_LIMIT,
+      suggestions: buildWatchSuggestions(nextKeywords, competitors),
+      limit: WATCH_TERM_LIMIT,
     })
   } catch (error) {
     return jsonApiError(500, error, "luckmaxxing watchlist POST")
@@ -105,7 +104,7 @@ export async function DELETE(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = (await req.json().catch(() => ({}))) as { term?: string }
-    const term = normalizeXWatchTerm(body.term ?? "")
+    const term = normalizeWatchTerm(body.term ?? "")
     if (!term) {
       return NextResponse.json({ error: "Missing watch term." }, { status: 400 })
     }
@@ -131,9 +130,8 @@ export async function DELETE(req: Request) {
     return NextResponse.json({
       ok: true,
       watchTerms: nextKeywords,
-      suggestions: buildXWatchSuggestions(nextKeywords, competitors),
-      xReady: isXConfigured(),
-      limit: X_WATCH_TERM_LIMIT,
+      suggestions: buildWatchSuggestions(nextKeywords, competitors),
+      limit: WATCH_TERM_LIMIT,
     })
   } catch (error) {
     return jsonApiError(500, error, "luckmaxxing watchlist DELETE")

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Search, Bell, Settings, LogOut, User as UserIcon, Command } from "lucide-react"
+import { Search, Bell, Settings, LogOut, User as UserIcon, Command, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
+import { authClient } from "@/lib/better-auth-client"
 import { createClient } from "@/lib/supabase/client"
 import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher"
 import { User } from "@supabase/supabase-js"
@@ -20,7 +21,7 @@ import { User } from "@supabase/supabase-js"
 export function TopNavbar() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
     const getUser = async () => {
@@ -33,8 +34,15 @@ export function TopNavbar() {
   }, [supabase])
 
   const handleSignOut = async () => {
+    try {
+      await authClient.signOut()
+    } catch {
+      // Best effort so Better Auth cookies do not linger if the route is unavailable.
+    }
+
     await supabase.auth.signOut()
     router.push("/login")
+    router.refresh()
   }
 
   const userEmail = user?.email || "guest@ideatostartup.io"
@@ -106,6 +114,13 @@ export function TopNavbar() {
             >
               <Settings className="mr-2.5 h-4 w-4 text-muted-foreground" />
               Account Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer px-3 py-2 text-[13px]"
+              onClick={() => router.push("/paywall")}
+            >
+              <CreditCard className="mr-2.5 h-4 w-4 text-muted-foreground" />
+              Billing & Access
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

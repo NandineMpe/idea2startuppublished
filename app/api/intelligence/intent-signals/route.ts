@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const supabase = await createClient()
     const {
@@ -10,12 +10,23 @@ export async function GET() {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data, error } = await supabase
+    const { searchParams } = new URL(req.url)
+    const platform = searchParams.get("platform")?.trim().toLowerCase() || null
+    const limitParam = Number(searchParams.get("limit") ?? 40)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(Math.round(limitParam), 1), 100) : 40
+
+    let query = supabase
       .from("intent_signals")
       .select("*")
       .eq("user_id", user.id)
       .order("discovered_at", { ascending: false })
-      .limit(40)
+      .limit(limit)
+
+    if (platform) {
+      query = query.eq("platform", platform)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       return jsonApiError(500, error, "intent-signals GET")
