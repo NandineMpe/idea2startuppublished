@@ -55,25 +55,26 @@ const sections = [
   },
 ] as const
 
-const sourceGroups = [
+const actionableSourceGroups = [
   {
-    title: "Startup and VC RSS",
-    description: "Ecosystem news, launches, investors, and company moves that can open a door.",
-    names: SOURCES
-      .filter((source) => source.category === "startup" || source.category === "vc")
-      .map((source) => source.name),
+    title: "Hiring and buyer-demand feeds",
+    description: "Open roles and public demand signals are the most directly usable luck surface here.",
+    names: [
+      ...SOURCES.filter((source) => source.category === "jobs").map((source) => source.name),
+      "Hacker News Who's Hiring",
+      "Reddit intent scan",
+      "X watchlist search",
+    ],
   },
   {
-    title: "AI and regulation RSS",
-    description: "Model, product, research, and policy shifts that can create timing advantages.",
-    names: SOURCES
-      .filter((source) => source.category === "ai_research" || source.category === "ai_industry" || source.category === "regulation")
-      .map((source) => source.name),
+    title: "What counts as a real opening",
+    description: "Luckmaxxing should highlight openings you can move on, not broad market news.",
+    names: ["Hiring", "Hackathons", "Accelerators", "Grants", "Events", "Partnerships"],
   },
   {
-    title: "Job and hiring feeds",
-    description: "Signals that a company is staffing into a problem you can help solve.",
-    names: SOURCES.filter((source) => source.category === "jobs").map((source) => source.name),
+    title: "Still to wire",
+    description: "These are the next high-signal sources to add so the page gets even more useful.",
+    names: ["Accelerator deadlines", "Grant programs", "Hackathon calendars", "Startup event feeds"],
   },
 ] as const
 
@@ -94,6 +95,8 @@ const gaps = [
   "Luckmaxxing still needs alerts, reminders, and a tighter follow-up queue after a strong signal is found.",
 ] as const
 
+const ACTIONABLE_OPENING_TYPES = ["Hiring", "Hackathons", "Accelerators", "Grants", "Events", "Partnerships"] as const
+
 type TriggerPipeline = "cbs" | "intent" | "cro"
 
 type IntelligenceFeedSnapshot = {
@@ -107,8 +110,10 @@ type IntelligenceFeedSnapshot = {
     created_at?: string
     content?: {
       markdown?: string
+      dashboard?: BriefDashboard
     }
   } | null
+  leads?: LeadRow[]
 }
 
 type IntentSignalRow = {
@@ -122,6 +127,40 @@ type IntentSignalRow = {
   relevance_score: number | null
   discovered_at: string
   matched_keywords: string[] | null
+}
+
+type BriefDashboardItem = {
+  title?: string
+  source?: string
+  url?: string
+  score?: number
+  urgency?: string
+  category?: string
+  whyItMatters?: string
+  strategicImplication?: string
+  suggestedAction?: string
+  connectionToRoadmap?: string | null
+}
+
+type BriefDashboard = {
+  breaking?: BriefDashboardItem[]
+  ai_tools?: BriefDashboardItem[]
+  research?: BriefDashboardItem[]
+  competitors?: BriefDashboardItem[]
+  funding?: BriefDashboardItem[]
+}
+
+type LeadRow = {
+  id: string
+  created_at: string
+  content?: {
+    company?: unknown
+    role?: unknown
+    url?: unknown
+    score?: unknown
+    pitchAngle?: unknown
+    body?: string
+  }
 }
 
 type WatchlistSnapshot = {
@@ -138,13 +177,99 @@ function formatDateTime(iso: string | null | undefined): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(parsed)
 }
 
-function briefPreview(markdown: string | undefined): string {
-  if (!markdown?.trim()) return "No daily brief generated yet."
-  return markdown
-    .replace(/^#+\s+/gm, "")
-    .replace(/\n+/g, " ")
-    .trim()
-    .slice(0, 220)
+type ActionableOpening = {
+  key: string
+  title: string
+  source: string
+  why: string
+  action: string
+  url: string | null
+  kind: string
+  scoreLabel: string
+}
+
+const ACTIONABLE_SIGNAL_RE =
+  /\b(hiring|job opening|open role|recruiting|who is hiring|hackathon|accelerator|incubator|grant|fellowship|deadline|apply|application|program|cohort|demo day|pitch competition|conference|summit|meetup|webinar|event|partnership|partner program|pilot|rfp)\b/i
+
+const NON_ACTIONABLE_NEWS_RE =
+  /\b(going public|ipo|acquisition|acquired|valuation|earnings|stock price|sec filing)\b/i
+
+function isActionableOpportunityText(text: string): boolean {
+  const normalized = text.trim()
+  if (!normalized) return false
+  if (ACTIONABLE_SIGNAL_RE.test(normalized)) return true
+  if (NON_ACTIONABLE_NEWS_RE.test(normalized)) return false
+  return false
+}
+
+function deriveActionableOpenings(snapshot: IntelligenceFeedSnapshot | null): ActionableOpening[] {
+  if (!snapshot) return []
+
+  const openings: ActionableOpening[] = []
+  const seen = new Set<string>()
+
+  for (const lead of snapshot.leads ?? []) {
+    const company = String(lead.content?.company ?? "").trim()
+    const role = String(lead.content?.role ?? "").trim()
+    const url = typeof lead.content?.url === "string" ? lead.content.url : null
+    if (!company || !role) continue
+
+    const key = `${company}\0${role}`
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    openings.push({
+      key,
+      title: `${company} is hiring for ${role}`,
+      source: "Hiring signal",
+      why:
+        String(lead.content?.pitchAngle ?? "").trim() ||
+        String(lead.content?.body ?? "").trim().slice(0, 220) ||
+        "A live role is often the clearest public signal that a company has budget and urgency in this area.",
+      action: "Review the opening and decide whether this is an intro, outreach, or customer-development target.",
+      url,
+      kind: "hiring",
+      scoreLabel:
+        typeof lead.content?.score === "number" ? `${Math.round(lead.content.score)}/10 fit` : "live role",
+    })
+  }
+
+  const dashboardItems = [
+    ...(snapshot.brief?.content?.dashboard?.breaking ?? []),
+    ...(snapshot.brief?.content?.dashboard?.ai_tools ?? []),
+    ...(snapshot.brief?.content?.dashboard?.research ?? []),
+    ...(snapshot.brief?.content?.dashboard?.competitors ?? []),
+    ...(snapshot.brief?.content?.dashboard?.funding ?? []),
+  ]
+
+  for (const item of dashboardItems) {
+    const title = String(item.title ?? "").trim()
+    const why = String(item.whyItMatters ?? "").trim()
+    const action = String(item.suggestedAction ?? "").trim()
+    const implication = String(item.strategicImplication ?? "").trim()
+    const combined = [title, why, action, implication].filter(Boolean).join("\n")
+    if (!isActionableOpportunityText(combined)) continue
+
+    const key = `${String(item.url ?? title)}\0${title}`
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    openings.push({
+      key,
+      title,
+      source: String(item.source ?? "Public signal"),
+      why: why || implication || "This looks like a public opening you can act on.",
+      action: action || "Open the source and decide whether to apply, reach out, or track the deadline.",
+      url: typeof item.url === "string" ? item.url : null,
+      kind: String(item.category ?? "opportunity"),
+      scoreLabel:
+        typeof item.score === "number"
+          ? `${Math.round(item.score)}/10`
+          : String(item.urgency ?? "actionable"),
+    })
+  }
+
+  return openings.slice(0, 8)
 }
 
 export default function LuckmaxxingPage() {
@@ -155,6 +280,7 @@ export default function LuckmaxxingPage() {
   const [loadingSnapshot, setLoadingSnapshot] = useState(true)
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false)
   const [runningPipeline, setRunningPipeline] = useState<TriggerPipeline | null>(null)
+  const [syncingAll, setSyncingAll] = useState(false)
   const [lastQueuedLabel, setLastQueuedLabel] = useState<string | null>(null)
   const [watchTermDraft, setWatchTermDraft] = useState("")
   const [savingWatchTerm, setSavingWatchTerm] = useState(false)
@@ -164,6 +290,31 @@ export default function LuckmaxxingPage() {
   const xReady = Boolean(watchlist?.xReady)
   const publicMentionCoverage = 2 + (xReady ? 1 : 0)
   const latestSignalSeenAt = intentSignals[0]?.discovered_at ?? null
+  const actionableOpenings = deriveActionableOpenings(snapshot)
+
+  function scheduleSnapshotRefresh() {
+    window.setTimeout(() => {
+      void loadSnapshot(true)
+    }, 3500)
+
+    window.setTimeout(() => {
+      void loadSnapshot()
+    }, 12000)
+  }
+
+  async function triggerPipeline(pipeline: TriggerPipeline) {
+    const res = await fetch("/api/intelligence/trigger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ pipeline }),
+    })
+
+    const json = (await res.json().catch(() => ({}))) as { error?: string }
+    if (!res.ok) {
+      throw new Error(json.error || "Could not queue the scan.")
+    }
+  }
 
   async function loadSnapshot(showSpinner = false) {
     if (showSpinner) setRefreshingSnapshot(true)
@@ -220,31 +371,13 @@ export default function LuckmaxxingPage() {
   async function runScan(pipeline: TriggerPipeline, label: string) {
     setRunningPipeline(pipeline)
     try {
-      const res = await fetch("/api/intelligence/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ pipeline }),
-      })
-
-      const json = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) {
-        throw new Error(json.error || "Could not queue the scan.")
-      }
-
+      await triggerPipeline(pipeline)
       setLastQueuedLabel(label)
       toast({
         title: `${label} queued`,
         description: "Juno is running it now. Results on this page will refresh automatically.",
       })
-
-      window.setTimeout(() => {
-        void loadSnapshot(true)
-      }, 3500)
-
-      window.setTimeout(() => {
-        void loadSnapshot()
-      }, 12000)
+      scheduleSnapshotRefresh()
     } catch (error) {
       toast({
         title: "Could not start scan",
@@ -253,6 +386,30 @@ export default function LuckmaxxingPage() {
       })
     } finally {
       setRunningPipeline(null)
+    }
+  }
+
+  async function syncAll() {
+    setSyncingAll(true)
+    try {
+      await triggerPipeline("cbs")
+      await triggerPipeline("intent")
+      await triggerPipeline("cro")
+
+      setLastQueuedLabel("Full sync")
+      toast({
+        title: "Full sync queued",
+        description: "Ecosystem, mentions, and jobs are updating now.",
+      })
+      scheduleSnapshotRefresh()
+    } catch (error) {
+      toast({
+        title: "Could not start full sync",
+        description: error instanceof Error ? error.message : "Try again in a moment.",
+        variant: "destructive",
+      })
+    } finally {
+      setSyncingAll(false)
     }
   }
 
@@ -339,13 +496,24 @@ export default function LuckmaxxingPage() {
       variants={container}
       className="flex flex-col gap-6 p-6 lg:p-8 max-w-4xl mx-auto"
     >
-      <motion.div variants={item} className="flex flex-col gap-1">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Surface area</p>
-        <h1 className="text-2xl font-semibold text-foreground">Luckmaxxing</h1>
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Stack the odds: ecosystem openings, applications, jobs, and other moves that increase your luck. You will
-          curate here; Juno will help fill it from your company profile and intelligence feed.
-        </p>
+      <motion.div variants={item} className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-1">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Surface area</p>
+          <h1 className="text-2xl font-semibold text-foreground">Luckmaxxing</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Stack the odds: ecosystem openings, applications, jobs, and other moves that increase your luck. You will
+            curate here; Juno will help fill it from your company profile and intelligence feed.
+          </p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => void syncAll()}
+          disabled={syncingAll || runningPipeline !== null || refreshingSnapshot}
+          className="gap-2 md:mt-1"
+        >
+          {syncingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          Sync now
+        </Button>
       </motion.div>
 
       <motion.section variants={item} className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -552,8 +720,8 @@ export default function LuckmaxxingPage() {
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-foreground">Signal Coverage Right Now</h2>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            This is what Juno can already see without adding new connectors, and where the blind spots still are for
-            opportunity hunting.
+            This page is now biased toward openings you can act on, not broad market chatter. These are the public
+            signal lanes Luckmaxxing can use today.
           </p>
         </div>
 
@@ -561,13 +729,12 @@ export default function LuckmaxxingPage() {
           <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
             <div className="flex items-center gap-2 text-foreground">
               <Rss className="h-4 w-4 text-primary shrink-0" />
-              <span className="text-[13px] font-semibold">RSS feeds</span>
+              <span className="text-[13px] font-semibold">Actionable filters</span>
             </div>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
-              {SOURCES.filter((source) => source.type === "rss").length}
-            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{ACTIONABLE_OPENING_TYPES.length}</p>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Startup, AI, regulation, VC, and hiring sources are already in the scraper registry.
+              Generic startup and funding headlines are intentionally down-ranked here unless they create one of these
+              usable opening types.
             </p>
           </div>
 
@@ -598,15 +765,48 @@ export default function LuckmaxxingPage() {
       <motion.section variants={item} className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-2 text-foreground">
-            <Rss className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">Latest Ecosystem Brief</h2>
+            <Compass className="h-4 w-4 text-primary shrink-0" />
+            <h2 className="text-[13px] font-semibold">Actionable Openings</h2>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Most recent CBS run: {formatDateTime(snapshot?.brief?.created_at ?? snapshot?.pipelineStatus?.cbs ?? null)}
-          </p>
-          <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
-            {loadingSnapshot ? "Loading latest brief..." : briefPreview(snapshot?.brief?.content?.markdown)}
-          </p>
+          <div className="mt-3 space-y-3">
+            {loadingSnapshot ? (
+              <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading openings...
+              </div>
+            ) : actionableOpenings.length === 0 ? (
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                No actionable openings yet. Luckmaxxing will only surface items that look usable, like hiring signals,
+                accelerators, grants, hackathons, events, or partnerships.
+              </p>
+            ) : (
+              actionableOpenings.map((opening) => (
+                <div key={opening.key} className="rounded-md border border-border bg-muted/15 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium text-foreground">{opening.title}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {opening.source} / {opening.kind} / {opening.scoreLabel}
+                      </p>
+                    </div>
+                    {opening.url ? (
+                      <a
+                        href={opening.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Open source"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">{opening.why}</p>
+                  <p className="mt-2 text-[12px] leading-relaxed text-foreground">{opening.action}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -672,10 +872,10 @@ export default function LuckmaxxingPage() {
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center gap-2 text-foreground">
             <Rss className="h-4 w-4 text-primary shrink-0" />
-            <h2 className="text-[13px] font-semibold">RSS Sources Already Wired</h2>
+            <h2 className="text-[13px] font-semibold">Actionable Source Coverage</h2>
           </div>
           <div className="mt-3 space-y-3">
-            {sourceGroups.map((group) => (
+            {actionableSourceGroups.map((group) => (
               <div key={group.title}>
                 <p className="text-[12px] font-medium text-foreground">{group.title}</p>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">{group.description}</p>
