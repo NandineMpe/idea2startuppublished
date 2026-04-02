@@ -24,6 +24,7 @@ export default async function IntegrationsPage() {
         pipedreamReady={pipedreamReady}
         pipedreamProjectEnvironment={pipedreamReady ? getPipedreamProjectEnvironment() : undefined}
         githubOauthAppId={process.env.PIPEDREAM_GITHUB_OAUTH_APP_ID || undefined}
+        xSearchReady={Boolean(process.env.X_BEARER_TOKEN?.trim())}
       />
     </div>
   )

@@ -4,8 +4,9 @@
  *
  * Layers (in order):
  *   1. Structured profile (company_profile)
- *   2. Primary markdown knowledge base (company_profile.knowledge_base_md)
- *   3. Cached Obsidian vault digest (company_profile.vault_context_cache)
+ *   2. Uploaded docs + scraped assets
+ *   3. Primary markdown knowledge base (company_profile.knowledge_base_md)
+ *   4. Cached Obsidian vault digest (company_profile.vault_context_cache)
  *
  * Output: structured CompanyContext + promptBlock for system prompts.
  */
@@ -97,12 +98,16 @@ export interface CompanyAsset {
   source_url?: string | null
 }
 
+export type VaultRefreshMode = "never" | "if_stale" | "always"
+
 export interface GetCompanyContextOptions {
   queryHint?: string
   maxAssets?: number
   maxAssetChars?: number
   workspaceId?: string | null
   useCookieWorkspace?: boolean
+  refreshVault?: VaultRefreshMode
+  vaultMaxStaleMs?: number
 }
 
 async function getSupabaseForContext(): Promise<SupabaseClient> {
@@ -112,6 +117,65 @@ async function getSupabaseForContext(): Promise<SupabaseClient> {
   }
   const { createClient } = await import("@/lib/supabase/server")
   return createClient()
+}
+
+const DEFAULT_VAULT_MAX_STALE_MS = 1000 * 60 * 15
+
+function shouldRefreshVaultContext(
+  profile: CompanyProfile,
+  options: GetCompanyContextOptions,
+  scope: CompanyContext["scope"],
+): boolean {
+  if (scope !== "owner") return false
+  if (!profile.github_vault_repo.trim()) return false
+
+  const mode = options.refreshVault ?? "never"
+  if (mode === "never") return false
+  if (mode === "always") return true
+
+  if (!profile.vault_context_cache.trim()) return true
+
+  const lastSynced = profile.vault_context_last_synced_at
+    ? new Date(profile.vault_context_last_synced_at).getTime()
+    : Number.NaN
+
+  if (!Number.isFinite(lastSynced)) return true
+  return Date.now() - lastSynced > (options.vaultMaxStaleMs ?? DEFAULT_VAULT_MAX_STALE_MS)
+}
+
+async function maybeRefreshVaultContext(
+  supabase: SupabaseClient,
+  userId: string,
+  profile: CompanyProfile,
+  options: GetCompanyContextOptions,
+  scope: CompanyContext["scope"],
+): Promise<CompanyProfile> {
+  if (!shouldRefreshVaultContext(profile, options, scope)) return profile
+
+  try {
+    const { syncVaultContextCacheForUser } = await import("@/lib/vault-context-sync")
+    const result = await syncVaultContextCacheForUser(supabase, userId)
+
+    if (!result.connected) return profile
+    if (!result.ok) {
+      return {
+        ...profile,
+        vault_context_sync_error: result.error ?? profile.vault_context_sync_error,
+      }
+    }
+
+    return {
+      ...profile,
+      vault_context_cache: result.cache,
+      vault_context_last_synced_at: result.lastSyncedAt,
+      vault_context_file_count: result.fileCount,
+      vault_context_sync_error: result.warning ?? null,
+      vault_folders: result.folders,
+    }
+  } catch (e) {
+    console.error("[company-context] vault refresh failed:", e)
+    return profile
+  }
 }
 
 export async function getCompanyContext(
@@ -129,12 +193,19 @@ export async function getCompanyContext(
       workspaceId: options.workspaceId,
       useCookieWorkspace: options.useCookieWorkspace,
     })
-    const profile = workspace
+    let profile = workspace
       ? await loadWorkspaceProfile(supabase, userId, workspace.id)
       : await loadProfile(supabase, userId)
     const assets = workspace
       ? await loadWorkspaceAssets(supabase, userId, workspace.id, maxAssets, maxAssetChars)
       : await loadAssets(supabase, userId, maxAssets, maxAssetChars)
+    profile = await maybeRefreshVaultContext(
+      supabase,
+      userId,
+      profile,
+      options,
+      workspace ? "workspace" : "owner",
+    )
     const extracted = extractIntelligence(profile)
 
     return {
@@ -147,7 +218,7 @@ export async function getCompanyContext(
       assets,
       vaultFiles: [],
       knowledgeHits: [],
-      promptBlock: buildPromptBlock(profile),
+      promptBlock: buildPromptBlock(profile, assets),
       extracted,
     }
   } catch (e) {
@@ -373,7 +444,7 @@ function normalizeAssetType(t: string | null): CompanyAssetType {
   return "other"
 }
 
-function buildPromptBlock(profile: CompanyProfile): string {
+function buildPromptBlock(profile: CompanyProfile, assets: CompanyAsset[] = []): string {
   const structuredLines: string[] = []
   const channelVoice = profile.brand_channel_voice
 
@@ -414,10 +485,26 @@ function buildPromptBlock(profile: CompanyProfile): string {
     || (profile.github_vault_repo.trim()
       ? "Vault connected but no cached context is available yet. Run a sync from /dashboard/context."
       : "No Obsidian vault connected.")
+  const assetsBlock = assets.length > 0
+    ? assets
+        .map((asset) => {
+          const sourceLine = asset.source_url ? `Source: ${asset.source_url}\n` : ""
+          return [
+            `--- ${asset.type.toUpperCase()}: ${asset.name} ---`,
+            sourceLine + asset.content.trim(),
+          ]
+            .filter(Boolean)
+            .join("\n")
+        })
+        .join("\n\n")
+    : "No uploaded documents or scraped assets saved yet."
 
   return [
     "=== COMPANY PROFILE ===",
     structuredBlock,
+    "",
+    "=== DOCUMENTS & ASSETS ===",
+    assetsBlock,
     "",
     "=== KNOWLEDGE BASE ===",
     knowledgeBaseBlock,

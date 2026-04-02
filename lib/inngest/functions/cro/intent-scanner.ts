@@ -3,6 +3,8 @@ import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList, REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
 import { scanHNForIntent, scanRedditForIntent } from "@/lib/juno/intent-monitor"
 import { scoreIntentSignals } from "@/lib/juno/intent-scoring"
+import { hasXRecentSearchConfig, scanXForIntent } from "@/lib/juno/x-monitor"
+import { buildXWatchTermsFromContext } from "@/lib/juno/x-watchlist"
 import { getFanOutUserIds } from "@/lib/juno/users"
 import { supabaseAdmin } from "@/lib/supabase"
 
@@ -49,16 +51,18 @@ export const intentScanner = inngest.createFunction(
     }
 
     const keywords = buildKeywordList(context.extracted.keywords)
+    const xWatchTerms = buildXWatchTermsFromContext(context)
 
-    const [redditSignals, hnSignals] = await step.run("scan-platforms", async () => {
-      const [r, h] = await Promise.all([
+    const [redditSignals, hnSignals, xSignals] = await step.run("scan-platforms", async () => {
+      const [r, h, x] = await Promise.all([
         scanRedditForIntent(keywords, REDDIT_SUBREDDITS),
         scanHNForIntent(keywords),
+        hasXRecentSearchConfig() ? scanXForIntent(xWatchTerms) : Promise.resolve([]),
       ])
-      return [r, h] as const
+      return [r, h, x] as const
     })
 
-    const raw = [...redditSignals, ...hnSignals]
+    const raw = [...redditSignals, ...hnSignals, ...xSignals]
     if (raw.length === 0) {
       return { userId, scanned: 0, saved: 0, reason: "no_candidates" }
     }

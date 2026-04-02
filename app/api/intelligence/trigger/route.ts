@@ -10,6 +10,13 @@ const PIPELINE_EVENTS: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
+    if (!process.env.INNGEST_EVENT_KEY) {
+      return NextResponse.json(
+        { error: "INNGEST_EVENT_KEY is not set, so manual scan triggers are unavailable right now." },
+        { status: 501 },
+      )
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

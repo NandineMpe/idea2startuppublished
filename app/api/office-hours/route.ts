@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     // Load company context to ground the advisor in the user's actual business
-    const companyCtx = await getCompanyContext(user.id).catch(() => null)
+    const companyCtx = await getCompanyContext(user.id, { refreshVault: "always" }).catch(() => null)
 
     const systemPrompt = buildOfficeHoursSystemPrompt(
       companyCtx ?? { promptBlock: "", userId: user.id, profile: {} as never, assets: [], vaultFiles: [], knowledgeHits: [], extracted: { competitors: [], keywords: [], icp: [], vertical: "", stage: "" } },

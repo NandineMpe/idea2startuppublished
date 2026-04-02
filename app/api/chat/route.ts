@@ -33,6 +33,7 @@ export async function POST(req: Request) {
 
     const companyCtx = await getCompanyContext(userId, {
       queryHint: lastMessage.slice(0, 500) || "company strategy product market",
+      refreshVault: "always",
     })
     const companyBlock =
       companyCtx?.promptBlock?.trim()

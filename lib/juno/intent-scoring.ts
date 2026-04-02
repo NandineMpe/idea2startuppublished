@@ -28,21 +28,29 @@ function hasAnthropicKey(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
+function defaultResponsePlatform(platform: IntentSignal["platform"]): ResponsePlatform {
+  if (platform === "hn") return "hn_reply"
+  if (platform === "x") return "x_reply"
+  if (platform === "linkedin") return "linkedin_dm"
+  return "reddit_comment"
+}
+
 /**
- * Score a batch of intent signals with Claude — helpful, non-salesy reply drafts.
+ * Score a batch of intent signals with Claude and generate helpful, non-salesy reply drafts.
  */
 export async function scoreIntentSignals(
   signals: IntentSignal[],
   context: CompanyContext,
 ): Promise<ScoredIntent[]> {
   if (signals.length === 0) return []
+
   if (!hasAnthropicKey()) {
-    return signals.map((s) => ({
-      ...s,
+    return signals.map((signal) => ({
+      ...signal,
       relevanceScore: 5,
-      whyRelevant: "ANTHROPIC_API_KEY missing — manual review.",
+      whyRelevant: "ANTHROPIC_API_KEY missing - manual review.",
       suggestedResponse: "",
-      responsePlatform: s.platform === "hn" ? "hn_reply" : "reddit_comment",
+      responsePlatform: defaultResponsePlatform(signal.platform),
       urgency: "monitor" as const,
     }))
   }
@@ -60,15 +68,15 @@ ${context.promptBlock}
 
 INTENT SIGNALS (JSON array of public posts/comments):
 ${JSON.stringify(
-      chunk.map((s) => ({
-        url: s.url,
-        platform: s.platform,
-        type: s.type,
-        title: s.title,
-        body: s.body,
-        author: s.author,
-        subreddit: s.subreddit,
-        matchedKeywords: s.matchedKeywords,
+      chunk.map((signal) => ({
+        url: signal.url,
+        platform: signal.platform,
+        type: signal.type,
+        title: signal.title,
+        body: signal.body,
+        author: signal.author,
+        subreddit: signal.subreddit,
+        matchedKeywords: signal.matchedKeywords,
       })),
       null,
       2,
@@ -79,7 +87,7 @@ For EACH signal, return one object in a JSON array with this exact shape:
   "url": "same as input",
   "relevanceScore": <1-10 integer>,
   "whyRelevant": "1-3 sentences: why this thread matters for our ICP",
-  "suggestedResponse": "Draft a helpful reply that does NOT sell. Lead with genuine insight (founder's Big Four / technical accounting background where relevant). Answer their question or validate pain. Match Reddit vs HN tone. Only mention our company naturally if there's a clear opening — never pitch. No 'DM me', no 'check out our product'.",
+  "suggestedResponse": "Draft a helpful reply that does NOT sell. Lead with genuine insight (founder's Big Four / technical accounting background where relevant). Answer their question or validate pain. Match the platform tone (Reddit, HN, or X). Only mention our company naturally if there's a clear opening - never pitch. No 'DM me', no 'check out our product'.",
   "responsePlatform": "reddit_comment" | "hn_reply" | "linkedin_dm" | "x_reply" | "direct_email",
   "urgency": "respond_now" | "this_week" | "monitor"
 }
@@ -108,8 +116,8 @@ Return ONLY a valid JSON array, no markdown fences.`
       const byUrl = new Map<string, Record<string, unknown>>()
       for (const row of rows) {
         if (row && typeof row === "object" && "url" in row) {
-          const u = String((row as { url: string }).url).trim()
-          byUrl.set(u.split("?")[0], row as Record<string, unknown>)
+          const url = String((row as { url: string }).url).trim()
+          byUrl.set(url.split("?")[0], row as Record<string, unknown>)
         }
       }
 
@@ -121,39 +129,36 @@ Return ONLY a valid JSON array, no markdown fences.`
         urgency?: string
       }
 
-      for (let idx = 0; idx < chunk.length; idx++) {
-        const s = chunk[idx]
-        const key = s.url.split("?")[0]
+      for (let index = 0; index < chunk.length; index++) {
+        const signal = chunk[index]
+        const key = signal.url.split("?")[0]
         const fromUrl = byUrl.get(key) as RowShape | undefined
-        const fromIdx = rows[idx] as RowShape | undefined
-        const r = fromUrl ?? fromIdx
+        const fromIndex = rows[index] as RowShape | undefined
+        const row = fromUrl ?? fromIndex
 
         const score =
-          typeof r?.relevanceScore === "number"
-            ? Math.min(10, Math.max(1, Math.round(r.relevanceScore)))
+          typeof row?.relevanceScore === "number"
+            ? Math.min(10, Math.max(1, Math.round(row.relevanceScore)))
             : 5
 
-        const responsePlatform = normalizePlatform(r?.responsePlatform, s.platform)
-        const urgency = normalizeUrgency(r?.urgency)
-
         out.push({
-          ...s,
+          ...signal,
           relevanceScore: score,
-          whyRelevant: typeof r?.whyRelevant === "string" ? r.whyRelevant : "",
-          suggestedResponse: typeof r?.suggestedResponse === "string" ? r.suggestedResponse : "",
-          responsePlatform,
-          urgency,
+          whyRelevant: typeof row?.whyRelevant === "string" ? row.whyRelevant : "",
+          suggestedResponse: typeof row?.suggestedResponse === "string" ? row.suggestedResponse : "",
+          responsePlatform: normalizePlatform(row?.responsePlatform, signal.platform),
+          urgency: normalizeUrgency(row?.urgency),
         })
       }
-    } catch (e) {
-      console.error("[intent-scoring] Claude batch failed:", e)
-      for (const s of chunk) {
+    } catch (error) {
+      console.error("[intent-scoring] Claude batch failed:", error)
+      for (const signal of chunk) {
         out.push({
-          ...s,
+          ...signal,
           relevanceScore: 5,
-          whyRelevant: "Scoring failed — review manually.",
+          whyRelevant: "Scoring failed - review manually.",
           suggestedResponse: "",
-          responsePlatform: s.platform === "hn" ? "hn_reply" : "reddit_comment",
+          responsePlatform: defaultResponsePlatform(signal.platform),
           urgency: "monitor",
         })
       }
@@ -164,18 +169,18 @@ Return ONLY a valid JSON array, no markdown fences.`
 }
 
 function normalizePlatform(raw: string | undefined, platform: IntentSignal["platform"]): ResponsePlatform {
-  const r = (raw ?? "").toLowerCase()
-  if (r.includes("hn") || r === "hn_reply") return "hn_reply"
-  if (r.includes("reddit")) return "reddit_comment"
-  if (r.includes("linkedin")) return "linkedin_dm"
-  if (r.includes("x_") || r.includes("twitter")) return "x_reply"
-  if (r.includes("email")) return "direct_email"
-  return platform === "hn" ? "hn_reply" : "reddit_comment"
+  const value = (raw ?? "").toLowerCase()
+  if (value.includes("hn") || value === "hn_reply") return "hn_reply"
+  if (value.includes("reddit")) return "reddit_comment"
+  if (value.includes("linkedin")) return "linkedin_dm"
+  if (value.includes("x_") || value.includes("twitter")) return "x_reply"
+  if (value.includes("email")) return "direct_email"
+  return defaultResponsePlatform(platform)
 }
 
 function normalizeUrgency(raw: string | undefined): UrgencyLevel {
-  const r = (raw ?? "").toLowerCase()
-  if (r.includes("now")) return "respond_now"
-  if (r.includes("week")) return "this_week"
+  const value = (raw ?? "").toLowerCase()
+  if (value.includes("now")) return "respond_now"
+  if (value.includes("week")) return "this_week"
   return "monitor"
 }

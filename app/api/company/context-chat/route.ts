@@ -2,16 +2,27 @@ import { NextRequest } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { logApiError, safeErrorMessageForClient } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import { getCompanyContext } from "@/lib/company-context"
 import { createClient } from "@/lib/supabase/server"
 
 const anthropic = new Anthropic()
 
-export function buildContextUpdatePrompt(founderName: string, brainSummary: string): string {
+export function buildContextUpdatePrompt(
+  founderName: string,
+  companyContext: string,
+  brainSummary: string,
+): string {
+  const serverContext =
+    companyContext.trim() || "No server-side company context loaded yet."
+  const pageSummaryBlock = brainSummary.trim()
+    ? `\n\nThe context page also handed you this summary. Treat it as supporting context, but prefer the server-side company context above if they conflict:\n\n${brainSummary}`
+    : ""
+
   return `You are Juno, the founder's AI executive team. They opened "Update context" to tell you what changed about their company — pivot, traction, competitors, funding, risks, or priorities.
 
-You already have this picture of their brain (keep it in mind; they may be updating parts of it):
+You already have this server-side company context in mind (company profile, saved knowledge base, synced vault cache, and saved documents):
 
-${brainSummary}
+${serverContext}${pageSummaryBlock}
 
 RULES:
 - Be concise: 2–3 sentences per reply unless they ask for detail.
@@ -41,18 +52,20 @@ export async function POST(req: NextRequest) {
   }
 
   const messages = Array.isArray(body.messages) ? body.messages : []
-  const founderName = typeof body.founderName === "string" ? body.founderName : ""
+  const clientFounderName = typeof body.founderName === "string" ? body.founderName : ""
   const brainSummary =
     typeof body.brainSummary === "string" && body.brainSummary.trim()
       ? body.brainSummary.slice(0, 12000)
-      : "(No profile loaded yet.)"
+      : ""
+  const companyCtx = await getCompanyContext(user.id, { refreshVault: "always" }).catch(() => null)
+  const founderName = companyCtx?.profile.founder_name?.trim() || clientFounderName
 
   const bootstrap =
     messages.length === 0
       ? [{ role: "user" as const, content: "I'm ready — I want to update you on what changed." }]
       : messages
 
-  const systemPrompt = buildContextUpdatePrompt(founderName, brainSummary)
+  const systemPrompt = buildContextUpdatePrompt(founderName, companyCtx?.promptBlock ?? "", brainSummary)
 
   let activeSessionId = typeof body.sessionId === "string" && body.sessionId ? body.sessionId : null
   const lastUser = [...bootstrap].reverse().find((m) => m.role === "user")
