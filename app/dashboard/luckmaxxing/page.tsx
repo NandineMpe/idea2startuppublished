@@ -63,7 +63,7 @@ const actionableSourceGroups = [
       ...SOURCES.filter((source) => source.category === "jobs").map((source) => source.name),
       "Hacker News Who's Hiring",
       "Reddit intent scan",
-      "X watchlist search",
+      "Saved watchlist terms",
     ],
   },
   {
@@ -90,8 +90,8 @@ const accountIntegrations = [
 ] as const
 
 const gaps = [
-  "LinkedIn mention tracking is still not wired, so buyer pain that only appears there will be missed for now.",
-  "X monitoring depends on X_BEARER_TOKEN being configured and only covers public posts via recent search.",
+  "Luckmaxxing still needs more public-source coverage for hackathons, accelerator deadlines, and local ecosystem events.",
+  "The saved watchlist should feed more scanners and sharper ranking so the best opportunities rise faster.",
   "Luckmaxxing still needs alerts, reminders, and a tighter follow-up queue after a strong signal is found.",
 ] as const
 
@@ -584,7 +584,7 @@ export default function LuckmaxxingPage() {
             </div>
           </div>
           <div className="rounded-md border border-border bg-muted/20 p-3">
-            <div className="text-[11px] text-muted-foreground">X watch terms</div>
+            <div className="text-[11px] text-muted-foreground">Watch terms</div>
             <div className="mt-1 text-sm font-medium text-foreground">
               {loadingSnapshot ? "Loading..." : `${watchTerms.length}/${watchlist?.limit ?? 24}`}
             </div>
@@ -607,14 +607,14 @@ export default function LuckmaxxingPage() {
       <motion.section variants={item} className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div className="max-w-2xl">
-            <h2 className="text-base font-semibold text-foreground">X Opportunity Watchlist</h2>
+            <h2 className="text-base font-semibold text-foreground">Opportunity Watchlist</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Add the companies, products, or phrases you want Juno to look for on X. Examples: a competitor name, a
-              product category, or a specific pain phrase like "cofounder tool."
+              Add the companies, products, or phrases you want Juno to prioritize as public-source coverage expands.
+              Examples: a competitor name, a product category, or a specific pain phrase like "cofounder tool."
             </p>
           </div>
           <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-[12px] text-muted-foreground">
-            {xReady ? "X search ready" : "Set X_BEARER_TOKEN to turn on X scanning"}
+            Reusable across future source expansion
           </div>
         </div>
 
@@ -745,7 +745,7 @@ export default function LuckmaxxingPage() {
             </div>
             <p className="mt-2 text-2xl font-semibold text-foreground">{publicMentionCoverage}</p>
             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-              Reddit and Hacker News are live today, and X joins that coverage when the search token is configured.
+              Active public-source lanes contributing to the mentions queue today, with room to add more over time.
             </p>
           </div>
 
@@ -822,8 +822,8 @@ export default function LuckmaxxingPage() {
               </div>
             ) : intentSignals.length === 0 ? (
               <p className="text-[12px] leading-relaxed text-muted-foreground">
-                No saved public mention signals yet. Run "Scan mentions now" to look across Reddit, Hacker News, and X
-                when it is configured.
+                No saved public mention signals yet. Run "Scan mentions now" to look across the live public-source
+                scans.
               </p>
             ) : (
               intentSignals.map((signal) => (
@@ -901,11 +901,10 @@ export default function LuckmaxxingPage() {
           </div>
           <div className="mt-3 space-y-3">
             <div>
-              <p className="text-[12px] font-medium text-foreground">X recent search</p>
+              <p className="text-[12px] font-medium text-foreground">Saved watchlist</p>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                {xReady
-                  ? "Juno can now scan public X posts for the watch terms saved above and feed relevant hits into the intent queue."
-                  : "Configured next: set X_BEARER_TOKEN in the deployment environment and the mentions pipeline will include public X posts automatically."}
+                The watch terms you save above give Luckmaxxing a reusable set of companies, products, and pain
+                phrases to prioritize as more public-source scanners come online.
               </p>
             </div>
 
@@ -938,8 +937,8 @@ export default function LuckmaxxingPage() {
             <div className="rounded-md border border-border bg-muted/20 p-3">
               <p className="text-[12px] font-medium text-foreground">What this can catch today</p>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Posts like "we need a better cofounder workflow tool," "what are people using for X," or "we are
-                replacing [competitor]" are now in scope across Reddit and HN, and on X once the token is set.
+                Posts like "we need a better cofounder workflow tool," "what are people using for this," or "we are
+                replacing [competitor]" are now in scope across the public-source scans that are live today.
               </p>
             </div>
           </div>
@@ -988,8 +987,8 @@ export default function LuckmaxxingPage() {
         className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-6 text-center"
       >
         <p className="text-sm text-muted-foreground">
-          Luckmaxxing now has a real watchlist and can fold X into the mentions pipeline. The next useful step is
-          LinkedIn coverage plus alerts so strong signals become faster follow-up.
+          Luckmaxxing now has a real watchlist and actionable-source scans. The next useful step is turning strong
+          signals into faster follow-up with alerts and a tighter opportunity queue.
         </p>
       </motion.div>
     </motion.div>

@@ -11,7 +11,6 @@ import {
   Loader2,
   Lock,
   Plug,
-  Radio,
   RefreshCw,
   ShieldCheck,
   Unlock,
@@ -660,73 +659,15 @@ function GithubPipedreamCard({ userId, githubOauthAppId }: { userId: string; git
   )
 }
 
-function XMonitoringCard({ xSearchReady }: { xSearchReady: boolean }) {
-  return (
-    <Card className="glass-card border-border">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Radio className="h-5 w-5 text-foreground" />
-          <CardTitle className="text-foreground">X search monitoring</CardTitle>
-        </div>
-        <CardDescription className="text-muted-foreground">
-          Luckmaxxing uses app-level X recent-search access for discovery. This is separate from founder posting or
-          reply workflows.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div
-          className={cn(
-            "rounded-lg border px-3 py-2.5 text-sm",
-            xSearchReady
-              ? "border-primary/30 bg-primary/5 text-foreground"
-              : "border-border bg-muted/30 text-muted-foreground",
-          )}
-        >
-          {xSearchReady ? (
-            <span className="inline-flex items-center gap-2 font-medium text-primary">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              X recent search is configured for this deployment.
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              X recent search is not configured yet.
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-2 rounded-lg border border-border bg-background/30 p-3 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">What this powers</p>
-          <p>Find public posts that mention a target company, keyword, or pain signal and feed the strongest hits into Luckmaxxing.</p>
-          <p>It does not require each founder to connect an X account just to monitor public opportunity threads.</p>
-        </div>
-
-        {!xSearchReady ? (
-          <div className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-            Add <code className="text-xs">X_BEARER_TOKEN</code> to the deployment environment, then reload this page.
-          </div>
-        ) : null}
-
-        <a href="/dashboard/luckmaxxing" className="inline-flex text-sm font-medium text-primary hover:text-primary/80">
-          Open Luckmaxxing
-        </a>
-      </CardContent>
-    </Card>
-  )
-}
-
 export function IntegrationsPageClient({
   userId,
   pipedreamReady,
   githubOauthAppId,
-  xSearchReady,
 }: {
   userId: string
   pipedreamReady: boolean
   pipedreamProjectEnvironment?: "development" | "production"
   githubOauthAppId?: string
-  xSearchReady: boolean
 }) {
   const queryClient = useMemo(
     () =>
@@ -770,8 +711,6 @@ export function IntegrationsPageClient({
           </CardContent>
         </Card>
       )}
-
-      <XMonitoringCard xSearchReady={xSearchReady} />
 
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-foreground">Obsidian vault (GitHub repo)</h2>
