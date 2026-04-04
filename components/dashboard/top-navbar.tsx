@@ -32,6 +32,7 @@ export function TopNavbar() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [supabase] = useState(() => createClient())
+  const [inviteFriendsOpen, setInviteFriendsOpen] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {

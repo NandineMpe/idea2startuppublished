@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers"
 import { auth, applyBetterAuthResponseHeaders, hashBetterAuthPassword } from "@/lib/better-auth"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
+import { recordReferralAttributionIfEligible } from "@/lib/referrals"
 
 type BetterAuthUserRow = {
   id: string
