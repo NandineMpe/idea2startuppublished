@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { searchFounderPublic } from "@/lib/founder-public-search"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 
@@ -12,8 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Name or LinkedIn URL required" }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const query = linkedinUrl || `Founder ${name}`
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const context = searchResults.map((r) => r.text).join("\n\n")
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt: appendWritingRules(`Based on the following public search results about a founder:
       
 ${context}

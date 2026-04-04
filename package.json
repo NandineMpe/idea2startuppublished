@@ -19,9 +19,8 @@
     "pipedream:init": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 init connect"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "latest",
+    "@ai-sdk/openai": "latest",
     "@ai-sdk/react": "^3.0.143",
-    "@anthropic-ai/sdk": "^0.80.0",
     "@emotion/is-prop-valid": "latest",
     "@fontsource/inter": "^5.2.8",
     "@hookform/resolvers": "^3.10.0",

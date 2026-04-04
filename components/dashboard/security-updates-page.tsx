@@ -413,7 +413,7 @@ export function SecurityUpdatesPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Security updates</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Daily scans of the repository you pick below. GitHub access uses your Pipedream Connect account (same as
-          Integrations). Claude analyses selected files server-side — no local clone.
+          Integrations). The model analyses selected files server-side — no local clone.
         </p>
         <p className="text-xs text-muted-foreground">
           {ghLoading ? (

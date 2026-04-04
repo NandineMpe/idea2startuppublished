@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE } from "@/lib/llm-provider"
 import { generateCompetitorAnalysis } from "./perplexity"
 
 export async function POST(request: Request) {
@@ -10,10 +11,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Problem statement is required" }, { status: 400 })
     }
 
-    // Check if API key exists
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     // Construct a query from the provided information

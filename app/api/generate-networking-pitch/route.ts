@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -19,10 +19,8 @@ export async function POST(request: Request) {
     const companyContext = await getCompanyContextPrompt(user?.id)
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
-    // Check if API key exists
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const systemPrompt = `You are an expert in networking and personal branding for entrepreneurs. Your task is to help craft a compelling elevator pitch for networking events based on the information provided.
@@ -53,7 +51,7 @@ ${goals ? `Networking Goals: ${goals}` : ""}
 Based on this information, please craft my networking elevator pitch.`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt,
       system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 1000,

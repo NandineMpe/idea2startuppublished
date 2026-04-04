@@ -407,7 +407,8 @@ export function IntentSignalsPanel() {
             No new Reddit signals yet. Use <strong className="text-foreground/90">Scan Reddit now</strong> or wait for
             the schedule. Saved posts stay pinned in the ribbon above for later follow-up. If scans never return rows,
             confirm Inngest is receiving events (Vercel has <code className="text-[11px]">INNGEST_*</code> keys) and{" "}
-            <code className="text-[11px]">ANTHROPIC_API_KEY</code> for scoring. Add audit or compliance phrases in{" "}
+            <code className="text-[11px]">OPENROUTER_API_KEY</code> or{" "}
+            <code className="text-[11px]">LLM_API_KEY</code> for scoring. Add audit or compliance phrases in{" "}
             <a href="/dashboard/context" className="text-primary hover:underline">
               company context
             </a>

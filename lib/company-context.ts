@@ -12,11 +12,15 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 export interface CompanyContext {
   userId: string
   scope?: "owner" | "workspace"
+  organizationId?: string | null
+  organizationSlug?: string | null
+  organizationDisplayName?: string | null
   workspaceId?: string | null
   workspaceSlug?: string | null
   workspaceDisplayName?: string | null
@@ -106,6 +110,8 @@ export interface GetCompanyContextOptions {
   maxAssetChars?: number
   workspaceId?: string | null
   useCookieWorkspace?: boolean
+  organizationId?: string | null
+  useCookieOrganization?: boolean
   refreshVault?: VaultRefreshMode
   vaultMaxStaleMs?: number
 }
@@ -146,6 +152,7 @@ function shouldRefreshVaultContext(
 async function maybeRefreshVaultContext(
   supabase: SupabaseClient,
   userId: string,
+  organizationId: string | undefined,
   profile: CompanyProfile,
   options: GetCompanyContextOptions,
   scope: CompanyContext["scope"],
@@ -154,7 +161,7 @@ async function maybeRefreshVaultContext(
 
   try {
     const { syncVaultContextCacheForUser } = await import("@/lib/vault-context-sync")
-    const result = await syncVaultContextCacheForUser(supabase, userId)
+    const result = await syncVaultContextCacheForUser(supabase, userId, organizationId)
 
     if (!result.connected) return profile
     if (!result.ok) {
@@ -193,15 +200,24 @@ export async function getCompanyContext(
       workspaceId: options.workspaceId,
       useCookieWorkspace: options.useCookieWorkspace,
     })
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(userId, {
+            organizationId: options.organizationId,
+            useCookieOrganization: options.useCookieOrganization,
+          })
+        : null
+
     let profile = workspace
       ? await loadWorkspaceProfile(supabase, userId, workspace.id)
-      : await loadProfile(supabase, userId)
+      : await loadProfile(supabase, organization?.id)
     const assets = workspace
       ? await loadWorkspaceAssets(supabase, userId, workspace.id, maxAssets, maxAssetChars)
-      : await loadAssets(supabase, userId, maxAssets, maxAssetChars)
+      : await loadAssets(supabase, organization?.id, maxAssets, maxAssetChars)
     profile = await maybeRefreshVaultContext(
       supabase,
       userId,
+      organization?.id,
       profile,
       options,
       workspace ? "workspace" : "owner",
@@ -211,6 +227,9 @@ export async function getCompanyContext(
     return {
       userId,
       scope: workspace ? "workspace" : "owner",
+      organizationId: organization?.id ?? null,
+      organizationSlug: organization?.slug ?? null,
+      organizationDisplayName: organization?.displayName ?? null,
       workspaceId: workspace?.id ?? null,
       workspaceSlug: workspace?.slug ?? null,
       workspaceDisplayName: workspace?.displayName ?? null,
@@ -280,16 +299,27 @@ export async function getActiveUserIds(): Promise<string[]> {
   }
 }
 
-async function loadProfile(supabase: SupabaseClient, userId: string): Promise<CompanyProfile> {
-  const { data, error } = await supabase.from("company_profile").select("*").eq("user_id", userId).single()
+async function loadProfile(
+  supabase: SupabaseClient,
+  organizationId: string | undefined,
+): Promise<CompanyProfile> {
+  if (!organizationId) {
+    throw new Error("No active organization. Pick an organization or create one first.")
+  }
+
+  const { data, error } = await supabase
+    .from("company_profile")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .single()
 
   if (error || !data) {
     throw new Error(
-      `No company profile for user ${userId}. The founder needs to fill in their company profile first.`,
+      `No company profile for this organization (${organizationId}). The founder needs to fill in their company profile first.`,
     )
   }
 
-  return mapRowToCompanyProfile(data as Record<string, unknown>, userId)
+  return mapRowToCompanyProfile(data as Record<string, unknown>)
 }
 
 async function loadWorkspaceProfile(
@@ -310,10 +340,11 @@ async function loadWorkspaceProfile(
     )
   }
 
-  return mapRowToCompanyProfile(data as Record<string, unknown>, userId)
+  return mapRowToCompanyProfile(data as Record<string, unknown>)
 }
 
-function mapRowToCompanyProfile(row: Record<string, unknown>, userId: string): CompanyProfile {
+function mapRowToCompanyProfile(row: Record<string, unknown>): CompanyProfile {
+  const userId = String(row.user_id ?? "")
   const companyName = (row.company_name as string) || (row.name as string) || ""
   const tagline = (row.tagline as string) || ""
   const problem = (row.problem as string) || (row.problem_statement as string) || ""
@@ -374,14 +405,16 @@ function mapRowToCompanyProfile(row: Record<string, unknown>, userId: string): C
 
 async function loadAssets(
   supabase: SupabaseClient,
-  userId: string,
+  organizationId: string | undefined,
   maxAssets: number,
   maxChars: number,
 ): Promise<CompanyAsset[]> {
+  if (!organizationId) return []
+
   const { data, error } = await supabase
     .from("company_assets")
     .select("id, type, title, source_url, content, created_at")
-    .eq("user_id", userId)
+    .eq("organization_id", organizationId)
     .not("content", "is", null)
     .order("created_at", { ascending: false })
     .limit(maxAssets + 8)

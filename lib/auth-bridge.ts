@@ -1,7 +1,7 @@
 import "server-only"
 
 import { randomUUID } from "node:crypto"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { auth, applyBetterAuthResponseHeaders, hashBetterAuthPassword } from "@/lib/better-auth"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
@@ -402,6 +402,20 @@ export async function signUpWithBetterAuthBridge({
       name: displayName,
       supabaseUserId: supabaseUser.id,
     })
+
+    try {
+      const cookieStore = await cookies()
+      const refRaw = cookieStore.get("juno_ref")?.value
+      if (refRaw?.trim()) {
+        await recordReferralAttributionIfEligible({
+          referredUserId: supabaseUser.id,
+          referralCodeFromCookie: refRaw,
+        })
+      }
+      cookieStore.delete("juno_ref")
+    } catch {
+      // Referral capture is best effort; sign-up should still succeed.
+    }
 
     await applyBetterAuthResponseHeaders(response.headers)
 

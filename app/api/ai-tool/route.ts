@@ -3,6 +3,7 @@ import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { runTool, TOOLS } from "@/lib/ai-tools"
 import { getCompanyContextPrompt } from "@/lib/company-context"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE } from "@/lib/llm-provider"
 
 export async function POST(request: Request) {
   try {
@@ -17,8 +18,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Inputs are required" }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const supabase = await createClient()

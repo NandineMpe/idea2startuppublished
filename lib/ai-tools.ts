@@ -4,9 +4,9 @@
  * Used by /api/ai-tool (direct tool calls) and /api/delegate/plan (agent delegation).
  */
 
-import { anthropic } from "@ai-sdk/anthropic"
 import { generateText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 
 // ─── Tool field descriptors ──────────────────────────────────────────────────
 
@@ -432,7 +432,7 @@ export async function runTool(
   const tool = TOOLS[toolId]
   if (!tool) throw new Error(`Unknown tool: ${toolId}`)
 
-  if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured")
+  if (!isLlmConfigured()) throw new Error(LLM_API_KEY_MISSING_MESSAGE)
 
   const userInput = Object.entries(inputs)
     .filter(([, v]) => v && String(v).trim())
@@ -445,7 +445,7 @@ export async function runTool(
       : userInput
 
   const { text } = await generateText({
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: qwenModel(),
     system: mergeSystemWithWritingRules(tool.systemPrompt),
     prompt,
     maxTokens: 6000,

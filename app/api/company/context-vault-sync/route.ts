@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { syncVaultContextCacheForUser } from "@/lib/vault-context-sync"
 
 export async function POST() {
@@ -13,7 +14,12 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const result = await syncVaultContextCacheForUser(supabase, user.id)
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
+    const result = await syncVaultContextCacheForUser(supabase, user.id, organization.id)
 
     if (!result.connected) {
       return NextResponse.json(

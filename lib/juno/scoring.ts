@@ -1,13 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules, mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import type { CompanyContext } from "@/lib/company-context"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import type { CompetitorEvent, RawItem, ScoredItem } from "./types"
 
 export type { RawItem, ScoredItem } from "./types"
-
-const client = new Anthropic()
 
 const VALID_URGENCY = new Set<ScoredItem["urgency"]>(["breaking", "today", "this_week"])
 const VALID_CATEGORY = new Set<ScoredItem["category"]>([
@@ -21,19 +18,19 @@ const VALID_CATEGORY = new Set<ScoredItem["category"]>([
 
 /**
  * Score items against the FULL company context.
- * This is not keyword matching — Claude reads the founder's pitch deck,
+ * This is not keyword matching — the model reads the founder's pitch deck,
  * thesis, ICP, competitive landscape, and then judges relevance.
  */
 export async function scoreItems(items: RawItem[], context: CompanyContext): Promise<ScoredItem[]> {
   if (items.length === 0) return []
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isLlmConfigured()) {
     return items.map((item) => ({
       ...item,
       relevanceScore: 5,
       urgency: "today" as const,
       category: "opportunity" as const,
-      whyItMatters: "Unscored — set ANTHROPIC_API_KEY",
+      whyItMatters: "Unscored — set LLM_API_KEY or OPENROUTER_API_KEY",
       strategicImplication: "—",
       suggestedAction: "No immediate action — file as context",
       connectionToRoadmap: null,
@@ -154,16 +151,12 @@ CRITICAL RULES:
   important signals. A 10 should make the founder stop what they're doing.`
 
   try {
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 12000,
+    const { text } = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 12000,
       messages: [{ role: "user", content: appendWritingRules(prompt) }],
     })
-
-    const text = response.content
-      .filter((c) => c.type === "text")
-      .map((c) => (c as { text: string }).text)
-      .join("")
+    if (!text) return []
 
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) return []
@@ -251,7 +244,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
  * Produce a structured daily brief markdown from scored items.
  */
 export async function generateBriefMarkdown(companyContext: string, scored: ScoredItem[]): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!isLlmConfigured()) {
     const top = [...scored].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 8)
     return [
       "## Daily brief (offline)",
@@ -266,7 +259,7 @@ export async function generateBriefMarkdown(companyContext: string, scored: Scor
   const top = [...scored].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 12)
 
   const { text } = await generateText({
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: qwenModel(),
     maxOutputTokens: 2048,
     system: mergeSystemWithWritingRules(`Write a tight executive daily brief in Markdown: sections Top signals, Why it matters, Strategic implications, Suggested actions (bullets).
 Ground everything in the company context when possible. Use each item's relevance score (0-10), category, urgency, whyItMatters, strategicImplication, suggestedAction, and connectionToRoadmap. Be direct.`),

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { isProduction, logApiError } from "@/lib/api-error-response"
 import { streamText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
@@ -24,8 +24,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Slide type and data are required" }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const supabase = await createClient()
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     })
 
     const result = streamText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       system: mergeSystemWithWritingRules(systemPrompt),
       messages: [{ role: "user", content: userMessage }],
       maxTokens: 500,

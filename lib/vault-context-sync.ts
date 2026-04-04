@@ -240,6 +240,7 @@ function buildVaultContextCache(params: {
 async function syncVaultContextCacheForRow(
   supabase: SupabaseClient,
   userId: string,
+  organizationId: string,
   row: VaultProfileRow,
 ): Promise<VaultContextSyncResult> {
   const repoParts = resolveGithubVaultRepoParts(row as Record<string, unknown>)
@@ -301,10 +302,11 @@ async function syncVaultContextCacheForRow(
         .from("company_profile")
         .upsert(
           {
+            organization_id: organizationId,
             user_id: userId,
             vault_context_sync_error: listed.error,
           },
-          { onConflict: "user_id" },
+          { onConflict: "organization_id" },
         )
 
       return {
@@ -358,10 +360,11 @@ async function syncVaultContextCacheForRow(
         .from("company_profile")
         .upsert(
           {
+            organization_id: organizationId,
             user_id: userId,
             vault_context_sync_error: filesResult.error,
           },
-          { onConflict: "user_id" },
+          { onConflict: "organization_id" },
         )
 
       return {
@@ -400,13 +403,14 @@ async function syncVaultContextCacheForRow(
     .from("company_profile")
     .upsert(
       {
+        organization_id: organizationId,
         user_id: userId,
         vault_context_cache: cache,
         vault_context_last_synced_at: syncedAt,
         vault_context_file_count: allPaths.size,
         vault_context_sync_error: warning ?? null,
       },
-      { onConflict: "user_id" },
+      { onConflict: "organization_id" },
     )
 
   if (error) {
@@ -440,11 +444,35 @@ async function syncVaultContextCacheForRow(
 export async function syncVaultContextCacheForUser(
   supabase: SupabaseClient,
   userId: string,
+  organizationId?: string,
 ): Promise<VaultContextSyncResult> {
+  const { ensurePersonalOrganization, getOrganizationByIdForUser } = await import("@/lib/organizations")
+
+  let orgId = organizationId ?? null
+  if (!orgId) {
+    const org = await ensurePersonalOrganization(userId)
+    orgId = org.id
+  } else {
+    const verified = await getOrganizationByIdForUser(userId, orgId)
+    if (!verified) {
+      return {
+        ok: false,
+        connected: false,
+        repo: null,
+        branch: "main",
+        folders: [],
+        fileCount: 0,
+        lastSyncedAt: null,
+        cache: "",
+        error: "Not a member of this organization.",
+      }
+    }
+  }
+
   const { data, error } = await supabase
     .from("company_profile")
     .select("github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path, vault_folders")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .maybeSingle()
 
   if (error) {
@@ -461,5 +489,5 @@ export async function syncVaultContextCacheForUser(
     }
   }
 
-  return syncVaultContextCacheForRow(supabase, userId, (data ?? {}) as VaultProfileRow)
+  return syncVaultContextCacheForRow(supabase, userId, orgId, (data ?? {}) as VaultProfileRow)
 }

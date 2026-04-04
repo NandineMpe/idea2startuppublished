@@ -8,6 +8,7 @@ import {
   parseStringArray,
 } from "@/lib/context-view"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -44,6 +45,11 @@ export async function GET(request: Request) {
     const workspace =
       url.searchParams.get("scope") === "owner" ? null : await resolveWorkspaceSelection(user.id)
 
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
+
     const [{ data: profile }, { data: onboardingRows }, { data: assets }, { data: competitorRows }] =
       workspace
         ? await Promise.all([
@@ -66,11 +72,13 @@ export async function GET(request: Request) {
             Promise.resolve({ data: [] }),
           ])
         : await Promise.all([
-            supabase
-              .from("company_profile")
-              .select("*")
-              .eq("user_id", user.id)
-              .maybeSingle(),
+            organization
+              ? supabase
+                  .from("company_profile")
+                  .select("*")
+                  .eq("organization_id", organization.id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null }),
             supabase
               .from("ai_outputs")
               .select("inputs, created_at")
@@ -78,7 +86,9 @@ export async function GET(request: Request) {
               .eq("tool", "onboarding_extraction")
               .order("created_at", { ascending: false })
               .limit(1),
-            supabase.from("company_assets").select("type, title").eq("user_id", user.id),
+            organization
+              ? supabase.from("company_assets").select("type, title").eq("organization_id", organization.id)
+              : Promise.resolve({ data: [] }),
             supabase
               .from("competitor_tracking")
               .select("competitor_name, event_type, title, threat_level, discovered_at")

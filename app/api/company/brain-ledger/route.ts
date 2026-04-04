@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { parseStringArray } from "@/lib/context-view"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function str(v: unknown): string {
@@ -233,6 +234,11 @@ export async function GET() {
       return NextResponse.json({ data: ledger, scope: "workspace", workspace })
     }
 
+    const organization = await resolveOrganizationSelection(uid, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const [
       profileRes,
       assetsRes,
@@ -243,13 +249,12 @@ export async function GET() {
       outreachRes,
       briefsRes,
       sessionsRes,
-      msgCountsRes,
     ] = await Promise.all([
-      supabase.from("company_profile").select("*").eq("user_id", uid).maybeSingle(),
+      supabase.from("company_profile").select("*").eq("organization_id", organization.id).maybeSingle(),
       supabase
         .from("company_assets")
         .select("id, type, title, source_url, created_at")
-        .eq("user_id", uid)
+        .eq("organization_id", organization.id)
         .order("created_at", { ascending: false }),
       supabase
         .from("ai_outputs")
@@ -290,14 +295,16 @@ export async function GET() {
       supabase
         .from("chat_sessions")
         .select("id, title, channel, created_at, updated_at")
-        .eq("user_id", uid)
+        .eq("organization_id", organization.id)
         .order("updated_at", { ascending: false })
         .limit(30),
-      supabase
-        .from("chat_messages")
-        .select("session_id")
-        .eq("user_id", uid),
     ])
+
+    const sessionIds = (sessionsRes.data ?? []).map((s) => str(s.id))
+    const msgCountsRes =
+      sessionIds.length > 0
+        ? await supabase.from("chat_messages").select("session_id").in("session_id", sessionIds)
+        : { data: [] as { session_id: string }[] }
 
     // Count messages per session
     const msgCountMap: Record<string, number> = {}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 type Channel = "sidekick" | "context"
 
@@ -23,11 +24,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ authenticated: false, sessions: [] })
     }
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ authenticated: true, sessions: [] })
+    }
+
     const channel = parseChannel(new URL(req.url).searchParams)
     let q = supabase
       .from("chat_sessions")
       .select("id, title, created_at, updated_at, channel")
-      .eq("user_id", user.id)
+      .eq("organization_id", organization.id)
     if (channel) {
       q = q.eq("channel", channel)
     }
@@ -63,9 +69,19 @@ export async function POST(req: Request) {
     const channel: Channel =
       body.channel === "context" ? "context" : "sidekick"
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ session: null, error: "No active organization" }, { status: 400 })
+    }
+
     const { data: session, error } = await supabase
       .from("chat_sessions")
-      .insert({ user_id: user.id, title, channel })
+      .insert({
+        user_id: user.id,
+        organization_id: organization.id,
+        title,
+        channel,
+      })
       .select("id, title, created_at, updated_at, channel")
       .single()
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -20,9 +20,8 @@ export async function POST(request: Request) {
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     // Check if API key exists
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const systemPrompt = `You are a senior brand strategist and conversion copywriter who has spent years helping startups land their first 1,000 customers. You don't do vague slogans or marketing fluff — your job is to craft laser-sharp customer-facing pitches that create emotional urgency, build rational trust, and position the product as the obvious answer to a well-defined pain.
@@ -66,7 +65,7 @@ Make reasonable assumptions about the target audience, pain points, and market t
     const prompt = `${companyBlock}Business Idea: ${businessIdea || "Selected project from database"}`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt,
       system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 2000,

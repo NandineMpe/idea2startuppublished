@@ -1,24 +1,12 @@
 /**
- * GTM Motion — account research, contact selection, cold email drafting (Claude).
+ * GTM Motion — account research, contact selection, cold email drafting.
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import type { CompanyContext } from "@/lib/company-context"
 import type { OrgChartResult, OrgPerson } from "@/lib/juno/theorg"
-
-const anthropic = new Anthropic()
-
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("")
-}
-
-function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
-}
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 
 export type AccountResearch = {
   summary: string
@@ -41,7 +29,7 @@ export async function researchCompany(
     newsHooks: [],
     outreachAngle: "",
   }
-  if (!hasAnthropicKey()) return empty
+  if (!isLlmConfigured()) return empty
 
   const orgBlock = orgChart
     ? `ORG CHART (TheOrg):
@@ -54,7 +42,7 @@ ${orgChart.relevantContacts
 `
     : "No org chart data available."
 
-  const userPrompt = `Research this company for a B2B sales opportunity. Use web search when helpful for recent news, hiring, or public initiatives; cite recency in hooks when you can.
+  const userPrompt = `Research this company for a B2B sales opportunity. Use public knowledge for recent news, hiring, or initiatives when helpful.
 
 COMPANY: ${companyName}
 JOB POSTING / ROLE SIGNAL: ${jobTitle}
@@ -74,31 +62,24 @@ Return JSON only:
 
 Use org chart names/titles when picking contacts; if org chart empty, set those three to null.`
 
-  const baseParams = {
-    model: "claude-sonnet-4-20250514" as const,
-    max_tokens: 2000,
-    messages: [{ role: "user" as const, content: appendWritingRules(userPrompt) }],
-  }
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 2000,
+    messages: [{ role: "user", content: appendWritingRules(userPrompt) }],
+  })
 
-  let response: Anthropic.Messages.Message
-  try {
-    response = await anthropic.messages.create({
-      ...baseParams,
-      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] as any,
+  let body = text?.trim() ?? ""
+  if (!body) {
+    const retry = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 2000,
+      messages: [{ role: "user", content: appendWritingRules(userPrompt) }],
     })
-  } catch (e) {
-    console.warn("[gtm-outreach] researchCompany web_search tool failed, retrying without:", e)
-    response = await anthropic.messages.create(baseParams)
-  }
-
-  let text = extractText(response)
-  if (!text.trim()) {
-    response = await anthropic.messages.create(baseParams)
-    text = extractText(response)
+    body = retry.text?.trim() ?? ""
   }
 
   try {
-    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<AccountResearch>
+    const parsed = JSON.parse(body.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<AccountResearch>
     return {
       summary: String(parsed.summary ?? ""),
       aiStance: String(parsed.aiStance ?? ""),
@@ -109,7 +90,7 @@ Use org chart names/titles when picking contacts; if org chart empty, set those 
       internalChampion: parsed.internalChampion,
     }
   } catch {
-    return { ...empty, summary: text.slice(0, 500) }
+    return { ...empty, summary: body.slice(0, 500) }
   }
 }
 
@@ -119,7 +100,7 @@ export async function selectBestContacts(
   jobTitle: string,
   maxContacts: number,
 ): Promise<OrgPerson[]> {
-  if (!hasAnthropicKey()) {
+  if (!isLlmConfigured()) {
     return orgChart.relevantContacts.slice(0, maxContacts)
   }
 
@@ -127,9 +108,9 @@ export async function selectBestContacts(
   if (pool.length === 0) return []
   if (pool.length <= maxContacts) return pool
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 800,
     messages: [
       {
         role: "user",
@@ -148,9 +129,9 @@ Return JSON: { "positionIds": ["..."] } — ordered best first, max ${maxContact
     ],
   })
 
-  const text = extractText(response)
+  const raw = text?.trim() ?? ""
   try {
-    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
+    const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
       positionIds?: string[]
     }
     const ids = Array.isArray(parsed.positionIds) ? parsed.positionIds : []
@@ -178,7 +159,7 @@ export async function draftOutreachEmail(params: {
   recipientEmailUnknown?: boolean
 }): Promise<{ subject: string; body: string }> {
   const empty = { subject: "", body: "" }
-  if (!hasAnthropicKey()) return empty
+  if (!isLlmConfigured()) return empty
 
   const p = params.context.profile
   const voice = p.brand_voice_dna?.trim() || p.brand_voice?.trim() || ""
@@ -196,9 +177,9 @@ export async function draftOutreachEmail(params: {
     ? "\nNOTE: We do not have their work email on file — the founder will send this from their own mail client. Do not mention missing email or placeholders in the body.\n"
     : ""
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1200,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 1200,
     messages: [
       {
         role: "user",
@@ -245,9 +226,9 @@ Return JSON: {"subject":"...","body":"..."}`),
     ],
   })
 
-  const text = extractText(response)
+  const raw = text?.trim() ?? ""
   try {
-    const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
+    const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
       subject?: string
       body?: string
     }

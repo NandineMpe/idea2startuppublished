@@ -368,7 +368,7 @@ export function GtmMotionPanel() {
             Outreach queue
           </p>
           <p className="text-sm text-muted-foreground">
-            {"Jack & Jill"} leads (7+ ICP) → TheOrg org chart + Claude drafts. Copy and send from your inbox; in-app
+            {"Jack & Jill"} leads (7+ ICP) → TheOrg org chart + AI drafts. Copy and send from your inbox; in-app
             sending uses the configured provider.
           </p>
         </div>

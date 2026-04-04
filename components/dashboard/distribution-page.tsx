@@ -219,7 +219,7 @@ export function DistributionPage() {
           })
           toast({
             title: "Outreach personalized",
-            description: `Claude drafted messages for ${updated.filter((m) => m.personalizedInmail).length} leads.`,
+            description: `Drafted messages for ${updated.filter((m) => m.personalizedInmail).length} leads.`,
           })
         } catch (e) {
           toast({
@@ -933,7 +933,7 @@ export function DistributionPage() {
                             <span>Cold email</span>
                             {m.personalizedEmail ? (
                               <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold normal-case text-violet-700 dark:text-violet-300">
-                                Claude
+                                AI
                               </span>
                             ) : null}
                           </p>
@@ -971,7 +971,7 @@ export function DistributionPage() {
             <code className="rounded bg-muted px-1 py-0.5 text-[12px]">
               {"{name}"} {"{firstName}"} {"{title}"} {"{function}"} {"{company}"} {"{location}"} {"{sender_name}"}
             </code>
-            . Claude uses these when drafting the playbook; CSV import fills in fully personalized copy per row for you to review.
+            . Juno uses these when drafting the playbook; CSV import fills in fully personalized copy per row for you to review.
           </p>
           <div>
             <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

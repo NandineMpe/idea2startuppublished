@@ -494,7 +494,7 @@ export function BrandingPage({ embedded = false }: { embedded?: boolean }) {
             </Button>
             <div className="min-w-0 flex-1 space-y-1">
               <label className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Optional direction for Claude
+                Optional direction for the model
               </label>
               <Input
                 value={hints.brand_voice_dna ?? ""}
@@ -518,7 +518,7 @@ export function BrandingPage({ embedded = false }: { embedded?: boolean }) {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            Refine with Claude
+            Refine with AI
           </Button>
         </div>
       </section>
@@ -542,7 +542,7 @@ export function BrandingPage({ embedded = false }: { embedded?: boolean }) {
           <Input
             value={hints.brand_promise ?? ""}
             onChange={(e) => setHints((h) => ({ ...h, brand_promise: e.target.value }))}
-            placeholder="Optional direction for Claude"
+            placeholder="Optional direction for the model"
             className="flex-1 text-[13px]"
           />
           <Button
@@ -596,7 +596,7 @@ export function BrandingPage({ embedded = false }: { embedded?: boolean }) {
                   onChange={(e) =>
                     setHints((h) => ({ ...h, [REFINE_KEY[key]]: e.target.value }))
                   }
-                  placeholder="Optional direction for Claude"
+                  placeholder="Optional direction for the model"
                   className="flex-1 text-[13px]"
                 />
                 <Button
@@ -700,7 +700,7 @@ export function BrandingPage({ embedded = false }: { embedded?: boolean }) {
           <Input
             value={hints.brand_credibility_hooks ?? ""}
             onChange={(e) => setHints((h) => ({ ...h, brand_credibility_hooks: e.target.value }))}
-            placeholder="Optional direction for Claude"
+            placeholder="Optional direction for the model"
             className="flex-1 text-[13px]"
           />
           <Button

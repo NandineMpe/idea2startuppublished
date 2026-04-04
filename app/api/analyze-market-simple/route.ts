@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
@@ -13,6 +13,10 @@ export async function POST(req: Request) {
 
     if (!query) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 })
+    }
+
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     console.log("Starting market analysis for:", query)
@@ -130,7 +134,7 @@ Present 3–5 key bullets summarizing the opportunity, challenge, and next step
 IMPORTANT: Do not deviate from the exact section headings provided above. The frontend application parses these headings to extract and display the content correctly.`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt: `${companyBlock}Provide a comprehensive market analysis for the following business idea: ${query}`,
       system: mergeSystemWithWritingRules(systemPrompt),
       temperature: 0.2,

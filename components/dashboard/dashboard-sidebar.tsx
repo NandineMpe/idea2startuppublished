@@ -21,6 +21,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useContext, createContext } from "react"
 import { cn } from "@/lib/utils"
+import { OrganizationSwitcher } from "@/components/dashboard/organization-switcher"
 
 type NavItem = {
   title: string
@@ -53,7 +54,7 @@ export function useSidebar() {
 }
 
 export function DashboardSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
   const [expanded, setExpanded] = useState(true)
 
   return (
@@ -87,6 +88,8 @@ export function DashboardSidebar() {
             </button>
           )}
         </div>
+
+        <OrganizationSwitcher expanded={expanded} />
 
         {/* Navigation */}
         <nav className={cn("flex-1 overflow-y-auto scrollbar-auto-hide py-2 space-y-px", expanded ? "px-2" : "px-1")}>

@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const formattedInput = {
@@ -68,7 +68,7 @@ Write in a natural, confident tone. Include 1-2 relevant industry statistics. Cr
 
     try {
       const { text } = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
+        model: qwenModel(),
         prompt: JSON.stringify(formattedInput),
         system: mergeSystemWithWritingRules(systemPrompt),
         maxTokens: 2000,

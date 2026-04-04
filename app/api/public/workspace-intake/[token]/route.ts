@@ -1,11 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { convert } from "html-to-text"
 import { NextResponse } from "next/server"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { supabaseAdmin } from "@/lib/supabase"
 import { getWorkspaceRecordByShareToken } from "@/lib/workspaces"
-
-const anthropic = new Anthropic()
+import { generateText } from "ai"
 
 function extractJsonObject(text: string): Record<string, unknown> {
   const match = text.match(/\{[\s\S]*\}/)
@@ -154,13 +153,13 @@ export async function POST(
 
     const websiteText = await fetchWebsiteText(payload.websiteUrl)
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured." }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
-    const extraction = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 3000,
+    const { text: extractedText } = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 3000,
       messages: [
         {
           role: "user",
@@ -207,11 +206,6 @@ Return JSON only in this shape:
         },
       ],
     })
-
-    const extractedText = extraction.content
-      .filter((item): item is Anthropic.TextBlock => item.type === "text")
-      .map((item) => item.text)
-      .join("")
 
     const extracted = extractJsonObject(extractedText) as {
       company?: Record<string, unknown>

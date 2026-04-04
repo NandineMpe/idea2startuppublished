@@ -1,7 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk"
 import type { CompanyContext } from "@/lib/company-context"
-
-const anthropic = new Anthropic()
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 
 export type RedditReconSignal = {
   title: string
@@ -22,17 +21,6 @@ export type RedditReconSummary = {
   opportunities: string[]
   gaps: string[]
   nextMoves: string[]
-}
-
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((block): block is Anthropic.Messages.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("")
-}
-
-function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
 function normalizeLines(values: unknown, limit: number): string[] {
@@ -177,7 +165,7 @@ export async function summarizeRedditRecon(
   context: CompanyContext,
   signals: RedditReconSignal[],
 ): Promise<RedditReconSummary> {
-  if (signals.length === 0 || !hasAnthropicKey()) {
+  if (signals.length === 0 || !isLlmConfigured()) {
     return buildFallbackSummary(context, signals)
   }
 
@@ -229,13 +217,12 @@ Rules:
 - Return only valid JSON.`
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2200,
+    const { text } = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 2200,
       messages: [{ role: "user", content: prompt }],
     })
-
-    const text = extractText(response)
+    if (!text) return buildFallbackSummary(context, signals)
     const match = text.match(/\{[\s\S]*\}/)
     const parsed = match ? (JSON.parse(match[0]) as Record<string, unknown>) : null
     if (!parsed) {

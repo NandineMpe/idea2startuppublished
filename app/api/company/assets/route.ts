@@ -3,6 +3,7 @@ import { jsonApiError } from "@/lib/api-error-response"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 async function extractTextFromBuffer(buffer: Buffer, mimetype: string): Promise<string> {
@@ -36,6 +37,10 @@ export async function GET() {
     }
 
     const workspace = await resolveWorkspaceSelection(user.id)
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
 
     const { data: assets, error } = workspace
       ? await supabaseAdmin
@@ -44,11 +49,13 @@ export async function GET() {
           .eq("owner_user_id", user.id)
           .eq("workspace_id", workspace.id)
           .order("created_at", { ascending: false })
-      : await supabase
-          .from("company_assets")
-          .select("id, type, title, source_url, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
+      : organization
+        ? await supabase
+            .from("company_assets")
+            .select("id, type, title, source_url, created_at")
+            .eq("organization_id", organization.id)
+            .order("created_at", { ascending: false })
+        : { data: [], error: null }
 
     if (error) throw error
 
@@ -56,6 +63,7 @@ export async function GET() {
       assets: assets ?? [],
       scope: workspace ? "workspace" : "owner",
       workspace: workspace ?? null,
+      organization: organization ?? null,
     })
   } catch (error) {
     console.error("Company assets GET error:", error)
@@ -75,6 +83,15 @@ export async function POST(request: Request) {
     }
 
     const workspace = await resolveWorkspaceSelection(user.id)
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
+
+    if (!workspace && !organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const formData = await request.formData()
     const file = formData.get("file") as File | null
     const type = (formData.get("type") as string) || "document"
@@ -130,6 +147,10 @@ export async function POST(request: Request) {
       })
     }
 
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const vaultWrite = await saveVaultKnowledgeEntry({
       content,
       title: filename,
@@ -147,13 +168,18 @@ export async function POST(request: Request) {
     }
 
     if (isPitchDeck) {
-      await supabase.from("company_assets").delete().eq("user_id", user.id).eq("type", "pitch_deck")
+      await supabase
+        .from("company_assets")
+        .delete()
+        .eq("organization_id", organization.id)
+        .eq("type", "pitch_deck")
     }
 
     const { data: asset, error } = await supabase
       .from("company_assets")
       .insert({
         user_id: user.id,
+        organization_id: organization.id,
         type: isPitchDeck ? "pitch_deck" : "document",
         title: filename,
         content: content.slice(0, 100000),

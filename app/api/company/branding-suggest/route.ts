@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { createClient } from "@/lib/supabase/server"
@@ -57,8 +57,8 @@ ${JSON.stringify(body.brand_credibility_hooks ?? [])}
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "Missing ANTHROPIC_API_KEY" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const supabase = await createClient()
@@ -105,7 +105,7 @@ The three sections must sound like the SAME person. If the founder serves techni
 Output plain text only (no JSON).`
 
       const { text } = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
+        model: qwenModel(),
         system,
         prompt: `${companyBlock}\n\nWrite the three demonstrated samples above.`,
         maxTokens: 3500,
@@ -143,7 +143,7 @@ Rules:
 Tailor to the actual buyer and founder background in the context (e.g. Big Four + CFO buyer vs. indie hacker vs. clinical buyer).`
 
       const { text } = await generateText({
-        model: anthropic("claude-sonnet-4-20250514"),
+        model: qwenModel(),
         system: mergeSystemWithWritingRules(system),
         prompt: `${companyBlock}\n\nProduce the full JSON kit from the company context.`,
         maxTokens: 5000,
@@ -254,7 +254,7 @@ ${hint ? `\nFounder direction: ${hint}\n` : ""}
 Output only the JSON object requested.`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       system: mergeSystemWithWritingRules(system),
       prompt: userPrompt,
       maxTokens: section.startsWith("brand_words") || section === "brand_credibility_hooks" ? 2000 : 3500,

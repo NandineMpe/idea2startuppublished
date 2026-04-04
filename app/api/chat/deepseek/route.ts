@@ -1,19 +1,19 @@
-import { anthropic } from "@ai-sdk/anthropic"
 import { streamText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 
 export async function POST(req: Request) {
   const { messages } = await req.json()
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return new Response(JSON.stringify({ error: "Missing ANTHROPIC_API_KEY environment variable" }), {
+  if (!isLlmConfigured()) {
+    return new Response(JSON.stringify({ error: LLM_API_KEY_MISSING_MESSAGE }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     })
   }
 
   const result = streamText({
-    model: anthropic("claude-sonnet-4-20250514"),
+    model: qwenModel(),
     system: mergeSystemWithWritingRules(""),
     messages: messages.map((m: any) => ({
       role: m.role as "user" | "assistant",

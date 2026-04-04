@@ -47,10 +47,12 @@ export async function sendOutreachEmailForUser(
     }
   }
 
+  const { ensurePersonalOrganization } = await import("@/lib/organizations")
+  const org = await ensurePersonalOrganization(userId)
   const { data: profile } = await supabase
     .from("company_profile")
     .select("founder_name")
-    .eq("user_id", userId)
+    .eq("organization_id", org.id)
     .maybeSingle()
 
   const founder = profile?.founder_name?.trim() || "Founder"

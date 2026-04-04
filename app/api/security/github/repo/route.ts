@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 /** Persist selected GitHub repo + branch for security scans (Pipedream → GitHub API). */
 export async function PATCH(req: Request) {
@@ -29,10 +30,15 @@ export async function PATCH(req: Request) {
 
   const branch = (body.github_branch?.trim() || "main").slice(0, 200)
 
+  const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+  if (!organization) {
+    return NextResponse.json({ error: "No active organization" }, { status: 400 })
+  }
+
   const { data: existing, error: fetchErr } = await supabase
     .from("company_profile")
-    .select("user_id")
-    .eq("user_id", user.id)
+    .select("id")
+    .eq("organization_id", organization.id)
     .maybeSingle()
 
   if (fetchErr) {
@@ -53,7 +59,7 @@ export async function PATCH(req: Request) {
       github_repo: repo,
       github_branch: branch,
     })
-    .eq("user_id", user.id)
+    .eq("organization_id", organization.id)
 
   if (upErr) {
     console.error("[security/github/repo] update", upErr.message)

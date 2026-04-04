@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { jsonApiError, logApiError } from "@/lib/api-error-response"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function hasOwn(body: Record<string, unknown>, key: string): boolean {
@@ -34,6 +36,11 @@ export async function GET(request: Request) {
 
     const workspace = await getWorkspaceForRequest(user.id, request)
 
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
+
     const { data: profile, error } = workspace
       ? await supabaseAdmin
           .from("client_workspace_profiles")
@@ -41,22 +48,27 @@ export async function GET(request: Request) {
           .eq("owner_user_id", user.id)
           .eq("workspace_id", workspace.id)
           .maybeSingle()
-      : await supabaseAdmin
-          .from("company_profile")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle()
+      : organization
+        ? await supabaseAdmin
+            .from("company_profile")
+            .select("*")
+            .eq("organization_id", organization.id)
+            .maybeSingle()
+        : { data: null, error: null }
 
-    if (error && error.code !== "PGRST116") throw error
+    if (error && error.code !== "PGRST116") {
+      logApiError("company profile GET company_profile", error)
+      return jsonApiError(500, error, "company profile GET")
+    }
 
     return NextResponse.json({
       profile: profile ?? null,
       scope: workspace ? "workspace" : "owner",
       workspace: workspace ?? null,
+      organization: organization ?? null,
     })
   } catch (error) {
-    console.error("Company profile GET error:", error)
-    return NextResponse.json({ profile: null }, { status: 500 })
+    return jsonApiError(500, error, "company profile GET outer")
   }
 }
 
@@ -74,6 +86,15 @@ export async function PUT(request: Request) {
     const workspace = await getWorkspaceForRequest(user.id, request)
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
 
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
+
+    if (!workspace && !organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const { data: existingRow } = workspace
       ? await supabaseAdmin
           .from("client_workspace_profiles")
@@ -81,15 +102,17 @@ export async function PUT(request: Request) {
           .eq("owner_user_id", user.id)
           .eq("workspace_id", workspace.id)
           .maybeSingle()
-      : await supabaseAdmin
-          .from("company_profile")
-          .select("knowledge_base_md, knowledge_base_updated_at")
-          .eq("user_id", user.id)
-          .maybeSingle()
+      : organization
+        ? await supabaseAdmin
+            .from("company_profile")
+            .select("knowledge_base_md, knowledge_base_updated_at")
+            .eq("organization_id", organization.id)
+            .maybeSingle()
+        : { data: null }
 
     const patch: Record<string, unknown> = workspace
       ? { owner_user_id: user.id, workspace_id: workspace.id }
-      : { user_id: user.id }
+      : { user_id: user.id, organization_id: organization?.id }
 
     const passthroughFields = [
       "company_name",
@@ -186,7 +209,7 @@ export async function PUT(request: Request) {
     const table = workspace ? "client_workspace_profiles" : "company_profile"
     const { data, error } = await supabaseAdmin
       .from(table)
-      .upsert(patch, { onConflict: workspace ? "workspace_id" : "user_id" })
+      .upsert(patch, { onConflict: workspace ? "workspace_id" : "organization_id" })
       .select()
       .single()
 
@@ -210,6 +233,7 @@ export async function PUT(request: Request) {
       profile: data,
       scope: workspace ? "workspace" : "owner",
       workspace: workspace ?? null,
+      organization: organization ?? null,
     })
   } catch (error) {
     console.error("Company profile PUT error:", error)

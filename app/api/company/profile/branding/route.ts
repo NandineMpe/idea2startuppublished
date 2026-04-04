@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function isStringArray(val: unknown): val is string[] {
@@ -25,6 +26,15 @@ export async function PATCH(request: Request) {
     }
 
     const workspace = await resolveWorkspaceSelection(user.id)
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+        : null
+
+    if (!workspace && !organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const body = await request.json()
     const {
       brand_voice_dna,
@@ -78,7 +88,7 @@ export async function PATCH(request: Request) {
           .eq("workspace_id", workspace.id)
           .select()
           .single()
-      : await query.eq("user_id", user.id).select().single()
+      : await query.eq("organization_id", organization?.id ?? "").select().single()
 
     if (error) throw error
 
@@ -86,6 +96,7 @@ export async function PATCH(request: Request) {
       profile: data,
       scope: workspace ? "workspace" : "owner",
       workspace: workspace ?? null,
+      organization: organization ?? null,
     })
   } catch (error) {
     console.error("Company profile branding PATCH error:", error)

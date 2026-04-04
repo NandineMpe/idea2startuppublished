@@ -650,7 +650,7 @@ export function ContextBrainPage() {
         <div className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
           <div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Ask any AI (ChatGPT, Claude, Gemini) to generate a company overview in markdown, then paste or upload it here.
+              Ask any AI (ChatGPT, Qwen, Gemini) to generate a company overview in markdown, then paste or upload it here.
             </p>
             <div className="mt-2 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground font-mono leading-relaxed">
               &quot;Generate everything you know about my company [name] as a detailed markdown document covering our product, market, traction, team, and strategy.&quot;

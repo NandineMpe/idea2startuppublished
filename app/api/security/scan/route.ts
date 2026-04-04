@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { JUNO_SECURITY_SCAN_REQUESTED } from "@/lib/inngest/event-names"
 import { inngest } from "@/lib/inngest/client"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -12,11 +13,14 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: profile } = await supabase
-    .from("company_profile")
-    .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+  const { data: profile } = organization
+    ? await supabase
+        .from("company_profile")
+        .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
+        .eq("organization_id", organization.id)
+        .maybeSingle()
+    : { data: null }
 
   const resolved = profile
     ? resolveGithubRepoFromProfile({

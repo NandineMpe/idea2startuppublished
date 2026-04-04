@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
@@ -39,8 +39,8 @@ export async function POST(req: Request) {
       )
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "Missing ANTHROPIC_API_KEY" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const userContent = document
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
       : `## Question\n${question}`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       system: mergeSystemWithWritingRules(SYSTEM_PROMPT),
       messages: [{ role: "user", content: userContent }],
       maxTokens: 2000,

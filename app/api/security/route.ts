@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -8,6 +9,8 @@ export async function GET(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
 
   const url = new URL(req.url)
   const statusFilter = url.searchParams.get("status") || "open"
@@ -30,11 +33,13 @@ export async function GET(req: NextRequest) {
     findingRows = []
   }
 
-  const { data: profile, error: profileErr } = await supabase
-    .from("company_profile")
-    .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const { data: profile, error: profileErr } = organization
+    ? await supabase
+        .from("company_profile")
+        .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
+        .eq("organization_id", organization.id)
+        .maybeSingle()
+    : { data: null, error: null }
 
   if (profileErr) {
     console.error("[api/security GET] company_profile", profileErr.message)

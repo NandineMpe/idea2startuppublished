@@ -175,10 +175,12 @@ async function mergeJackJillJobs(
   items: Array<{ company: string; title: string; url: string; description: string }>,
 ): Promise<void> {
   if (items.length === 0) return
+  const { ensurePersonalOrganization } = await import("@/lib/organizations")
+  const org = await ensurePersonalOrganization(userId)
   const { data: row, error: fetchErr } = await supabaseAdmin
     .from("company_profile")
     .select("jack_jill_jobs")
-    .eq("user_id", userId)
+    .eq("organization_id", org.id)
     .maybeSingle()
 
   if (fetchErr || !row) return
@@ -210,7 +212,7 @@ async function mergeJackJillJobs(
     merged.push(it)
   }
 
-  await supabaseAdmin.from("company_profile").update({ jack_jill_jobs: merged }).eq("user_id", userId)
+  await supabaseAdmin.from("company_profile").update({ jack_jill_jobs: merged }).eq("organization_id", org.id)
 }
 
 /**

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { jsonApiError, logApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { inngest } from "@/lib/inngest/client"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 const PIPELINE_EVENTS: Record<string, string> = {
   cbs: "juno/brief.requested",
@@ -21,19 +23,36 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { pipeline } = await req.json() as { pipeline: string }
+    const body = (await req.json().catch(() => ({}))) as { pipeline?: string }
+    const pipeline = typeof body.pipeline === "string" ? body.pipeline : ""
     const eventName = PIPELINE_EVENTS[pipeline]
     if (!eventName) {
       return NextResponse.json({ error: `Unknown pipeline: ${pipeline}` }, { status: 400 })
     }
 
+    let organization
+    try {
+      organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    } catch (orgErr) {
+      logApiError("intelligence trigger resolveOrganization", orgErr)
+      return NextResponse.json(
+        {
+          error:
+            "Could not load your workspace. Check that SUPABASE_SERVICE_ROLE_KEY is set on the server and try again.",
+        },
+        { status: 503 },
+      )
+    }
+
     // Check company profile exists — brief will be skipped if not
     if (pipeline === "cbs") {
-      const { data: profile } = await supabase
-        .from("company_profile")
-        .select("company_name")
-        .eq("user_id", user.id)
-        .single()
+      const { data: profile } = organization
+        ? await supabase
+            .from("company_profile")
+            .select("company_name")
+            .eq("organization_id", organization.id)
+            .maybeSingle()
+        : { data: null }
 
       if (!profile?.company_name) {
         return NextResponse.json(
@@ -44,11 +63,13 @@ export async function POST(req: Request) {
     }
 
     if (pipeline === "intent") {
-      const { data: profile } = await supabase
-        .from("company_profile")
-        .select("company_name")
-        .eq("user_id", user.id)
-        .maybeSingle()
+      const { data: profile } = organization
+        ? await supabase
+            .from("company_profile")
+            .select("company_name")
+            .eq("organization_id", organization.id)
+            .maybeSingle()
+        : { data: null }
 
       if (!profile?.company_name?.trim()) {
         return NextResponse.json(
@@ -58,17 +79,27 @@ export async function POST(req: Request) {
       }
     }
 
-    await inngest.send({
-      name: eventName as
-        | "juno/brief.requested"
-        | "juno/jobs.scan.requested"
-        | "juno/intent.scan.requested",
-      data: { userId: user.id },
-    })
+    try {
+      await inngest.send({
+        name: eventName as
+          | "juno/brief.requested"
+          | "juno/jobs.scan.requested"
+          | "juno/intent.scan.requested",
+        data: { userId: user.id },
+      })
+    } catch (sendErr) {
+      logApiError("intelligence trigger inngest.send", sendErr)
+      return NextResponse.json(
+        {
+          error:
+            "Could not queue the job with Inngest. Confirm INNGEST_EVENT_KEY in Vercel matches Inngest Cloud → Keys (Production).",
+        },
+        { status: 502 },
+      )
+    }
 
     return NextResponse.json({ ok: true, pipeline, event: eventName })
   } catch (err) {
-    console.error("Trigger error:", err)
-    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+    return jsonApiError(500, err, "intelligence trigger POST")
   }
 }

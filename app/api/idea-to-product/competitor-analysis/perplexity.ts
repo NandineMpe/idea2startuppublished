@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 
@@ -126,7 +126,7 @@ Use bullet points for clarity where appropriate`
 
   try {
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt: `Provide a comprehensive competitor analysis for: ${query}`,
       system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 4000,

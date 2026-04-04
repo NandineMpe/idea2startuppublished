@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
+import { streamText } from "ai"
 import { logApiError, safeErrorMessageForClient } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { getCompanyContext } from "@/lib/company-context"
+import { LLM_API_KEY_MISSING_MESSAGE, isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { createClient } from "@/lib/supabase/server"
-
-const anthropic = new Anthropic()
 
 export function buildContextUpdatePrompt(
   founderName: string,
@@ -71,16 +71,20 @@ export async function POST(req: NextRequest) {
   const lastUser = [...bootstrap].reverse().find((m) => m.role === "user")
 
   if (!activeSessionId && lastUser?.content) {
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
     const title = lastUser.content.trim().slice(0, 80) || "Context update"
-    const { data: row, error: insErr } = await supabase
-      .from("chat_sessions")
-      .insert({
-        user_id: user.id,
-        title,
-        channel: "context",
-      })
-      .select("id")
-      .single()
+    const { data: row, error: insErr } = organization
+      ? await supabase
+          .from("chat_sessions")
+          .insert({
+            user_id: user.id,
+            organization_id: organization.id,
+            title,
+            channel: "context",
+          })
+          .select("id")
+          .single()
+      : { data: null, error: { message: "No organization" } as Error }
     if (!insErr && row?.id) activeSessionId = row.id
   }
 
@@ -94,14 +98,21 @@ export async function POST(req: NextRequest) {
     if (msgErr) console.error("[context-chat] user message insert:", msgErr.message)
   }
 
-  const stream = anthropic.messages.stream({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+  if (!isLlmConfigured()) {
+    return new Response(JSON.stringify({ error: LLM_API_KEY_MISSING_MESSAGE }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
+  const result = streamText({
+    model: qwenModel(),
     system: mergeSystemWithWritingRules(systemPrompt),
     messages: bootstrap.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     })),
+    maxTokens: 800,
   })
 
   const encoder = new TextEncoder()
@@ -114,16 +125,9 @@ export async function POST(req: NextRequest) {
             encoder.encode(`data: ${JSON.stringify({ sessionId: activeSessionId })}\n\n`),
           )
         }
-        for await (const event of stream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta" &&
-            "text" in event.delta
-          ) {
-            const text = event.delta.text
-            assistantText += text
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-          }
+        for await (const text of result.textStream) {
+          assistantText += text
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
         }
         if (activeSessionId && assistantText.trim()) {
           await supabase.from("chat_messages").insert({

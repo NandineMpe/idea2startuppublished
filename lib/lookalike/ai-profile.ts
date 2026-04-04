@@ -1,6 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import type { CompanyContext } from "@/lib/company-context"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 import type {
   LookalikeDimensions,
   LookalikeStats,
@@ -11,19 +12,6 @@ import { DEFAULT_STATS } from "./defaults"
 import { fallbackDimensionsFromConversion, fallbackPlaybook } from "./fallback-profile"
 import { generatePlatformQueries, platformQueriesToLegacySearch } from "./generate-queries"
 import { dimensionsToLegacyCriteria } from "./derive-legacy"
-
-const anthropic = new Anthropic()
-
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("")
-}
-
-export function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
-}
 
 function resolveSimilarLeadIndices(
   snippets: Array<{ company: string; role: string; contactName?: string }>,
@@ -105,7 +93,7 @@ export async function runLookalikeConversionAnalysis(params: {
   const industry = params.conversion.industry?.trim() || ""
   const companySizeHint = params.conversion.companySize?.trim() || ""
 
-  if (!hasAnthropicKey()) {
+  if (!isLlmConfigured()) {
     const dimensions = fallbackDimensionsFromConversion({
       name: params.conversion.name,
       title: params.conversion.title,
@@ -127,7 +115,7 @@ export async function runLookalikeConversionAnalysis(params: {
         location: params.conversion.location,
         channel,
         responseTime,
-        multiplierNote: "Set ANTHROPIC_API_KEY to generate multiplier and lookalike criteria.",
+        multiplierNote: "Set LLM_API_KEY or OPENROUTER_API_KEY to generate multiplier and lookalike criteria.",
       },
       rationale: outreachPlaybook.rationale,
       searchQueries: sq,
@@ -135,7 +123,7 @@ export async function runLookalikeConversionAnalysis(params: {
       pitchAngle: outreachPlaybook.bestAngle,
       segmentTag: "unknown",
       insightsHeadline: "Log conversions with AI enabled to see segment insights here.",
-      proactiveMessage: "Connect ANTHROPIC_API_KEY to scan your saved Juno leads for lookalikes.",
+      proactiveMessage: "Connect LLM_API_KEY or OPENROUTER_API_KEY to scan your saved Juno leads for lookalikes.",
       similarExistingLeadsCount: 0,
       similarExistingLeads: [],
       stats: { ...DEFAULT_STATS },
@@ -147,9 +135,9 @@ export async function runLookalikeConversionAnalysis(params: {
     params.existingLeadSnippets?.slice(0, 40).map((s, i) => `${i + 1}. ${s.company} — ${s.role}`).join("\n") ||
     "(No saved leads in Juno yet, or list not loaded.)"
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 6000,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 6000,
     messages: [
       {
         role: "user",
@@ -219,8 +207,6 @@ Rules:
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Record<string, unknown>
     if (!parsed.dimensions || !parsed.outreachPlaybook || !parsed.convertedLead) {
@@ -311,17 +297,17 @@ export async function refineLookalikeProfileWithAI(params: {
     notes: string | null
   }>
 }): Promise<{ dimensions: LookalikeDimensions; outreachPlaybook: OutreachPlaybook; explanation: string }> {
-  if (!hasAnthropicKey()) {
+  if (!isLlmConfigured()) {
     return {
       dimensions: params.dimensions,
       outreachPlaybook: params.outreachPlaybook,
-      explanation: "ANTHROPIC_API_KEY not set — skipped refinement.",
+      explanation: "LLM API key not set — skipped refinement.",
     }
   }
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 4000,
     messages: [
       {
         role: "user",
@@ -357,8 +343,6 @@ Return JSON ONLY:
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
       dimensions?: unknown

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Building2, Loader2 } from "lucide-react"
 import {
@@ -33,8 +33,11 @@ export function WorkspaceSwitcher() {
         const data = (await response.json()) as WorkspaceResponse
         if (cancelled || !response.ok) return
 
-        setWorkspaces(data.workspaces ?? [])
-        setSelected(data.activeWorkspaceId ?? "owner")
+        const list = data.workspaces ?? []
+        setWorkspaces(list)
+        const raw = data.activeWorkspaceId ?? "owner"
+        const allowed = new Set(["owner", ...list.map((w) => w.id)])
+        setSelected(allowed.has(raw) ? raw : "owner")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -45,8 +48,20 @@ export function WorkspaceSwitcher() {
     }
   }, [])
 
+  const safeSelected = useMemo(() => {
+    if (selected === "owner") return "owner"
+    return workspaces.some((w) => w.id === selected) ? selected : "owner"
+  }, [selected, workspaces])
+
+  useEffect(() => {
+    if (loading) return
+    if (selected !== "owner" && !workspaces.some((w) => w.id === selected)) {
+      setSelected("owner")
+    }
+  }, [loading, selected, workspaces])
+
   const currentWorkspace =
-    selected === "owner" ? null : workspaces.find((workspace) => workspace.id === selected) ?? null
+    safeSelected === "owner" ? null : workspaces.find((workspace) => workspace.id === safeSelected) ?? null
 
   function handleChange(value: string) {
     setSelected(value)
@@ -78,7 +93,7 @@ export function WorkspaceSwitcher() {
   return (
     <div className="hidden items-center gap-2 md:flex">
       <Building2 className="h-4 w-4 text-muted-foreground" />
-      <Select value={selected} onValueChange={handleChange} disabled={pending}>
+      <Select value={safeSelected} onValueChange={handleChange} disabled={pending}>
         <SelectTrigger className="h-8 w-[240px] border-border bg-surface-2 text-[13px]">
           <SelectValue placeholder={currentWorkspace?.displayName || "Your company"} />
         </SelectTrigger>

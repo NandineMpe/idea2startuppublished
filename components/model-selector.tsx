@@ -9,13 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const models = [
   {
-    value: "claude-sonnet",
-    label: "Claude Sonnet 4",
+    value: "qwen-3.6",
+    label: "Qwen 3.6",
     apiRoute: "/api/chat",
   },
   {
-    value: "claude-sonnet-alt",
-    label: "Claude Sonnet 4 (Alt)",
+    value: "qwen-3.6-alt",
+    label: "Qwen 3.6 (Alt)",
     apiRoute: "/api/chat/deepseek",
   },
 ]

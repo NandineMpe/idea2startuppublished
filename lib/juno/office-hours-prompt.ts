@@ -4,7 +4,7 @@ export type OfficeHoursMode = "startup" | "builder"
 
 /**
  * Builds the system prompt that encodes the full YC Office Hours methodology.
- * Claude tracks phase progression through conversation context.
+ * The model tracks phase progression through conversation context.
  * Phase signals are emitted as [PHASE: name] at the start of each response.
  * Design doc output is wrapped in <<<DESIGN_DOC>>> ... <<<END_DOC>>> delimiters.
  */

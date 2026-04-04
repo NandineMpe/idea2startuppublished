@@ -1,5 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
 import { getActiveUserIds, getCompanyContext } from "@/lib/company-context"
 import { loadCompetitorTrackingRecent, loadFundingTrackerRecent } from "@/lib/juno/competitor-persistence"
@@ -8,15 +9,6 @@ import { supabaseAdmin } from "@/lib/supabase"
 import { inngest } from "@/lib/inngest/client"
 
 export type { StaffMeetingSynthesis } from "@/lib/staff-meeting-types"
-
-const anthropic = new Anthropic()
-
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("")
-}
 
 function parseSynthesisJson(text: string): StaffMeetingSynthesis {
   try {
@@ -375,26 +367,25 @@ export const staffMeeting = inngest.createFunction(
     const organised = await step.run("organise-outputs", () => organiseByRole(agentOutputs))
 
     const synthesis = await step.run("synthesise", async (): Promise<StaffMeetingSynthesis> => {
-      if (!process.env.ANTHROPIC_API_KEY) {
+      if (!isLlmConfigured()) {
         return {
           insights: [],
           actions: [],
           roadmapRecommendations: [],
           conflicts: [],
-          executiveSummary: "Staff meeting skipped: ANTHROPIC_API_KEY is not set.",
+          executiveSummary: "Staff meeting skipped: LLM API key is not set.",
         }
       }
 
       const prompt = buildStaffMeetingPrompt(companyBlock, organised, persistent)
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 3000,
+      const { text } = await generateText({
+        model: qwenModel(),
+        maxOutputTokens: 3000,
         messages: [{ role: "user", content: appendWritingRules(prompt) }],
       })
 
-      const text = extractText(response)
-      return parseSynthesisJson(text)
+      return parseSynthesisJson(text ?? "")
     })
 
     await step.run("save-meeting", async () => {

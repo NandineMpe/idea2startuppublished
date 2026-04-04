@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { convert } from "html-to-text"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
 
 export async function POST(request: Request) {
@@ -13,6 +14,11 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
     }
 
     const { url } = await request.json()
@@ -60,6 +66,7 @@ export async function POST(request: Request) {
       .from("company_assets")
       .insert({
         user_id: user.id,
+        organization_id: organization.id,
         type: "scraped_url",
         title,
         source_url: trimmed,

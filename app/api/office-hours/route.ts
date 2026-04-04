@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { convertToModelMessages, streamText, type UIMessage } from "ai"
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
@@ -20,6 +20,10 @@ export async function POST(req: Request) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
+    }
 
     const payload = (await req.json()) as {
       messages: UIMessage[]
@@ -55,7 +59,7 @@ export async function POST(req: Request) {
     )
 
     const result = streamText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       system: systemPrompt,
       messages: modelMessages,
       maxOutputTokens: 2000,
@@ -72,7 +76,6 @@ export async function POST(req: Request) {
             .from("chat_sessions")
             .update({ updated_at: new Date().toISOString() })
             .eq("id", sessionId)
-            .eq("user_id", user.id)
             .then(() => {})
 
           const doc = extractDesignDoc(text)

@@ -1,6 +1,6 @@
 /**
  * Product voice for all user-visible model output.
- * - Anthropic `messages` user content: wrap with `appendWritingRules(...)`.
+ * - User message content: wrap with `appendWritingRules(...)`.
  * - Vercel AI `system`: use `mergeSystemWithWritingRules(...)`.
  * - Prompt-only calls: `appendWritingRules(prompt)`.
  */

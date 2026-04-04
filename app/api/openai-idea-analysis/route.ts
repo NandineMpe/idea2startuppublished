@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { getCompanyContextPrompt } from "@/lib/company-context"
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Problem description is required", analysis: { sections: defaultSections } })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured", analysis: { sections: defaultSections } })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE, analysis: { sections: defaultSections } })
     }
 
     const supabase = await createClient()
@@ -67,7 +67,7 @@ ${intendedUsers ? `Users: ${intendedUsers}` : ""}
 ${geographicFocus ? `Geography: ${geographicFocus}` : ""}`
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt,
       system: mergeSystemWithWritingRules(SYSTEM_PROMPT),
       maxTokens: 8000,

@@ -1,4 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 import {
   getRecentCommits,
   getRepoTreeWithDiagnostics,
@@ -18,8 +19,6 @@ import {
 import { JUNO_SECURITY_SCAN_REQUESTED } from "@/lib/inngest/event-names"
 import { inngest } from "@/lib/inngest/client"
 import { supabaseAdmin } from "@/lib/supabase"
-
-const anthropic = new Anthropic()
 
 type ScanEvent = {
   userId: string
@@ -221,20 +220,17 @@ export const securityScan = inngest.createFunction(
     )
 
     const findings = await step.run("analyse", async (): Promise<RawSecurityFinding[]> => {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn("[security-scan] ANTHROPIC_API_KEY missing")
+      if (!isLlmConfigured()) {
+        console.warn("[security-scan] LLM API key missing")
         return []
       }
       const prompt = buildSecurityScanPrompt(files, tree, commits, repo, mode)
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8192,
+      const { text } = await generateText({
+        model: qwenModel(),
+        maxOutputTokens: 8192,
         messages: [{ role: "user", content: prompt }],
       })
-      const text = response.content
-        .filter((c): c is Anthropic.TextBlock => c.type === "text")
-        .map((c) => c.text)
-        .join("")
+      if (!text) return []
       return parseSecurityFindingsJson(text)
     })
 
@@ -309,10 +305,12 @@ export const securityScan = inngest.createFunction(
         (f) => (f.severity || "").toUpperCase() === "CRITICAL" || (f.severity || "").toUpperCase() === "HIGH",
       )
       if (critical.length === 0) return
+      const { ensurePersonalOrganization } = await import("@/lib/organizations")
+      const org = await ensurePersonalOrganization(userId)
       const { data: profile } = await supabaseAdmin
         .from("company_profile")
         .select("whatsapp_number")
-        .eq("user_id", userId)
+        .eq("organization_id", org.id)
         .maybeSingle()
       const num = profile?.whatsapp_number as string | undefined
       if (!num?.trim()) return

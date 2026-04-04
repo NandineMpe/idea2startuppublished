@@ -1,7 +1,7 @@
 /**
  * POST /api/delegate
  *
- * Receives a strategic goal from the user and uses Claude to:
+ * Receives a strategic goal from the user and uses the LLM to:
  * 1. Decompose it into concrete tasks for each relevant executive agent
  * 2. Return the breakdown so the frontend can execute each task via /api/ai-tool
  *
@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -95,8 +95,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Goal is required" }, { status: 400 })
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const supabase = await createClient()
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const userPrompt = `STRATEGIC GOAL: ${goal}\n\nSTARTUP CONTEXT:\n${startupContext}`
 
     const { text: planText } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       system: mergeSystemWithWritingRules(PLANNING_SYSTEM_PROMPT),
       prompt: userPrompt,
       maxTokens: 2000,

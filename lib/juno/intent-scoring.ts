@@ -1,9 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import type { CompanyContext } from "@/lib/company-context"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import type { IntentSignal } from "@/lib/juno/intent-monitor"
-
-const anthropic = new Anthropic()
+import { generateText } from "ai"
 
 export type ResponsePlatform = "reddit_comment" | "linkedin_dm" | "x_reply" | "direct_email" | "hn_reply"
 
@@ -17,17 +16,6 @@ export interface ScoredIntent extends IntentSignal {
   urgency: UrgencyLevel
 }
 
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((c): c is Anthropic.Messages.TextBlock => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-}
-
-function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
-}
-
 function defaultResponsePlatform(platform: IntentSignal["platform"]): ResponsePlatform {
   if (platform === "hn") return "hn_reply"
   if (platform === "x") return "x_reply"
@@ -36,7 +24,7 @@ function defaultResponsePlatform(platform: IntentSignal["platform"]): ResponsePl
 }
 
 /**
- * Score a batch of Reddit intent signals with Claude and generate helpful, non-salesy reply drafts.
+ * Score a batch of Reddit intent signals and generate helpful, non-salesy reply drafts.
  */
 export async function scoreIntentSignals(
   signals: IntentSignal[],
@@ -44,11 +32,11 @@ export async function scoreIntentSignals(
 ): Promise<ScoredIntent[]> {
   if (signals.length === 0) return []
 
-  if (!hasAnthropicKey()) {
+  if (!isLlmConfigured()) {
     return signals.map((signal) => ({
       ...signal,
       relevanceScore: 5,
-      whyRelevant: "ANTHROPIC_API_KEY missing - manual review.",
+      whyRelevant: "LLM API key missing — manual review.",
       suggestedResponse: "",
       responsePlatform: defaultResponsePlatform(signal.platform),
       urgency: "monitor" as const,
@@ -102,13 +90,13 @@ Scoring guide:
 Return ONLY a valid JSON array, no markdown fences.`
 
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 6000,
+      const { text } = await generateText({
+        model: qwenModel(),
+        maxOutputTokens: 6000,
         messages: [{ role: "user", content: appendWritingRules(prompt) }],
       })
+      if (!text) throw new Error("empty response")
 
-      const text = extractText(response)
       const match = text.match(/\[[\s\S]*\]/)
       const parsed = match ? (JSON.parse(match[0]) as unknown) : []
       const rows = Array.isArray(parsed) ? parsed : []
@@ -151,7 +139,7 @@ Return ONLY a valid JSON array, no markdown fences.`
         })
       }
     } catch (error) {
-      console.error("[intent-scoring] Claude batch failed:", error)
+      console.error("[intent-scoring] batch failed:", error)
       for (const signal of chunk) {
         out.push({
           ...signal,

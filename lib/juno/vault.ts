@@ -77,11 +77,13 @@ function decodeBase64Utf8(b64: string): string {
  */
 export async function resolveGithubVaultConfig(userId: string | undefined): Promise<GithubVaultConfig | null> {
   if (userId) {
+    const { ensurePersonalOrganization } = await import("@/lib/organizations")
+    const org = await ensurePersonalOrganization(userId)
     const { supabaseAdmin } = await import("@/lib/supabase")
     const { data: row, error } = await supabaseAdmin
       .from("company_profile")
       .select("github_vault_owner, github_vault_repo, github_vault_branch, github_vault_path")
-      .eq("user_id", userId)
+      .eq("organization_id", org.id)
       .maybeSingle()
 
     if (!error && row) {

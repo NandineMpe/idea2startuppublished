@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
@@ -12,8 +12,8 @@ import { appendWritingRules } from "@/lib/copy-writing-rules"
  */
 export async function POST(req: Request) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not configured" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     let focus = ""
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const today = new Date().toISOString().slice(0, 10)
 
     const { text } = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt: appendWritingRules(`You are helping a founder plan short-form video (TikTok / Reels / Shorts) content.
 
 TODAY (UTC date): ${today}

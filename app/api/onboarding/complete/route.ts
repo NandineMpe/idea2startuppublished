@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { createClient } from "@/lib/supabase/server"
 import { supabaseAdmin } from "@/lib/supabase"
+import { ensurePersonalOrganization } from "@/lib/organizations"
 import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
-
-const anthropic = new Anthropic()
+import { generateText } from "ai"
 
 function extractJsonObject(text: string): Record<string, unknown> {
   const match = text.match(/\{[\s\S]*\}/)
@@ -89,12 +89,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 })
   }
 
+  if (!isLlmConfigured()) {
+    return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
+  }
+
   const scrapedData = body.scrapedData ?? null
   const founderName = typeof body.founderName === "string" ? body.founderName.trim() : ""
 
-  const extraction = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 3000,
+  const { text: extractedText } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 3000,
     messages: [
       {
         role: "user",
@@ -143,11 +147,6 @@ Return a JSON object with these fields (use null for anything not discussed):
     ],
   })
 
-  const extractedText = extraction.content
-    .filter((c): c is Anthropic.TextBlock => c.type === "text")
-    .map((c) => c.text)
-    .join("")
-
   const extracted = extractJsonObject(extractedText) as {
     company?: Record<string, unknown>
     founder?: Record<string, unknown>
@@ -176,8 +175,11 @@ Return a JSON object with these fields (use null for anything not discussed):
   const priorities90 = asStringArray(strategy.priorities_90d)
   const risksList = asStringArray(strategy.risks)
 
+  const organization = await ensurePersonalOrganization(user.id)
+
   const profileData = {
     user_id: user.id,
+    organization_id: organization.id,
     company_name: companyName,
     company_description: companyDescription,
     tagline: companyDescription ? companyDescription.slice(0, 500) : null,
@@ -211,12 +213,13 @@ Return a JSON object with these fields (use null for anything not discussed):
   await supabaseAdmin
     .from("company_assets")
     .delete()
-    .eq("user_id", user.id)
+    .eq("organization_id", organization.id)
     .eq("type", "document")
     .eq("title", "Onboarding conversation")
 
   await supabaseAdmin.from("company_assets").insert({
     user_id: user.id,
+    organization_id: organization.id,
     type: "document",
     title: "Onboarding conversation",
     content: transcript.slice(0, 100000),

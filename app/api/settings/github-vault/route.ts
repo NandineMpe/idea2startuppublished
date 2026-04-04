@@ -3,6 +3,7 @@ import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
 import { syncVaultContextCacheForUser } from "@/lib/vault-context-sync"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 export async function GET() {
@@ -29,12 +30,17 @@ export async function GET() {
       })
     }
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const { data } = await supabase
       .from("company_profile")
       .select(
         "github_vault_repo, github_vault_branch, vault_folders, vault_context_last_synced_at, vault_context_file_count, vault_context_sync_error",
       )
-      .eq("user_id", user.id)
+      .eq("organization_id", organization.id)
       .maybeSingle()
 
     return NextResponse.json({
@@ -68,6 +74,11 @@ export async function POST(request: Request) {
         { error: "GitHub vault sync is only available on your primary workspace right now." },
         { status: 400 },
       )
+    }
+
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
     }
 
     const body = (await request.json().catch(() => ({}))) as {
@@ -117,6 +128,7 @@ export async function POST(request: Request) {
 
     const { error: upErr } = await supabase.from("company_profile").upsert(
       {
+        organization_id: organization.id,
         user_id: user.id,
         github_vault_owner: null,
         github_vault_repo: repo,
@@ -124,7 +136,7 @@ export async function POST(request: Request) {
         github_vault_path: "",
         vault_folders: folders,
       },
-      { onConflict: "user_id" },
+      { onConflict: "organization_id" },
     )
 
     if (upErr) {
@@ -142,7 +154,7 @@ export async function POST(request: Request) {
       })
     }
 
-    const result = await syncVaultContextCacheForUser(supabase, user.id)
+    const result = await syncVaultContextCacheForUser(supabase, user.id, organization.id)
     return NextResponse.json({
       saved: true,
       cleared: false,

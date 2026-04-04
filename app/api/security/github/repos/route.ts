@@ -4,6 +4,7 @@ import { splitGithubRepoRef } from "@/lib/github-vault"
 import { githubProxyListUserReposForLatestAccount } from "@/lib/juno/pipedream-github"
 import { listUserReposViaPat } from "@/lib/juno/github-repo"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 function formatRepoListError(msg: string | undefined | null): string | null {
   if (!msg) return null
@@ -27,15 +28,19 @@ export async function GET() {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+
   const pipedreamConfigured = Boolean(
     process.env.PIPEDREAM_CLIENT_ID && process.env.PIPEDREAM_CLIENT_SECRET && process.env.PIPEDREAM_PROJECT_ID,
   )
 
-  const { data: profile } = await supabase
-    .from("company_profile")
-    .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
-    .eq("user_id", user.id)
-    .maybeSingle()
+  const { data: profile } = organization
+    ? await supabase
+        .from("company_profile")
+        .select("github_repo, github_branch, github_vault_owner, github_vault_repo, github_vault_branch")
+        .eq("organization_id", organization.id)
+        .maybeSingle()
+    : { data: null }
 
   const resolved = profile
     ? resolveGithubRepoFromProfile({

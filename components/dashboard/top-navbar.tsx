@@ -1,7 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Search, Bell, Settings, LogOut, User as UserIcon, Command, CreditCard } from "lucide-react"
+import {
+  Search,
+  Bell,
+  Settings,
+  LogOut,
+  User as UserIcon,
+  Command,
+  CreditCard,
+  Gift,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -16,6 +25,7 @@ import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/better-auth-client"
 import { createClient } from "@/lib/supabase/client"
 import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher"
+import { InviteFriendsDialog } from "@/components/dashboard/invite-friends-dialog"
 import { User } from "@supabase/supabase-js"
 
 export function TopNavbar() {
@@ -104,6 +114,13 @@ export function TopNavbar() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer px-3 py-2 text-[13px]"
+              onSelect={() => setInviteFriendsOpen(true)}
+            >
+              <Gift className="mr-2.5 h-4 w-4 text-muted-foreground" />
+              Invite friends
+            </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer px-3 py-2 text-[13px]">
               <UserIcon className="mr-2.5 h-4 w-4 text-muted-foreground" />
               Founder Profile
@@ -133,6 +150,8 @@ export function TopNavbar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <InviteFriendsDialog open={inviteFriendsOpen} onOpenChange={setInviteFriendsOpen} />
     </header>
   )
 }

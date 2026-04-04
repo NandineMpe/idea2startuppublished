@@ -1,14 +1,7 @@
 import Link from "next/link"
 import localFont from "next/font/local"
 import { redirect } from "next/navigation"
-import {
-  ArrowRight,
-  Check,
-  Lock,
-  RadioTower,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react"
+import { ArrowRight, Lock, Sparkles } from "lucide-react"
 import { LandingThemeToggle } from "@/components/landing-theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,40 +23,6 @@ const casualHumanBold = localFont({
 const editorialHeading = {
   fontFamily: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
 }
-
-const featureCards = [
-  {
-    icon: RadioTower,
-    title: "Morning brief, already shaped",
-    body:
-      "Juno turns your saved company context into a calm read on what matters before the day gets noisy.",
-  },
-  {
-    icon: Sparkles,
-    title: "One blue room for context",
-    body:
-      "Notes, founder voice, assets, operating memory, and moving decisions stay together instead of scattering.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Built for a real workspace",
-    body:
-      "Sign in, create an account, and move straight into the gated workspace without jumping between different-looking pages.",
-  },
-]
-
-const authNotes = [
-  {
-    icon: Lock,
-    title: "Secure email and password sign-in",
-    body: "Returning founders can get back in fast with the same front door.",
-  },
-  {
-    icon: Check,
-    title: "New accounts can start here",
-    body: "Use Sign up to create your account instantly from this page.",
-  },
-]
 
 function BlueDotMark({ className = "" }: { className?: string }) {
   return (
@@ -115,9 +74,12 @@ function messageTone(message?: string) {
 export async function JunoAuthPage({
   pagePath,
   message,
+  redirectAfterAuth,
 }: {
   pagePath: "/" | "/login"
   message?: string
+  /** Safe internal path only (e.g. /join/abc). Defaults to /dashboard. */
+  redirectAfterAuth?: string
 }) {
   const supabase = await createClient()
   const {
@@ -125,8 +87,17 @@ export async function JunoAuthPage({
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect("/dashboard")
+    redirect(
+      redirectAfterAuth?.startsWith("/") && !redirectAfterAuth.startsWith("//")
+        ? redirectAfterAuth
+        : "/dashboard",
+    )
   }
+
+  const afterAuthPath =
+    redirectAfterAuth?.startsWith("/") && !redirectAfterAuth.startsWith("//")
+      ? redirectAfterAuth
+      : "/dashboard"
 
   const login = async (formData: FormData) => {
     "use server"
@@ -148,7 +119,7 @@ export async function JunoAuthPage({
       return redirect(`${pagePath}?message=${encodeURIComponent(message)}`)
     }
 
-    return redirect("/dashboard")
+    return redirect(afterAuthPath)
   }
 
   const signup = async (formData: FormData) => {
@@ -179,7 +150,7 @@ export async function JunoAuthPage({
       return redirect(`${pagePath}?message=${encodeURIComponent(message)}`)
     }
 
-    return redirect("/dashboard")
+    return redirect(afterAuthPath)
   }
 
   return (
@@ -243,41 +214,7 @@ export async function JunoAuthPage({
                 The blue room
               </div>
 
-              <h1
-                style={editorialHeading}
-                className="mt-6 max-w-3xl text-5xl leading-[1.02] tracking-[-0.05em] text-slate-950 dark:text-white md:text-6xl"
-              >
-                Sign into Juno.
-                <br />
-                Keep the company together.
-              </h1>
-
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
-                This is the front door to Juno AI: the blue-dot workspace where your company
-                context, founder voice, and daily intelligence live in one place. Returning users
-                can sign in. New founders can create their account right here.
-              </p>
-
-              <div className="mt-8 grid gap-4 md:grid-cols-3">
-                {featureCards.map((feature) => (
-                  <article
-                    key={feature.title}
-                    className="rounded-[1.6rem] border border-slate-200/80 bg-white/75 p-5 shadow-[0_12px_32px_rgba(148,163,184,0.08)] transition-colors duration-700 dark:border-white/10 dark:bg-white/[0.03] dark:shadow-[0_18px_40px_rgba(2,8,14,0.24)]"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white dark:bg-sky-100 dark:text-slate-950">
-                      <feature.icon className="h-4 w-4" />
-                    </div>
-                    <h2 className="mt-4 text-base font-semibold leading-7 text-slate-950 dark:text-white">
-                      {feature.title}
-                    </h2>
-                    <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
-                      {feature.body}
-                    </p>
-                  </article>
-                ))}
-              </div>
-
-              <article className="mt-8 rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(243,248,255,0.82))] p-7 shadow-[0_24px_70px_rgba(148,163,184,0.12)] transition-colors duration-700 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(9,25,34,0.85),rgba(8,19,28,0.92))] dark:shadow-[0_24px_80px_rgba(2,8,14,0.36)]">
+              <article className="mt-6 rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(243,248,255,0.82))] p-7 shadow-[0_24px_70px_rgba(148,163,184,0.12)] transition-colors duration-700 dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(9,25,34,0.85),rgba(8,19,28,0.92))] dark:shadow-[0_24px_80px_rgba(2,8,14,0.36)]">
                 <p className="text-xs uppercase tracking-[0.32em] text-slate-500 dark:text-sky-100/55">
                   A note from
                 </p>
@@ -324,8 +261,7 @@ export async function JunoAuthPage({
               </h2>
 
               <p className="mt-4 text-base leading-8 text-slate-600 dark:text-slate-300">
-                Use the same form for returning access or first-time sign-up. New accounts are
-                created directly here and land inside the workspace immediately.
+                Returning founders can get back in fast with the same front door.
               </p>
 
               <form className="mt-8 space-y-5 text-slate-950 dark:text-white">
@@ -398,13 +334,6 @@ export async function JunoAuthPage({
                   </SubmitButton>
                 </div>
 
-                <p className="text-sm leading-7 text-slate-500 dark:text-slate-400">
-                  New here? Add your name, choose a password, and use{" "}
-                  <span className="font-medium text-slate-700 dark:text-slate-200">Sign up</span>.
-                  Returning founders can keep using{" "}
-                  <span className="font-medium text-slate-700 dark:text-slate-200">Sign in</span>.
-                </p>
-
                 {message ? (
                   <div
                     className={`rounded-[1.2rem] border px-4 py-3 text-sm leading-7 ${messageTone(message)}`}
@@ -414,25 +343,6 @@ export async function JunoAuthPage({
                 ) : null}
               </form>
             </section>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              {authNotes.map((note) => (
-                <article
-                  key={note.title}
-                  className="rounded-[1.8rem] border border-white/90 bg-white/70 p-5 shadow-[0_18px_50px_rgba(148,163,184,0.12)] backdrop-blur-xl transition-colors duration-700 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_24px_70px_rgba(2,8,14,0.32)]"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white dark:bg-sky-100 dark:text-slate-950">
-                    <note.icon className="h-4 w-4" />
-                  </div>
-                  <h3 className="mt-4 text-base font-semibold leading-7 text-slate-950 dark:text-white">
-                    {note.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
-                    {note.body}
-                  </p>
-                </article>
-              ))}
-            </div>
           </aside>
         </main>
       </div>

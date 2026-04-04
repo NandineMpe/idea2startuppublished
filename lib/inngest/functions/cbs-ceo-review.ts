@@ -1,11 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { getFanOutUserIds } from "@/lib/juno/users"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { supabaseAdmin } from "@/lib/supabase"
 import { JUNO_CEO_REVIEW_REQUESTED } from "@/lib/inngest/event-names"
-
-const anthropic = new Anthropic()
+import { generateText } from "ai"
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -158,26 +157,22 @@ export const cbsCeoReview = inngest.createFunction(
       }
     })
 
-    // ── Step 3: Claude CEO review ─────────────────────────────────────────────
+    // ── Step 3: CEO review (LLM) ─────────────────────────────────────────────
     const reviewData = await step.run("analyse", async (): Promise<CeoReviewData | null> => {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.warn("[ceo-review] ANTHROPIC_API_KEY missing")
+      if (!isLlmConfigured()) {
+        console.warn("[ceo-review] LLM API key missing")
         return null
       }
 
       const prompt = buildCeoReviewPrompt(context.promptBlock, liveData)
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
+      const { text } = await generateText({
+        model: qwenModel(),
+        maxOutputTokens: 4096,
         system: CEO_REVIEW_SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
       })
 
-      const text = response.content
-        .filter((c): c is Anthropic.TextBlock => c.type === "text")
-        .map((c) => c.text)
-        .join("")
-
+      if (!text) return null
       return parseCeoReviewJson(text)
     })
 

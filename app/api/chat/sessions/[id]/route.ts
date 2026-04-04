@@ -21,7 +21,6 @@ export async function GET(
       .from("chat_messages")
       .select("id, role, content, created_at")
       .eq("session_id", id)
-      .eq("user_id", user.id)
       .order("created_at", { ascending: true })
 
     if (error) throw error
@@ -49,11 +48,7 @@ export async function DELETE(
       return NextResponse.json({ success: false }, { status: 401 })
     }
 
-    const { error } = await supabase
-      .from("chat_sessions")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id)
+    const { error } = await supabase.from("chat_sessions").delete().eq("id", id)
 
     if (error) throw error
 

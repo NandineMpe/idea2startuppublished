@@ -84,7 +84,7 @@ export function SecurityAlertsSummary() {
           </CardTitle>
           <p className="text-xs text-muted-foreground max-w-xl">
             {hasOpen
-              ? `You have ${counts.total} open finding${counts.total === 1 ? "" : "s"} from repo scans (Claude + GitHub).`
+              ? `You have ${counts.total} open finding${counts.total === 1 ? "" : "s"} from repo scans (AI + GitHub).`
               : "No open findings. Daily scans run on your linked repo; you can also scan from Security updates."}
           </p>
         </div>

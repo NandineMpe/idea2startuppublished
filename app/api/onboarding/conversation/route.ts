@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
+import { streamText } from "ai"
 import { logApiError, safeErrorMessageForClient } from "@/lib/api-error-response"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import { LLM_API_KEY_MISSING_MESSAGE, isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { createClient } from "@/lib/supabase/server"
-
-const anthropic = new Anthropic()
 
 export function buildOnboardingSystemPrompt(scrapedContext: unknown, founderName: string): string {
   const ctx =
@@ -85,31 +84,31 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = buildOnboardingSystemPrompt(scrapedContext, founderName)
 
-  const stream = anthropic.messages.stream({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+  if (!isLlmConfigured()) {
+    return new Response(JSON.stringify({ error: LLM_API_KEY_MISSING_MESSAGE }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
+  const result = streamText({
+    model: qwenModel(),
     system: mergeSystemWithWritingRules(systemPrompt),
     messages: bootstrap.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     })),
+    maxTokens: 800,
   })
 
   const encoder = new TextEncoder()
   const readable = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of stream) {
-          if (
-            event.type === "content_block_delta" &&
-            event.delta.type === "text_delta" &&
-            "text" in event.delta
-          ) {
-            const text = event.delta.text
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
-            )
-          }
+        for await (const text of result.textStream) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ text })}\n\n`),
+          )
         }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"))
         controller.close()

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { jsonApiError } from "@/lib/api-error-response"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 function missingModeColumn(msg: string | undefined): boolean {
   const m = (msg ?? "").toLowerCase()
@@ -16,10 +17,15 @@ export async function GET() {
 
   if (!user) return NextResponse.json({ authenticated: false, sessions: [] })
 
+  const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+  if (!organization) {
+    return NextResponse.json({ authenticated: true, sessions: [] })
+  }
+
   let first = await supabase
     .from("chat_sessions")
     .select("id, title, mode, created_at, updated_at, channel")
-    .eq("user_id", user.id)
+    .eq("organization_id", organization.id)
     .eq("channel", "office-hours")
     .order("updated_at", { ascending: false })
     .limit(20)
@@ -28,7 +34,7 @@ export async function GET() {
     first = await supabase
       .from("chat_sessions")
       .select("id, title, created_at, updated_at, channel")
-      .eq("user_id", user.id)
+      .eq("organization_id", organization.id)
       .eq("channel", "office-hours")
       .order("updated_at", { ascending: false })
       .limit(20)
@@ -75,6 +81,11 @@ export async function POST(req: Request) {
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const body = (await req.json().catch(() => ({}))) as { mode?: string }
     const mode = body.mode === "builder" ? "builder" : "startup"
     const title = `${mode === "startup" ? "Startup" : "Builder"} Office Hours — ${new Date().toLocaleDateString()}`
@@ -82,14 +93,25 @@ export async function POST(req: Request) {
     // Use the user session client (RLS), not service role — avoids hard failure when SUPABASE_SERVICE_ROLE_KEY is unset.
     let result = await supabase
       .from("chat_sessions")
-      .insert({ user_id: user.id, title, channel: "office-hours", mode })
+      .insert({
+        user_id: user.id,
+        organization_id: organization.id,
+        title,
+        channel: "office-hours",
+        mode,
+      })
       .select("id, title, mode, created_at, updated_at, channel")
       .single()
 
     if (result.error && missingModeColumn(result.error.message)) {
       result = await supabase
         .from("chat_sessions")
-        .insert({ user_id: user.id, title, channel: "office-hours" })
+        .insert({
+          user_id: user.id,
+          organization_id: organization.id,
+          title,
+          channel: "office-hours",
+        })
         .select("id, title, created_at, updated_at, channel")
         .single()
     }

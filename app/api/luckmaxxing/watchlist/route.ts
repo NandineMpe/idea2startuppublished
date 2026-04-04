@@ -7,13 +7,23 @@ import {
   normalizeXWatchTerms as normalizeWatchTerms,
   X_WATCH_TERM_LIMIT as WATCH_TERM_LIMIT,
 } from "@/lib/juno/x-watchlist"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 
 async function getProfileKeywordsAndCompetitors(userId: string) {
   const supabase = await createClient()
+  const organization = await resolveOrganizationSelection(userId, { useCookieOrganization: true })
+  if (!organization) {
+    return {
+      profileExists: false,
+      keywords: normalizeWatchTerms([]),
+      competitors: normalizeWatchTerms([]),
+    }
+  }
+
   const { data, error } = await supabase
     .from("company_profile")
     .select("keywords, competitors")
-    .eq("user_id", userId)
+    .eq("organization_id", organization.id)
     .maybeSingle()
 
   if (error) throw error
@@ -75,10 +85,15 @@ export async function POST(req: Request) {
     }
     const nextKeywords = normalizeWatchTerms([...keywords, term]).slice(0, WATCH_TERM_LIMIT)
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const { error } = await supabase
       .from("company_profile")
       .update({ keywords: nextKeywords })
-      .eq("user_id", user.id)
+      .eq("organization_id", organization.id)
 
     if (error) {
       return jsonApiError(500, error, "luckmaxxing watchlist POST")
@@ -118,10 +133,15 @@ export async function DELETE(req: Request) {
     }
     const nextKeywords = keywords.filter((value) => value.toLowerCase() !== term.toLowerCase())
 
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const { error } = await supabase
       .from("company_profile")
       .update({ keywords: nextKeywords })
-      .eq("user_id", user.id)
+      .eq("organization_id", organization.id)
 
     if (error) {
       return jsonApiError(500, error, "luckmaxxing watchlist DELETE")

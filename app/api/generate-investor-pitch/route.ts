@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { anthropic } from "@ai-sdk/anthropic"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -20,9 +20,8 @@ export async function POST(request: Request) {
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     // Check if API key exists
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 })
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
     }
 
     const systemPrompt = `You are a top-tier startup investor advisor and pitch strategist. Your role is to help early-stage founders craft precise, persuasive, and data-backed investor pitches. Your insights are shaped by years of experience working inside VC firms, evaluating thousands of decks and participating in hundreds of successful fundraises. Your job is not only to generate a pitch — but to shape it around the psychology, expectations, and decision-making processes of professional investors.
@@ -93,7 +92,7 @@ Return the response as a JSON object with the following structure:
     const prompt = `${companyBlock}Create an investor elevator pitch based on this startup idea: ${businessIdea || "Project ID: " + projectId}`
 
     const response = await generateText({
-      model: anthropic("claude-sonnet-4-20250514"),
+      model: qwenModel(),
       prompt,
       system: mergeSystemWithWritingRules(systemPrompt),
       maxTokens: 2000,

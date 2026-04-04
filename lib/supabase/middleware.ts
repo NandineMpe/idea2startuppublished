@@ -1,7 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { normalizeReferralCodeParam } from '@/lib/referral-code'
+
+function applyReferralCaptureCookie(response: NextResponse, ref: string | null) {
+    if (!ref) return
+    response.cookies.set('juno_ref', ref, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 90,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+    })
+}
 
 export async function updateSession(request: NextRequest) {
+    const refFromQuery = normalizeReferralCodeParam(request.nextUrl.searchParams.get('ref'))
+
     let supabaseResponse = NextResponse.next({
         request,
     })
@@ -55,8 +69,11 @@ export async function updateSession(request: NextRequest) {
         // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone()
         url.pathname = '/login'
-        return NextResponse.redirect(url)
+        const redirectResponse = NextResponse.redirect(url)
+        applyReferralCaptureCookie(redirectResponse, refFromQuery)
+        return redirectResponse
     }
 
+    applyReferralCaptureCookie(supabaseResponse, refFromQuery)
     return supabaseResponse
 }

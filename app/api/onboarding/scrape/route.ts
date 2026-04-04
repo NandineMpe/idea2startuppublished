@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
 import { safeErrorMessageForClient } from "@/lib/api-error-response"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { convert } from "html-to-text"
 import { createClient } from "@/lib/supabase/server"
-
-const anthropic = new Anthropic()
+import { generateText } from "ai"
 
 function extractJsonObject(text: string): Record<string, unknown> {
   const match = text.match(/\{[\s\S]*\}/)
@@ -36,6 +35,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 })
   }
 
+  if (!isLlmConfigured()) {
+    return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 500 })
+  }
+
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Juno.ai/1.0 (onboarding scraper)" },
@@ -55,9 +58,9 @@ export async function POST(req: NextRequest) {
     })
     const slice = text.replace(/\s+/g, " ").trim().slice(0, 8000)
 
-    const extraction = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1500,
+    const { text: extractedText } = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 1500,
       messages: [
         {
           role: "user",
@@ -79,11 +82,6 @@ ${slice}`),
         },
       ],
     })
-
-    const extractedText = extraction.content
-      .filter((c): c is Anthropic.TextBlock => c.type === "text")
-      .map((c) => c.text)
-      .join("")
 
     const data = extractJsonObject(extractedText)
 

@@ -1,28 +1,16 @@
 /**
  * Juno AI engine — LinkedIn, lead fit, outreach, trends, comments.
- * Uses @anthropic-ai/sdk with full CompanyContext.promptBlock.
+ * Uses full CompanyContext.promptBlock with the configured LLM (default Qwen 3.6).
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import type { CompanyContext } from "@/lib/company-context"
 import { runLookalikeConversionAnalysis } from "@/lib/lookalike/ai-profile"
 import { dimensionsToLegacyCriteria } from "@/lib/lookalike/derive-legacy"
 import type { LookalikeDimensions, OutreachPlaybook, PlatformQuery } from "@/types/lookalike"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
+import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
+import { generateText } from "ai"
 import type { ScoredItem } from "./types"
-
-const anthropic = new Anthropic()
-
-function extractText(response: Anthropic.Messages.Message): string {
-  return response.content
-    .filter((c) => c.type === "text")
-    .map((c) => (c as { text: string }).text)
-    .join("")
-}
-
-function hasAnthropicKey(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY)
-}
 
 // ─── LinkedIn Post Generation ────────────────────────────────────
 
@@ -32,17 +20,17 @@ export async function generateLinkedInPost(params: {
   /** Last N dismissal reasons — CMO learns what to avoid */
   dismissalFeedbackBlock?: string
 }): Promise<{ post: string; angle: string }> {
-  if (!hasAnthropicKey()) {
-    return { post: "", angle: "Set ANTHROPIC_API_KEY" }
+  if (!isLlmConfigured()) {
+    return { post: "", angle: "Set LLM_API_KEY or OPENROUTER_API_KEY" }
   }
 
   const feedback = params.dismissalFeedbackBlock?.trim()
     ? `\n\n${params.dismissalFeedbackBlock.trim()}\n`
     : ""
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1500,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 1500,
     messages: [
       {
         role: "user",
@@ -75,8 +63,6 @@ Return JSON: {"angle": "one sentence describing the content angle", "post": "the
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as { post?: string; angle?: string }
     return { post: parsed.post || "", angle: parsed.angle || "" }
@@ -105,11 +91,11 @@ export async function scoreLeadFit(params: {
     pitchAngle: "Review manually",
   }
 
-  if (!hasAnthropicKey()) return fallback
+  if (!isLlmConfigured()) return fallback
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 500,
     messages: [
       {
         role: "user",
@@ -137,8 +123,6 @@ Return JSON:
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<{
       icpFit: number
@@ -177,11 +161,11 @@ export async function generateOutreach(params: {
   email: string
 }> {
   const empty = { linkedinConnect: "", linkedinDM: "", email: "" }
-  if (!hasAnthropicKey()) return empty
+  if (!isLlmConfigured()) return empty
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 2000,
     messages: [
       {
         role: "user",
@@ -211,8 +195,6 @@ Return JSON: {"linkedinConnect": "...", "linkedinDM": "...", "email": "..."}`),
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<typeof empty>
     return {
@@ -235,11 +217,11 @@ export async function analyzeTechTrends(params: {
   postSuggestions: string[]
 }> {
   const empty = { trends: [] as Array<{ trend: string; relevance: string; action: string }>, postSuggestions: [] as string[] }
-  if (!hasAnthropicKey()) return empty
+  if (!isLlmConfigured()) return empty
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 2000,
     messages: [
       {
         role: "user",
@@ -267,8 +249,6 @@ Return JSON:
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<typeof empty>
     return {
@@ -288,15 +268,15 @@ export async function generateComments(params: {
   dismissalFeedbackBlock?: string
 }): Promise<Array<{ author: string; url: string; comment: string }>> {
   if (params.targetPosts.length === 0) return []
-  if (!hasAnthropicKey()) return []
+  if (!isLlmConfigured()) return []
 
   const feedback = params.dismissalFeedbackBlock?.trim()
     ? `\n\n${params.dismissalFeedbackBlock.trim()}\n`
     : ""
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2000,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 2000,
     messages: [
       {
         role: "user",
@@ -318,8 +298,6 @@ Return JSON array: [{"index": 0, "comment": "..."}]`),
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] || "[]") as Array<{ index?: number; comment?: string }>
     return parsed.map((c) => ({
@@ -446,16 +424,16 @@ export async function personalizeDistributionLead(params: {
   personalizedEmail: string
 }> {
   const empty = { fitScore: 70, personalizedInmail: "", personalizedEmail: "" }
-  if (!hasAnthropicKey()) return empty
+  if (!isLlmConfigured()) return empty
 
   const fullName = [params.lead.firstName, params.lead.lastName].filter(Boolean).join(" ").trim()
   const dimBlock = params.dimensionsJson?.trim()
     ? `\nWEIGHTED ICP DIMENSIONS (use as guardrails; do not recite verbatim):\n${params.dimensionsJson.trim()}\n`
     : ""
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 2500,
+  const { text } = await generateText({
+    model: qwenModel(),
+    maxOutputTokens: 2500,
     messages: [
       {
         role: "user",
@@ -497,8 +475,6 @@ Rules:
       },
     ],
   })
-
-  const text = extractText(response)
   try {
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] || "{}") as Partial<{
       fitScore: number
