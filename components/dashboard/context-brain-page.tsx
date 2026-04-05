@@ -1,15 +1,13 @@
 "use client"
 
-import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { FileUp, Github, Loader2, RefreshCw, Save, Trash2 } from "lucide-react"
+import { FileUp, Loader2, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { type ContextData, emptyContextData } from "@/lib/context-view"
 import { useToast } from "@/hooks/use-toast"
-import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 import type { BrainLedgerData } from "@/app/api/company/brain-ledger/route"
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -46,10 +44,6 @@ function signalColor(type: string): string {
   if (type === "buying_signal") return "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200"
   if (type === "problem_mention") return "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border-blue-200"
   return "text-muted-foreground bg-muted/30 border-border"
-}
-
-function isVaultSyncWarning(message: string | null | undefined): boolean {
-  return Boolean(message && /^No markdown files found/i.test(message))
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -432,13 +426,6 @@ function BrainLedger({ refreshKey }: { refreshKey: number }) {
 
 type Tab = "upload" | "vault" | "ledger"
 
-type VaultMutationResponse = {
-  cleared?: boolean
-  error?: string
-  fileCount?: number
-  warning?: string | null
-}
-
 export function ContextBrainPage() {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -452,13 +439,6 @@ export function ContextBrainPage() {
   const [markdownDirty, setMarkdownDirty] = useState(false)
   const [savingMd, setSavingMd] = useState(false)
 
-  const [vaultRepo, setVaultRepo] = useState("")
-  const [vaultBranch, setVaultBranch] = useState("main")
-  const [vaultFoldersText, setVaultFoldersText] = useState("")
-  const [vaultDirty, setVaultDirty] = useState(false)
-  const [savingVault, setSavingVault] = useState(false)
-  const [syncingVault, setSyncingVault] = useState(false)
-
   async function refresh() {
     try {
       const res = await fetch("/api/company/context-view", { credentials: "include" })
@@ -468,10 +448,6 @@ export function ContextBrainPage() {
       setData(d)
       setMarkdown(d.knowledge.markdown)
       setMarkdownDirty(false)
-      setVaultRepo(d.vault.repo)
-      setVaultBranch(d.vault.branch || "main")
-      setVaultFoldersText(d.vault.folders.join("\n"))
-      setVaultDirty(false)
     } catch {
       toast({ title: "Could not load brain data", variant: "destructive" })
     } finally {
@@ -482,21 +458,6 @@ export function ContextBrainPage() {
   useEffect(() => {
     void refresh()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function normalizeRepoInput(value: string): string {
-    // Strip full GitHub URLs to just owner/repo
-    return value
-      .trim()
-      .replace(/^https?:\/\/(www\.)?github\.com\//, "")
-      .replace(/\.git$/, "")
-      .replace(/\/$/, "")
-  }
-
-  function handleRepoChange(value: string) {
-    const normalized = normalizeRepoInput(value)
-    setVaultRepo(normalized)
-    setVaultDirty(true)
-  }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -531,76 +492,6 @@ export function ContextBrainPage() {
     } finally {
       setSavingMd(false)
     }
-  }
-
-  async function persistVaultSettings(mode: "save" | "sync") {
-    const repo = vaultRepo.trim()
-    const branch = vaultBranch.trim() || "main"
-    const folders = normalizeVaultFolders(vaultFoldersText)
-    const shouldSync = Boolean(repo)
-
-    if (mode === "sync" && !repo) {
-      toast({ title: "Sync failed", description: "Enter a GitHub repo first.", variant: "destructive" })
-      return
-    }
-
-    if (mode === "save") setSavingVault(true)
-    else setSyncingVault(true)
-
-    try {
-      const res = await fetch("/api/settings/github-vault", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          repo: repo || null,
-          branch,
-          folders,
-          sync: shouldSync,
-        }),
-      })
-      const json = (await res.json().catch(() => ({}))) as VaultMutationResponse
-      if (!res.ok) throw new Error(json.error || (mode === "save" ? "Failed to save vault" : "Vault sync failed"))
-
-      setVaultDirty(false)
-      await refresh()
-      setLedgerRefreshKey((k) => k + 1)
-
-      if (json.cleared) {
-        toast({ title: "Vault disconnected" })
-        return
-      }
-
-      if (json.warning) {
-        toast({
-          title: mode === "save" ? "Connection saved with warning" : "Vault synced with warning",
-          description: json.warning,
-        })
-        return
-      }
-
-      toast({
-        title: mode === "save" ? "Vault connected" : "Vault synced",
-        description: typeof json.fileCount === "number" ? `${json.fileCount} file(s) cached` : undefined,
-      })
-    } catch (e) {
-      toast({
-        title: mode === "save" ? "Could not save vault" : "Sync failed",
-        description: e instanceof Error ? e.message : undefined,
-        variant: "destructive",
-      })
-    } finally {
-      if (mode === "save") setSavingVault(false)
-      else setSyncingVault(false)
-    }
-  }
-
-  async function saveVaultSettings() {
-    await persistVaultSettings("save")
-  }
-
-  async function syncVaultNow() {
-    await persistVaultSettings("sync")
   }
 
   if (loading) {
@@ -698,127 +589,7 @@ export function ContextBrainPage() {
       )}
 
       {/* Obsidian Vault tab */}
-      {tab === "vault" && (
-        <div className="space-y-5">
-
-          <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground space-y-2">
-            <div className="flex items-start gap-2">
-              <Github className="h-4 w-4 shrink-0 mt-0.5" />
-              <p>
-                Connect GitHub in{" "}
-                <Link href="/dashboard/integrations" className="font-medium text-foreground underline">
-                  Integrations
-                </Link>{" "}
-                (Pipedream) so Juno can list your repos. Then paste the vault repo here and sync.
-              </p>
-            </div>
-            <p>
-              Private repos also need a server token in Vercel env:{" "}
-              <span className="font-mono text-xs">GITHUB_VAULT_TOKEN</span>,{" "}
-              <span className="font-mono text-xs">GITHUB_TOKEN</span>, or{" "}
-              <span className="font-mono text-xs">GITHUB_PAT</span>.
-            </p>
-          </div>
-
-          {/* Sync status cards */}
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              {
-                label: "Vault status",
-                value: data.vault.lastSyncedAt ? "Synced" : data.vault.connected ? "Saved, needs sync" : "Not set",
-              },
-              { label: "Last synced", value: formatDateTime(data.vault.lastSyncedAt) },
-              { label: "Files cached", value: String(data.vault.fileCount) },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl border border-border bg-muted/15 p-3">
-                <div className="text-[11px] text-muted-foreground">{label}</div>
-                <div className="mt-1 text-sm font-medium">{value}</div>
-              </div>
-            ))}
-          </div>
-
-          {data.vault.connected && !data.vault.lastSyncedAt && !data.vault.syncError && (
-            <div className="rounded-lg border border-blue-500/25 bg-blue-500/5 px-3 py-2 text-sm text-blue-700 dark:text-blue-300">
-              The repo is saved, but Juno has not pulled any files yet. Use <span className="font-medium">Save + verify</span> or <span className="font-medium">Sync now</span> to test the connection and cache markdown.
-            </div>
-          )}
-
-          {data.vault.syncError && (
-            <div
-              className={cn(
-                "rounded-lg border px-3 py-2 text-sm",
-                isVaultSyncWarning(data.vault.syncError)
-                  ? "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300"
-                  : "border-destructive/30 bg-destructive/5 text-destructive",
-              )}
-            >
-              {data.vault.syncError}
-            </div>
-          )}
-
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-4">
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Point Juno at your GitHub-backed Obsidian vault. Paste the full repo URL or just <span className="font-mono text-foreground/80">owner/repo</span> — it normalizes automatically.
-            </p>
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">GitHub repo</div>
-                <Input
-                  value={vaultRepo}
-                  onChange={(e) => handleRepoChange(e.target.value)}
-                  onBlur={(e) => {
-                    const normalized = normalizeRepoInput(e.target.value)
-                    if (normalized !== vaultRepo) {
-                      setVaultRepo(normalized)
-                      setVaultDirty(true)
-                    }
-                  }}
-                  placeholder="NandineMpe/JunoAIObsidian or full GitHub URL"
-                  className="font-mono text-[13px]"
-                />
-                {vaultRepo && !vaultRepo.includes("/") && (
-                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">Enter as owner/repo — e.g. NandineMpe/JunoAIObsidian</p>
-                )}
-              </div>
-              <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Branch</div>
-                <Input
-                  value={vaultBranch}
-                  onChange={(e) => { setVaultBranch(e.target.value); setVaultDirty(true) }}
-                  placeholder="main or master"
-                  className="font-mono text-[13px] max-w-[180px]"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">Check your repo — some vaults use <span className="font-mono">master</span> instead of <span className="font-mono">main</span></p>
-              </div>
-              <div>
-                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Folders to sync <span className="normal-case font-normal">(one per line, leave blank to sync entire vault)</span>
-                </div>
-                <Textarea
-                  value={vaultFoldersText}
-                  onChange={(e) => { setVaultFoldersText(e.target.value); setVaultDirty(true) }}
-                  rows={3}
-                  placeholder={"Leave blank to sync all files\nor enter specific folders:\ncompany\nresearch"}
-                  className="font-mono text-[13px]"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" onClick={() => void saveVaultSettings()} disabled={savingVault || !vaultDirty}>
-                {savingVault ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save + verify
-              </Button>
-              <Button type="button" variant="outline" onClick={() => void syncVaultNow()} disabled={syncingVault || savingVault}>
-                {syncingVault ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Sync now
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Save + verify checks the repo immediately and caches matching markdown. Auto-sync still runs nightly at 4am UTC.
-            </p>
-          </div>
-        </div>
-      )}
+      {tab === "vault" && <GithubVaultSettings />}
 
       {/* Brain Ledger tab */}
       {tab === "ledger" && <BrainLedger refreshKey={ledgerRefreshKey} />}

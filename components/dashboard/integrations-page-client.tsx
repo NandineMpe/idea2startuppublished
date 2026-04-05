@@ -23,7 +23,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 import { cn } from "@/lib/utils"
 import type { PipedreamAccountPublic } from "@/lib/pipedream-serialize-account"
 import { latestPipedreamActivityIso } from "@/lib/pipedream-serialize-account"
@@ -1097,15 +1096,6 @@ export function IntegrationsPageClient({
         </Card>
       )}
 
-      {/* Obsidian vault — separate from Connect */}
-      <div className="space-y-2 pt-2 border-t border-border">
-        <h2 className="text-lg font-semibold text-foreground">Obsidian vault (GitHub repo)</h2>
-        <p className="text-sm text-muted-foreground">
-          Separate from Connect: grant repo access for the knowledge vault Juno reads. Uses a
-          personal access token and repo fields below.
-        </p>
-        <GithubVaultSettings />
-      </div>
     </div>
   )
 }
