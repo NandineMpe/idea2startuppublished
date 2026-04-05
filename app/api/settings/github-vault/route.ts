@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
+import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
-import { syncVaultContextCacheForUser } from "@/lib/vault-context-sync"
+import { syncVaultContextCacheForUser, syncVaultContextCacheForWorkspace } from "@/lib/vault-context-sync"
 import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
@@ -18,15 +19,24 @@ export async function GET() {
 
     const workspace = await resolveWorkspaceSelection(user.id)
     if (workspace) {
+      const { data } = await supabaseAdmin
+        .from("client_workspace_profiles")
+        .select(
+          "github_vault_repo, github_vault_branch, vault_folders, vault_context_last_synced_at, vault_context_file_count, vault_context_sync_error",
+        )
+        .eq("owner_user_id", user.id)
+        .eq("workspace_id", workspace.id)
+        .maybeSingle()
+
       return NextResponse.json({
-        repo: null,
-        branch: "main",
-        folders: [],
-        connected: false,
-        lastSyncedAt: null,
-        fileCount: 0,
-        syncError: null,
-        unsupported: true,
+        repo: data?.github_vault_repo ?? null,
+        branch: data?.github_vault_branch ?? "main",
+        folders: normalizeVaultFolders(data?.vault_folders),
+        connected: Boolean(data?.github_vault_repo),
+        lastSyncedAt: data?.vault_context_last_synced_at ?? null,
+        fileCount: data?.vault_context_file_count ?? 0,
+        syncError: data?.vault_context_sync_error ?? null,
+        unsupported: false,
       })
     }
 
@@ -68,19 +78,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const workspace = await resolveWorkspaceSelection(user.id)
-    if (workspace) {
-      return NextResponse.json(
-        { error: "GitHub vault sync is only available on your primary workspace right now." },
-        { status: 400 },
-      )
-    }
-
-    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
-    if (!organization) {
-      return NextResponse.json({ error: "No active organization" }, { status: 400 })
-    }
-
     const body = (await request.json().catch(() => ({}))) as {
       repo?: string | null
       branch?: string | null
@@ -92,10 +89,96 @@ export async function POST(request: Request) {
     const branch = typeof body.branch === "string" && body.branch.trim() ? body.branch.trim() : "main"
     const folders = normalizeVaultFolders(body.folders)
 
+    const workspace = await resolveWorkspaceSelection(user.id)
+    if (workspace) {
+      if (!repo) {
+        const { error: clearErr } = await supabaseAdmin
+          .from("client_workspace_profiles")
+          .update({
+            github_vault_owner: null,
+            github_vault_repo: null,
+            github_vault_branch: "main",
+            github_vault_path: "",
+            vault_folders: folders,
+            vault_context_cache: null,
+            vault_context_last_synced_at: null,
+            vault_context_file_count: null,
+            vault_context_sync_error: null,
+          })
+          .eq("workspace_id", workspace.id)
+          .eq("owner_user_id", user.id)
+
+        if (clearErr) {
+          return jsonApiError(500, clearErr, "github-vault POST clear workspace vault")
+        }
+
+        return NextResponse.json({
+          saved: true,
+          cleared: true,
+          repo: null,
+          branch: "main",
+          folders,
+          connected: false,
+          lastSyncedAt: null,
+          fileCount: 0,
+          syncError: null,
+        })
+      }
+
+      const vaultPatch = {
+        owner_user_id: user.id,
+        workspace_id: workspace.id,
+        github_vault_owner: null as string | null,
+        github_vault_repo: repo,
+        github_vault_branch: branch,
+        github_vault_path: "",
+        vault_folders: folders,
+      }
+
+      const { error: upsertErr } = await supabaseAdmin
+        .from("client_workspace_profiles")
+        .upsert(vaultPatch, { onConflict: "workspace_id" })
+
+      if (upsertErr) {
+        return jsonApiError(500, upsertErr, "github-vault POST upsert workspace vault")
+      }
+
+      if (body.sync === false) {
+        return NextResponse.json({
+          saved: true,
+          cleared: false,
+          repo,
+          branch,
+          folders,
+          connected: true,
+        })
+      }
+
+      const result = await syncVaultContextCacheForWorkspace(supabaseAdmin, user.id, workspace.id)
+      return NextResponse.json({
+        saved: true,
+        cleared: false,
+        repo,
+        branch,
+        folders,
+        connected: result.connected,
+        synced: result.ok,
+        lastSyncedAt: result.lastSyncedAt,
+        fileCount: result.fileCount,
+        syncError: result.error ?? null,
+        warning: result.warning ?? null,
+      })
+    }
+
+    const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     if (!repo) {
-      const { error: clearErr } = await supabase.from("company_profile").upsert(
-        {
-          user_id: user.id,
+      const { error: clearErr } = await supabase
+        .from("company_profile")
+        .update({
           github_vault_owner: null,
           github_vault_repo: null,
           github_vault_branch: "main",
@@ -105,12 +188,11 @@ export async function POST(request: Request) {
           vault_context_last_synced_at: null,
           vault_context_file_count: null,
           vault_context_sync_error: null,
-        },
-        { onConflict: "user_id" },
-      )
+        })
+        .eq("organization_id", organization.id)
 
       if (clearErr) {
-        return jsonApiError(500, clearErr, "github-vault POST clear")
+        return jsonApiError(500, clearErr, "github-vault POST clear vault fields")
       }
 
       return NextResponse.json({
@@ -126,21 +208,34 @@ export async function POST(request: Request) {
       })
     }
 
-    const { error: upErr } = await supabase.from("company_profile").upsert(
-      {
-        organization_id: organization.id,
-        user_id: user.id,
-        github_vault_owner: null,
-        github_vault_repo: repo,
-        github_vault_branch: branch,
-        github_vault_path: "",
-        vault_folders: folders,
-      },
-      { onConflict: "organization_id" },
-    )
+    const vaultPatch = {
+      user_id: user.id,
+      github_vault_owner: null as string | null,
+      github_vault_repo: repo,
+      github_vault_branch: branch,
+      github_vault_path: "",
+      vault_folders: folders,
+    }
 
-    if (upErr) {
-      return jsonApiError(500, upErr, "github-vault POST upsert")
+    const { data: updatedRow, error: updateErr } = await supabase
+      .from("company_profile")
+      .update(vaultPatch)
+      .eq("organization_id", organization.id)
+      .select("id")
+      .maybeSingle()
+
+    if (updateErr) {
+      return jsonApiError(500, updateErr, "github-vault POST update vault fields")
+    }
+
+    if (!updatedRow) {
+      const { error: insertErr } = await supabase.from("company_profile").insert({
+        organization_id: organization.id,
+        ...vaultPatch,
+      })
+      if (insertErr) {
+        return jsonApiError(500, insertErr, "github-vault POST insert company_profile")
+      }
     }
 
     if (body.sync === false) {

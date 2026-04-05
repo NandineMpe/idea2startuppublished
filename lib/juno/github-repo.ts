@@ -1,12 +1,8 @@
-import {
-  githubProxyGetJson,
-  githubProxyGetJsonResult,
-  type GithubRepoListItem,
-} from "@/lib/juno/pipedream-github"
+export type GithubRepoListItem = { full_name: string; default_branch: string; private: boolean }
 
 export type RepoTreeEntry = { path: string; size: number; type: string }
 
-/** Server-only classic PAT with `repo` scope — bypasses Pipedream Connect for GitHub REST calls. */
+/** Server-only classic PAT with `repo` scope for GitHub REST calls. */
 function githubPat(): string | null {
   const t = process.env.GITHUB_PAT?.trim()
   return t || null
@@ -25,7 +21,6 @@ async function githubDirectGetJsonResult<T>(url: string): Promise<{ ok: true; da
     const res = await fetch(url, {
       headers: {
         ...GITHUB_REST_HEADERS_BASE,
-        /** Classic `ghp_` PATs expect `Authorization: token …`; `Bearer` often returns 401. */
         Authorization: `token ${pat}`,
       },
     })
@@ -55,10 +50,7 @@ async function githubDirectGetJson<T>(url: string): Promise<T | null> {
   return r.ok ? r.data : null
 }
 
-/**
- * Lists repos via `GITHUB_PAT` (direct GitHub API). Used when Pipedream proxy returns 502/503
- * or empty so Security updates can still populate the repo dropdown.
- */
+/** Lists repos via `GITHUB_PAT` (direct GitHub API). */
 export async function listUserReposViaPat(): Promise<{
   repos: GithubRepoListItem[]
   error?: string
@@ -84,7 +76,6 @@ export async function listUserReposViaPat(): Promise<{
   }
 }
 
-/** Raw file body via Contents API (PAT path). Classic tokens use `Authorization: token …`. */
 async function githubDirectGetRawText(url: string): Promise<string | null> {
   const pat = githubPat()
   if (!pat) return null
@@ -127,11 +118,6 @@ export async function getRepoTree(
   return entries
 }
 
-/**
- * Same as {@link getRepoTree} but returns a human-readable reason when the tree is empty
- * (wrong branch, no access, invalid slug) so failed scans are easier to debug.
- */
-/** Build scan entries from a `git/trees` `tree` array (recursive). */
 export function treeEntriesFromGithubTreeRaw(
   raw: Array<{ path?: string; size?: number; type?: string }>,
   repoFull: string,
@@ -161,9 +147,12 @@ export function treeEntriesFromGithubTreeRaw(
   return { entries: out }
 }
 
+const NO_PAT_DIAGNOSTIC =
+  'Set GITHUB_PAT on the server (classic token with repo scope) so Juno can read this repository.'
+
 export async function getRepoTreeWithDiagnostics(
-  externalUserId: string,
-  accountId: string,
+  _externalUserId: string,
+  _accountId: string,
   repoFull: string,
   branch: string,
 ): Promise<{ entries: RepoTreeEntry[]; diagnostic?: string }> {
@@ -174,60 +163,18 @@ export async function getRepoTreeWithDiagnostics(
       diagnostic: `Invalid repository "${repoFull}" — use owner/repo (one slash).`,
     }
   }
+  if (!githubPat()) {
+    return { entries: [], diagnostic: NO_PAT_DIAGNOSTIC }
+  }
   const { owner, name } = parsed
   const base = `https://api.github.com/repos/${owner}/${name}`
 
-  if (githubPat()) {
-    const refUrl = `${base}/git/ref/heads/${encodeURIComponent(branch)}`
-    const refRes = await githubDirectGetJsonResult<{ object?: { sha?: string }; message?: string }>(refUrl)
-    if (!refRes.ok) {
-      return {
-        entries: [],
-        diagnostic: `Cannot resolve branch "${branch}" for ${repoFull}: ${refRes.error}. Check the default branch name (main vs master) and that GITHUB_PAT can access the repo.`,
-      }
-    }
-    const commitSha = refRes.data?.object?.sha
-    if (!commitSha) {
-      return {
-        entries: [],
-        diagnostic: `Branch "${branch}" has no commit SHA for ${repoFull}. Try another branch name.`,
-      }
-    }
-    const commitRes = await githubDirectGetJsonResult<{ tree?: { sha?: string }; message?: string }>(
-      `${base}/git/commits/${commitSha}`,
-    )
-    if (!commitRes.ok) {
-      return {
-        entries: [],
-        diagnostic: `Could not load commit for ${repoFull}@${branch}: ${commitRes.error}`,
-      }
-    }
-    const treeSha = commitRes.data?.tree?.sha
-    if (!treeSha) {
-      return { entries: [], diagnostic: `Commit metadata missing tree for ${repoFull}@${branch}.` }
-    }
-    const treeRes = await githubDirectGetJsonResult<{
-      tree?: Array<{ path?: string; size?: number; type?: string }>
-      truncated?: boolean
-      message?: string
-    }>(`${base}/git/trees/${treeSha}?recursive=1`)
-    if (!treeRes.ok) {
-      return { entries: [], diagnostic: `Could not load file tree: ${treeRes.error}` }
-    }
-    const raw = treeRes.data?.tree ?? []
-    return treeEntriesFromGithubTreeRaw(raw, repoFull, branch)
-  }
-
   const refUrl = `${base}/git/ref/heads/${encodeURIComponent(branch)}`
-  const refRes = await githubProxyGetJsonResult<{ object?: { sha?: string }; message?: string }>(
-    externalUserId,
-    accountId,
-    refUrl,
-  )
+  const refRes = await githubDirectGetJsonResult<{ object?: { sha?: string }; message?: string }>(refUrl)
   if (!refRes.ok) {
     return {
       entries: [],
-      diagnostic: `Cannot resolve branch "${branch}" for ${repoFull}: ${refRes.error}. Check the default branch name (main vs master) and that this GitHub account can access the repo.`,
+      diagnostic: `Cannot resolve branch "${branch}" for ${repoFull}: ${refRes.error}. Check the default branch name (main vs master) and that GITHUB_PAT can access the repo.`,
     }
   }
   const commitSha = refRes.data?.object?.sha
@@ -237,10 +184,7 @@ export async function getRepoTreeWithDiagnostics(
       diagnostic: `Branch "${branch}" has no commit SHA for ${repoFull}. Try another branch name.`,
     }
   }
-
-  const commitRes = await githubProxyGetJsonResult<{ tree?: { sha?: string }; message?: string }>(
-    externalUserId,
-    accountId,
+  const commitRes = await githubDirectGetJsonResult<{ tree?: { sha?: string }; message?: string }>(
     `${base}/git/commits/${commitSha}`,
   )
   if (!commitRes.ok) {
@@ -253,16 +197,14 @@ export async function getRepoTreeWithDiagnostics(
   if (!treeSha) {
     return { entries: [], diagnostic: `Commit metadata missing tree for ${repoFull}@${branch}.` }
   }
-
-  const treeRes = await githubProxyGetJsonResult<{
+  const treeRes = await githubDirectGetJsonResult<{
     tree?: Array<{ path?: string; size?: number; type?: string }>
     truncated?: boolean
     message?: string
-  }>(externalUserId, accountId, `${base}/git/trees/${treeSha}?recursive=1`)
+  }>(`${base}/git/trees/${treeSha}?recursive=1`)
   if (!treeRes.ok) {
     return { entries: [], diagnostic: `Could not load file tree: ${treeRes.error}` }
   }
-
   const raw = treeRes.data?.tree ?? []
   return treeEntriesFromGithubTreeRaw(raw, repoFull, branch)
 }
@@ -274,30 +216,21 @@ type ContentsFile = {
 }
 
 export async function readRepoFile(
-  externalUserId: string,
-  accountId: string,
+  _externalUserId: string,
+  _accountId: string,
   repoFull: string,
   path: string,
   branch: string,
 ): Promise<string | null> {
+  if (!githubPat()) return null
   const parsed = splitGithubRepo(repoFull)
   if (!parsed) return null
   const { owner, name } = parsed
   const base = `https://api.github.com/repos/${owner}/${name}`
   const url = `${base}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`
-  if (githubPat()) {
-    const raw = await githubDirectGetRawText(url)
-    if (raw !== null) return raw
-    const res = await githubDirectGetJson<ContentsFile | ContentsFile[]>(url)
-    if (!res) return null
-    if (Array.isArray(res)) return null
-    if (res.encoding === "base64" && typeof res.content === "string") {
-      const buf = Buffer.from(res.content.replace(/\s/g, ""), "base64")
-      return buf.toString("utf8")
-    }
-    return null
-  }
-  const res = await githubProxyGetJson<ContentsFile | ContentsFile[]>(externalUserId, accountId, url)
+  const raw = await githubDirectGetRawText(url)
+  if (raw !== null) return raw
+  const res = await githubDirectGetJson<ContentsFile | ContentsFile[]>(url)
   if (!res) return null
   if (Array.isArray(res)) return null
   if (res.encoding === "base64" && typeof res.content === "string") {
@@ -315,12 +248,13 @@ type CommitDetail = {
 }
 
 export async function getRecentCommits(
-  externalUserId: string,
-  accountId: string,
+  _externalUserId: string,
+  _accountId: string,
   repoFull: string,
   branch: string,
   days: number,
 ): Promise<Array<{ sha: string; message: string; date: string; files: string[] }>> {
+  if (!githubPat()) return []
   const parsed = splitGithubRepo(repoFull)
   if (!parsed) return []
   const { owner, name } = parsed
@@ -328,9 +262,7 @@ export async function getRecentCommits(
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const listUrl = `${base}/commits?sha=${encodeURIComponent(branch)}&since=${encodeURIComponent(since)}&per_page=30`
 
-  const list = githubPat()
-    ? await githubDirectGetJson<CommitListItem[]>(listUrl)
-    : await githubProxyGetJson<CommitListItem[]>(externalUserId, accountId, listUrl)
+  const list = await githubDirectGetJson<CommitListItem[]>(listUrl)
   if (!Array.isArray(list) || list.length === 0) return []
 
   const limited = list.slice(0, 20)
@@ -339,13 +271,7 @@ export async function getRecentCommits(
   for (const c of limited) {
     const sha = c.sha
     if (!sha) continue
-    const detail = githubPat()
-      ? await githubDirectGetJson<CommitDetail>(`${base}/commits/${sha}`)
-      : await githubProxyGetJson<CommitDetail>(
-          externalUserId,
-          accountId,
-          `${base}/commits/${sha}`,
-        )
+    const detail = await githubDirectGetJson<CommitDetail>(`${base}/commits/${sha}`)
     const files = (detail?.files ?? []).map((f) => f.filename).filter((x): x is string => Boolean(x))
     out.push({
       sha,

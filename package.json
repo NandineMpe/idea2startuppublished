@@ -13,10 +13,7 @@
     "db:migrate": "node scripts/apply-all-supabase-migrations.cjs",
     "start": "next start",
     "lint": "next lint",
-    "pd": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1",
-    "pipedream:login": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 login",
-    "pipedream:logout": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 logout",
-    "pipedream:init": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pipedream-pd.ps1 init connect"
+    "prepare": "husky"
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
@@ -25,7 +22,7 @@
     "@fontsource/inter": "^5.2.8",
     "@hookform/resolvers": "^3.10.0",
     "@pipedream/connect-react": "^2.8.0",
-    "@pipedream/sdk": "^2.4.1",
+    "@pipedream/sdk": "^2.4.3",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -55,6 +52,7 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
+    "@tanstack/react-query": "^5.96.2",
     "@vercel/analytics": "latest",
     "@x402/fetch": "^2.8.0",
     "agentmail": "^0.4.15",
@@ -101,6 +99,7 @@
     "concurrently": "^9.2.1",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
+    "husky": "^9.1.7",
     "pg": "^8.20.0",
     "postcss": "^8.5.4",
     "tailwindcss": "^3.4.19",

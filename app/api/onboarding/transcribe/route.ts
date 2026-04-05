@@ -1,34 +1,40 @@
-"use server"
-
 import { NextRequest, NextResponse } from "next/server"
-import { getServerEnv } from "@/lib/server-env"
+import { getLlmApiKey, getLlmBaseUrl } from "@/lib/llm-provider"
 
-const DASHSCOPE_BASE_INTL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+/**
+ * Audio transcription via the OpenAI-compatible /audio/transcriptions endpoint.
+ * Works with OpenRouter (openai/whisper-1), DashScope (paraformer-realtime-v2),
+ * or any other provider that exposes the endpoint.
+ */
+function getTranscribeConfig(): { url: string; apiKey: string; model: string } {
+  const apiKey = getLlmApiKey()
+  const base = getLlmBaseUrl().replace(/\/+$/, "")
 
-function getDashScopeKey() {
-  return (
-    getServerEnv("DASHSCOPE_API_KEY") ||
-    getServerEnv("LLM_API_KEY") ||
-    ""
-  )
-}
+  // OpenRouter uses whisper via openai/whisper-1
+  const isOpenRouter = base.includes("openrouter.ai")
+  const isDashScope = base.includes("dashscope") || base.includes("aliyuncs.com")
 
-function getDashScopeBase() {
-  const explicit = getServerEnv("LLM_BASE_URL") || getServerEnv("DASHSCOPE_BASE_URL")
-  if (explicit) return explicit.replace(/\/+$/, "")
+  let model: string
+  if (isOpenRouter) {
+    model = "openai/whisper-1"
+  } else if (isDashScope) {
+    model = process.env.DASHSCOPE_STT_MODEL?.trim() || "paraformer-realtime-v2"
+  } else {
+    // Generic OpenAI-compatible — assume whisper-1
+    model = process.env.STT_MODEL?.trim() || "whisper-1"
+  }
 
-  const region = getServerEnv("DASHSCOPE_REGION")?.trim().toLowerCase()
-  if (region === "us") return "https://dashscope-us.aliyuncs.com/compatible-mode/v1"
-  if (region === "cn" || region === "beijing") return "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  if (region === "hk") return "https://cn-hongkong.dashscope.aliyuncs.com/compatible-mode/v1"
-
-  return DASHSCOPE_BASE_INTL
+  return { url: `${base}/audio/transcriptions`, apiKey, model }
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = getDashScopeKey()
+  const { url, apiKey, model } = getTranscribeConfig()
+
   if (!apiKey) {
-    return NextResponse.json({ error: "DASHSCOPE_API_KEY not configured" }, { status: 503 })
+    return NextResponse.json(
+      { error: "No LLM API key configured. Set LLM_API_KEY, OPENROUTER_API_KEY, or DASHSCOPE_API_KEY." },
+      { status: 503 },
+    )
   }
 
   let audioBlob: Blob
@@ -43,35 +49,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 
-  // Convert blob to base64 for DashScope paraformer REST API
-  const arrayBuffer = await audioBlob.arrayBuffer()
-  const base64Audio = Buffer.from(arrayBuffer).toString("base64")
-
-  // DashScope paraformer-v2 (Fun-ASR) via OpenAI-compatible audio transcriptions endpoint
-  const base = getDashScopeBase()
-  const transcribeUrl = `${base}/audio/transcriptions`
+  const fd = new FormData()
+  fd.append(
+    "file",
+    new Blob([await audioBlob.arrayBuffer()], { type: audioBlob.type || "audio/webm" }),
+    "audio.webm",
+  )
+  fd.append("model", model)
 
   try {
-    // Use multipart form (same as OpenAI Whisper API — DashScope is compatible)
-    const fd = new FormData()
-    fd.append(
-      "file",
-      new Blob([Buffer.from(base64Audio, "base64")], { type: audioBlob.type || "audio/webm" }),
-      "audio.webm",
-    )
-    fd.append("model", "paraformer-realtime-v2")
-
-    const res = await fetch(transcribeUrl, {
+    const res = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { Authorization: `Bearer ${apiKey}` },
       body: fd,
+      signal: AbortSignal.timeout(60_000),
     })
 
     if (!res.ok) {
       const errorText = await res.text().catch(() => "")
-      console.error("DashScope transcribe error:", res.status, errorText)
+      console.error("[transcribe] provider error:", res.status, errorText)
       return NextResponse.json(
         { error: "Transcription failed. Please try again or type your context instead." },
         { status: 502 },
@@ -79,11 +75,12 @@ export async function POST(req: NextRequest) {
     }
 
     const data = (await res.json()) as { text?: string; error?: string }
-    const transcript = data.text?.trim() ?? ""
-
-    return NextResponse.json({ transcript })
+    return NextResponse.json({ transcript: data.text?.trim() ?? "" })
   } catch (err) {
-    console.error("Transcription error:", err)
-    return NextResponse.json({ error: "Transcription service unavailable" }, { status: 503 })
+    console.error("[transcribe] error:", err)
+    return NextResponse.json(
+      { error: "Transcription service unavailable. Please try again or type your context instead." },
+      { status: 503 },
+    )
   }
 }

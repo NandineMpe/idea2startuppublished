@@ -332,12 +332,20 @@ async function loadWorkspaceProfile(
     .select("*")
     .eq("owner_user_id", userId)
     .eq("workspace_id", workspaceId)
-    .single()
+    .maybeSingle()
 
-  if (error || !data) {
-    throw new Error(
-      `No workspace profile for workspace ${workspaceId}. The contact still needs to submit their context.`,
-    )
+  if (error) {
+    console.error("[company-context] loadWorkspaceProfile:", error.message)
+    throw error
+  }
+
+  if (!data) {
+    return mapRowToCompanyProfile({
+      id: `pending-${workspaceId}`,
+      user_id: userId,
+      owner_user_id: userId,
+      workspace_id: workspaceId,
+    })
   }
 
   return mapRowToCompanyProfile(data as Record<string, unknown>)

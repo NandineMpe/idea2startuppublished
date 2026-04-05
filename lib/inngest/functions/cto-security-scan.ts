@@ -7,7 +7,6 @@ import {
   splitGithubRepo,
   treeEntriesFromGithubTreeRaw,
 } from "@/lib/juno/github-repo"
-import { resolveGithubAccountForSecurityScan } from "@/lib/juno/pipedream-github"
 import { resolveGithubRepoFromProfile } from "@/lib/juno/security-scan-profile"
 import {
   buildSecurityScanPrompt,
@@ -95,10 +94,10 @@ export const securityScan = inngest.createFunction(
 
     const accountId = await step.run("resolve-github-account", async () => {
       if (process.env.GITHUB_PAT?.trim()) {
-        console.log("[Security Scan] GITHUB_PAT set — using direct GitHub API for tree/files/commits (skipping Pipedream for those calls)")
+        console.log("[Security Scan] GITHUB_PAT set — using direct GitHub API for tree/files/commits")
         return "__github_pat__"
       }
-      return resolveGithubAccountForSecurityScan(userId)
+      return null
     })
     if (!accountId) {
       await step.run("record-failed-no-account", async () => {
@@ -110,7 +109,7 @@ export const securityScan = inngest.createFunction(
           mode,
           status: "failed",
           error_message:
-            "No GitHub account linked in Pipedream Connect. Connect under Integrations, or set GITHUB_PAT (classic token with repo scope) on the server as a temporary fallback.",
+            "Set GITHUB_PAT on the server (classic token with repo scope) so Juno can read the repository.",
         })
       })
       return { scanId, status: "failed", reason: "no_github_account" }
@@ -189,7 +188,7 @@ export const securityScan = inngest.createFunction(
     if (tree.length === 0) {
       const msg =
         diagnostic ??
-        "Empty repo tree (check repo name, branch, or GitHub access via Pipedream Connect)."
+        "Empty repo tree (check repo name, branch, and that GITHUB_PAT can access the repo)."
       await step.run("record-failed-empty-tree", async () => {
         await supabaseAdmin.from("security_scans").insert({
           user_id: userId,

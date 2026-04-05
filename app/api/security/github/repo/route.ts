@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { resolveOrganizationSelection } from "@/lib/organizations"
 
-/** Persist selected GitHub repo + branch for security scans (Pipedream → GitHub API). */
+/** Persist selected GitHub repo + branch for security scans (GitHub API via GITHUB_PAT). */
 export async function PATCH(req: Request) {
   const supabase = await createClient()
   const {

@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     counts.total++
   }
 
-  /** Server can scan repos via `GITHUB_PAT` without Pipedream; used by Security updates UI to enable “Scan now”. */
+  /** Server can scan repos when `GITHUB_PAT` is set; used by Security updates UI to enable “Scan now”. */
   const patFallbackAvailable = Boolean(process.env.GITHUB_PAT?.trim())
 
   return NextResponse.json({

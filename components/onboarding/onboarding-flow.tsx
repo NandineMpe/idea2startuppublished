@@ -25,7 +25,7 @@ type Mode = "choose" | "upload" | "speak" | "write" | "activate" | "done"
 
 const LLM_EXPORT_TIPS = [
   {
-    name: "ChatGPT / GPT-4",
+    name: "Chat assistant",
     steps: [
       "Open a conversation where you've discussed your startup.",
       'Paste this prompt: "Summarise everything you know about my startup — product, market, team, goals — as a detailed markdown document."',
@@ -33,7 +33,7 @@ const LLM_EXPORT_TIPS = [
     ],
   },
   {
-    name: "Claude (Anthropic)",
+    name: "Another project or thread",
     steps: [
       "Open any project or conversation with company context.",
       'Prompt: "Export a full markdown summary of my startup context — product, market, team, goals, traction."',
@@ -41,10 +41,10 @@ const LLM_EXPORT_TIPS = [
     ],
   },
   {
-    name: "Notion / Google Docs",
+    name: "Notes or documents",
     steps: [
       "Open your strategy doc, pitch deck notes, or founder journal.",
-      'In Notion: "Export" → "Markdown & CSV". In Docs: File → Download → Plain Text.',
+      'Export as Markdown (.md) or plain text (.txt) from your notes app (use Export or Download).',
       "Upload the exported file below.",
     ],
   },
@@ -252,50 +252,62 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
   const [transcript, setTranscript] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const mediaRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
-  async function startRecording() {
+  function startRecording() {
     setError(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" })
-      chunksRef.current = []
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" })
-        await transcribeAudio(blob)
-      }
-      recorder.start()
-      mediaRef.current = recorder
-      setRecording(true)
-    } catch {
-      setError("Microphone access denied. Please allow microphone access and try again.")
+    const SpeechRecognitionAPI =
+      (typeof window !== "undefined" &&
+        (window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition)) ||
+      null
+
+    if (!SpeechRecognitionAPI) {
+      setError("Voice input isn't supported in this browser. Please use Chrome, or type your context instead.")
+      return
     }
+
+    const recognition = new SpeechRecognitionAPI()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = "en-US"
+
+    let finalText = ""
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = ""
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          finalText += (result[0]?.transcript ?? "") + " "
+        } else {
+          interim += result[0]?.transcript ?? ""
+        }
+      }
+      setTranscript((finalText + interim).trim())
+    }
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "not-allowed") {
+        setError("Microphone access denied. Please allow microphone access and try again.")
+      } else if (event.error !== "no-speech") {
+        setError("Voice recognition error. Please try again or type your context instead.")
+      }
+      setRecording(false)
+    }
+
+    recognition.onend = () => {
+      setRecording(false)
+    }
+
+    recognition.start()
+    recognitionRef.current = recognition
+    setRecording(true)
   }
 
   function stopRecording() {
-    mediaRef.current?.stop()
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
     setRecording(false)
-    setProcessing(true)
-  }
-
-  async function transcribeAudio(blob: Blob) {
-    try {
-      const fd = new FormData()
-      fd.append("audio", blob, "recording.webm")
-      const res = await fetch("/api/onboarding/transcribe", { method: "POST", body: fd })
-      const data = (await res.json()) as { transcript?: string; error?: string }
-      if (!res.ok || data.error) throw new Error(data.error || "Transcription failed")
-      setTranscript(data.transcript ?? "")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Transcription failed. Please try again.")
-    } finally {
-      setProcessing(false)
-    }
   }
 
   async function saveAndContinue() {
@@ -327,8 +339,7 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
         </p>
         <h2 className="mt-1 text-xl font-semibold tracking-tight">Speak your startup story</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Talk for 2–3 minutes. Fun-ASR (Alibaba ModelStudio) will transcribe it and Juno will
-          use it as your foundation context.
+          Talk for 2–3 minutes. Your voice is transcribed live and Juno uses it as your foundation context.
         </p>
       </div>
 
@@ -343,7 +354,7 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="flex flex-col items-center gap-4 py-4">
-        {!recording && !processing && !transcript && (
+        {!recording && !transcript && (
           <>
             <button
               type="button"
@@ -360,7 +371,7 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
           <>
             <div className="flex items-center gap-2 text-sm text-red-500 font-medium animate-pulse">
               <span className="h-2 w-2 rounded-full bg-red-500" />
-              Recording — speak clearly
+              Listening — speak clearly
             </div>
             <button
               type="button"
@@ -369,15 +380,8 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
             >
               <MicOff className="h-8 w-8" />
             </button>
-            <p className="text-xs text-muted-foreground">Tap to stop recording</p>
+            <p className="text-xs text-muted-foreground">Tap to stop</p>
           </>
-        )}
-
-        {processing && (
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            Transcribing with Fun-ASR…
-          </div>
         )}
       </div>
 
@@ -408,6 +412,9 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
           />
+          {recording && (
+            <p className="text-xs text-muted-foreground">Still listening — tap the mic to stop when done.</p>
+          )}
         </div>
       )}
 
@@ -419,17 +426,22 @@ function SpeakMode({ onDone }: { onDone: () => void }) {
       )}
 
       <div className="flex gap-3">
-        {transcript && (
+        {transcript && !recording && (
           <Button onClick={saveAndContinue} disabled={processing} className="flex-1">
             {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save & continue →
+          </Button>
+        )}
+        {recording && (
+          <Button onClick={stopRecording} variant="outline" className="flex-1">
+            Stop recording
           </Button>
         )}
         <Button
           variant="outline"
           onClick={onDone}
           disabled={processing}
-          className={transcript ? "" : "w-full"}
+          className={transcript && !recording ? "" : "w-full"}
         >
           {transcript ? "Skip saving" : "Continue without speaking"}
         </Button>
@@ -551,7 +563,7 @@ function ChooseMode({ onChoose }: { onChoose: (m: "upload" | "speak" | "write" |
         <OptionCard
           icon={<FileText className="h-5 w-5" />}
           title="Upload from another AI"
-          description="Export a markdown summary from ChatGPT, Claude, or Notion and upload it. Fastest way to get started."
+          description="Export a markdown summary from the chat tool or notes app you already use, then upload it. Fastest way to get started."
           onClick={() => onChoose("upload")}
           highlight
         />
@@ -559,7 +571,7 @@ function ChooseMode({ onChoose }: { onChoose: (m: "upload" | "speak" | "write" |
         <OptionCard
           icon={<Mic className="h-5 w-5" />}
           title="Speak your startup story"
-          description="Talk for 2–3 minutes. Fun-ASR (Alibaba ModelStudio) transcribes it into your foundation context."
+          description="Talk for 2–3 minutes. We transcribe it into your foundation context."
           onClick={() => onChoose("speak")}
         />
 

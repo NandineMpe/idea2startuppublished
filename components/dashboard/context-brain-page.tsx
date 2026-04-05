@@ -1,7 +1,8 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { CheckCircle2, FileUp, Github, Loader2, RefreshCw, Save, Trash2, XCircle } from "lucide-react"
+import { FileUp, Github, Loader2, RefreshCw, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -135,18 +136,30 @@ function TimelineItem({ date, label, children }: {
 
 // ─── Brain Ledger view ────────────────────────────────────────────────────────
 
-function BrainLedger() {
+function BrainLedger({ refreshKey }: { refreshKey: number }) {
   const [ledger, setLedger] = useState<BrainLedgerData | null>(null)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
+    setLoading(true)
     fetch("/api/company/brain-ledger", { credentials: "include" })
-      .then((r) => r.json())
-      .then((j: { data?: BrainLedgerData }) => setLedger(j.data ?? null))
+      .then(async (r) => {
+        const j = (await r.json()) as { data?: BrainLedgerData; error?: string }
+        if (!r.ok) {
+          toast({
+            title: "Could not load ledger",
+            description: j.error ?? `HTTP ${r.status}`,
+            variant: "destructive",
+          })
+          setLedger(null)
+          return
+        }
+        setLedger(j.data ?? null)
+      })
       .catch(() => toast({ title: "Could not load ledger", variant: "destructive" }))
       .finally(() => setLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -431,6 +444,7 @@ export function ContextBrainPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [tab, setTab] = useState<Tab>("upload")
+  const [ledgerRefreshKey, setLedgerRefreshKey] = useState(0)
   const [data, setData] = useState<ContextData>(emptyContextData())
   const [loading, setLoading] = useState(true)
 
@@ -444,8 +458,6 @@ export function ContextBrainPage() {
   const [vaultDirty, setVaultDirty] = useState(false)
   const [savingVault, setSavingVault] = useState(false)
   const [syncingVault, setSyncingVault] = useState(false)
-  const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
-  const [githubLogin, setGithubLogin] = useState<string | null>(null)
 
   async function refresh() {
     try {
@@ -469,14 +481,6 @@ export function ContextBrainPage() {
 
   useEffect(() => {
     void refresh()
-    // Check Pipedream GitHub connection status
-    fetch("/api/pipedream/github-verify", { credentials: "include" })
-      .then((r) => r.json())
-      .then((j: { ok?: boolean; githubLogin?: string }) => {
-        setGithubConnected(Boolean(j.ok))
-        setGithubLogin(j.githubLogin ?? null)
-      })
-      .catch(() => setGithubConnected(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function normalizeRepoInput(value: string): string {
@@ -492,11 +496,6 @@ export function ContextBrainPage() {
     const normalized = normalizeRepoInput(value)
     setVaultRepo(normalized)
     setVaultDirty(true)
-  }
-
-  function connectGithubViaPipedream() {
-    // Redirect to integrations page where the full Pipedream Connect flow lives
-    window.location.href = "/dashboard/integrations?connect=github&return=/dashboard/context"
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -525,6 +524,7 @@ export function ContextBrainPage() {
       const json = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(json.error || "Failed to save")
       await refresh()
+      setLedgerRefreshKey((k) => k + 1)
       toast({ title: "Knowledge base saved" })
     } catch (e) {
       toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
@@ -564,6 +564,7 @@ export function ContextBrainPage() {
 
       setVaultDirty(false)
       await refresh()
+      setLedgerRefreshKey((k) => k + 1)
 
       if (json.cleared) {
         toast({ title: "Vault disconnected" })
@@ -700,42 +701,23 @@ export function ContextBrainPage() {
       {tab === "vault" && (
         <div className="space-y-5">
 
-          {/* GitHub account status */}
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <Github className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">GitHub account</p>
-                  {githubConnected === null && (
-                    <p className="text-xs text-muted-foreground">Checking…</p>
-                  )}
-                  {githubConnected === true && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Connected{githubLogin ? ` as @${githubLogin}` : ""}
-                    </p>
-                  )}
-                  {githubConnected === false && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <XCircle className="h-3 w-3" />
-                      Not connected — required for private repos
-                    </p>
-                  )}
-                </div>
-              </div>
-              {githubConnected === false && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => connectGithubViaPipedream()}
-                >
-                  <Github className="h-3.5 w-3.5" />
-                  Connect GitHub
-                </Button>
-              )}
+          <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground space-y-2">
+            <div className="flex items-start gap-2">
+              <Github className="h-4 w-4 shrink-0 mt-0.5" />
+              <p>
+                Connect GitHub in{" "}
+                <Link href="/dashboard/integrations" className="font-medium text-foreground underline">
+                  Integrations
+                </Link>{" "}
+                (Pipedream) so Juno can list your repos. Then paste the vault repo here and sync.
+              </p>
             </div>
+            <p>
+              Private repos also need a server token in Vercel env:{" "}
+              <span className="font-mono text-xs">GITHUB_VAULT_TOKEN</span>,{" "}
+              <span className="font-mono text-xs">GITHUB_TOKEN</span>, or{" "}
+              <span className="font-mono text-xs">GITHUB_PAT</span>.
+            </p>
           </div>
 
           {/* Sync status cards */}
@@ -839,7 +821,7 @@ export function ContextBrainPage() {
       )}
 
       {/* Brain Ledger tab */}
-      {tab === "ledger" && <BrainLedger />}
+      {tab === "ledger" && <BrainLedger refreshKey={ledgerRefreshKey} />}
     </div>
   )
 }

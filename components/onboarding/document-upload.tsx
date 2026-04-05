@@ -10,7 +10,7 @@ type Props = {
 
 const LLM_INSTRUCTIONS = [
   {
-    name: "ChatGPT / GPT-4",
+    name: "Chat assistant",
     steps: [
       'Open a conversation with context about your startup.',
       'Type: "Summarise everything you know about my startup, product, and goals as a detailed markdown document."',
@@ -18,7 +18,7 @@ const LLM_INSTRUCTIONS = [
     ],
   },
   {
-    name: "Claude (Anthropic)",
+    name: "Another project or thread",
     steps: [
       "Open any project or conversation where you've shared company context.",
       'Ask: "Export a full markdown summary of my startup context — product, market, team, goals."',
@@ -26,10 +26,10 @@ const LLM_INSTRUCTIONS = [
     ],
   },
   {
-    name: "Notion / Docs",
+    name: "Notes or documents",
     steps: [
       "Open your strategy doc, pitch deck notes, or founder journal.",
-      'Export as Markdown (.md) or plain text (.txt) — "Export" → "Markdown & CSV" in Notion.',
+      'Export as Markdown (.md) or plain text (.txt) from your notes app (use Export or Download).',
       "Upload the exported file below.",
     ],
   },

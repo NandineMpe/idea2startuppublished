@@ -1,14 +1,11 @@
 import Link from "next/link"
 import localFont from "next/font/local"
 import { redirect } from "next/navigation"
-import { ArrowRight, Lock, Sparkles } from "lucide-react"
+import { Lock, Sparkles } from "lucide-react"
 import { LandingThemeToggle } from "@/components/landing-theme-toggle"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { signInWithBetterAuthBridge, signUpWithBetterAuthBridge } from "@/lib/auth-bridge"
 import { createClient } from "@/lib/supabase/server"
-import { SubmitButton } from "@/components/access/submit-button"
+import { JunoAuthForm } from "@/components/access/juno-auth-form"
 
 const casualHuman = localFont({
   src: "../../app/fonts/CasualHuman.otf",
@@ -98,60 +95,6 @@ export async function JunoAuthPage({
     redirectAfterAuth?.startsWith("/") && !redirectAfterAuth.startsWith("//")
       ? redirectAfterAuth
       : "/dashboard"
-
-  const login = async (formData: FormData) => {
-    "use server"
-
-    const email = String(formData.get("email") ?? "").trim()
-    const password = String(formData.get("password") ?? "")
-
-    if (!email || !password) {
-      return redirect(`${pagePath}?message=${encodeURIComponent("Email and password are required.")}`)
-    }
-
-    try {
-      await signInWithBetterAuthBridge({
-        email,
-        password,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "We couldn't sign you in."
-      return redirect(`${pagePath}?message=${encodeURIComponent(message)}`)
-    }
-
-    return redirect(afterAuthPath)
-  }
-
-  const signup = async (formData: FormData) => {
-    "use server"
-
-    const name = String(formData.get("name") ?? "").trim()
-    const email = String(formData.get("email") ?? "").trim()
-    const password = String(formData.get("password") ?? "")
-
-    if (!email || !password) {
-      return redirect(`${pagePath}?message=${encodeURIComponent("Email and password are required.")}`)
-    }
-
-    if (password.length < 8) {
-      return redirect(
-        `${pagePath}?message=${encodeURIComponent("Passwords must be at least 8 characters long.")}`,
-      )
-    }
-
-    try {
-      await signUpWithBetterAuthBridge({
-        email,
-        name,
-        password,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "We couldn't create your account."
-      return redirect(`${pagePath}?message=${encodeURIComponent(message)}`)
-    }
-
-    return redirect(afterAuthPath)
-  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] text-slate-950 transition-colors duration-700 dark:bg-[#061219] dark:text-slate-100">
@@ -264,84 +207,12 @@ export async function JunoAuthPage({
                 Returning founders can get back in fast with the same front door.
               </p>
 
-              <form className="mt-8 space-y-5 text-slate-950 dark:text-white">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="name">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    name="name"
-                    autoComplete="name"
-                    placeholder="Founder name"
-                    className="h-14 rounded-[1.2rem] border-slate-200 bg-white px-4 text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#091924] dark:text-white dark:placeholder:text-slate-500"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="email">
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    name="email"
-                    autoComplete="email"
-                    placeholder="founder@company.com"
-                    className="h-14 rounded-[1.2rem] border-slate-200 bg-white px-4 text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#091924] dark:text-white dark:placeholder:text-slate-500"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="password">
-                      Password
-                    </Label>
-                    <span className="text-xs uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">
-                      Min 8 chars
-                    </span>
-                  </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    name="password"
-                    autoComplete="current-password"
-                    minLength={8}
-                    placeholder="Enter your password"
-                    className="h-14 rounded-[1.2rem] border-slate-200 bg-white px-4 text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#091924] dark:text-white dark:placeholder:text-slate-500"
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                  <SubmitButton
-                    formAction={login}
-                    pendingText="Signing in..."
-                    className="h-14 rounded-[1.2rem] bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.16)] hover:bg-slate-800 dark:bg-sky-100 dark:text-slate-950 dark:hover:bg-white"
-                  >
-                    Sign in
-                    <ArrowRight className="h-4 w-4" />
-                  </SubmitButton>
-                  <SubmitButton
-                    formAction={signup}
-                    pendingText="Creating account..."
-                    variant="outline"
-                    className="h-14 rounded-[1.2rem] border-slate-300 bg-white text-slate-900 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:hover:bg-white/10"
-                  >
-                    Sign up
-                  </SubmitButton>
-                </div>
-
-                {message ? (
-                  <div
-                    className={`rounded-[1.2rem] border px-4 py-3 text-sm leading-7 ${messageTone(message)}`}
-                  >
-                    {message}
-                  </div>
-                ) : null}
-              </form>
+              <JunoAuthForm
+                pagePath={pagePath}
+                afterAuthPath={afterAuthPath}
+                message={message}
+                messageBannerClassName={message ? messageTone(message) : ""}
+              />
             </section>
           </aside>
         </main>

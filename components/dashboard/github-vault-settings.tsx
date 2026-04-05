@@ -83,6 +83,16 @@ export function GithubVaultSettings() {
         throw new Error(typeof data.error === "string" ? data.error : "Save failed")
       }
 
+      if (syncAfterSave && data.synced === false && typeof data.syncError === "string" && data.syncError) {
+        toast({
+          title: "Could not sync vault",
+          description: data.syncError,
+          variant: "destructive",
+        })
+        await load()
+        return
+      }
+
       setConnected(Boolean(data.connected))
       setFileCount(Number(data.fileCount ?? 0))
       setLastSyncedAt(typeof data.lastSyncedAt === "string" ? data.lastSyncedAt : null)

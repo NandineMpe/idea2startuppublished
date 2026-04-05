@@ -203,7 +203,7 @@ Return a JSON object with these fields (use null for anything not discussed):
   }
 
   const { error: profileError } = await supabaseAdmin.from("company_profile").upsert(profileData, {
-    onConflict: "user_id",
+    onConflict: "organization_id",
   })
 
   if (profileError) {

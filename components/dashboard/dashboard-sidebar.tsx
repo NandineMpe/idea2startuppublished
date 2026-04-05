@@ -4,7 +4,6 @@ import type React from "react"
 import {
   Radio,
   Target,
-  Wrench,
   Layers,
   Settings,
   PanelLeftClose,
@@ -38,7 +37,6 @@ const navItems: NavItem[] = [
   { title: "Luckmaxxing", href: "/dashboard/luckmaxxing", icon: Sparkles },
   { title: "GTM", href: "/dashboard/distribution", icon: Share2 },
   { title: "Founder brand", href: "/dashboard/founder-brand", icon: UserCircle },
-  { title: "Tools & workflows", href: "/dashboard/tools", icon: Wrench },
 ]
 
 const SidebarContext = createContext<{
