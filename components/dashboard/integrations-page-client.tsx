@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import React, { useCallback, useMemo, useState } from "react"
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query"
 import { createFrontendClient } from "@pipedream/sdk/browser"
 import type { CreateTokenResponse } from "@pipedream/sdk"
@@ -44,9 +44,149 @@ type AppDefinition = {
   slug: string
   name: string
   description: string
-  logo: string // emoji or URL
+  logo: React.ReactNode
   category: string
   comingSoon?: boolean
+}
+
+// ─── App logos (inline SVG) ───────────────────────────────────────────────────
+
+function GithubLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+    </svg>
+  )
+}
+
+function SlackLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#E01E5A"/>
+    </svg>
+  )
+}
+
+function GmailLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="#EA4335"/>
+    </svg>
+  )
+}
+
+function GoogleCalendarLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M18 0H6L0 6v12l6 6h12l6-6V6L18 0z" fill="#fff"/>
+      <path d="M18 0H6v6H0v12h6v6h12v-6h6V6h-6V0z" fill="#fff"/>
+      <rect x="6" y="6" width="12" height="12" rx="1" fill="#fff" stroke="#4285F4" strokeWidth="0.5"/>
+      <path d="M17.5 3h-11A3.5 3.5 0 0 0 3 6.5v11A3.5 3.5 0 0 0 6.5 21h11a3.5 3.5 0 0 0 3.5-3.5v-11A3.5 3.5 0 0 0 17.5 3z" fill="#fff"/>
+      <path d="M17.5 3h-11A3.5 3.5 0 0 0 3 6.5V9h18V6.5A3.5 3.5 0 0 0 17.5 3z" fill="#4285F4"/>
+      <path d="M3 9v8.5A3.5 3.5 0 0 0 6.5 21H9V9H3z" fill="#34A853"/>
+      <path d="M9 21h6v-6H9v6z" fill="#FBBC05"/>
+      <path d="M21 9h-6v6h6V9z" fill="#EA4335"/>
+      <path d="M15 21h2.5A3.5 3.5 0 0 0 21 17.5V15h-6v6z" fill="#188038"/>
+      <path d="M3 9V6.5A3.5 3.5 0 0 1 6.5 3H9v6H3z" fill="#1967D2"/>
+      <text x="12" y="17" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#1967D2">
+        {new Date().getDate()}
+      </text>
+    </svg>
+  )
+}
+
+function NotionLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/>
+    </svg>
+  )
+}
+
+function TwitterLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  )
+}
+
+function LinkedInLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#0A66C2">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+    </svg>
+  )
+}
+
+function HubSpotLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#FF7A59">
+      <path d="M22.162 5.656a8.384 8.384 0 0 0-3.127-2.027 8.37 8.37 0 0 0-3.899-.463A8.402 8.402 0 0 0 11.57 4.45a8.354 8.354 0 0 0-2.49 2.76 8.337 8.337 0 0 0-.877 3.565 8.407 8.407 0 0 0 .54 3.75 8.39 8.39 0 0 0 2.163 3.046l-2.826 4.892a1.56 1.56 0 0 0 .57 2.133 1.567 1.567 0 0 0 2.135-.569l2.824-4.889a8.416 8.416 0 0 0 3.677.606 8.39 8.39 0 0 0 3.615-1.044 8.368 8.368 0 0 0 2.73-2.61 8.35 8.35 0 0 0 1.316-3.62 8.44 8.44 0 0 0-.34-3.786 8.39 8.39 0 0 0-2.405-3.224zM12 15.9a3.9 3.9 0 1 1 0-7.8 3.9 3.9 0 0 1 0 7.8z"/>
+    </svg>
+  )
+}
+
+function AirtableLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M11.155.5L1.09 4.405c-.53.212-.526.96.007 1.166L11.17 9.5c.538.208 1.122.208 1.66 0l10.072-3.929c.533-.208.537-.954.007-1.166L12.845.5a2.344 2.344 0 0 0-1.69 0z" fill="#FCB400"/>
+      <path d="M12.83 12.562v9.952c0 .59.613 1 1.157.778l11.25-4.356a.844.844 0 0 0 .532-.778V8.206c0-.59-.613-1-1.157-.778l-11.25 4.356a.844.844 0 0 0-.532.778z" fill="#18BFFF"/>
+      <path d="M10.613 13.052L7.155 14.51 6.99 14.58 1.06 17.062a.844.844 0 0 1-1.19-.764v-8.09c0-.312.17-.574.41-.718a.84.84 0 0 1 .84-.034l.462.194 2.476 1.036 3.932 1.648.985.413a.918.918 0 0 1 .638.855v.854a.918.918 0 0 1-.6.857v-.061z" fill="#F82B60"/>
+    </svg>
+  )
+}
+
+function GoogleSheetsLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M14.727 0H3.272A1.09 1.09 0 0 0 2.182 1.09v21.82A1.09 1.09 0 0 0 3.273 24h17.454a1.09 1.09 0 0 0 1.091-1.09V7.09L14.727 0z" fill="#23A566"/>
+      <path d="M14.727 0v7.09h7.091L14.727 0z" fill="#1C8C57"/>
+      <path d="M6.545 11.455h10.91v1.363H6.545zm0 2.727h10.91v1.363H6.545zm0 2.727h7.273v1.363H6.545z" fill="#fff"/>
+    </svg>
+  )
+}
+
+function StripeLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#635BFF">
+      <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.003z"/>
+    </svg>
+  )
+}
+
+function ShopifyLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#96BF48">
+      <path d="M15.337.903s-.142.041-.374.124a5.988 5.988 0 0 0-.366-1.027C14.235-.764 13.5.15 13.5.15s-.413-.166-.88-.166c-.342 0-.65.083-.916.228-.278-.7-.74-1.16-1.304-1.16-1.923 0-2.847 2.406-3.136 3.63-.748.233-1.276.398-1.342.42-.415.13-.428.143-.483.534C5.392 3.854 3 21.8 3 21.8l14.017 2.2V.756l-1.68.147zM12.5 1.053c-.45.14-.96.297-1.5.466.29-1.116.845-1.655 1.32-1.864.135.367.234.895.18 1.398zm-.78 4.714l1.853-.574c-.002-.003-.433-2.2-.956-2.88.617.04 1.076.614 1.35 1.25l.606-.188s-.17-1.78-1.432-2.214c.226-.7.697-1.232 1.287-1.455L12.5 1.053C12.198.13 11.55-.47 10.7-.47c-1.71 0-2.547 2.14-2.82 3.21l-2.39.74S3 21.8 3 21.8l14.017 2.2V.903l-5.297.864z"/>
+    </svg>
+  )
+}
+
+function DiscordLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#5865F2">
+      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+    </svg>
+  )
+}
+
+function ZohoCRMLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#E42527">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 7.5H6.438a.937.937 0 0 0-.938.938v7.124c0 .518.42.938.938.938h11.124a.937.937 0 0 0 .938-.938V8.438A.937.937 0 0 0 17.562 7.5zm-5.624 7.5L7.5 10.5h9l-4.562 4.5z"/>
+    </svg>
+  )
+}
+
+function ZohoMailLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <rect width="24" height="24" rx="4" fill="#E42527"/>
+      <path d="M4 8l8 5 8-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+      <rect x="4" y="7" width="16" height="11" rx="1.5" stroke="#fff" strokeWidth="1.5" fill="none"/>
+    </svg>
+  )
 }
 
 // ─── App catalog ──────────────────────────────────────────────────────────────
@@ -56,105 +196,105 @@ const APPS: AppDefinition[] = [
     slug: "github",
     name: "GitHub",
     description: "Access repos, trigger workflows, and let Juno act on your codebase via Pipedream.",
-    logo: "🐙",
+    logo: <GithubLogo />,
     category: "Developer",
   },
   {
     slug: "slack",
     name: "Slack",
     description: "Post messages, read channels, and trigger automations from your Slack workspace.",
-    logo: "🟦",
+    logo: <SlackLogo />,
     category: "Communication",
   },
   {
     slug: "gmail",
     name: "Gmail",
     description: "Send and read emails, manage labels, and automate inbox workflows.",
-    logo: "📧",
+    logo: <GmailLogo />,
     category: "Email",
   },
   {
     slug: "google_calendar",
     name: "Google Calendar",
     description: "Create events, check availability, and sync meeting data.",
-    logo: "📅",
+    logo: <GoogleCalendarLogo />,
     category: "Productivity",
   },
   {
     slug: "notion",
     name: "Notion",
     description: "Create pages, update databases, and sync notes into your workspace.",
-    logo: "📝",
+    logo: <NotionLogo />,
     category: "Productivity",
   },
   {
     slug: "twitter",
     name: "X (Twitter)",
     description: "Post tweets, monitor mentions, and engage with your audience.",
-    logo: "🐦",
+    logo: <TwitterLogo />,
     category: "Social",
   },
   {
     slug: "linkedin",
     name: "LinkedIn",
     description: "Share posts, track engagement, and manage your professional presence.",
-    logo: "💼",
+    logo: <LinkedInLogo />,
     category: "Social",
   },
   {
     slug: "hubspot",
     name: "HubSpot",
     description: "Sync contacts, track deals, and automate CRM workflows.",
-    logo: "🟠",
+    logo: <HubSpotLogo />,
     category: "CRM",
   },
   {
     slug: "airtable",
     name: "Airtable",
     description: "Read and write records, automate table updates, and sync structured data.",
-    logo: "🗃️",
+    logo: <AirtableLogo />,
     category: "Data",
   },
   {
     slug: "google_sheets",
     name: "Google Sheets",
     description: "Read rows, append data, and automate spreadsheet workflows.",
-    logo: "📊",
+    logo: <GoogleSheetsLogo />,
     category: "Data",
   },
   {
     slug: "stripe",
     name: "Stripe",
     description: "Monitor payments, manage customers, and automate billing workflows.",
-    logo: "💳",
+    logo: <StripeLogo />,
     category: "Finance",
   },
   {
     slug: "shopify",
     name: "Shopify",
     description: "Sync orders, manage products, and automate your store.",
-    logo: "🛍️",
+    logo: <ShopifyLogo />,
     category: "E-commerce",
   },
   {
     slug: "discord",
     name: "Discord",
     description: "Send messages, manage channels, and automate community interactions.",
-    logo: "🎮",
+    logo: <DiscordLogo />,
     category: "Communication",
   },
   {
     slug: "zoho_crm",
     name: "Zoho CRM",
     description: "Sync leads, contacts, and deals. Automate CRM workflows and track your pipeline.",
-    logo: "🔴",
+    logo: <ZohoCRMLogo />,
     category: "CRM",
   },
   {
     slug: "zoho_mail",
     name: "Zoho Mail",
     description: "Send and read emails, manage folders, and automate inbox workflows.",
-    logo: "📮",
+    logo: <ZohoMailLogo />,
     category: "Email",
   },
 ]
@@ -326,7 +466,7 @@ function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition })
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl leading-none" aria-hidden="true">{app.logo}</span>
+            <div className="shrink-0" aria-hidden="true">{app.logo}</div>
             <div>
               <CardTitle className="text-base text-foreground">{app.name}</CardTitle>
               <span className="text-[11px] text-muted-foreground">{app.category}</span>
