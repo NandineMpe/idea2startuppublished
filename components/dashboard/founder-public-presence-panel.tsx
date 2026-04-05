@@ -15,7 +15,11 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { UpcomingTopicsPlanner } from "@/components/dashboard/upcoming-topics-planner"
 import { useToast } from "@/hooks/use-toast"
-import type { FounderBrandState, TiktokWorkDigestConfig } from "@/lib/founder-brand"
+import {
+  DEFAULT_TIKTOK_DIGEST,
+  type FounderBrandState,
+  type TiktokWorkDigestConfig,
+} from "@/lib/founder-brand"
 
 type Props = {
   hint: string
@@ -32,7 +36,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
   function patchTiktok(patch: Partial<TiktokWorkDigestConfig>) {
     setData((prev) => ({
       ...prev,
-      tiktokWorkDigest: { ...prev.tiktokWorkDigest, ...patch },
+      tiktokWorkDigest: { ...(prev.tiktokWorkDigest ?? DEFAULT_TIKTOK_DIGEST), ...patch },
     }))
   }
 
@@ -64,7 +68,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
     }
   }
 
-  const td = data.tiktokWorkDigest
+  const td = data.tiktokWorkDigest ?? DEFAULT_TIKTOK_DIGEST
 
   return (
     <div className="space-y-6">

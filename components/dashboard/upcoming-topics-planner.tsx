@@ -24,19 +24,19 @@ function sortTopics(list: UpcomingConversationTopic[]): UpcomingConversationTopi
 }
 
 export function UpcomingTopicsPlanner({ data, setData }: Props) {
-  const topics = sortTopics(data.upcomingTopics)
+  const topics = sortTopics(data.upcomingTopics ?? [])
 
   function updateTopic(id: string, patch: Partial<UpcomingConversationTopic>) {
     setData((prev) => ({
       ...prev,
-      upcomingTopics: prev.upcomingTopics.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+      upcomingTopics: (prev.upcomingTopics ?? []).map((t) => (t.id === id ? { ...t, ...patch } : t)),
     }))
   }
 
   function removeTopic(id: string) {
     setData((prev) => ({
       ...prev,
-      upcomingTopics: prev.upcomingTopics.filter((t) => t.id !== id),
+      upcomingTopics: (prev.upcomingTopics ?? []).filter((t) => t.id !== id),
     }))
   }
 
@@ -52,7 +52,7 @@ export function UpcomingTopicsPlanner({ data, setData }: Props) {
     }
     setData((prev) => ({
       ...prev,
-      upcomingTopics: [row, ...prev.upcomingTopics],
+      upcomingTopics: [row, ...(prev.upcomingTopics ?? [])],
     }))
   }
 

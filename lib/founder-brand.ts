@@ -54,6 +54,7 @@ export const DEFAULT_FOUNDER_BRAND: FounderBrandState = {
   credibilityProof: "",
   founderLocation: "",
   tiktokWorkDigest: { ...DEFAULT_TIKTOK_DIGEST },
+  upcomingTopics: [],
 }
 
 function mergeTiktokDigest(partial: Partial<TiktokWorkDigestConfig> | undefined): TiktokWorkDigestConfig {
@@ -76,6 +77,32 @@ function mergeTiktokDigest(partial: Partial<TiktokWorkDigestConfig> | undefined)
   }
 }
 
+export function newUpcomingTopicId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `topic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function mergeUpcomingTopics(raw: unknown): UpcomingConversationTopic[] {
+  if (!Array.isArray(raw)) return []
+  const out: UpcomingConversationTopic[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const o = item as Record<string, unknown>
+    out.push({
+      id: typeof o.id === "string" && o.id.trim() ? o.id.trim() : newUpcomingTopicId(),
+      title: typeof o.title === "string" ? o.title : "",
+      notes: typeof o.notes === "string" ? o.notes : "",
+      links: typeof o.links === "string" ? o.links : "",
+      mediaNotes: typeof o.mediaNotes === "string" ? o.mediaNotes : "",
+      scheduledDate: typeof o.scheduledDate === "string" ? o.scheduledDate : "",
+      scheduledTime: typeof o.scheduledTime === "string" ? o.scheduledTime : "",
+    })
+  }
+  return out
+}
+
 export function hydrateFounderBrand(partial: Partial<FounderBrandState> | null): FounderBrandState {
   const base = { ...DEFAULT_FOUNDER_BRAND }
   if (!partial) return base
@@ -89,13 +116,6 @@ export function hydrateFounderBrand(partial: Partial<FounderBrandState> | null):
     upcomingTopics:
       partial.upcomingTopics !== undefined ? mergeUpcomingTopics(partial.upcomingTopics) : base.upcomingTopics,
   }
-}
-
-export function newUpcomingTopicId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID()
-  }
-  return `topic-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 export function loadFounderBrandState(): FounderBrandState {
