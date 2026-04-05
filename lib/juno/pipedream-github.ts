@@ -225,6 +225,29 @@ function isTransientProxyError(message: string): boolean {
   )
 }
 
+/**
+ * The Pipedream SDK v2 returns `wr.data` as parsed JSON for object responses,
+ * but as a body stream (with `.bytes()`) for array responses. Normalise both.
+ */
+async function readProxyData(data: unknown): Promise<unknown> {
+  if (data === null || data === undefined) return data
+  // Body stream shape — SDK wraps array payloads in a Response-like object
+  if (
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    typeof (data as Record<string, unknown>).bytes === "function"
+  ) {
+    try {
+      const buf = await (data as { bytes: () => Promise<Uint8Array> }).bytes()
+      const text = Buffer.from(buf).toString("utf-8")
+      return JSON.parse(text)
+    } catch {
+      return data
+    }
+  }
+  return data
+}
+
 async function githubProxyGetJsonResultOnce<T>(
   externalUserId: string,
   accountId: string,
@@ -241,7 +264,8 @@ async function githubProxyGetJsonResultOnce<T>(
       setTimeout(() => reject(new Error(`Pipedream proxy timed out after ${timeoutMs}ms`)), timeoutMs),
     )
     const wr = await Promise.race([sdkCall, timeout])
-    return parseGithubJson<T>(wr.data)
+    const resolved = await readProxyData(wr.data)
+    return parseGithubJson<T>(resolved)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error("[pipedream-github] proxy.get", url, msg)
@@ -292,7 +316,8 @@ async function githubProxyPostJsonResultOnce<T>(
         },
       })
       .withRawResponse()
-    return parseGithubJson<T>(wr.data)
+    const resolved = await readProxyData(wr.data)
+    return parseGithubJson<T>(resolved)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error("[pipedream-github] proxy.post", url, msg)
