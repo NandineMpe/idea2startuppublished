@@ -4,7 +4,18 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
-import { Coffee, Plus, ChevronRight, CheckCircle2, Clock, Send, ArrowLeft, FileText, Loader2 } from "lucide-react"
+import {
+  AlertTriangle,
+  Coffee,
+  Plus,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  Send,
+  ArrowLeft,
+  FileText,
+  Loader2,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -279,11 +290,16 @@ function DesignDocView({ doc, onBack }: { doc: DesignDoc; onBack: () => void }) 
   )
 }
 
+/** Text + reasoning (models often stream reasoning without a text part until the end). */
 function getMessageText(message: UIMessage): string {
   return message.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join("")
+    .map((p) => {
+      if (p.type === "text") return p.text
+      if (p.type === "reasoning") return p.text
+      return ""
+    })
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -313,19 +329,20 @@ function ConversationPane({
   const [currentPhase, setCurrentPhase] = useState<string>("mode_selection")
   const [designDocReady, setDesignDocReady] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const [initialMessageSent, setInitialMessageSent] = useState(false)
   const [input, setInput] = useState("")
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/office-hours",
+        credentials: "include",
         body: { sessionId, mode },
       }),
     [sessionId, mode],
   )
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, setMessages, error } = useChat({
+    id: sessionId,
     transport,
     onFinish: ({ message }) => {
       const text = getMessageText(message)
@@ -348,14 +365,41 @@ function ConversationPane({
 
   const isLoading = status === "submitted" || status === "streaming"
 
-  // Send the opening message automatically on mount
+  // Load saved thread, then open with a single starter message only if the session is empty.
   useEffect(() => {
-    if (initialMessageSent) return
-    setInitialMessageSent(true)
-    void sendMessage({
-      text: `I'm ready to start ${mode === "startup" ? "Startup" : "Builder"} Mode Office Hours.`,
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(`/api/chat/sessions/${sessionId}`, { credentials: "include" })
+        const data = (await res.json()) as {
+          messages?: Array<{ id: string; role: string; content: string }>
+        }
+        if (cancelled) return
+        const rows = data.messages ?? []
+        const uiMsgs: UIMessage[] = rows.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant",
+          parts: [{ type: "text" as const, text: m.content ?? "" }],
+        }))
+        setMessages(uiMsgs)
+        if (uiMsgs.length === 0) {
+          await sendMessage({
+            text: `I'm ready to start ${mode === "startup" ? "Startup" : "Builder"} Mode Office Hours.`,
+          })
+        }
+      } catch {
+        if (!cancelled) {
+          await sendMessage({
+            text: `I'm ready to start ${mode === "startup" ? "Startup" : "Builder"} Mode Office Hours.`,
+          })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // setMessages / sendMessage are stable enough; including them can re-run this and duplicate the opener.
+  }, [sessionId, mode])
 
   function submitMessage() {
     if (!input.trim() || isLoading || designDocReady) return
@@ -371,7 +415,7 @@ function ConversationPane({
   const currentPhaseIdx = phaseIndex(currentPhase)
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Phase indicator */}
       <div className="flex items-center gap-1 border-b border-border px-4 py-2">
         {PHASES.map((phase, i) => {
@@ -410,8 +454,17 @@ function ConversationPane({
         </div>
       )}
 
+      {error && (
+        <div className="flex items-start gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2.5 text-[12px] text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <p className="min-w-0 leading-relaxed">
+            {error.message || "Could not reach the advisor. Check the network, API keys on the server, and try again."}
+          </p>
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {messages
           .filter((m) => {
             const c = getMessageText(m)
@@ -706,7 +759,7 @@ export function OfficeHoursPageContent() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {/* No active session — mode picker */}
         {!activeSessionId && (
           <ModePicker onSelect={startSession} startingMode={startingMode} />
