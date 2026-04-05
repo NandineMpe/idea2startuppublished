@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Shield, Loader2, RefreshCw, AlertTriangle, Github, Plug } from "lucide-react"
+import { Shield, Loader2, RefreshCw, AlertTriangle, Github } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,31 +21,29 @@ import { useToast } from "@/components/ui/toast-context"
 type GithubRepoOption = { full_name: string; default_branch: string; private: boolean }
 
 type GithubContext = {
-  pipedreamConfigured: boolean
+  githubConfigured: boolean
   connected: boolean
   githubLogin: string | null
   repos: GithubRepoOption[]
   reposFetchError?: string | null
-  /** Distinct errors from GitHub/proxy when no repos were returned (helps distinguish API errors vs OAuth scope). */
   repoListErrors?: string[]
   reposEmptyLikelyScope?: boolean
-  /** How many Pipedream GitHub connections were queried when building the repo list */
   githubAccountsTried?: number
   selectedRepo: string | null
   selectedBranch: string | null
   selectionSource: "explicit" | "vault" | null
-  /** Obsidian vault owner/repo from company profile — use when GitHub API returns no list (OAuth scope). */
   vaultRepo: string | null
   vaultBranch: string | null
-  /** Repo list came from GITHUB_PAT after Pipedream proxy failed or no Connect account. */
   reposListedViaPat?: boolean
+  /** Server token present; used for scan file reads, not for listing other users' repos. */
+  serverPatConfigured?: boolean
 }
 
 /** Avoids render crashes if the API omits fields or returns an unexpected shape. */
 function normalizeGithubContext(raw: unknown): GithubContext {
   if (!raw || typeof raw !== "object") {
     return {
-      pipedreamConfigured: false,
+      githubConfigured: false,
       connected: false,
       githubLogin: null,
       repos: [],
@@ -55,6 +53,7 @@ function normalizeGithubContext(raw: unknown): GithubContext {
       vaultRepo: null,
       vaultBranch: null,
       reposListedViaPat: false,
+      serverPatConfigured: false,
     }
   }
   const o = raw as Record<string, unknown>
@@ -71,7 +70,7 @@ function normalizeGithubContext(raw: unknown): GithubContext {
   const repoListErrors = Array.isArray(errRaw) ? errRaw.filter((e): e is string => typeof e === "string") : []
   const src = o.selectionSource
   return {
-    pipedreamConfigured: Boolean(o.pipedreamConfigured),
+    githubConfigured: Boolean(o.githubConfigured),
     connected: Boolean(o.connected),
     githubLogin: typeof o.githubLogin === "string" ? o.githubLogin : null,
     repos,
@@ -85,6 +84,7 @@ function normalizeGithubContext(raw: unknown): GithubContext {
     vaultRepo: typeof o.vaultRepo === "string" ? o.vaultRepo : null,
     vaultBranch: typeof o.vaultBranch === "string" ? o.vaultBranch : null,
     reposListedViaPat: Boolean(o.reposListedViaPat),
+    serverPatConfigured: Boolean(o.serverPatConfigured),
   }
 }
 
@@ -168,7 +168,6 @@ export function SecurityUpdatesPage() {
   const [savingRepo, setSavingRepo] = useState(false)
   const [branchDraft, setBranchDraft] = useState("")
   const [manualRepo, setManualRepo] = useState("")
-  /** Server has `GITHUB_PAT` — scans work without Pipedream Connect. */
   const [patFallbackAvailable, setPatFallbackAvailable] = useState(false)
 
   const loadGithub = useCallback(async () => {
@@ -211,7 +210,7 @@ export function SecurityUpdatesPage() {
       setGh(null)
       if (e instanceof Error && e.name === "AbortError") {
         setGithubLoadError(
-          `Loading GitHub status timed out after ${Math.round(timeoutMs / 1000)}s. Try again, or open Integrations to verify Pipedream.`,
+          `Loading GitHub status timed out after ${Math.round(timeoutMs / 1000)}s. Try again.`,
         )
       } else {
         setGithubLoadError("Could not load GitHub connection status.")
@@ -412,8 +411,10 @@ export function SecurityUpdatesPage() {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Security updates</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Daily scans of the repository you pick below. GitHub access uses your Pipedream Connect account (same as
-          Integrations). The model analyses selected files server-side — no local clone.
+          Daily scans of the repository you pick below. The repo picker lists only repositories your account can see
+          (GitHub via Integrations). Scans read files using the server{" "}
+          <span className="font-mono text-xs">GITHUB_PAT</span> when it is set. The model runs server-side on selected
+          files, no local clone.
         </p>
         <p className="text-xs text-muted-foreground">
           {ghLoading ? (
@@ -433,16 +434,18 @@ export function SecurityUpdatesPage() {
           ) : repo && gh && !gh.connected && patFallbackAvailable ? (
             <>
               Profile points at <span className="font-medium text-foreground">{repo}</span>
-              {branch ? ` · ${branch}` : ""}. Server-side GitHub access is configured — you can run scans without
-              Pipedream.
+              {branch ? ` · ${branch}` : ""}. Server-side GitHub access is configured — you can run scans.
             </>
           ) : repo && gh && !gh.connected ? (
             <>
-              Profile points at <span className="font-medium text-foreground">{repo}</span> — connect GitHub via
-              Pipedream below to run scans, or set <span className="font-mono">GITHUB_PAT</span> on the server.
+              Profile points at <span className="font-medium text-foreground">{repo}</span>. Set{" "}
+              <span className="font-mono">GITHUB_PAT</span> on the server so scans can read the repo.
             </>
           ) : (
-            <>Choose a repository below after connecting GitHub.</>
+            <>
+              Link GitHub under Integrations, or add <span className="font-mono">GITHUB_PAT</span> on the server, then
+              pick a repo below.
+            </>
           )}
         </p>
       </div>
@@ -454,15 +457,15 @@ export function SecurityUpdatesPage() {
             <CardTitle className="text-base">Repository for scans</CardTitle>
           </div>
           <CardDescription>
-            Connect once under Integrations; then pick which project to audit. Your selection is saved to your
-            profile.
+            Pick which project to audit. Your selection is saved to the organization profile. Repo lists come from your
+            linked GitHub account; you can also type <span className="font-mono">owner/repo</span> manually.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {ghLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading repo list from Pipedream / GitHub (slow if many repos)…
+              Loading repo list from GitHub…
             </div>
           ) : githubLoadError ? (
             <div className="space-y-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
@@ -471,45 +474,49 @@ export function SecurityUpdatesPage() {
                 Retry
               </Button>
             </div>
-          ) : !gh?.pipedreamConfigured ? (
+          ) : !gh?.githubConfigured ? (
             <p className="text-sm text-muted-foreground">
-              Pipedream is not configured on the server. Set Pipedream env vars to list repositories.
+              Connect GitHub on the{" "}
+              <Link href="/dashboard/integrations" className="underline underline-offset-2 font-medium text-foreground">
+                Integrations
+              </Link>{" "}
+              page, or add <span className="font-mono">GITHUB_PAT</span> (classic token, repo scope) in the server
+              environment so scans can read the repo. Then reload.
             </p>
-          ) : !gh.connected ? (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Connect your GitHub account with Pipedream so Juno can read repo files for security analysis.
-              </p>
-              <Button asChild size="sm" variant="outline" className="gap-1.5">
-                <Link href="/dashboard/integrations">
-                  <Plug className="h-3.5 w-3.5" />
-                  Open Integrations
-                </Link>
-              </Button>
-            </div>
           ) : (
             <>
-              <p className="text-sm">
-                {gh.githubLogin ? (
+              <p className="text-sm text-muted-foreground">
+                {gh.connected ? (
                   <>
-                    <span className="text-muted-foreground">Connected as</span>{" "}
-                    <span className="font-mono font-medium text-foreground">@{gh.githubLogin}</span>
+                    Listing repos as{" "}
+                    {gh.githubLogin ? (
+                      <span className="font-medium text-foreground">@{gh.githubLogin}</span>
+                    ) : (
+                      "your linked GitHub"
+                    )}
+                    .{" "}
                   </>
                 ) : (
-                  <span className="text-muted-foreground">
-                    GitHub is linked via Pipedream (we couldn&apos;t read your username from the API — listing may
-                    still work).
-                  </span>
+                  <>No personal GitHub link yet. Use the manual <span className="font-mono">owner/repo</span> field, or{" "}
+                  <Link
+                    href="/dashboard/integrations"
+                    className="underline underline-offset-2 font-medium text-foreground"
+                  >
+                    connect GitHub
+                  </Link>
+                  .{" "}
+                  </>
+                )}
+                {gh.serverPatConfigured ? (
+                  <>
+                    Server <span className="font-mono">GITHUB_PAT</span> is set for reading files during scans.
+                  </>
+                ) : (
+                  <>Add server <span className="font-mono">GITHUB_PAT</span> so scans can read private repos.</>
                 )}
                 {gh.selectionSource === "vault" && gh.selectedRepo && (
-                  <span className="text-muted-foreground text-xs ml-2">
+                  <span className="text-xs ml-2">
                     (selection also inferred from Obsidian vault until you pick a repo)
-                  </span>
-                )}
-                {gh.reposListedViaPat && (
-                  <span className="text-muted-foreground text-xs ml-2 block mt-1">
-                    Repo list loaded via server <span className="font-mono">GITHUB_PAT</span> (bypasses Pipedream proxy
-                    when it errors or you have no Connect account).
                   </span>
                 )}
               </p>
@@ -604,12 +611,8 @@ export function SecurityUpdatesPage() {
                   )}
                   {!gh.reposFetchError && gh.reposEmptyLikelyScope && (
                     <p className="text-xs text-muted-foreground">
-                      GitHub did not return any repos (private repos need the <strong>repo</strong> OAuth scope in
-                      Pipedream).{" "}
-                      <Link href="/dashboard/integrations" className="underline font-medium text-foreground">
-                        Reconnect GitHub
-                      </Link>{" "}
-                      or use your vault / manual entry below.
+                      GitHub did not return any repos. Check that <span className="font-mono">GITHUB_PAT</span> has{" "}
+                      <strong>repo</strong> scope and access to your orgs, or use manual owner/repo below.
                     </p>
                   )}
                   {!gh.reposFetchError && !gh.reposEmptyLikelyScope && gh.repos.length === 0 && !gh.vaultRepo && (
