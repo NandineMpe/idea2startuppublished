@@ -120,6 +120,10 @@ export async function POST(req: Request) {
 
     if (error || !session) {
       console.error("[office-hours/sessions POST]", error?.code, error?.message)
+      const rlsRecursion =
+        typeof error?.message === "string" &&
+        error.message.toLowerCase().includes("infinite recursion") &&
+        error.message.toLowerCase().includes("organization_members")
       const channelViolation =
         error?.code === "23514" ||
         (typeof error?.message === "string" &&
@@ -135,9 +139,11 @@ export async function POST(req: Request) {
           details: error?.message ?? "No row returned",
           code: error?.code,
           hint:
-            missingColumn || channelViolation
-              ? "Run supabase/migrations/034_office_hours_live.sql in the Supabase SQL editor (unblocks channel office-hours). If you use db:migrate, run 035_design_docs_office_hours_rls.sql too for design_docs."
-              : undefined,
+            rlsRecursion
+              ? "Run supabase/migrations/044_organization_members_rls_recursion_fix.sql in the Supabase SQL editor (fixes organization_members RLS recursion)."
+              : missingColumn || channelViolation
+                ? "Run supabase/migrations/034_office_hours_live.sql in the Supabase SQL editor (unblocks channel office-hours). If you use db:migrate, run 035_design_docs_office_hours_rls.sql too for design_docs."
+                : undefined,
         },
         { status: 500 },
       )

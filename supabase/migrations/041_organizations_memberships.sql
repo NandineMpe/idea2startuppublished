@@ -153,15 +153,10 @@ CREATE POLICY "Members can view their organizations"
   );
 
 DROP POLICY IF EXISTS "Members can view org rosters they belong to" ON public.organization_members;
+-- Own rows only: do not subquery organization_members here (that causes infinite RLS recursion).
 CREATE POLICY "Members can view org rosters they belong to"
   ON public.organization_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.organization_members m
-      WHERE m.organization_id = organization_members.organization_id
-        AND m.user_id = auth.uid()
-    )
-  );
+  USING (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- RLS: company_profile + company_assets (org members)
