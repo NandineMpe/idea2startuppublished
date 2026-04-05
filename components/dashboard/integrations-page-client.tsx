@@ -53,6 +53,13 @@ type AppDefinition = {
 
 const APPS: AppDefinition[] = [
   {
+    slug: "github",
+    name: "GitHub",
+    description: "Access repos, trigger workflows, and let Juno act on your codebase via Pipedream.",
+    logo: "🐙",
+    category: "Developer",
+  },
+  {
     slug: "slack",
     name: "Slack",
     description: "Post messages, read channels, and trigger automations from your Slack workspace.",
@@ -135,6 +142,20 @@ const APPS: AppDefinition[] = [
     description: "Send messages, manage channels, and automate community interactions.",
     logo: "🎮",
     category: "Communication",
+  },
+  {
+    slug: "zoho_crm",
+    name: "Zoho CRM",
+    description: "Sync leads, contacts, and deals. Automate CRM workflows and track your pipeline.",
+    logo: "🔴",
+    category: "CRM",
+  },
+  {
+    slug: "zoho_mail",
+    name: "Zoho Mail",
+    description: "Send and read emails, manage folders, and automate inbox workflows.",
+    logo: "📮",
+    category: "Email",
   },
 ]
 
