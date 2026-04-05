@@ -86,6 +86,22 @@ function phaseIndex(phase: string | null): number {
   return PHASES.findIndex((p) => p.key === phase)
 }
 
+/** DB or titles may use different casing; keeps UI from losing activeMode (blank pane). */
+function normalizeOfficeHoursMode(
+  rowMode: string | null | undefined,
+  title: string | undefined,
+  docMode: string | null | undefined,
+): OfficeHoursMode {
+  const d = docMode?.toLowerCase()
+  if (d === "builder" || d === "startup") return d
+
+  const r = String(rowMode ?? "").toLowerCase()
+  if (r === "builder" || r === "startup") return r as OfficeHoursMode
+
+  const t = (title ?? "").toLowerCase()
+  return t.includes("builder") ? "builder" : "startup"
+}
+
 // ─── Mode picker ──────────────────────────────────────────────────
 
 function ModePicker({
@@ -342,7 +358,8 @@ function ConversationPane({
   )
 
   const { messages, sendMessage, status, setMessages, error } = useChat({
-    id: sessionId,
+    // Recreate chat when mode changes (transport body); id alone only keyed sessionId before.
+    id: `${sessionId}:${mode}`,
     transport,
     onFinish: ({ message }) => {
       const text = getMessageText(message)
@@ -468,7 +485,13 @@ function ConversationPane({
         {messages
           .filter((m) => {
             const c = getMessageText(m)
-            if (m.role === "user" && c.includes("I'm ready to start") && messages.indexOf(m) === 0) {
+            // Hide boilerplate opener only once the thread has more than this message (otherwise the pane looks blank).
+            if (
+              m.role === "user" &&
+              c.includes("I'm ready to start") &&
+              messages.indexOf(m) === 0 &&
+              messages.length > 1
+            ) {
               return false
             }
             return true
@@ -564,6 +587,17 @@ export function OfficeHoursPageContent() {
   const [viewingDoc, setViewingDoc] = useState<DesignDoc | null>(null)
   const [loadingDoc, setLoadingDoc] = useState(false)
   const [startingMode, setStartingMode] = useState<OfficeHoursMode | null>(null)
+
+  const activeSession = useMemo(
+    () => (activeSessionId ? sessions.find((s) => s.id === activeSessionId) : undefined),
+    [sessions, activeSessionId],
+  )
+
+  const effectiveMode: OfficeHoursMode | null = useMemo(() => {
+    if (activeMode) return activeMode
+    if (!activeSession) return null
+    return normalizeOfficeHoursMode(activeSession.mode, activeSession.title, activeSession.designDoc?.mode)
+  }, [activeMode, activeSession])
 
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true)
@@ -722,16 +756,7 @@ export function OfficeHoursPageContent() {
                 key={s.id}
                 onClick={() => {
                   setActiveSessionId(s.id)
-                  const fromTitle = s.title.includes("Builder") ? "builder" : "startup"
-                  const docMode = s.designDoc?.mode
-                  const rowMode = s.mode
-                  setActiveMode(
-                    docMode === "builder" || docMode === "startup"
-                      ? docMode
-                      : rowMode === "builder" || rowMode === "startup"
-                        ? rowMode
-                        : fromTitle,
-                  )
+                  setActiveMode(normalizeOfficeHoursMode(s.mode, s.title, s.designDoc?.mode))
                   setViewingDocId(null)
                   setViewingDoc(null)
                 }}
@@ -786,16 +811,22 @@ export function OfficeHoursPageContent() {
         )}
 
         {/* Active conversation */}
-        {activeSessionId && !viewingDocId && activeMode && (
+        {activeSessionId && !viewingDocId && effectiveMode && (
           <ConversationPane
-            key={activeSessionId}
+            key={`${activeSessionId}-${effectiveMode}`}
             sessionId={activeSessionId}
-            mode={activeMode}
+            mode={effectiveMode}
             onDesignDocReady={(docId) => {
               void loadSessions()
               void viewDoc(docId)
             }}
           />
+        )}
+
+        {activeSessionId && !viewingDocId && !effectiveMode && (
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            Loading session…
+          </div>
         )}
       </div>
     </div>
