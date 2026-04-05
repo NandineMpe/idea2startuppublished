@@ -24,7 +24,6 @@ import {
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/better-auth-client"
 import { createClient } from "@/lib/supabase/client"
-import { WorkspaceSwitcher } from "@/components/dashboard/workspace-switcher"
 import { InviteFriendsDialog } from "@/components/dashboard/invite-friends-dialog"
 import { User } from "@supabase/supabase-js"
 
@@ -70,7 +69,6 @@ export function TopNavbar() {
             <Command className="h-2.5 w-2.5" /> K
           </kbd>
         </button>
-        <WorkspaceSwitcher />
       </div>
 
       <div className="flex items-center gap-1">
