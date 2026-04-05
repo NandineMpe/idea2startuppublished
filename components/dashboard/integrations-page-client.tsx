@@ -16,9 +16,12 @@ import {
   RefreshCw,
   ShieldCheck,
   Unlock,
+  Link2,
+  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { GithubVaultSettings } from "@/components/dashboard/github-vault-settings"
 import { cn } from "@/lib/utils"
@@ -36,6 +39,104 @@ type RepoData = {
   reposFetchError: string | null
   reposEmptyLikelyScope?: boolean
 }
+
+type AppDefinition = {
+  slug: string
+  name: string
+  description: string
+  logo: string // emoji or URL
+  category: string
+  comingSoon?: boolean
+}
+
+// ─── App catalog ──────────────────────────────────────────────────────────────
+
+const APPS: AppDefinition[] = [
+  {
+    slug: "slack",
+    name: "Slack",
+    description: "Post messages, read channels, and trigger automations from your Slack workspace.",
+    logo: "🟦",
+    category: "Communication",
+  },
+  {
+    slug: "gmail",
+    name: "Gmail",
+    description: "Send and read emails, manage labels, and automate inbox workflows.",
+    logo: "📧",
+    category: "Email",
+  },
+  {
+    slug: "google_calendar",
+    name: "Google Calendar",
+    description: "Create events, check availability, and sync meeting data.",
+    logo: "📅",
+    category: "Productivity",
+  },
+  {
+    slug: "notion",
+    name: "Notion",
+    description: "Create pages, update databases, and sync notes into your workspace.",
+    logo: "📝",
+    category: "Productivity",
+  },
+  {
+    slug: "twitter",
+    name: "X (Twitter)",
+    description: "Post tweets, monitor mentions, and engage with your audience.",
+    logo: "🐦",
+    category: "Social",
+  },
+  {
+    slug: "linkedin",
+    name: "LinkedIn",
+    description: "Share posts, track engagement, and manage your professional presence.",
+    logo: "💼",
+    category: "Social",
+  },
+  {
+    slug: "hubspot",
+    name: "HubSpot",
+    description: "Sync contacts, track deals, and automate CRM workflows.",
+    logo: "🟠",
+    category: "CRM",
+  },
+  {
+    slug: "airtable",
+    name: "Airtable",
+    description: "Read and write records, automate table updates, and sync structured data.",
+    logo: "🗃️",
+    category: "Data",
+  },
+  {
+    slug: "google_sheets",
+    name: "Google Sheets",
+    description: "Read rows, append data, and automate spreadsheet workflows.",
+    logo: "📊",
+    category: "Data",
+  },
+  {
+    slug: "stripe",
+    name: "Stripe",
+    description: "Monitor payments, manage customers, and automate billing workflows.",
+    logo: "💳",
+    category: "Finance",
+  },
+  {
+    slug: "shopify",
+    name: "Shopify",
+    description: "Sync orders, manage products, and automate your store.",
+    logo: "🛍️",
+    category: "E-commerce",
+  },
+  {
+    slug: "discord",
+    name: "Discord",
+    description: "Send messages, manage channels, and automate community interactions.",
+    logo: "🎮",
+    category: "Communication",
+  },
+]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,8 +162,8 @@ function accountActivityMs(a: PdAccount): number {
   return best
 }
 
-function pickPrimaryGithubAccount(accounts: PdAccount[]): { primary: PdAccount; duplicateRows: number } {
-  if (accounts.length === 0) throw new Error("pickPrimaryGithubAccount: empty")
+function pickPrimaryAccount(accounts: PdAccount[]): { primary: PdAccount; duplicateRows: number } {
+  if (accounts.length === 0) throw new Error("pickPrimaryAccount: empty")
   const byName = new Map<string, PdAccount[]>()
   for (const a of accounts) {
     const key = a.name?.trim() ? a.name.trim().toLowerCase() : `__id_${a.id}`
@@ -117,7 +218,178 @@ async function syncAccountsAfterConnect(
   return false
 }
 
-// ─── Main Card ────────────────────────────────────────────────────────────────
+// ─── Generic App Connect Card ─────────────────────────────────────────────────
+
+function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition }) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const client = useFrontendClient()
+  const [connecting, setConnecting] = useState(false)
+  const [syncingAfterConnect, setSyncingAfterConnect] = useState(false)
+
+  const {
+    data: accounts = [],
+    isLoading,
+    refetch,
+    isFetching,
+    isFetched,
+    error: accountsError,
+  } = useQuery<PdAccount[]>({
+    queryKey: ["pipedream-accounts", userId, app.slug],
+    queryFn: async () => {
+      const res = await fetch(`/api/pipedream/accounts?app=${encodeURIComponent(app.slug)}`)
+      const body = (await res.json().catch(() => ({}))) as { accounts?: PdAccount[]; error?: string }
+      if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`)
+      return (body.accounts ?? []) as PdAccount[]
+    },
+    enabled: Boolean(userId),
+  })
+
+  const connected = accounts.length > 0
+  const hasUnhealthy = accounts.some((a) => a.dead || a.healthy === false)
+  const allDead = accounts.length > 0 && accounts.every((a) => a.dead)
+  const pipedreamLastActivity = latestPipedreamActivityIso(accounts)
+
+  const { primary: primaryAccount } = useMemo(() => {
+    if (accounts.length === 0) return { primary: null as PdAccount | null, duplicateRows: 0 }
+    return pickPrimaryAccount(accounts)
+  }, [accounts])
+
+  const statusBusy =
+    connecting || syncingAfterConnect || (Boolean(isFetching) && !connected && !isLoading)
+
+  const runPostConnectSync = useCallback(async () => {
+    setSyncingAfterConnect(true)
+    try {
+      const ok = await syncAccountsAfterConnect(queryClient, () => refetch())
+      if (ok) {
+        toast({ title: `${app.name} linked`, description: "Connection is up to date." })
+      } else {
+        toast({
+          title: "Connected — status may lag",
+          description: "Pipedream saved the link. Reload if the banner still shows not connected.",
+        })
+      }
+    } finally {
+      setSyncingAfterConnect(false)
+    }
+  }, [queryClient, refetch, toast, app.name])
+
+  const connect = async () => {
+    setConnecting(true)
+    try {
+      await client.connectAccount({
+        app: app.slug,
+        onSuccess: () => {
+          toast({ title: `${app.name} authorized`, description: "Finishing up…" })
+        },
+        onError: (err) => {
+          toast({ title: "Connection issue", description: err.message, variant: "destructive" })
+        },
+        onClose: (status) => {
+          setConnecting(false)
+          if (status.successful) {
+            void runPostConnectSync()
+          } else if (status.completed && !status.successful) {
+            toast({ title: "Not connected", description: "Window closed before finishing." })
+          }
+        },
+      })
+    } catch {
+      setConnecting(false)
+    }
+  }
+
+  return (
+    <Card className="glass-card border-border flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl leading-none" aria-hidden="true">{app.logo}</span>
+            <div>
+              <CardTitle className="text-base text-foreground">{app.name}</CardTitle>
+              <span className="text-[11px] text-muted-foreground">{app.category}</span>
+            </div>
+          </div>
+          {connected && !allDead && (
+            <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 text-[10px] shrink-0">
+              <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+              Connected
+            </Badge>
+          )}
+          {(allDead || (!connected && isFetched && !statusBusy)) && !isLoading && (
+            <Badge variant="outline" className={cn("text-[10px] shrink-0", allDead ? "text-destructive border-destructive/30" : "text-muted-foreground")}>
+              {allDead ? "Expired" : "Not connected"}
+            </Badge>
+          )}
+        </div>
+        <CardDescription className="text-xs text-muted-foreground leading-relaxed mt-1">
+          {app.description}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="pt-0 mt-auto space-y-3">
+        {/* Status line */}
+        {connected && !isLoading && primaryAccount && (
+          <div className="rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs space-y-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-foreground truncate">
+                {primaryAccount.name ? `@${primaryAccount.name}` : `Account …${primaryAccount.id.slice(-6)}`}
+              </span>
+              <AccountHealthBadge account={primaryAccount} />
+            </div>
+            {pipedreamLastActivity && (
+              <p className="text-muted-foreground flex items-center gap-1">
+                <Activity className="h-3 w-3 shrink-0" />
+                Last active: {formatDate(pipedreamLastActivity)}
+              </p>
+            )}
+          </div>
+        )}
+
+        {!connected && !isLoading && statusBusy && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+            {connecting ? "Complete sign-in in the Pipedream window…" : "Syncing…"}
+          </div>
+        )}
+
+        {accountsError && (
+          <p className="text-xs text-destructive">
+            {accountsError instanceof Error ? accountsError.message : "Failed to load"}
+          </p>
+        )}
+
+        {/* Connect button */}
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void connect()}
+          disabled={connecting || syncingAfterConnect || isLoading}
+          variant={connected && !allDead && !hasUnhealthy ? "outline" : "default"}
+          className="w-full gap-2 h-8 text-xs"
+        >
+          {connecting || syncingAfterConnect ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plug className="h-3.5 w-3.5" />
+          )}
+          {isLoading
+            ? "Loading…"
+            : connected && !allDead
+              ? hasUnhealthy
+                ? "Reconnect"
+                : "Reconnect"
+              : `Connect ${app.name}`}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── GitHub card (enhanced — repos, live verify) ──────────────────────────────
 
 function GithubPipedreamCard({ userId }: { userId: string }) {
   const { toast } = useToast()
@@ -142,7 +414,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
     isFetched,
     error: accountsError,
   } = useQuery<PdAccount[]>({
-    queryKey: ["pipedream-accounts", userId],
+    queryKey: ["pipedream-accounts", userId, "github"],
     queryFn: async () => {
       const res = await fetch("/api/pipedream/accounts?app=github")
       const body = (await res.json().catch(() => ({}))) as { accounts?: PdAccount[]; error?: string }
@@ -178,7 +450,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
 
   const { primary: primaryAccount, duplicateRows } = useMemo(() => {
     if (accounts.length === 0) return { primary: null as PdAccount | null, duplicateRows: 0 }
-    return pickPrimaryGithubAccount(accounts)
+    return pickPrimaryAccount(accounts)
   }, [accounts])
 
   const runLiveVerify = useCallback(async () => {
@@ -608,18 +880,41 @@ export function IntegrationsPageClient({
   }, [userId, pipedreamReady, pipedreamProjectEnvironment])
 
   return (
-    <div className="flex flex-col gap-8 max-w-3xl">
+    <div className="flex flex-col gap-8 max-w-5xl">
       <div className="space-y-1">
         <h1 className="text-3xl font-bold text-foreground">Integrations</h1>
         <p className="text-muted-foreground">
-          Connect external accounts. More integrations will show up here as we ship them.
+          Connect your accounts. Juno uses these connections to act on your behalf across tools and workflows.
         </p>
       </div>
 
       {pipedreamReady && pdClient ? (
         <QueryClientProvider client={queryClient}>
           <FrontendClientProvider client={pdClient}>
-            <GithubPipedreamCard userId={userId} />
+            {/* GitHub — featured card with extra capabilities */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Featured</h2>
+              </div>
+              <GithubPipedreamCard userId={userId} />
+            </section>
+
+            {/* All other apps */}
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Connect more apps</h2>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-1">
+                All connections use Pipedream&apos;s hosted OAuth — you can revoke access from Pipedream project settings at any time.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {APPS.map((app) => (
+                  <AppConnectCard key={app.slug} userId={userId} app={app} />
+                ))}
+              </div>
+            </section>
           </FrontendClientProvider>
         </QueryClientProvider>
       ) : (
@@ -641,7 +936,8 @@ export function IntegrationsPageClient({
         </Card>
       )}
 
-      <div className="space-y-2">
+      {/* Obsidian vault — separate from Connect */}
+      <div className="space-y-2 pt-2 border-t border-border">
         <h2 className="text-lg font-semibold text-foreground">Obsidian vault (GitHub repo)</h2>
         <p className="text-sm text-muted-foreground">
           Separate from Connect: grant repo access for the knowledge vault Juno reads. Uses a
