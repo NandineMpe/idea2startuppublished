@@ -11,6 +11,12 @@ export type GithubVaultConfig = {
   branch?: string
   /** Optional prefix, e.g. "notes" or "vault/" — slashes normalized */
   pathPrefix?: string
+  /**
+   * Optional override for fetching JSON from GitHub API.
+   * When provided (e.g. via Pipedream proxy for private repos),
+   * used instead of direct fetch + server token.
+   */
+  fetchJson?: (url: string) => Promise<unknown>
 }
 
 export type VaultFile = {
@@ -145,6 +151,24 @@ function shouldSkipPath(path: string): boolean {
  * Fetch all .md files from the repo (recursive tree), optionally under pathPrefix.
  * Respects maxFiles / maxTotalChars for LLM context limits.
  */
+/** Fetch JSON from GitHub using either the Pipedream proxy or a direct token-authenticated request. */
+async function githubGet<T>(url: string, token: string | undefined, fetchJson?: (url: string) => Promise<unknown>): Promise<{ ok: true; data: T } | { ok: false; status?: number; error: string }> {
+  if (fetchJson) {
+    try {
+      const data = await fetchJson(url)
+      return { ok: true, data: data as T }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Proxy fetch failed" }
+    }
+  }
+  const res = await fetch(url, { headers: headers(token) })
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    return { ok: false, status: res.status, error: `GitHub ${res.status}: ${text.slice(0, 200)}` }
+  }
+  return { ok: true, data: (await res.json()) as T }
+}
+
 export async function fetchGithubVaultMarkdown(
   config: GithubVaultConfig,
   options: {
@@ -161,57 +185,44 @@ export async function fetchGithubVaultMarkdown(
   const repo = config.repo?.trim()
   const branch = config.branch?.trim() || "main"
   const prefix = normalizePrefix(config.pathPrefix)
+  const { fetchJson } = config
 
   if (!owner || !repo) {
     return { files: [], error: "owner and repo are required" }
   }
 
-  const token = getToken()
-
+  const token = fetchJson ? undefined : getToken()
   const base = `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
 
   try {
-    const branchRes = await fetch(`${base}/branches/${encodeURIComponent(branch)}`, {
-      headers: headers(token),
-    })
-
-    if (!branchRes.ok) {
-      const errText = await branchRes.text().catch(() => "")
-      if (branchRes.status === 404) {
-        return {
-          files: [],
-          error: await describeRepoOrBranchError(base, token, owner, repo, branch),
-        }
+    const branchResult = await githubGet<{ commit?: { sha?: string } }>(
+      `${base}/branches/${encodeURIComponent(branch)}`, token, fetchJson,
+    )
+    if (!branchResult.ok) {
+      if (branchResult.status === 404 || branchResult.error.includes("404") || branchResult.error.includes("Not Found")) {
+        return { files: [], error: await describeRepoOrBranchError(base, token, owner, repo, branch) }
       }
-      return { files: [], error: `GitHub ${branchRes.status}: ${errText.slice(0, 200)}` }
+      return { files: [], error: branchResult.error }
     }
 
-    const branchJson = (await branchRes.json()) as { commit?: { sha?: string } }
-    const commitSha = branchJson.commit?.sha
-    if (!commitSha) {
-      return { files: [], error: "Could not resolve branch commit" }
-    }
+    const commitSha = branchResult.data.commit?.sha
+    if (!commitSha) return { files: [], error: "Could not resolve branch commit" }
 
-    const commitRes = await fetch(`${base}/git/commits/${commitSha}`, { headers: headers(token) })
-    if (!commitRes.ok) {
-      return { files: [], error: `GitHub commit ${commitRes.status}` }
-    }
-    const commitData = (await commitRes.json()) as { tree?: { sha?: string } }
-    const treeSha = commitData.tree?.sha
-    if (!treeSha) {
-      return { files: [], error: "Could not resolve git tree" }
-    }
+    const commitResult = await githubGet<{ tree?: { sha?: string } }>(
+      `${base}/git/commits/${commitSha}`, token, fetchJson,
+    )
+    if (!commitResult.ok) return { files: [], error: `GitHub commit: ${commitResult.error}` }
 
-    const treeRes = await fetch(`${base}/git/trees/${treeSha}?recursive=1`, { headers: headers(token) })
-    if (!treeRes.ok) {
-      return { files: [], error: `GitHub tree ${treeRes.status}` }
-    }
+    const treeSha = commitResult.data.tree?.sha
+    if (!treeSha) return { files: [], error: "Could not resolve git tree" }
 
-    const treeData = (await treeRes.json()) as {
+    const treeResult = await githubGet<{
       tree?: Array<{ path?: string; type?: string; sha?: string; size?: number }>
       truncated?: boolean
-    }
+    }>(`${base}/git/trees/${treeSha}?recursive=1`, token, fetchJson)
+    if (!treeResult.ok) return { files: [], error: `GitHub tree: ${treeResult.error}` }
 
+    const treeData = treeResult.data
     if (treeData.truncated) {
       console.warn("[github-vault] GitHub tree response was truncated; increase file limits or narrow path prefix.")
     }
@@ -232,10 +243,11 @@ export async function fetchGithubVaultMarkdown(
     for (const entry of sorted) {
       if (files.length >= maxFiles || totalChars >= maxTotalChars) break
       const path = entry.path as string
-      const blobRes = await fetch(`${base}/git/blobs/${entry.sha}`, { headers: headers(token) })
-      if (!blobRes.ok) continue
-
-      const blob = (await blobRes.json()) as { encoding?: string; content?: string }
+      const blobResult = await githubGet<{ encoding?: string; content?: string }>(
+        `${base}/git/blobs/${entry.sha}`, token, fetchJson,
+      )
+      if (!blobResult.ok) continue
+      const blob = blobResult.data
       if (blob.encoding !== "base64" || !blob.content) continue
 
       let text: string
@@ -277,57 +289,46 @@ export async function listGithubVaultMarkdownPaths(
   const branch = config.branch?.trim() || "main"
   const prefix = normalizePrefix(config.pathPrefix)
   const folderPrefix = folder ? normalizePrefix(folder.replace(/^\//, "")) : ""
+  const { fetchJson } = config
 
   if (!owner || !repo) {
     return { entries: [], error: "owner and repo are required" }
   }
 
-  const token = getToken()
+  const token = fetchJson ? undefined : getToken()
   const base = `${GITHUB_API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
 
   try {
-    const branchRes = await fetch(`${base}/branches/${encodeURIComponent(branch)}`, {
-      headers: headers(token),
-    })
-
-    if (!branchRes.ok) {
-      const errText = await branchRes.text().catch(() => "")
+    const branchResult = await githubGet<{ commit?: { sha?: string } }>(
+      `${base}/branches/${encodeURIComponent(branch)}`, token, fetchJson,
+    )
+    if (!branchResult.ok) {
       return {
         entries: [],
-        error:
-          branchRes.status === 404
-            ? await describeRepoOrBranchError(base, token, owner, repo, branch)
-            : `GitHub ${branchRes.status}: ${errText.slice(0, 200)}`,
+        error: branchResult.status === 404 || branchResult.error.includes("404") || branchResult.error.includes("Not Found")
+          ? await describeRepoOrBranchError(base, token, owner, repo, branch)
+          : branchResult.error,
       }
     }
 
-    const branchJson = (await branchRes.json()) as { commit?: { sha?: string } }
-    const commitSha = branchJson.commit?.sha
-    if (!commitSha) {
-      return { entries: [], error: "Could not resolve branch commit" }
-    }
+    const commitSha = branchResult.data.commit?.sha
+    if (!commitSha) return { entries: [], error: "Could not resolve branch commit" }
 
-    const commitRes = await fetch(`${base}/git/commits/${commitSha}`, { headers: headers(token) })
-    if (!commitRes.ok) {
-      return { entries: [], error: `GitHub commit ${commitRes.status}` }
-    }
+    const commitResult = await githubGet<{ tree?: { sha?: string } }>(
+      `${base}/git/commits/${commitSha}`, token, fetchJson,
+    )
+    if (!commitResult.ok) return { entries: [], error: `GitHub commit: ${commitResult.error}` }
 
-    const commitData = (await commitRes.json()) as { tree?: { sha?: string } }
-    const treeSha = commitData.tree?.sha
-    if (!treeSha) {
-      return { entries: [], error: "Could not resolve git tree" }
-    }
+    const treeSha = commitResult.data.tree?.sha
+    if (!treeSha) return { entries: [], error: "Could not resolve git tree" }
 
-    const treeRes = await fetch(`${base}/git/trees/${treeSha}?recursive=1`, { headers: headers(token) })
-    if (!treeRes.ok) {
-      return { entries: [], error: `GitHub tree ${treeRes.status}` }
-    }
-
-    const treeData = (await treeRes.json()) as {
+    const treeResult = await githubGet<{
       tree?: Array<{ path?: string; type?: string; sha?: string; size?: number }>
       truncated?: boolean
-    }
+    }>(`${base}/git/trees/${treeSha}?recursive=1`, token, fetchJson)
+    if (!treeResult.ok) return { entries: [], error: `GitHub tree: ${treeResult.error}` }
 
+    const treeData = treeResult.data
     const fullPrefix = prefix + folderPrefix
 
     const entries = (treeData.tree ?? [])

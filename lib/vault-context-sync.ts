@@ -7,6 +7,22 @@ import {
   type VaultFile,
 } from "@/lib/github-vault"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { githubProxyGetJsonResult, getGithubAccountId } from "@/lib/juno/pipedream-github"
+
+/** Build a fetchJson function that routes through Pipedream proxy using the user's connected account. */
+async function buildPipedreamFetchJson(userId: string): Promise<((url: string) => Promise<unknown>) | undefined> {
+  try {
+    const accountId = await getGithubAccountId(userId)
+    if (!accountId) return undefined
+    return async (url: string) => {
+      const result = await githubProxyGetJsonResult<unknown>(userId, accountId, url)
+      if (!result.ok) throw new Error(result.error)
+      return result.data
+    }
+  } catch {
+    return undefined
+  }
+}
 
 const MAX_FETCHED_FILES_PER_FOLDER = 60
 const MAX_FETCH_TOTAL_CHARS_PER_FOLDER = 180_000
@@ -144,11 +160,15 @@ async function syncVaultContextCacheForRow(
     }
   }
 
+  // Prefer Pipedream proxy (uses the user's OAuth token — works for private repos without a server PAT)
+  const fetchJson = await buildPipedreamFetchJson(userId)
+
   const config: GithubVaultConfig = {
     owner: repoParts.owner,
     repo: repoParts.repo,
     branch,
     pathPrefix: row.github_vault_path?.trim() || undefined,
+    fetchJson,
   }
 
   const allPaths = new Set<string>()
@@ -197,16 +217,9 @@ async function syncVaultContextCacheForRow(
     )
 
     if (filesResult.error) {
-      await supabase
-        .from("company_profile")
-        .upsert(
-          {
-            organization_id: organizationId,
-            user_id: userId,
-            vault_context_sync_error: filesResult.error,
-          },
-          { onConflict: "organization_id" },
-        )
+      await upsertVaultSyncFields(supabase, userId, target, {
+        vault_context_sync_error: filesResult.error,
+      })
 
       return {
         ok: false,
