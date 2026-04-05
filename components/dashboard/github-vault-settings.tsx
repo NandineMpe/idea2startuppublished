@@ -1,19 +1,28 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { BookMarked, Github, Loader2, RefreshCw, Unplug } from "lucide-react"
+import { BookMarked, Check, ChevronsUpDown, Github, Lock, Loader2, RefreshCw, Unplug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useToast } from "@/hooks/use-toast"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { cn } from "@/lib/utils"
 
 type VaultSettingsState = {
   repo: string
   branch: string
   foldersText: string
+}
+
+type GithubRepo = {
+  full_name: string
+  default_branch: string
+  private: boolean
 }
 
 export function GithubVaultSettings() {
@@ -30,6 +39,9 @@ export function GithubVaultSettings() {
     branch: "main",
     foldersText: "company\njuno\nresearch",
   })
+  const [repos, setRepos] = useState<GithubRepo[]>([])
+  const [reposLoading, setReposLoading] = useState(false)
+  const [repoPickerOpen, setRepoPickerOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,9 +63,22 @@ export function GithubVaultSettings() {
     }
   }, [])
 
+  const loadRepos = useCallback(async () => {
+    setReposLoading(true)
+    try {
+      const res = await fetch("/api/security/github/repos")
+      if (!res.ok) return
+      const data = await res.json()
+      setRepos(Array.isArray(data.repos) ? (data.repos as GithubRepo[]) : [])
+    } finally {
+      setReposLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void load()
-  }, [load])
+    void loadRepos()
+  }, [load, loadRepos])
 
   const save = async (syncAfterSave = false, nextForm?: Partial<VaultSettingsState>) => {
     if (syncAfterSave) {
@@ -183,16 +208,81 @@ export function GithubVaultSettings() {
 
             <div className="space-y-3 rounded-xl border border-border bg-background p-4">
               <div className="space-y-1.5">
-                <Label htmlFor="gh-repo" className="text-[12px]">
-                  GitHub vault repo
-                </Label>
-                <Input
-                  id="gh-repo"
-                  placeholder="e.g. NandineMpe/obsidian-vault"
-                  value={form.repo}
-                  onChange={(e) => setForm((current) => ({ ...current, repo: e.target.value }))}
-                  className="bg-background font-mono text-[13px]"
-                />
+                <Label className="text-[12px]">GitHub vault repo</Label>
+                {repos.length > 0 ? (
+                  <Popover open={repoPickerOpen} onOpenChange={setRepoPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={repoPickerOpen}
+                        className="w-full justify-between font-mono text-[13px] bg-background"
+                      >
+                        {form.repo || "Select a repo…"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search repos…" className="text-[13px]" />
+                        <CommandList>
+                          <CommandEmpty>No repos found.</CommandEmpty>
+                          <CommandGroup>
+                            {repos.map((repo) => (
+                              <CommandItem
+                                key={repo.full_name}
+                                value={repo.full_name}
+                                onSelect={(value) => {
+                                  const selected = repos.find((r) => r.full_name === value)
+                                  setForm((current) => ({
+                                    ...current,
+                                    repo: value,
+                                    branch: selected?.default_branch ?? "main",
+                                  }))
+                                  setRepoPickerOpen(false)
+                                }}
+                                className="font-mono text-[13px]"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    form.repo === repo.full_name ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                {repo.private && <Lock className="mr-1.5 h-3 w-3 text-muted-foreground shrink-0" />}
+                                {repo.full_name}
+                                <span className="ml-auto text-[11px] text-muted-foreground">
+                                  {repo.default_branch}
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Input
+                      id="gh-repo"
+                      placeholder="e.g. NandineMpe/obsidian-vault"
+                      value={form.repo}
+                      onChange={(e) => setForm((current) => ({ ...current, repo: e.target.value }))}
+                      className="bg-background font-mono text-[13px]"
+                    />
+                    {reposLoading && (
+                      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Loading your repos…
+                      </p>
+                    )}
+                    {!reposLoading && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Connect GitHub on this page to browse repos instead of typing manually.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
