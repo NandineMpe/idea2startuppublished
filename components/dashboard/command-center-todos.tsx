@@ -53,7 +53,7 @@ const TEMPLATE_TODOS: TemplateTodo[] = [
   {
     id: "intel-feed",
     title: "Scan the Intelligence Feed",
-    hint: "Briefs, leads, content queue, and radar on the home feed.",
+    hint: "Briefs, behavioral updates, content queue, and radar on the home feed.",
     href: "/dashboard",
     icon: Radio,
   },
@@ -67,7 +67,7 @@ const TEMPLATE_TODOS: TemplateTodo[] = [
   {
     id: "signal-feed",
     title: "Use the Signal feed for alerts",
-    hint: "Open the dashboard feed for briefs, leads, and drafts.",
+    hint: "Open the dashboard feed for briefs, behavioral updates, and drafts.",
     href: "/dashboard",
     icon: MessageCircle,
   },

@@ -4,8 +4,8 @@ import { motion } from "framer-motion"
 import { BookOpen, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
+import { BehavioralUpdatesPanel } from "@/components/dashboard/behavioral-updates-panel"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
-import { IntentSignalsPanel } from "@/components/dashboard/intent-signals-panel"
 import { ContentQueue } from "@/components/dashboard/content-queue"
 import { SecurityAlertsSummary } from "@/components/dashboard/security-alerts-summary"
 
@@ -40,7 +40,8 @@ export default function DashboardPage() {
           <Link href="/dashboard/context" className="text-primary hover:underline">
             company context
           </Link>
-          . Briefs, leads, and drafts show up here for you to review, approve, and ship — on the schedule you set.
+          . Briefs, behavioral updates, and drafts show up here for you to review, approve, and ship on the
+          schedule you set.
         </p>
       </motion.div>
 
@@ -56,7 +57,7 @@ export default function DashboardPage() {
           </motion.div>
 
           <motion.div variants={item}>
-            <IntentSignalsPanel />
+            <BehavioralUpdatesPanel />
           </motion.div>
 
           <motion.div variants={item}>

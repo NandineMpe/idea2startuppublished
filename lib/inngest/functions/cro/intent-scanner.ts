@@ -2,9 +2,65 @@ import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList, REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
 import { scanRedditForIntent } from "@/lib/juno/intent-monitor"
-import { scoreIntentSignals } from "@/lib/juno/intent-scoring"
+import { scoreIntentSignals, type ScoredIntent } from "@/lib/juno/intent-scoring"
+import { summarizeRedditRecon, type RedditReconSignal } from "@/lib/juno/reddit-recon"
 import { getFanOutUserIds } from "@/lib/juno/users"
 import { supabaseAdmin } from "@/lib/supabase"
+
+function toRedditReconSignals(signals: ScoredIntent[]): RedditReconSignal[] {
+  return signals.map((signal) => ({
+    title: signal.title,
+    body: signal.body || null,
+    subreddit: signal.subreddit ?? null,
+    matched_keywords: signal.matchedKeywords ?? [],
+    why_relevant: signal.whyRelevant,
+    url: signal.url,
+    discovered_at: signal.discoveredAt,
+    relevance_score: signal.relevanceScore,
+    signal_type: signal.type,
+  }))
+}
+
+async function saveBehavioralUpdatesArtifact(params: {
+  userId: string
+  companyName: string
+  signals: RedditReconSignal[]
+  summary: Awaited<ReturnType<typeof summarizeRedditRecon>>
+}) {
+  const { userId, companyName, signals, summary } = params
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const uniqueSubreddits = [...new Set(signals.map((signal) => signal.subreddit).filter(Boolean) as string[])]
+  const latestSignalAt =
+    signals
+      .map((signal) => signal.discovered_at)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null
+
+  const { error } = await supabaseAdmin.from("ai_outputs").insert({
+    user_id: userId,
+    tool: "behavioral_updates",
+    title: `Behavioral updates - ${companyName || "Customer research"} - ${dateStr}`.slice(0, 500),
+    output: summary.overview,
+    inputs: {
+      summary,
+      companyName,
+      conversationCount: signals.length,
+      subreddits: uniqueSubreddits,
+      latestSignalAt,
+      source: "reddit",
+    },
+    metadata: {
+      generated_at: new Date().toISOString(),
+      source: "reddit",
+      signal_count: signals.length,
+      latest_signal_at: latestSignalAt,
+      subreddits: uniqueSubreddits,
+    },
+  })
+
+  if (error) {
+    console.error("[intent-scanner] behavioral_updates insert:", error.message)
+  }
+}
 
 export const intentScanFanOut = inngest.createFunction(
   {
@@ -57,6 +113,17 @@ export const intentScanner = inngest.createFunction(
 
     const raw = [...redditSignals]
     if (raw.length === 0) {
+      const summary = await step.run("summarize-behavioral-updates-empty", () =>
+        summarizeRedditRecon(context, []),
+      )
+      await step.run("persist-behavioral-updates-empty", () =>
+        saveBehavioralUpdatesArtifact({
+          userId,
+          companyName: context.profile.name.trim(),
+          signals: [],
+          summary,
+        }),
+      )
       return { userId, scanned: 0, saved: 0, reason: "no_candidates" }
     }
 
@@ -66,6 +133,9 @@ export const intentScanner = inngest.createFunction(
 
     const toSave = scored.filter((s) => s.relevanceScore >= 4)
     const hot = scored.filter((s) => s.relevanceScore >= 8)
+    const researchSignals = toRedditReconSignals(
+      [...toSave].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 16),
+    )
 
     if (hot.length > 0) {
       console.log(`[intent-scanner] user=${userId} hot signals: ${hot.length}`, hot.map((h) => h.url))
@@ -102,12 +172,26 @@ export const intentScanner = inngest.createFunction(
       }
     })
 
+    const summary = await step.run("summarize-behavioral-updates", () =>
+      summarizeRedditRecon(context, researchSignals),
+    )
+
+    await step.run("persist-behavioral-updates", () =>
+      saveBehavioralUpdatesArtifact({
+        userId,
+        companyName: context.profile.name.trim(),
+        signals: researchSignals,
+        summary,
+      }),
+    )
+
     return {
       userId,
       scanned: raw.length,
       scored: scored.length,
       saved,
       hot: hot.length,
+      behavioralSignals: researchSignals.length,
       ...(saved === 0 && scored.length > 0 ? { reason: "all_below_threshold" as const } : {}),
     }
   },

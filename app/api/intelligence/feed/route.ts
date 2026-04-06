@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { coerceBehavioralSummary } from "@/lib/juno/reddit-recon"
 import { createClient } from "@/lib/supabase/server"
 import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
 
@@ -28,6 +29,15 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(15)
 
+    // Latest behavioral customer research snapshot
+    const { data: behavioralRows } = await supabase
+      .from("ai_outputs")
+      .select(OUT_FIELDS)
+      .eq("user_id", user.id)
+      .eq("tool", "behavioral_updates")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
     // Content queue — pending approval + drafts
     const { data: contentRows } = await supabase
       .from("ai_outputs")
@@ -55,18 +65,35 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(1)
 
-    // Pipeline status — last run per type
+    const { data: latestIntentRows } = await supabase
+      .from("intent_signals")
+      .select("discovered_at")
+      .eq("user_id", user.id)
+      .eq("platform", "reddit")
+      .order("discovered_at", { ascending: false })
+      .limit(1)
+
+    // Pipeline status - last run per type
     const pipelineStatus: Record<string, string | null> = {
       cbs: null,
       cro: null,
       cmo: null,
       cto: null,
+      intent: null,
     }
 
     if (briefRows?.[0]) pipelineStatus.cbs = briefRows[0].created_at
     if (leadRows?.[0]) pipelineStatus.cro = leadRows[0].created_at
+    if (behavioralRows?.[0]) {
+      pipelineStatus.intent = behavioralRows[0].created_at
+    } else if (latestIntentRows?.[0]) {
+      pipelineStatus.intent = latestIntentRows[0].discovered_at
+    }
 
     const contentRowsNorm = (contentRows ?? []).map((r) => toLegacyFeedRow(r as AiOutputDbRow))
+    const behavioralInputs = (behavioralRows?.[0]?.inputs ?? {}) as Record<string, unknown>
+    const behavioralSummary = coerceBehavioralSummary(behavioralInputs.summary)
+    const behavioralMeta = behavioralInputs
 
     const latestLinkedinPost =
       contentRowsNorm.find(
@@ -100,6 +127,25 @@ export async function GET() {
     return NextResponse.json({
       brief: briefRows?.[0] ? toLegacyFeedRow(briefRows[0] as AiOutputDbRow) : null,
       leads: (leadRows ?? []).map((r) => toLegacyFeedRow(r as AiOutputDbRow)),
+      behavioralUpdates:
+        behavioralRows?.[0] && behavioralSummary
+          ? {
+              id: behavioralRows[0].id,
+              created_at: behavioralRows[0].created_at,
+              summary: behavioralSummary,
+              conversationCount:
+                typeof behavioralMeta.conversationCount === "number"
+                  ? behavioralMeta.conversationCount
+                  : Number(behavioralMeta.conversationCount ?? 0) || 0,
+              subreddits: Array.isArray(behavioralMeta.subreddits)
+                ? behavioralMeta.subreddits.filter(
+                    (value): value is string => typeof value === "string" && value.trim().length > 0,
+                  )
+                : [],
+              latestSignalAt:
+                typeof behavioralMeta.latestSignalAt === "string" ? behavioralMeta.latestSignalAt : null,
+            }
+          : null,
       contentQueue,
       radar: radarRows?.[0] ? toLegacyFeedRow(radarRows[0] as AiOutputDbRow) : null,
       pipelineStatus,

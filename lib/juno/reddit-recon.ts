@@ -3,6 +3,7 @@ import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { generateText } from "ai"
 
 export type RedditReconSignal = {
+  id?: string
   title: string
   body: string | null
   subreddit: string | null
@@ -14,12 +15,26 @@ export type RedditReconSignal = {
   signal_type: string
 }
 
-export type RedditReconSummary = {
+export type BehavioralTheme = {
+  title: string
+  detail: string
+}
+
+export type RedditBehavioralSummary = {
   overview: string
-  themes: Array<{ title: string; detail: string }>
-  simulatedConversations: Array<{ speaker: string; message: string; implication: string }>
-  opportunities: string[]
-  gaps: string[]
+  sentiment: string
+  themes: BehavioralTheme[]
+  pushOfPresent: string[]
+  pullOfNew: string[]
+  anxietyOfNew: string[]
+  allegianceToOld: string[]
+  currentSolutions: string[]
+  frictionPoints: string[]
+  workarounds: string[]
+  discoveryPaths: string[]
+  buyingProcess: string[]
+  painPoints: string[]
+  gains: string[]
   nextMoves: string[]
 }
 
@@ -32,144 +47,226 @@ function normalizeLines(values: unknown, limit: number): string[] {
     .slice(0, limit)
 }
 
+function normalizeThemes(values: unknown, limit: number): BehavioralTheme[] {
+  if (!Array.isArray(values)) return []
+  return values
+    .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object")
+    .map((value) => ({
+      title: typeof value.title === "string" ? value.title.replace(/\s+/g, " ").trim() : "",
+      detail: typeof value.detail === "string" ? value.detail.replace(/\s+/g, " ").trim() : "",
+    }))
+    .filter((value) => value.title && value.detail)
+    .slice(0, limit)
+}
+
+function compact(text: string | null | undefined): string {
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 function truncate(text: string, max = 180): string {
-  const compact = text.replace(/\s+/g, " ").trim()
-  if (compact.length <= max) return compact
-  return `${compact.slice(0, max - 1).trimEnd()}…`
+  const normalized = compact(text)
+  if (normalized.length <= max) return normalized
+  return `${normalized.slice(0, max - 1).trimEnd()}...`
 }
 
-function fallbackThemeTitle(signal: RedditReconSignal): string {
-  const keywords = (signal.matched_keywords ?? []).filter(Boolean)
-  if (keywords.length > 0) {
-    return `Repeated pain around ${keywords.slice(0, 2).join(" and ")}`
-  }
-
-  if (signal.signal_type === "buying") return "Active search for a better tool"
-  if (signal.signal_type === "competitor") return "Competitor comparison or replacement motion"
-  return "Operational frustration surfacing in the open"
-}
-
-function fallbackConversationMessage(signal: RedditReconSignal): string {
-  const source = truncate(signal.body?.trim() || signal.title)
-  if (!source) return "I am frustrated with the current workflow and looking for a better approach."
-  const normalized = source.replace(/^["'`]+|["'`]+$/g, "").trim()
-  if (/^(i|we)\b/i.test(normalized)) return normalized
-  return `I am dealing with ${normalized.charAt(0).toLowerCase()}${normalized.slice(1)}`
-}
-
-function buildOpportunity(signal: RedditReconSignal, context: CompanyContext): string {
-  const company = context.profile.name.trim() || "our company"
-  const matched = (signal.matched_keywords ?? []).filter(Boolean)
-  const keywordLabel = matched.length > 0 ? matched.slice(0, 2).join(" / ") : "the repeated pain in this thread"
-
-  if (signal.signal_type === "buying") {
-    return `Use ${keywordLabel} as a direct customer-discovery wedge for ${company}; this thread already sounds like someone evaluating options.`
-  }
-
-  if (signal.signal_type === "competitor") {
-    return `Position ${company} against the competitor language showing up around ${keywordLabel}, and capture the replacement criteria in the vault.`
-  }
-
-  return `Treat ${keywordLabel} as product-learning input and validate whether ${company} should solve it more explicitly.`
-}
-
-function buildFallbackGaps(context: CompanyContext, signals: RedditReconSignal[]): string[] {
-  const gaps: string[] = []
-  const contextKeywords = new Set(context.extracted.keywords.map((value) => value.toLowerCase()))
-  const unmatched = new Map<string, number>()
-
+function topKeywords(signals: RedditReconSignal[], limit = 3): string[] {
+  const counts = new Map<string, number>()
   for (const signal of signals) {
     for (const keyword of signal.matched_keywords ?? []) {
-      const lower = keyword.toLowerCase()
-      if (!contextKeywords.has(lower)) {
-        unmatched.set(keyword, (unmatched.get(keyword) ?? 0) + 1)
-      }
+      const normalized = compact(keyword)
+      if (!normalized) continue
+      counts.set(normalized, (counts.get(normalized) ?? 0) + 1)
     }
   }
 
-  const risingKeywords = [...unmatched.entries()]
+  return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+    .slice(0, limit)
     .map(([keyword]) => keyword)
-
-  if (risingKeywords.length > 0) {
-    gaps.push(`Reddit keeps surfacing ${risingKeywords.join(", ")} more often than your saved context does today.`)
-  }
-
-  if (!context.profile.vault_context_cache.trim()) {
-    gaps.push("Your GitHub-backed vault is not yet contributing cached context, so product reconciliation is thinner than it should be.")
-  }
-
-  if (!context.profile.knowledge_base_md.trim()) {
-    gaps.push("There is no saved knowledge base markdown yet, which makes it harder to compare recurring Reddit pain to your current product stance.")
-  }
-
-  if (context.assets.length === 0) {
-    gaps.push("No supporting product docs or assets are saved yet, so Luckmaxxing has less concrete material to compare against live Reddit demand.")
-  }
-
-  if (gaps.length === 0) {
-    gaps.push("The biggest remaining gap is converting recurring Reddit pain into explicit roadmap language inside your context and vault.")
-  }
-
-  return gaps.slice(0, 5)
 }
 
-function buildFallbackSummary(context: CompanyContext, signals: RedditReconSignal[]): RedditReconSummary {
-  const ranked = [...signals].sort((a, b) => (b.relevance_score ?? 0) - (a.relevance_score ?? 0))
-  const topSignals = ranked.slice(0, 4)
-  const company = context.profile.name.trim() || "your company"
-
-  if (topSignals.length === 0) {
-    return {
-      overview: `No Reddit conversations have been saved yet for ${company}. Run the Reddit scan and Luckmaxxing will start turning live posts into product opportunities and gaps.`,
-      themes: [],
-      simulatedConversations: [],
-      opportunities: [
-        "Run the Reddit scan now so Juno can collect real customer-language before you make product decisions.",
-      ],
-      gaps: buildFallbackGaps(context, []),
-      nextMoves: [
-        "Add a few product, competitor, and pain phrases to the scan priorities above.",
-        "Keep the vault synced so new Reddit pain can be compared against your actual product context.",
-      ],
-    }
+function topSubreddits(signals: RedditReconSignal[], limit = 3): string[] {
+  const counts = new Map<string, number>()
+  for (const signal of signals) {
+    const subreddit = compact(signal.subreddit)
+    if (!subreddit) continue
+    counts.set(subreddit, (counts.get(subreddit) ?? 0) + 1)
   }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([subreddit]) => subreddit)
+}
+
+function themeTitle(signal: RedditReconSignal): string {
+  const matched = (signal.matched_keywords ?? []).map(compact).filter(Boolean)
+  if (matched.length > 0) {
+    return `Repeated demand around ${matched.slice(0, 2).join(" and ")}`
+  }
+
+  if (signal.signal_type === "buying") return "Active search for a better option"
+  if (signal.signal_type === "competitor") return "Replacement motion is surfacing"
+  return "Operational pain is showing up in the open"
+}
+
+function fallbackSentiment(signals: RedditReconSignal[]): string {
+  if (signals.length === 0) {
+    return "No recent Reddit conversations are available yet, so sentiment is still ungrounded."
+  }
+
+  const hotCount = signals.filter((signal) => (signal.relevance_score ?? 0) >= 8).length
+  if (hotCount >= 2) {
+    return "Sentiment is urgent and problem-led: people sound tired of patchwork workflows and are actively looking for relief."
+  }
+
+  return "Sentiment skews frustrated but pragmatic: people are managing with workarounds, yet they are open to better ways when the upside is concrete."
+}
+
+function fallbackThemes(signals: RedditReconSignal[]): BehavioralTheme[] {
+  return signals.slice(0, 3).map((signal) => ({
+    title: themeTitle(signal),
+    detail:
+      compact(signal.why_relevant) ||
+      truncate(signal.body || signal.title, 220) ||
+      "People are describing repeated workflow pain without a clean end-to-end fix.",
+  }))
+}
+
+function fallbackOverview(context: CompanyContext, signals: RedditReconSignal[]): string {
+  const company = compact(context.profile.name) || "your company"
+  if (signals.length === 0) {
+    return `No Reddit conversations have been synthesized for ${company} yet. Run the behavioral updates scan to turn live subreddit discussions into customer research.`
+  }
+
+  const keywords = topKeywords(signals)
+  const subreddits = topSubreddits(signals)
+  const keywordLabel = keywords.length > 0 ? keywords.join(", ") : "workflow pain and tool evaluation"
+  const subredditLabel =
+    subreddits.length > 0 ? ` across r/${subreddits.join(", r/")}` : ""
+
+  return `${company} is hearing repeated demand around ${keywordLabel}${subredditLabel}. The conversations are not just feature requests; they describe how buyers are coping today, where they get blocked, and what would need to be true for them to change tools.`
+}
+
+function fallbackArray(primary: string, secondary: string, signals: RedditReconSignal[]): string[] {
+  const evidence = signals
+    .slice(0, 1)
+    .map((signal) => compact(signal.why_relevant) || truncate(signal.body || signal.title, 150))
+    .filter(Boolean)
+
+  return evidence.length > 0 ? [primary, secondary, evidence[0] as string] : [primary, secondary]
+}
+
+function buildFallbackSummary(
+  context: CompanyContext,
+  signals: RedditReconSignal[],
+): RedditBehavioralSummary {
+  const keywords = topKeywords(signals)
+  const keywordLabel = keywords.length > 0 ? keywords.join(", ") : "their current workflow"
+  const company = compact(context.profile.name) || "your company"
 
   return {
-    overview: `Recent Reddit conversations suggest ${company} is closest to active customer pain around ${topSignals
-      .flatMap((signal) => signal.matched_keywords ?? [])
-      .slice(0, 3)
-      .join(", ") || "workflow frustration and tool evaluation"}. Use these threads as voice-of-customer input before deciding what to build next.`,
-    themes: topSignals.slice(0, 3).map((signal) => ({
-      title: fallbackThemeTitle(signal),
-      detail: signal.why_relevant?.trim() || truncate(signal.body?.trim() || signal.title, 220),
-    })),
-    simulatedConversations: topSignals.slice(0, 3).map((signal) => ({
-      speaker: signal.subreddit ? `Buyer voice from r/${signal.subreddit}` : "Potential customer",
-      message: fallbackConversationMessage(signal),
-      implication:
-        signal.why_relevant?.trim() || buildOpportunity(signal, context),
-    })),
-    opportunities: topSignals.map((signal) => buildOpportunity(signal, context)).slice(0, 5),
-    gaps: buildFallbackGaps(context, topSignals),
+    overview: fallbackOverview(context, signals),
+    sentiment: fallbackSentiment(signals),
+    themes: fallbackThemes(signals),
+    pushOfPresent: fallbackArray(
+      `Manual coordination around ${keywordLabel} feels expensive, slow, and too dependent on heroics.`,
+      "People are motivated to leave when deadlines, compliance pressure, or stakeholder visibility keep slipping.",
+      signals,
+    ),
+    pullOfNew: [
+      `Buyers are drawn to solutions that promise faster execution, better visibility, and less manual cleanup around ${keywordLabel}.`,
+      `A credible story for ${company} is fewer fire drills, cleaner handoffs, and more confidence for the team running the process.`,
+    ],
+    anxietyOfNew: [
+      "They worry implementation will be disruptive, expensive, or harder than the demo makes it look.",
+      "They also want proof that a new workflow will fit their existing stack, approvals, and reporting requirements.",
+    ],
+    allegianceToOld: [
+      "Teams already know the spreadsheet, ERP, shared-drive, and email stack they are using today.",
+      "Existing data, habits, and internal ownership make even a flawed process feel safer than switching.",
+    ],
+    currentSolutions: [
+      "Spreadsheet-led workflows and manual reconciliations remain the default system of record.",
+      "Teams are stitching together email, shared docs, exports, and lightweight automation instead of one opinionated workflow.",
+    ],
+    frictionPoints: [
+      "Information is scattered across tools, which creates repeated follow-up and last-minute cleanup.",
+      "Visibility is weak: leaders do not feel fully in control until the work is already late or stressful.",
+      "Processes break when one person owns too much institutional knowledge.",
+    ],
+    workarounds: [
+      "Extra checklists, one-off exports, Slack reminders, and manual QA right before deadlines.",
+      "People build mini-systems around the old stack instead of replacing it outright.",
+    ],
+    discoveryPaths: [
+      "They look for peer recommendations in Reddit threads and software comparison conversations.",
+      "Search starts when pain spikes: a deadline, audit, reporting issue, or handoff failure triggers the hunt.",
+    ],
+    buyingProcess: [
+      "The process usually starts with problem validation, then comparison shopping, then internal risk and budget checks.",
+      "Trust is won when the solution feels easy to implement and clearly better than the patched workflow they already know.",
+    ],
+    painPoints: [
+      "Operational drag, deadline stress, brittle handoffs, and too much manual effort.",
+      "Fear of missed details, rework, and losing credibility with leadership or external stakeholders.",
+    ],
+    gains: [
+      "Success looks like smoother close cycles, fewer surprises, clearer visibility, and more confidence in the numbers or process.",
+      "They want to feel proactive instead of constantly recovering.",
+    ],
     nextMoves: [
-      "Review the strongest Reddit threads weekly and turn repeated complaints into explicit product hypotheses.",
-      "Update your saved context when a new buyer phrase or workflow keeps appearing in Reddit conversations.",
-      "Use the simulated conversations below to test whether your current messaging sounds like it matches the real pain.",
+      `Use the strongest Reddit complaints to sharpen ${company}'s problem statement and ICP language.`,
+      "Track which frustrations appear repeatedly in the same subreddit because those usually signal a persistent buying trigger.",
+      "Test messaging that speaks to the old workflow, the switching fears, and the promised operational win in one story.",
     ],
   }
+}
+
+function parseSummaryObject(value: unknown): RedditBehavioralSummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  const overview = compact(typeof record.overview === "string" ? record.overview : "")
+  const sentiment = compact(typeof record.sentiment === "string" ? record.sentiment : "")
+
+  if (!overview) return null
+
+  return {
+    overview,
+    sentiment,
+    themes: normalizeThemes(record.themes, 4),
+    pushOfPresent: normalizeLines(record.pushOfPresent, 4),
+    pullOfNew: normalizeLines(record.pullOfNew, 4),
+    anxietyOfNew: normalizeLines(record.anxietyOfNew, 4),
+    allegianceToOld: normalizeLines(record.allegianceToOld, 4),
+    currentSolutions: normalizeLines(record.currentSolutions, 5),
+    frictionPoints: normalizeLines(record.frictionPoints, 5),
+    workarounds: normalizeLines(record.workarounds, 5),
+    discoveryPaths: normalizeLines(record.discoveryPaths, 4),
+    buyingProcess: normalizeLines(record.buyingProcess, 4),
+    painPoints: normalizeLines(record.painPoints, 5),
+    gains: normalizeLines(record.gains, 4),
+    nextMoves: normalizeLines(record.nextMoves, 4),
+  }
+}
+
+export function coerceBehavioralSummary(value: unknown): RedditBehavioralSummary | null {
+  return parseSummaryObject(value)
 }
 
 export async function summarizeRedditRecon(
   context: CompanyContext,
   signals: RedditReconSignal[],
-): Promise<RedditReconSummary> {
+): Promise<RedditBehavioralSummary> {
+  const fallback = buildFallbackSummary(context, signals)
+
   if (signals.length === 0 || !isLlmConfigured()) {
-    return buildFallbackSummary(context, signals)
+    return fallback
   }
 
-  const sample = signals.slice(0, 12).map((signal) => ({
+  const sample = signals.slice(0, 14).map((signal) => ({
     title: signal.title,
     body: signal.body,
     subreddit: signal.subreddit,
@@ -180,7 +277,7 @@ export async function summarizeRedditRecon(
     url: signal.url,
   }))
 
-  const prompt = `You are a product strategy analyst turning Reddit conversations into product-learning output.
+  const prompt = `You are a product strategy analyst converting Reddit discussions into customer research.
 
 COMPANY CONTEXT:
 ${context.promptBlock}
@@ -188,91 +285,74 @@ ${context.promptBlock}
 RECENT REDDIT THREADS:
 ${JSON.stringify(sample, null, 2)}
 
-Analyze these threads as voice-of-customer research. Reconcile what people are saying with the company context, knowledge base, saved assets, and vault context.
+Synthesize these threads as secondary customer research. Focus on what buyers are discussing, how they currently solve the problem, what frustrates them, what they are yearning for, and what would make them switch.
 
 Return one JSON object with this exact shape:
 {
-  "overview": "2-4 sentences summarizing the strongest pattern across the threads",
+  "overview": "2-4 sentences that summarize the strongest pattern across the threads",
+  "sentiment": "1-2 sentences on overall sentiment and emotional tone",
   "themes": [
-    { "title": "short theme", "detail": "1-2 sentence explanation of the repeated frustration or request" }
+    { "title": "short theme", "detail": "1-2 sentence explanation of the pattern" }
   ],
-  "simulatedConversations": [
-    {
-      "speaker": "short persona label",
-      "message": "a paraphrased 1-3 sentence customer-style statement synthesizing several threads",
-      "implication": "what this suggests for product validation"
-    }
-  ],
-  "opportunities": ["specific opportunity statement"],
-  "gaps": ["specific gap between demand and our current context/product story"],
-  "nextMoves": ["specific next step"]
+  "pushOfPresent": ["why the current way is painful enough that they want to leave"],
+  "pullOfNew": ["what is attractive about a new solution"],
+  "anxietyOfNew": ["what makes them nervous about change"],
+  "allegianceToOld": ["why they stay with the current way"],
+  "currentSolutions": ["how they solve it today"],
+  "frictionPoints": ["where they get frustrated"],
+  "workarounds": ["what patches or hacks they use"],
+  "discoveryPaths": ["how they discover new products or new solutions"],
+  "buyingProcess": ["how evaluation and buying tend to happen"],
+  "painPoints": ["what keeps them up at night"],
+  "gains": ["what success looks like for them"],
+  "nextMoves": ["specific product, positioning, or research follow-up"]
 }
 
 Rules:
-- Focus on what people want, what frustrates them, and what this means for what we should build or clarify.
-- Paraphrase customer language; do not quote long passages.
-- Opportunities should connect directly to the company context.
-- Gaps should call out where the current product scope, positioning, or saved context seems thin or mismatched.
-- Limit themes to 4, simulatedConversations to 3, opportunities to 5, gaps to 5, nextMoves to 4.
+- Treat this as customer research, not sales prospecting.
+- Paraphrase the Reddit language. Do not quote long passages.
+- Make every line concrete and behavior-focused.
+- Connect insights back to the company context when possible.
+- Limit themes to 4.
+- Keep push/pull/anxiety/allegiance to 4 bullets each.
+- Keep currentSolutions, frictionPoints, workarounds, painPoints to 5 bullets each.
+- Keep discoveryPaths, buyingProcess, gains, nextMoves to 4 bullets each.
 - Return only valid JSON.`
 
   try {
     const { text } = await generateText({
       model: qwenModel(),
-      maxOutputTokens: 2200,
+      maxOutputTokens: 2600,
       messages: [{ role: "user", content: prompt }],
     })
-    if (!text) return buildFallbackSummary(context, signals)
+
+    if (!text) return fallback
+
     const match = text.match(/\{[\s\S]*\}/)
-    const parsed = match ? (JSON.parse(match[0]) as Record<string, unknown>) : null
-    if (!parsed) {
-      return buildFallbackSummary(context, signals)
-    }
-
-    const overview =
-      typeof parsed.overview === "string" && parsed.overview.trim()
-        ? parsed.overview.trim()
-        : buildFallbackSummary(context, signals).overview
-
-    const themes = Array.isArray(parsed.themes)
-      ? parsed.themes
-          .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object")
-          .map((value) => ({
-            title: typeof value.title === "string" ? value.title.trim() : "",
-            detail: typeof value.detail === "string" ? value.detail.trim() : "",
-          }))
-          .filter((value) => value.title && value.detail)
-          .slice(0, 4)
-      : []
-
-    const simulatedConversations = Array.isArray(parsed.simulatedConversations)
-      ? parsed.simulatedConversations
-          .filter((value): value is Record<string, unknown> => Boolean(value) && typeof value === "object")
-          .map((value) => ({
-            speaker: typeof value.speaker === "string" ? value.speaker.trim() : "",
-            message: typeof value.message === "string" ? value.message.trim() : "",
-            implication: typeof value.implication === "string" ? value.implication.trim() : "",
-          }))
-          .filter((value) => value.speaker && value.message && value.implication)
-          .slice(0, 3)
-      : []
-
-    const opportunities = normalizeLines(parsed.opportunities, 5)
-    const gaps = normalizeLines(parsed.gaps, 5)
-    const nextMoves = normalizeLines(parsed.nextMoves, 4)
-    const fallback = buildFallbackSummary(context, signals)
+    const parsed = match ? parseSummaryObject(JSON.parse(match[0]) as unknown) : null
+    if (!parsed) return fallback
 
     return {
-      overview,
-      themes: themes.length > 0 ? themes : fallback.themes,
-      simulatedConversations:
-        simulatedConversations.length > 0 ? simulatedConversations : fallback.simulatedConversations,
-      opportunities: opportunities.length > 0 ? opportunities : fallback.opportunities,
-      gaps: gaps.length > 0 ? gaps : fallback.gaps,
-      nextMoves: nextMoves.length > 0 ? nextMoves : fallback.nextMoves,
+      overview: parsed.overview || fallback.overview,
+      sentiment: parsed.sentiment || fallback.sentiment,
+      themes: parsed.themes.length > 0 ? parsed.themes : fallback.themes,
+      pushOfPresent: parsed.pushOfPresent.length > 0 ? parsed.pushOfPresent : fallback.pushOfPresent,
+      pullOfNew: parsed.pullOfNew.length > 0 ? parsed.pullOfNew : fallback.pullOfNew,
+      anxietyOfNew: parsed.anxietyOfNew.length > 0 ? parsed.anxietyOfNew : fallback.anxietyOfNew,
+      allegianceToOld:
+        parsed.allegianceToOld.length > 0 ? parsed.allegianceToOld : fallback.allegianceToOld,
+      currentSolutions:
+        parsed.currentSolutions.length > 0 ? parsed.currentSolutions : fallback.currentSolutions,
+      frictionPoints: parsed.frictionPoints.length > 0 ? parsed.frictionPoints : fallback.frictionPoints,
+      workarounds: parsed.workarounds.length > 0 ? parsed.workarounds : fallback.workarounds,
+      discoveryPaths: parsed.discoveryPaths.length > 0 ? parsed.discoveryPaths : fallback.discoveryPaths,
+      buyingProcess: parsed.buyingProcess.length > 0 ? parsed.buyingProcess : fallback.buyingProcess,
+      painPoints: parsed.painPoints.length > 0 ? parsed.painPoints : fallback.painPoints,
+      gains: parsed.gains.length > 0 ? parsed.gains : fallback.gains,
+      nextMoves: parsed.nextMoves.length > 0 ? parsed.nextMoves : fallback.nextMoves,
     }
   } catch (error) {
     console.error("[reddit-recon] summary failed:", error)
-    return buildFallbackSummary(context, signals)
+    return fallback
   }
 }

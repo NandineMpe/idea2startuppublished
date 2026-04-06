@@ -2,21 +2,21 @@
 
 import Link from "next/link"
 import {
-  Briefcase,
-  FlaskConical,
-  Megaphone,
-  Cpu,
   ArrowUpRight,
-  Circle,
-  Play,
-  Loader2,
+  Briefcase,
   ChevronDown,
-  ExternalLink,
+  Circle,
+  Cpu,
+  FlaskConical,
+  Loader2,
+  Megaphone,
+  Play,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { formatDistanceToNow } from "date-fns"
 import type { LegacyAiFeedRow } from "@/lib/ai-outputs-legacy"
+import type { RedditBehavioralSummary } from "@/lib/juno/reddit-recon"
+import { cn } from "@/lib/utils"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 type PipelineStatus = Record<string, string | null>
@@ -35,9 +35,19 @@ type Pipeline = {
   triggerNote?: string
 }
 
+type BehavioralSnapshot = {
+  id: string
+  created_at: string
+  summary: RedditBehavioralSummary
+  conversationCount: number
+  subreddits: string[]
+  latestSignalAt: string | null
+}
+
 type FeedSnapshot = {
   brief: LegacyAiFeedRow | null
   leads: LegacyAiFeedRow[]
+  behavioralUpdates: BehavioralSnapshot | null
   radar: LegacyAiFeedRow | null
   contentQueue: LegacyAiFeedRow[]
 }
@@ -47,7 +57,7 @@ const PIPELINES: Pipeline[] = [
     id: "cbs",
     title: "Daily brief",
     subtitle: "News, research, and regulation filtered by your company context.",
-    schedule: "Scheduled · ~05:00 daily",
+    schedule: "Scheduled - ~05:00 daily",
     href: "/dashboard/team/cbs",
     icon: Briefcase,
     accent: "text-amber-600 bg-amber-500/10 border-amber-500/20",
@@ -56,35 +66,35 @@ const PIPELINES: Pipeline[] = [
     triggerable: true,
   },
   {
-    id: "cro",
-    title: "Lead & job scan",
-    subtitle: "Jack & Jill list from Context, then HN hiring and Remotive; ICP fit scoring.",
-    schedule: "Scheduled · every 6h",
-    href: "/dashboard/team/cro",
+    id: "intent",
+    title: "Behavioral updates",
+    subtitle: "Reddit customer research across target subreddits: pains, workarounds, buying behavior, and switching forces.",
+    schedule: "Scheduled - every 6h",
+    href: "/dashboard#behavioral-updates",
     icon: FlaskConical,
     accent: "text-sky-600 bg-sky-500/10 border-sky-500/20",
-    statusKey: "cro",
+    statusKey: "intent",
     windowHours: 7,
     triggerable: true,
   },
   {
     id: "cto",
     title: "Tech radar",
-    subtitle: "arXiv + HN → trends and technical post suggestions.",
-    schedule: "Scheduled · ~06:00 daily",
+    subtitle: "arXiv + HN to trends and technical post suggestions.",
+    schedule: "Scheduled - ~06:00 daily",
     href: "/dashboard/team",
     icon: Cpu,
     accent: "text-violet-600 bg-violet-500/10 border-violet-500/20",
     statusKey: "cto",
     windowHours: 26,
     triggerable: false,
-    triggerNote: "Scheduled only · runs ~06:00",
+    triggerNote: "Scheduled only - runs ~06:00",
   },
   {
     id: "cmo",
     title: "Content queue",
-    subtitle: "LinkedIn drafts and comments; triggered after the daily brief.",
-    schedule: "08:00 · 12:00 · 16:00 weekdays",
+    subtitle: "LinkedIn drafts and comments triggered after the daily brief.",
+    schedule: "08:00 - 12:00 - 16:00 weekdays",
     href: "/dashboard/team/cmo",
     icon: Megaphone,
     accent: "text-rose-600 bg-rose-500/10 border-rose-500/20",
@@ -95,6 +105,29 @@ const PIPELINES: Pipeline[] = [
   },
 ]
 
+const LOG_LINES: Record<string, string[]> = {
+  cbs: [
+    "Fetching company context...",
+    "Scraping RSS and news feeds...",
+    "Scraping arXiv and Hacker News...",
+    "Merging and scoring the last 24 hours...",
+    "Saving competitor and funding context...",
+    "Formatting the brief...",
+    "Saving the run and updating the vault...",
+    "Finished. Open Signal feed.",
+  ],
+  intent: [
+    "Fetching company context...",
+    "Scanning Reddit for intent signals...",
+    "Scoring threads against your ICP and product context...",
+    "Synthesizing customer behavior and switching forces...",
+    "Saving behavioral updates and thread evidence...",
+    "Finished. Open Behavioral updates below.",
+  ],
+}
+
+type TrendRow = { trend?: string; relevance?: string; action?: string }
+
 function statusDot(lastRun: string | null, windowHours: number) {
   if (!lastRun) return "none"
   const ageHours = (Date.now() - new Date(lastRun).getTime()) / 3_600_000
@@ -103,92 +136,36 @@ function statusDot(lastRun: string | null, windowHours: number) {
   return "red"
 }
 
-function stripMdPreview(s: string, max = 240): string {
-  const t = s
+function stripMdPreview(value: string, max = 240) {
+  const normalized = value
     .replace(/^#+\s+/gm, "")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/\n+/g, " ")
     .trim()
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}...` : normalized
 }
 
 function dashboardItemCount(dashboard: unknown): number {
   if (!dashboard || typeof dashboard !== "object") return 0
-  const d = dashboard as Record<string, unknown>
-  let n = 0
-  for (const k of ["breaking", "ai_tools", "research", "competitors", "funding"] as const) {
-    const arr = d[k]
-    if (Array.isArray(arr)) n += arr.length
+  const record = dashboard as Record<string, unknown>
+  let count = 0
+  for (const key of ["breaking", "ai_tools", "research", "competitors", "funding"] as const) {
+    const rows = record[key]
+    if (Array.isArray(rows)) count += rows.length
   }
-  return n
+  return count
 }
 
 function firstHeadlineFromDashboard(dashboard: unknown): string | null {
   if (!dashboard || typeof dashboard !== "object") return null
-  const d = dashboard as Record<string, unknown[]>
-  for (const k of ["breaking", "competitors", "funding", "ai_tools", "research"] as const) {
-    const items = d[k]
+  const record = dashboard as Record<string, unknown[]>
+  for (const key of ["breaking", "competitors", "funding", "ai_tools", "research"] as const) {
+    const items = record[key]
     const first = items?.[0] as { headline?: string; title?: string } | undefined
-    const h = first?.headline ?? first?.title
-    if (typeof h === "string" && h.trim()) return h.trim()
+    const headline = first?.headline ?? first?.title
+    if (typeof headline === "string" && headline.trim()) return headline.trim()
   }
   return null
-}
-
-type TrendRow = { trend?: string; relevance?: string; action?: string }
-
-function parseLeadsSorted(leads: LegacyAiFeedRow[]) {
-  return [...leads]
-    .filter((r) => r.type === "lead_discovered")
-    .map((r) => {
-      const c = r.content as {
-        company?: unknown
-        role?: unknown
-        url?: unknown
-        score?: unknown
-        pitchAngle?: unknown
-      }
-      const score = typeof c.score === "number" ? c.score : Number(c.score) || 0
-      return {
-        id: r.id,
-        company: String(c.company ?? "Company"),
-        role: String(c.role ?? "Role"),
-        url: typeof c.url === "string" && c.url.startsWith("http") ? c.url : null,
-        score,
-        why: String(c.pitchAngle ?? "").trim(),
-      }
-    })
-    .sort((a, b) => b.score - a.score)
-}
-
-// Live run log lines shown while polling
-/** Must stay aligned with `lib/inngest/functions/cbs/daily-brief.ts` (steps are illustrative; UI advances on a timer while the job runs). */
-const LOG_LINES: Record<string, string[]> = {
-  cbs: [
-    "Fetching company context…",
-    "Scraping RSS & news feeds (CBS sources)…",
-    "Scraping arXiv for relevant papers…",
-    "Scraping Hacker News…",
-    "Merging & applying 24h window…",
-    "Scoring items against your company context…",
-    "Saving competitor & funding signals (persistent)…",
-    "Loading strategic competitor + funding context…",
-    "Formatting brief (including recap sections)…",
-    "Saving to database…",
-    "Writing daily brief & competitor vault (Obsidian)…",
-    "Finished. Open Signal feed.",
-  ],
-  cro: [
-    "Fetching company context…",
-    "Loading Jack & Jill roles from Context…",
-    "Scraping HN Who's Hiring…",
-    "Scraping Remotive job board…",
-    "Scanning Reddit for intent signals…",
-    "Scoring leads & intent threads for ICP fit…",
-    "Saving qualified leads & hot intent signals…",
-    "Drafting outreach for top leads…",
-    "Done — check Content queue & intent signals ↓",
-  ],
 }
 
 function PipelineLatestOutput({
@@ -204,102 +181,96 @@ function PipelineLatestOutput({
     const brief = feed.brief
     if (!brief || brief.type !== "daily_brief") {
       return (
-        <p className="text-[11px] text-muted-foreground/80 italic border border-dashed border-border rounded-md px-2 py-1.5 bg-muted/20">
-          No brief saved yet — run the pipeline or wait for the daily schedule.
+        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
+          No brief saved yet. Run the pipeline or wait for the daily schedule.
         </p>
       )
     }
-    const dash = brief.content?.dashboard
-    const md = brief.content?.markdown
-    const n = dashboardItemCount(dash)
-    const headline = firstHeadlineFromDashboard(dash)
-    const text =
+
+    const dashboard = brief.content?.dashboard
+    const markdown = brief.content?.markdown
+    const count = dashboardItemCount(dashboard)
+    const headline = firstHeadlineFromDashboard(dashboard)
+    const preview =
       headline ??
-      (typeof md === "string" && md.trim() ? stripMdPreview(md, 280) : null) ??
+      (typeof markdown === "string" && markdown.trim() ? stripMdPreview(markdown, 280) : null) ??
       "Brief ready. Open Signal feed for full sections."
 
     return (
       <Collapsible defaultOpen className="space-y-2">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180 transition-colors">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
           <span>Latest brief preview</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" />
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2 text-[12px] text-foreground/90 leading-relaxed">
-          {n > 0 && (
+        <CollapsibleContent className="space-y-2 text-[12px] leading-relaxed text-foreground/90">
+          {count > 0 ? (
             <p className="text-[11px] text-muted-foreground">
-              <span className="font-medium text-foreground/80">{n}</span> scored items across Signal feed sections
+              <span className="font-medium text-foreground/80">{count}</span> scored items across Signal feed sections
               {brief.created_at ? (
                 <span className="text-muted-foreground/70">
                   {" "}
-                  · {formatDistanceToNow(new Date(brief.created_at), { addSuffix: true })}
+                  - {formatDistanceToNow(new Date(brief.created_at), { addSuffix: true })}
                 </span>
               ) : null}
             </p>
-          )}
-          <p className="border-l-2 border-amber-500/35 pl-2">{text}</p>
+          ) : null}
+          <p className="border-l-2 border-amber-500/35 pl-2">{preview}</p>
           <p className="text-[11px] text-muted-foreground">
-            Full brief (competitors, funding, actions) is in the{" "}
-            <span className="text-foreground/90">Signal feed</span> column.
+            Full brief is in the <span className="text-foreground/90">Signal feed</span> column.
           </p>
         </CollapsibleContent>
       </Collapsible>
     )
   }
 
-  if (pipelineId === "cro") {
-    const rows = parseLeadsSorted(feed.leads)
-    if (rows.length === 0) {
+  if (pipelineId === "intent") {
+    const research = feed.behavioralUpdates
+    if (!research) {
       return (
-        <p className="text-[11px] text-muted-foreground/80 italic border border-dashed border-border rounded-md px-2 py-1.5 bg-muted/20">
-          No leads saved yet — run a scan. When jobs finish, who to pursue and why (ICP angle) appears here.
+        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
+          No behavioral snapshot saved yet. Run the Reddit scan and the latest customer research will appear here.
         </p>
       )
     }
+
+    const leadSubreddit =
+      research.subreddits.length > 0 ? `r/${research.subreddits.slice(0, 3).join(", r/")}` : "recent subreddits"
+    const topPush = research.summary.pushOfPresent[0] ?? null
+    const topPain = research.summary.painPoints[0] ?? null
+
     return (
       <Collapsible defaultOpen className="space-y-2">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180 transition-colors">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
           <span>
-            Who to pursue ({rows.length} lead{rows.length === 1 ? "" : "s"})
+            Behavioral read ({research.conversationCount} thread{research.conversationCount === 1 ? "" : "s"})
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" />
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
-          <ul className="space-y-2">
-            {rows.map((r) => (
-              <li
-                key={r.id}
-                className="rounded-md border border-border/70 bg-background/80 px-2.5 py-2 text-[12px] leading-snug"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground">
-                      {r.company}
-                      <span className="font-normal text-muted-foreground"> · {r.role}</span>
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      <span className="font-medium text-foreground/85">Why: </span>
-                      {r.why || "—"}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-400">
-                      {r.score}/10
-                    </span>
-                    {r.url && (
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-primary inline-flex items-center gap-0.5 hover:underline"
-                      >
-                        Link <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <CollapsibleContent className="space-y-2 text-[12px] leading-relaxed text-foreground/90">
+          <p className="text-[11px] text-muted-foreground">
+            Latest synthesis from <span className="font-medium text-foreground/85">{leadSubreddit}</span>
+            {research.latestSignalAt ? (
+              <span className="text-muted-foreground/70">
+                {" "}
+                - {formatDistanceToNow(new Date(research.latestSignalAt), { addSuffix: true })}
+              </span>
+            ) : null}
+          </p>
+          <p className="border-l-2 border-sky-500/35 pl-2">{research.summary.overview}</p>
+          {topPush ? (
+            <p className="text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/85">Push:</span> {topPush}
+            </p>
+          ) : null}
+          {topPain ? (
+            <p className="text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/85">Pain:</span> {topPain}
+            </p>
+          ) : null}
+          <p className="text-[11px] text-muted-foreground">
+            Open <span className="text-foreground/90">Behavioral updates</span> below for subreddit filters,
+            switching forces, and raw thread evidence.
+          </p>
         </CollapsibleContent>
       </Collapsible>
     )
@@ -309,97 +280,105 @@ function PipelineLatestOutput({
     const radar = feed.radar
     if (!radar || radar.type !== "tech_radar") {
       return (
-        <p className="text-[11px] text-muted-foreground/80 italic border border-dashed border-border rounded-md px-2 py-1.5 bg-muted/20">
-          No tech radar run yet — runs on the daily schedule.
+        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
+          No tech radar run yet. It runs on the daily schedule.
         </p>
       )
     }
-    const raw = radar.content?.trends
-    const trends: TrendRow[] = Array.isArray(raw) ? (raw as TrendRow[]) : []
+
+    const rawTrends = radar.content?.trends
+    const trends: TrendRow[] = Array.isArray(rawTrends) ? (rawTrends as TrendRow[]) : []
     const sources =
       typeof radar.content?.sourcesScanned === "number" ? radar.content.sourcesScanned : null
-    const mdSum =
+    const markdownSummary =
       typeof radar.content?.markdownSummary === "string" ? radar.content.markdownSummary.trim() : ""
     const preview =
       trends[0]?.trend && trends[0]?.relevance
         ? `${trends[0].trend}: ${trends[0].relevance}`
-        : mdSum
-          ? stripMdPreview(mdSum, 220)
+        : markdownSummary
+          ? stripMdPreview(markdownSummary, 220)
           : null
 
     return (
       <Collapsible defaultOpen className="space-y-2">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180 transition-colors">
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
           <span>Latest radar</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2 text-[12px]">
-          {sources != null && (
+          {sources != null ? (
             <p className="text-[11px] text-muted-foreground">
               Sources scanned: <span className="font-medium text-foreground/85">{sources}</span>
             </p>
-          )}
-          {preview && <p className="border-l-2 border-violet-500/35 pl-2 text-foreground/90 leading-relaxed">{preview}</p>}
-          {trends.length > 1 && (
+          ) : null}
+          {preview ? (
+            <p className="border-l-2 border-violet-500/35 pl-2 leading-relaxed text-foreground/90">{preview}</p>
+          ) : null}
+          {trends.length > 1 ? (
             <ul className="space-y-1.5 text-[11px] text-muted-foreground">
-              {trends.slice(1, 5).map((t, i) => (
-                <li key={i} className="list-disc list-inside">
-                  <span className="text-foreground/90 font-medium">{t.trend ?? "Trend"}</span>
-                  {t.relevance ? <span> — {t.relevance}</span> : null}
+              {trends.slice(1, 5).map((trend, index) => (
+                <li key={`${trend.trend ?? "trend"}-${index}`} className="list-disc list-inside">
+                  <span className="font-medium text-foreground/90">{trend.trend ?? "Trend"}</span>
+                  {trend.relevance ? <span> - {trend.relevance}</span> : null}
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </CollapsibleContent>
       </Collapsible>
     )
   }
 
   if (pipelineId === "cmo") {
-    const q = feed.contentQueue ?? []
-    if (q.length === 0) {
+    const queue = feed.contentQueue ?? []
+    if (queue.length === 0) {
       return (
-        <p className="text-[11px] text-muted-foreground/80 italic border border-dashed border-border rounded-md px-2 py-1.5 bg-muted/20">
-          No drafts in queue — content appears after the daily brief runs and the CMO pipeline posts drafts.
+        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
+          No drafts in queue. Content appears after the daily brief runs and the CMO pipeline posts drafts.
         </p>
       )
     }
-    const preview = q.slice(0, 4)
+
+    const previewRows = queue.slice(0, 4)
 
     return (
       <Collapsible defaultOpen className="space-y-2">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180 transition-colors">
-          <span>
-            Drafts & outreach ({q.length})
-          </span>
+        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
+          <span>Drafts and outreach ({queue.length})</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" />
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-2">
           <ul className="space-y-2">
-            {preview.map((row) => {
-              const c = row.content as { angle?: string; body?: string; contentType?: string; status?: string }
+            {previewRows.map((row) => {
+              const content = row.content as {
+                angle?: string
+                body?: string
+                contentType?: string
+                status?: string
+              }
               const title =
                 row.type === "content_linkedin" || row.type === "content_technical"
-                  ? `${c.contentType ?? "item"} · ${c.status ?? "draft"}`
+                  ? `${content.contentType ?? "item"} - ${content.status ?? "draft"}`
                   : row.type
               const snippet = stripMdPreview(
-                (typeof c.angle === "string" && c.angle ? c.angle : c.body) ?? "",
+                (typeof content.angle === "string" && content.angle ? content.angle : content.body) ?? "",
                 160,
               )
+
               return (
                 <li
                   key={row.id}
                   className="rounded-md border border-border/70 bg-background/80 px-2.5 py-2 text-[11px] leading-snug"
                 >
-                  <p className="font-medium text-foreground/95 capitalize">{title}</p>
-                  {snippet ? <p className="text-muted-foreground mt-1">{snippet}</p> : null}
+                  <p className="font-medium capitalize text-foreground/95">{title}</p>
+                  {snippet ? <p className="mt-1 text-muted-foreground">{snippet}</p> : null}
                 </li>
               )
             })}
           </ul>
-          {q.length > 4 && (
-            <p className="text-[11px] text-muted-foreground">See full queue below ↓</p>
-          )}
+          {queue.length > 4 ? (
+            <p className="text-[11px] text-muted-foreground">See the full queue below.</p>
+          ) : null}
         </CollapsibleContent>
       </Collapsible>
     )
@@ -413,11 +392,10 @@ export function IntelligencePipelines() {
   const [feed, setFeed] = useState<FeedSnapshot | null>(null)
   const [triggering, setTriggering] = useState<string | null>(null)
   const [triggerResult, setTriggerResult] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
-
-  // Live run state
   const [activeRun, setActiveRun] = useState<{ pipeline: string; startedAt: number } | null>(null)
   const [logIndex, setLogIndex] = useState(0)
   const [elapsed, setElapsed] = useState(0)
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const logRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -425,23 +403,24 @@ export function IntelligencePipelines() {
   const fetchFeed = useCallback(async (): Promise<PipelineStatus> => {
     try {
       const res = await fetch("/api/intelligence/feed")
-      const d = await res.json()
-      const newStatus: PipelineStatus = d.pipelineStatus ?? {}
-      setStatus(newStatus)
+      const json = await res.json()
+      const nextStatus: PipelineStatus = json.pipelineStatus ?? {}
+      setStatus(nextStatus)
       setFeed({
-        brief: d.brief ?? null,
-        leads: d.leads ?? [],
-        radar: d.radar ?? null,
-        contentQueue: d.contentQueue ?? [],
+        brief: json.brief ?? null,
+        leads: json.leads ?? [],
+        behavioralUpdates: json.behavioralUpdates ?? null,
+        radar: json.radar ?? null,
+        contentQueue: json.contentQueue ?? [],
       })
-      return newStatus
+      return nextStatus
     } catch {
       return {}
     }
   }, [])
 
   useEffect(() => {
-    fetchFeed()
+    void fetchFeed()
   }, [fetchFeed])
 
   const stopPolling = useCallback(() => {
@@ -464,10 +443,10 @@ export function IntelligencePipelines() {
       setElapsed(0)
 
       const lines = LOG_LINES[pipeline] ?? []
-      let li = 0
+      let currentIndex = 0
       logRef.current = setInterval(() => {
-        li = Math.min(li + 1, lines.length - 1)
-        setLogIndex(li)
+        currentIndex = Math.min(currentIndex + 1, Math.max(lines.length - 1, 0))
+        setLogIndex(currentIndex)
       }, 8_000)
 
       elapsedRef.current = setInterval(() => {
@@ -476,34 +455,35 @@ export function IntelligencePipelines() {
 
       let attempts = 0
       pollRef.current = setInterval(async () => {
-        attempts++
-        const newStatus = await fetchFeed()
-        const prevTs = previousStatus[pipeline]
-        const newTs = newStatus[pipeline]
+        attempts += 1
+        const nextStatus = await fetchFeed()
+        const previousTimestamp = previousStatus[pipeline]
+        const nextTimestamp = nextStatus[pipeline]
+        const changed = Boolean(nextTimestamp && nextTimestamp !== previousTimestamp)
+        const timedOut = attempts >= 22
 
-        const changed = newTs && newTs !== prevTs
-        const timeout = attempts >= 22
+        if (!changed && !timedOut) return
 
-        if (changed || timeout) {
-          stopPolling()
-          await fetchFeed()
-          if (changed) {
-            setTriggerResult({
-              id: pipeline,
-              msg:
-                pipeline === "cbs"
-                  ? "Brief run finished — Signal feed and this card are updated. CMO drafts may appear below shortly."
-                  : "Lead scan saved — qualified leads and angles are shown in this card above.",
-              ok: true,
-            })
-          } else {
-            setTriggerResult({
-              id: pipeline,
-              msg: "Still running. Wait a minute and refresh; the feed updates when the job finishes.",
-              ok: false,
-            })
-          }
+        stopPolling()
+        await fetchFeed()
+
+        if (changed) {
+          const successMessage =
+            pipeline === "cbs"
+              ? "Brief run finished. Signal feed and this card are updated. CMO drafts may appear below shortly."
+              : pipeline === "intent"
+                ? "Behavioral updates refreshed. Reddit customer research and thread evidence are updated below."
+                : "Run finished and the card has been updated."
+
+          setTriggerResult({ id: pipeline, msg: successMessage, ok: true })
+          return
         }
+
+        setTriggerResult({
+          id: pipeline,
+          msg: "Still running. Wait a minute and refresh; the feed updates when the job finishes.",
+          ok: false,
+        })
       }, 8_000)
     },
     [fetchFeed, stopPolling],
@@ -523,11 +503,12 @@ export function IntelligencePipelines() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipeline }),
       })
-      const data = await res.json()
+      const json = await res.json()
+
       if (res.ok) {
         startPolling(pipeline, previousStatus)
       } else {
-        setTriggerResult({ id: pipeline, msg: data.error ?? "Failed to trigger", ok: false })
+        setTriggerResult({ id: pipeline, msg: json.error ?? "Failed to trigger", ok: false })
       }
     } catch {
       setTriggerResult({ id: pipeline, msg: "Could not reach server", ok: false })
@@ -544,52 +525,53 @@ export function IntelligencePipelines() {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="text-[15px] font-semibold text-foreground">Automated reporting</h2>
-          <p className="text-[12px] text-muted-foreground mt-0.5">
-            Results appear in Signal feed and the cards below; expand a card for the latest run.
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Results appear in Signal feed and the cards below. Expand a card for the latest run.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/team"
-            className="text-[12px] text-primary hover:text-primary/80 flex items-center gap-1 shrink-0"
-          >
-            My team
-            <ArrowUpRight className="h-3 w-3" />
-          </Link>
-        </div>
+        <Link
+          href="/dashboard/team"
+          className="flex shrink-0 items-center gap-1 text-[12px] text-primary hover:text-primary/80"
+        >
+          My team
+          <ArrowUpRight className="h-3 w-3" />
+        </Link>
       </div>
 
-      {activeRun && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+      {activeRun ? (
+        <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
               <span className="text-[13px] font-medium text-foreground">
-                {PIPELINES.find((p) => p.id === activeRun.pipeline)?.title} running…
+                {PIPELINES.find((pipeline) => pipeline.id === activeRun.pipeline)?.title} running...
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-muted-foreground tabular-nums">{elapsed}s elapsed</span>
-            </div>
+            <span className="text-[11px] tabular-nums text-muted-foreground">{elapsed}s elapsed</span>
           </div>
 
           <div className="space-y-1">
-            {logLines.map((line, i) => {
-              const done = i < logIndex
-              const active = i === logIndex
-              const pending = i > logIndex
+            {logLines.map((line, index) => {
+              const done = index < logIndex
+              const active = index === logIndex
+              const pending = index > logIndex
+
               return (
-                <div key={i} className={cn("flex items-center gap-2 text-[12px]", pending && "opacity-30")}>
+                <div key={`${line}-${index}`} className={cn("flex items-center gap-2 text-[12px]", pending && "opacity-30")}>
                   {done ? (
-                    <Circle className="h-1.5 w-1.5 fill-emerald-500 text-emerald-500 shrink-0" />
+                    <Circle className="h-1.5 w-1.5 shrink-0 fill-emerald-500 text-emerald-500" />
                   ) : active ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
                   ) : (
-                    <Circle className="h-1.5 w-1.5 text-muted-foreground/30 shrink-0" />
+                    <Circle className="h-1.5 w-1.5 shrink-0 text-muted-foreground/30" />
                   )}
                   <span
                     className={cn(
-                      done ? "text-muted-foreground line-through" : active ? "text-foreground font-medium" : "text-muted-foreground",
+                      done
+                        ? "line-through text-muted-foreground"
+                        : active
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground",
                     )}
                   >
                     {line}
@@ -599,25 +581,25 @@ export function IntelligencePipelines() {
             })}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {triggerResult && !activeRun && (
+      {triggerResult && !activeRun ? (
         <div
           className={cn(
-            "text-[13px] px-3 py-2 rounded-md",
+            "rounded-md border px-3 py-2 text-[13px]",
             triggerResult.ok
-              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-              : "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+              : "border-amber-500/20 bg-amber-500/10 text-amber-600",
           )}
         >
           {triggerResult.msg}
         </div>
-      )}
+      ) : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {PIPELINES.map((p) => {
-          const lastRun = status[p.statusKey] ?? null
-          const dot = statusDot(lastRun, p.windowHours)
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {PIPELINES.map((pipeline) => {
+          const lastRun = status[pipeline.statusKey] ?? null
+          const dot = statusDot(lastRun, pipeline.windowHours)
           const dotColor =
             dot === "green"
               ? "text-emerald-500"
@@ -629,60 +611,70 @@ export function IntelligencePipelines() {
           const lastRunLabel = lastRun
             ? formatDistanceToNow(new Date(lastRun), { addSuffix: true })
             : "Never run"
-          const isTriggering = triggering === p.id
-          const isRunning = runningPipeline === p.id
+          const isTriggering = triggering === pipeline.id
+          const isRunning = runningPipeline === pipeline.id
 
           return (
             <div
-              key={p.id}
+              key={pipeline.id}
               className={cn(
-                "rounded-lg border bg-card p-4 transition-colors flex flex-col gap-3",
+                "flex flex-col gap-3 rounded-lg border bg-card p-4 transition-colors",
                 isRunning ? "border-primary/40 bg-primary/5" : "border-border",
               )}
             >
               <div className="flex items-start gap-3">
-                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", p.accent)}>
-                  {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <p.icon className="h-4 w-4" />}
+                <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", pipeline.accent)}>
+                  {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <pipeline.icon className="h-4 w-4" />}
                 </div>
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Link href={p.href} className="text-[13px] font-semibold text-foreground hover:text-primary truncate">
-                      {p.title}
+                    <Link href={pipeline.href} className="truncate text-[13px] font-semibold text-foreground hover:text-primary">
+                      {pipeline.title}
                     </Link>
                     <Circle
-                      className={cn("h-2 w-2 fill-current shrink-0", isRunning ? "text-primary animate-pulse" : dotColor)}
+                      className={cn(
+                        "h-2 w-2 shrink-0 fill-current",
+                        isRunning ? "animate-pulse text-primary" : dotColor,
+                      )}
                     />
                   </div>
-                  <p className="text-[12px] text-muted-foreground leading-snug mt-1 line-clamp-2">{p.subtitle}</p>
-                  <div className="flex items-center justify-between mt-2 gap-2">
-                    <p className="text-[11px] text-muted-foreground/80">{p.schedule}</p>
-                    <p className="text-[11px] text-muted-foreground/60 shrink-0">
-                      {isRunning ? "Running now…" : lastRunLabel}
+                  <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-muted-foreground">
+                    {pipeline.subtitle}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-muted-foreground/80">{pipeline.schedule}</p>
+                    <p className="shrink-0 text-[11px] text-muted-foreground/60">
+                      {isRunning ? "Running now..." : lastRunLabel}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <PipelineLatestOutput pipelineId={p.id} feed={feed} />
+              <PipelineLatestOutput pipelineId={pipeline.id} feed={feed} />
 
               <div>
-                {p.triggerable ? (
+                {pipeline.triggerable ? (
                   <button
                     type="button"
-                    onClick={() => handleTrigger(p.id)}
+                    onClick={() => void handleTrigger(pipeline.id)}
                     disabled={isTriggering || isRunning || triggering !== null || activeRun !== null}
                     className={cn(
-                      "flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md transition-colors",
+                      "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
                       isRunning
-                        ? "bg-primary/10 text-primary cursor-default"
-                        : "bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed",
+                        ? "cursor-default bg-primary/10 text-primary"
+                        : "bg-primary/10 text-primary hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                   >
-                    {isRunning || isTriggering ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                    {isRunning ? "Running…" : isTriggering ? "Starting…" : "Run now"}
+                    {isRunning || isTriggering ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                    {isRunning ? "Running..." : isTriggering ? "Starting..." : "Run now"}
                   </button>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground/50 italic">{p.triggerNote}</p>
+                  <p className="text-[11px] italic text-muted-foreground/50">{pipeline.triggerNote}</p>
                 )}
               </div>
             </div>
