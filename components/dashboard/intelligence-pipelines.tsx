@@ -9,7 +9,6 @@ import {
   Cpu,
   FlaskConical,
   Loader2,
-  Megaphone,
   Play,
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -49,7 +48,6 @@ type FeedSnapshot = {
   leads: LegacyAiFeedRow[]
   behavioralUpdates: BehavioralSnapshot | null
   radar: LegacyAiFeedRow | null
-  contentQueue: LegacyAiFeedRow[]
 }
 
 const PIPELINES: Pipeline[] = [
@@ -89,19 +87,6 @@ const PIPELINES: Pipeline[] = [
     windowHours: 26,
     triggerable: false,
     triggerNote: "Scheduled only - runs ~06:00",
-  },
-  {
-    id: "cmo",
-    title: "Content queue",
-    subtitle: "LinkedIn drafts and comments triggered after the daily brief.",
-    schedule: "08:00 - 12:00 - 16:00 weekdays",
-    href: "/dashboard/team/cmo",
-    icon: Megaphone,
-    accent: "text-rose-600 bg-rose-500/10 border-rose-500/20",
-    statusKey: "cmo",
-    windowHours: 9,
-    triggerable: false,
-    triggerNote: "Chains from CBS brief",
   },
 ]
 
@@ -329,61 +314,6 @@ function PipelineLatestOutput({
     )
   }
 
-  if (pipelineId === "cmo") {
-    const queue = feed.contentQueue ?? []
-    if (queue.length === 0) {
-      return (
-        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
-          No drafts in queue. Content appears after the daily brief runs and the CMO pipeline posts drafts.
-        </p>
-      )
-    }
-
-    const previewRows = queue.slice(0, 4)
-
-    return (
-      <Collapsible defaultOpen className="space-y-2">
-        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-md border border-border/80 bg-muted/25 px-2.5 py-1.5 text-left text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/40 [&[data-state=open]>svg]:rotate-180">
-          <span>Drafts and outreach ({queue.length})</span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2">
-          <ul className="space-y-2">
-            {previewRows.map((row) => {
-              const content = row.content as {
-                angle?: string
-                body?: string
-                contentType?: string
-                status?: string
-              }
-              const title =
-                row.type === "content_linkedin" || row.type === "content_technical"
-                  ? `${content.contentType ?? "item"} - ${content.status ?? "draft"}`
-                  : row.type
-              const snippet = stripMdPreview(
-                (typeof content.angle === "string" && content.angle ? content.angle : content.body) ?? "",
-                160,
-              )
-
-              return (
-                <li
-                  key={row.id}
-                  className="rounded-md border border-border/70 bg-background/80 px-2.5 py-2 text-[11px] leading-snug"
-                >
-                  <p className="font-medium capitalize text-foreground/95">{title}</p>
-                  {snippet ? <p className="mt-1 text-muted-foreground">{snippet}</p> : null}
-                </li>
-              )
-            })}
-          </ul>
-          {queue.length > 4 ? (
-            <p className="text-[11px] text-muted-foreground">See the full queue below.</p>
-          ) : null}
-        </CollapsibleContent>
-      </Collapsible>
-    )
-  }
-
   return null
 }
 
@@ -411,7 +341,6 @@ export function IntelligencePipelines() {
         leads: json.leads ?? [],
         behavioralUpdates: json.behavioralUpdates ?? null,
         radar: json.radar ?? null,
-        contentQueue: json.contentQueue ?? [],
       })
       return nextStatus
     } catch {
@@ -470,7 +399,7 @@ export function IntelligencePipelines() {
         if (changed) {
           const successMessage =
             pipeline === "cbs"
-              ? "Brief run finished. Signal feed and this card are updated. CMO drafts may appear below shortly."
+              ? "Brief run finished. Signal feed and this card are updated."
               : pipeline === "intent"
                 ? "Behavioral updates refreshed. Reddit customer research and thread evidence are updated below."
                 : "Run finished and the card has been updated."

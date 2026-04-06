@@ -6,7 +6,6 @@ import Link from "next/link"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { BehavioralUpdatesPanel } from "@/components/dashboard/behavioral-updates-panel"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
-import { ContentQueue } from "@/components/dashboard/content-queue"
 import { SecurityAlertsSummary } from "@/components/dashboard/security-alerts-summary"
 
 const container = {
@@ -40,8 +39,7 @@ export default function DashboardPage() {
           <Link href="/dashboard/context" className="text-primary hover:underline">
             company context
           </Link>
-          . Briefs, behavioral updates, and drafts show up here for you to review, approve, and ship on the
-          schedule you set.
+          . Briefs, behavioral updates, and technical radar show up here for you to review on the schedule you set.
         </p>
       </motion.div>
 
@@ -58,10 +56,6 @@ export default function DashboardPage() {
 
           <motion.div variants={item}>
             <BehavioralUpdatesPanel />
-          </motion.div>
-
-          <motion.div variants={item}>
-            <ContentQueue />
           </motion.div>
 
           <motion.div variants={item} className="rounded-lg border border-dashed border-border bg-muted/20 p-5">
