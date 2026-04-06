@@ -5,6 +5,18 @@ import { parseStringArray } from "@/lib/context-view"
 import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
+function parseVaultFiles(cache: string): Array<{ path: string; preview: string }> {
+  if (!cache.trim()) return []
+  const parts = cache.split(/\n--- ([^\n]+) ---\n/)
+  const files: Array<{ path: string; preview: string }> = []
+  for (let i = 1; i < parts.length; i += 2) {
+    const path = parts[i].trim()
+    const content = (parts[i + 1] ?? "").trim()
+    if (path) files.push({ path, preview: content.slice(0, 200) })
+  }
+  return files
+}
+
 function str(v: unknown): string {
   return typeof v === "string" ? v : ""
 }
@@ -55,6 +67,7 @@ export type BrainLedgerData = {
     last_synced_at: string | null
     file_count: number
     sync_error: string | null
+    files: Array<{ path: string; preview: string }>
   }
   assets: Array<{
     id: string
@@ -214,6 +227,7 @@ export async function GET() {
             typeof p.vault_context_last_synced_at === "string" ? p.vault_context_last_synced_at : null,
           file_count: num(p.vault_context_file_count),
           sync_error: typeof p.vault_context_sync_error === "string" ? p.vault_context_sync_error : null,
+          files: parseVaultFiles(str(p.vault_context_cache)),
         },
         assets: (assets ?? []).map((a) => ({
           id: str(a.id),
@@ -359,6 +373,7 @@ export async function GET() {
         last_synced_at: typeof p.vault_context_last_synced_at === "string" ? p.vault_context_last_synced_at : null,
         file_count: num(p.vault_context_file_count),
         sync_error: typeof p.vault_context_sync_error === "string" ? p.vault_context_sync_error : null,
+        files: parseVaultFiles(str(p.vault_context_cache)),
       },
       assets: (assetsRes.data ?? []).map((a) => ({
         id: str(a.id),
