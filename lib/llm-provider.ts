@@ -54,20 +54,11 @@ export function isLlmConfigured(): boolean {
 
 /**
  * Model id for the provider.
- * - OpenRouter default: qwen/qwen3.6-plus (override with QWEN_MODEL).
- * - Alibaba Model Studio (DashScope) default: qwen3.6-plus — matches OpenAI-compatible examples in Model Studio docs.
+ * Default: qwen3-235b-a22b (DashScope model ID, no provider prefix).
+ * Override with QWEN_MODEL env var.
  */
 export function getDefaultModelId(): string {
-  const fromEnv = process.env.QWEN_MODEL?.trim()
-  if (fromEnv) return fromEnv
-
-  const dashKey = Boolean(process.env.DASHSCOPE_API_KEY?.trim())
-  const openRouterKey = Boolean(process.env.OPENROUTER_API_KEY?.trim())
-  if (dashKey && !openRouterKey) {
-    return "qwen3.6-plus"
-  }
-
-  return "qwen/qwen3.6-plus"
+  return process.env.QWEN_MODEL?.trim() || "qwen3-235b-a22b"
 }
 
 const openaiCompatible = createOpenAI({
