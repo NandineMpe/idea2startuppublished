@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   Unlock,
   Link2,
-  Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -194,7 +193,7 @@ const APPS: AppDefinition[] = [
   {
     slug: "github",
     name: "GitHub",
-    description: "Access repos, trigger workflows, and let Juno act on your codebase via Pipedream.",
+    description: "Access repos, trigger workflows, and let Juno act on your codebase.",
     logo: <GithubLogo />,
     category: "Developer",
   },
@@ -427,7 +426,7 @@ function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition })
       } else {
         toast({
           title: "Connected — status may lag",
-          description: "Pipedream saved the link. Reload if the banner still shows not connected.",
+          description: "Connection saved. Reload if the banner still shows not connected.",
         })
       }
     } finally {
@@ -510,7 +509,7 @@ function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition })
         {!connected && !isLoading && statusBusy && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-            {connecting ? "Complete sign-in in the Pipedream window…" : "Syncing…"}
+            {connecting ? "Complete sign-in in the pop-up window…" : "Syncing…"}
           </div>
         )}
 
@@ -656,7 +655,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
       } else {
         toast({
           title: "Connected — status may lag",
-          description: "Pipedream saved the link. Reload if the banner still shows not connected.",
+          description: "Connection saved. Reload if the banner still shows not connected.",
         })
       }
     } finally {
@@ -694,11 +693,10 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Github className="h-5 w-5 text-foreground" />
-          <CardTitle className="text-foreground">GitHub (Pipedream Connect)</CardTitle>
+          <CardTitle className="text-foreground">GitHub</CardTitle>
         </div>
         <CardDescription className="text-muted-foreground">
-          Connect your GitHub account through Pipedream. Juno can use this for workflows and tools
-          you enable in Pipedream.
+          Connect your GitHub account so Juno can read your repos, sync your vault, and act on your codebase.
         </CardDescription>
       </CardHeader>
 
@@ -747,7 +745,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
           {!connected && !isLoading && statusBusy && (
             <span className="inline-flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-              {connecting ? "Complete sign-in in the Pipedream window…" : "Syncing connection status…"}
+              {connecting ? "Complete sign-in in the pop-up window…" : "Syncing connection status…"}
             </span>
           )}
           {!connected && !isLoading && !statusBusy && isFetched && (
@@ -773,7 +771,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
               </div>
               <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                 {primaryAccount.updatedAt && (
-                  <div>Last updated (Pipedream): {formatDate(primaryAccount.updatedAt)}</div>
+                  <div>Last updated: {formatDate(primaryAccount.updatedAt)}</div>
                 )}
                 {primaryAccount.lastRefreshedAt && (
                   <div>Credentials last refreshed: {formatDate(primaryAccount.lastRefreshedAt)}</div>
@@ -782,7 +780,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
                   <div>Access refresh by: {formatDate(primaryAccount.expiresAt)}</div>
                 )}
                 {primaryAccount.error && (
-                  <div className="text-destructive">Pipedream: {primaryAccount.error}</div>
+                  <div className="text-destructive">{primaryAccount.error}</div>
                 )}
               </div>
             </div>
@@ -865,7 +863,7 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
                 {reposLoading && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Fetching repos via Pipedream…
+                    Fetching repos…
                   </div>
                 )}
                 {reposError && (
@@ -978,14 +976,13 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
                 ? hasUnhealthy || allDead
                   ? "Reconnect to refresh expired OAuth tokens."
                   : "Reconnect to switch accounts or refresh the OAuth grant."
-                : "Opens Pipedream to sign in."}
+                : "Opens a sign-in window."}
             </span>
           )}
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Uses Pipedream&apos;s hosted OAuth. You can disconnect from Pipedream project settings if
-          needed.
+          You can disconnect this at any time from the Connected Apps settings.
         </p>
       </CardContent>
     </Card>
@@ -1063,12 +1060,9 @@ export function IntegrationsPageClient({
             {/* All other apps */}
             <section className="space-y-3">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-muted-foreground" />
+                <Link2 className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Connect more apps</h2>
               </div>
-              <p className="text-xs text-muted-foreground -mt-1">
-                All connections use Pipedream&apos;s hosted OAuth — you can revoke access from Pipedream project settings at any time.
-              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {APPS.map((app) => (
                   <AppConnectCard key={app.slug} userId={userId} app={app} />
