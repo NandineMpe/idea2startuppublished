@@ -6,6 +6,25 @@ import { getCompanyContext } from "@/lib/company-context"
 import { buildOfficeHoursSystemPrompt, extractDesignDoc, type OfficeHoursMode } from "@/lib/juno/office-hours-prompt"
 import { jsonApiError } from "@/lib/api-error-response"
 
+/** Vercel serverless max runtime for long LLM streams (seconds). */
+export const maxDuration = 300
+
+/** Do not block the SSE on vault GitHub sync; chat must start streaming quickly. */
+const CONTEXT_LOAD_MS = 12_000
+
+async function getOfficeHoursCompanyContext(userId: string) {
+  const load = getCompanyContext(userId, {
+    refreshVault: "if_stale",
+    useCookieOrganization: true,
+  }).catch(() => null)
+
+  const timeout = new Promise<null>((resolve) => {
+    setTimeout(() => resolve(null), CONTEXT_LOAD_MS)
+  })
+
+  return (await Promise.race([load, timeout])) ?? null
+}
+
 function textFromUIMessage(m: UIMessage): string {
   return m.parts
     .filter((p): p is { type: "text"; text: string } => p.type === "text")
@@ -50,8 +69,7 @@ export async function POST(req: Request) {
         })
     }
 
-    // Load company context to ground the advisor in the user's actual business
-    const companyCtx = await getCompanyContext(user.id, { refreshVault: "always" }).catch(() => null)
+    const companyCtx = await getOfficeHoursCompanyContext(user.id)
 
     const systemPrompt = buildOfficeHoursSystemPrompt(
       companyCtx ?? { promptBlock: "", userId: user.id, profile: {} as never, assets: [], vaultFiles: [], knowledgeHits: [], extracted: { competitors: [], keywords: [], icp: [], vertical: "", stage: "" } },
@@ -98,7 +116,7 @@ export async function POST(req: Request) {
       },
     })
 
-    return result.toUIMessageStreamResponse()
+    return result.toUIMessageStreamResponse({ originalMessages: messages })
   } catch (error) {
     return jsonApiError(500, error, "office-hours POST")
   }
