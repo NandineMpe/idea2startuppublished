@@ -46,6 +46,9 @@ const TIER_3_PATTERNS: RegExp[] = [
 
 const MAX_FILES = 50
 const MAX_FILE_SIZE = 30_000
+/** Avoid multi-megabyte prompts that stall providers for tens of minutes. */
+const MAX_TREE_PATH_LINES = 2_500
+const MAX_TOTAL_FILE_BODY_CHARS = 120_000
 
 export function selectFiles(tree: RepoTreeEntry[]): string[] {
   const selected: string[] = []
@@ -75,14 +78,33 @@ export function buildSecurityScanPrompt(
 ): string {
   const confidenceGate = mode === "daily" ? 8 : 2
 
-  const treeLines = tree.map((f) => f.path).join("\n")
-  const fileBlocks = files
-    .map((f) => {
-      const cap = 5000
-      const body = f.content.length > cap ? `${f.content.slice(0, cap)}\n[...truncated at ${cap} chars]` : f.content
-      return `\n--- ${f.path} ---\n${body}`
-    })
-    .join("\n")
+  const paths = tree.map((f) => f.path)
+  const treeLines =
+    paths.length <= MAX_TREE_PATH_LINES
+      ? paths.join("\n")
+      : `${paths.slice(0, MAX_TREE_PATH_LINES).join("\n")}\n\n(... ${paths.length - MAX_TREE_PATH_LINES} more paths omitted. Selection still uses full tree metadata on the server.)`
+
+  const perFileCap = 5000
+  const fileBlockParts: string[] = []
+  let used = 0
+  let included = 0
+  for (const f of files) {
+    const body =
+      f.content.length > perFileCap
+        ? `${f.content.slice(0, perFileCap)}\n[...truncated at ${perFileCap} chars]`
+        : f.content
+    const block = `\n--- ${f.path} ---\n${body}`
+    if (included > 0 && used + block.length > MAX_TOTAL_FILE_BODY_CHARS) {
+      fileBlockParts.push(
+        `\n[... ${files.length - included} more files omitted; total file context capped at ${MAX_TOTAL_FILE_BODY_CHARS} characters.]`,
+      )
+      break
+    }
+    fileBlockParts.push(block)
+    used += block.length
+    included += 1
+  }
+  const fileBlocks = fileBlockParts.join("\n")
 
   const commitLines = commits
     .map((c) => `${c.sha.substring(0, 7)} ${c.message.split("\n")[0]} [${c.files.join(", ")}]`)

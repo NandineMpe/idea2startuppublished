@@ -266,19 +266,28 @@ export async function getRecentCommits(
   if (!Array.isArray(list) || list.length === 0) return []
 
   const limited = list.slice(0, 20)
+  const batchSize = 5
   const out: Array<{ sha: string; message: string; date: string; files: string[] }> = []
 
-  for (const c of limited) {
-    const sha = c.sha
-    if (!sha) continue
-    const detail = await githubDirectGetJson<CommitDetail>(`${base}/commits/${sha}`)
-    const files = (detail?.files ?? []).map((f) => f.filename).filter((x): x is string => Boolean(x))
-    out.push({
-      sha,
-      message: detail?.commit?.message ?? c.commit?.message ?? "",
-      date: detail?.commit?.author?.date ?? c.commit?.author?.date ?? "",
-      files,
-    })
+  for (let i = 0; i < limited.length; i += batchSize) {
+    const batch = limited.slice(i, i + batchSize)
+    const batchResults = await Promise.all(
+      batch.map(async (c) => {
+        const sha = c.sha
+        if (!sha) return null
+        const detail = await githubDirectGetJson<CommitDetail>(`${base}/commits/${sha}`)
+        const files = (detail?.files ?? []).map((f) => f.filename).filter((x): x is string => Boolean(x))
+        return {
+          sha,
+          message: detail?.commit?.message ?? c.commit?.message ?? "",
+          date: detail?.commit?.author?.date ?? c.commit?.author?.date ?? "",
+          files,
+        }
+      }),
+    )
+    for (const row of batchResults) {
+      if (row) out.push(row)
+    }
   }
 
   return out
