@@ -1,3 +1,9 @@
+/**
+ * Reddit behavioral pipeline (Inngest durable workflow, defined in code — synced via /api/inngest).
+ * Fan-out cron → per-user: resolve subreddits (profile pins or LLM + defaults) → scan Reddit → score →
+ * persist intent_signals → synthesize behavioral summary → ai_outputs (behavioral_updates).
+ * Local debugging: `npm run inngest:dev` + `npm run dev` (CLI dev server does not replace this source).
+ */
 import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList } from "@/lib/juno/intent-keywords"
@@ -66,8 +72,8 @@ async function saveBehavioralUpdatesArtifact(params: {
 export const intentScanFanOut = inngest.createFunction(
   {
     id: "cro-intent-scan-fanout",
-    name: "CRO: Intent Scan Fan-Out",
-    triggers: [{ cron: "15 */6 * * *" }],
+    name: "CRO: Reddit behavioral scan fan-out (4h)",
+    triggers: [{ cron: "15 */4 * * *" }],
   },
   async ({ step }) => {
     const userIds = await step.run("load-users", getFanOutUserIds)
@@ -87,7 +93,7 @@ export const intentScanFanOut = inngest.createFunction(
 export const intentScanner = inngest.createFunction(
   {
     id: "cro-intent-scanner",
-    name: "CRO: Intent Signal Scanner",
+    name: "CRO: Reddit behavioral scan (subreddits → signals → synthesis)",
     retries: 2,
     concurrency: { limit: 2 },
     triggers: [{ event: "juno/intent.scan.requested" }],

@@ -148,6 +148,25 @@ Register it in **`lib/inngest/functions/index.ts`** (`inngestFunctions` array) a
 
 ---
 
+## 8. Workflow definition vs Inngest CLI
+
+- **What Inngest actually runs:** TypeScript functions under **`lib/inngest/functions/`**, exported from **`lib/inngest/functions/index.ts`**, registered by **`serve()`** in **`app/api/inngest/route.ts`**. Cron schedules, events, and `step.run` names live there. After deploy, Inngest Cloud **syncs** from your public **`/api/inngest`** (Vercel integration or `PUT` as above).
+- **What the CLI is for:** **`npm run inngest:dev`** runs **`npx inngest-cli dev`**, the **Inngest Dev Server** (often UI at `http://127.0.0.1:8288`). Use it to **invoke and debug** runs against local Next. It does **not** replace writing workflow code in `.ts` files; there is no separate “CLI workflow file” that ships instead of this repo’s functions.
+
+## 9. Reddit customer research (behavioral updates)
+
+**Functions:** **`cro-intent-scan-fanout`** (cron) → emits **`juno/intent.scan.requested`** per user → **`cro-intent-scanner`**.
+
+**Schedule:** **`15 */4 * * *`** (UTC): every **4 hours** at minute 15.
+
+**Behavior:** Load company context → **resolve subreddits** (saved `reddit_intent_subreddits`, else LLM suggestion merged with defaults) → **scan Reddit** → score → **`intent_signals`** → **LLM synthesis** (push/pull/anxiety themes, next moves) → **`ai_outputs`** (`tool: behavioral_updates`) for the dashboard.
+
+**Manual run:** **`POST /api/intelligence/trigger`** with body **`{ "pipeline": "intent" }`** (needs **`INNGEST_EVENT_KEY`** on the server).
+
+**Code:** **`lib/inngest/functions/cro/intent-scanner.ts`**, subreddit resolution **`lib/juno/reddit-subreddit-suggest.ts`**.
+
+---
+
 ## Checklist summary
 
 - [ ] Inngest account + app; **Vercel integration** connected (or env vars set manually)  

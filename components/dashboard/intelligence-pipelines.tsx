@@ -68,7 +68,7 @@ const PIPELINES: Pipeline[] = [
     id: "intent",
     title: "Behavioral updates",
     subtitle: "Reddit customer research across target subreddits: pains, workarounds, buying behavior, and switching forces.",
-    schedule: "Scheduled - every 6h",
+    schedule: "Scheduled - every 4h",
     href: "/dashboard#behavioral-updates",
     icon: FlaskConical,
     accent: "text-sky-600 bg-sky-500/10 border-sky-500/20",

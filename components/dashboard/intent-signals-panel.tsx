@@ -285,7 +285,7 @@ export function IntentSignalsPanel() {
             Reddit intent signals
           </h2>
           <p className="mt-0.5 max-w-2xl text-[12px] text-muted-foreground">
-            Reddit threads matched to your saved company context. Runs on a schedule (every 6 hours) and on demand.
+            Reddit threads matched to your saved company context. Runs on a schedule (every 4 hours) and on demand.
             Suggested replies appear here if you want to join the conversation, but the main goal is learning what
             buyers actually want.
           </p>
