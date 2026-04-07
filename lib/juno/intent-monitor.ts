@@ -242,7 +242,7 @@ export async function crawlRedditForIntent(
   for (const subreddit of uniqSubs) {
     const posts = await crawlSubredditPosts(subreddit, keywords, cutoff, token)
     signals.push(...posts)
-    await sleep(1100)
+    await sleep(300)
   }
 
   return deduplicateSignals(signals)
