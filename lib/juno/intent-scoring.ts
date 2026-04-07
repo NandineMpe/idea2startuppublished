@@ -50,7 +50,7 @@ export async function scoreIntentSignals(
   }
 
   const out: ScoredIntent[] = []
-  const chunkSize = 6
+  const chunkSize = 10
 
   for (let i = 0; i < signals.length; i += chunkSize) {
     const chunk = signals.slice(i, i + chunkSize)

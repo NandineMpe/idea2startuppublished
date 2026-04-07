@@ -164,7 +164,7 @@ export const intentScanner = inngest.createFunction(
     )
 
     const scored = await step.run("score-intents", () =>
-      scoreIntentSignals(raw.slice(0, 80), context, { calibrationBlock }),
+      scoreIntentSignals(raw.slice(0, 40), context, { calibrationBlock }),
     )
 
     const toSave = scored.filter((s) => s.relevanceScore >= 4)
