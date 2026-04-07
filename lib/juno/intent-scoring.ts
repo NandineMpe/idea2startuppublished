@@ -23,12 +23,18 @@ function defaultResponsePlatform(platform: IntentSignal["platform"]): ResponsePl
   return "reddit_comment"
 }
 
+export type ScoreIntentOptions = {
+  /** Recent user feedback from intent_signals; tightens or loosens model scoring. */
+  calibrationBlock?: string
+}
+
 /**
  * Score a batch of Reddit intent signals and generate helpful, non-salesy reply drafts.
  */
 export async function scoreIntentSignals(
   signals: IntentSignal[],
   context: CompanyContext,
+  options?: ScoreIntentOptions,
 ): Promise<ScoredIntent[]> {
   if (signals.length === 0) return []
 
@@ -49,11 +55,16 @@ export async function scoreIntentSignals(
   for (let i = 0; i < signals.length; i += chunkSize) {
     const chunk = signals.slice(i, i + chunkSize)
 
+    const calibration =
+      typeof options?.calibrationBlock === "string" && options.calibrationBlock.trim().length > 0
+        ? `\n${options.calibrationBlock.trim()}\n\n`
+        : ""
+
     const prompt = `You are a product strategy and customer research analyst monitoring Reddit conversations for people who may need a product like ours.
 
 OUR COMPANY:
 ${context.promptBlock}
-
+${calibration}
 INTENT SIGNALS (JSON array of public posts/comments):
 ${JSON.stringify(
       chunk.map((signal) => ({

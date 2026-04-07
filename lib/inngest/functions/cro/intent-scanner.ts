@@ -9,6 +9,7 @@ import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList } from "@/lib/juno/intent-keywords"
 import { resolveSubredditsForIntentScan } from "@/lib/juno/reddit-subreddit-suggest"
 import { scanRedditForIntent } from "@/lib/juno/intent-monitor"
+import { buildIntentScoreCalibrationBlock } from "@/lib/juno/intent-score-calibration"
 import { scoreIntentSignals, type ScoredIntent } from "@/lib/juno/intent-scoring"
 import { summarizeRedditRecon, type RedditReconSignal } from "@/lib/juno/reddit-recon"
 import { getFanOutUserIds } from "@/lib/juno/users"
@@ -138,8 +139,12 @@ export const intentScanner = inngest.createFunction(
       return { userId, scanned: 0, saved: 0, reason: "no_candidates" }
     }
 
+    const calibrationBlock = await step.run("load-score-calibration", () =>
+      buildIntentScoreCalibrationBlock(userId),
+    )
+
     const scored = await step.run("score-intents", () =>
-      scoreIntentSignals(raw.slice(0, 40), context),
+      scoreIntentSignals(raw.slice(0, 40), context, { calibrationBlock }),
     )
 
     const toSave = scored.filter((s) => s.relevanceScore >= 4)

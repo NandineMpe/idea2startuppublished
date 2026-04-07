@@ -66,6 +66,8 @@ export type IntentSignalRow = {
   status: string
   responded_at: string | null
   response_notes: string | null
+  score_feedback: string | null
+  score_feedback_at: string | null
   discovered_at: string
 }
 
@@ -336,9 +338,10 @@ export function IntentSignalsPanel() {
   async function updateSignal(
     id: string,
     body: {
-      status: "new" | "responded" | "converted" | "irrelevant"
+      status?: "new" | "responded" | "converted" | "irrelevant"
       response_platform?: string | null
       response_notes?: string | null
+      score_feedback?: "too_high" | "ok" | "too_low" | null
     },
   ) {
     setActionId(id)
@@ -383,6 +386,10 @@ export function IntentSignalsPanel() {
     await updateSignal(id, { status: "irrelevant" })
   }
 
+  async function setScoreFeedback(id: string, value: "too_high" | "ok" | "too_low" | null) {
+    await updateSignal(id, { score_feedback: value })
+  }
+
   return (
     <section id="reddit-intent-signals" className="scroll-mt-24 overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
@@ -395,7 +402,8 @@ export function IntentSignalsPanel() {
           <p className="mt-0.5 max-w-2xl text-[12px] text-muted-foreground">
             Reddit threads matched to your saved company context. Runs on a schedule (every 4 hours) and on demand.
             Suggested replies appear here if you want to join the conversation, but the main goal is learning what
-            buyers actually want.
+            buyers actually want. Use <strong className="text-foreground/90">Score fit</strong> so later runs can
+            match how you judge relevance.
           </p>
         </div>
 
@@ -615,6 +623,41 @@ export function IntentSignalsPanel() {
                 {row.subreddit && <span>r/{row.subreddit}</span>}
                 <span>{when}</span>
                 <span className="ml-auto tabular-nums font-medium text-foreground">{score}/10</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Score fit?
+                </span>
+                {(
+                  [
+                    { key: "too_high" as const, label: "Too high" },
+                    { key: "ok" as const, label: "About right" },
+                    { key: "too_low" as const, label: "Too low" },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <Button
+                    key={key}
+                    type="button"
+                    size="sm"
+                    variant={row.score_feedback === key ? "secondary" : "ghost"}
+                    className={cn(
+                      "h-7 px-2 text-[11px]",
+                      row.score_feedback === key && "bg-primary/15 font-medium text-foreground",
+                    )}
+                    disabled={actionId === row.id}
+                    onClick={() =>
+                      void setScoreFeedback(row.id, row.score_feedback === key ? null : key)
+                    }
+                  >
+                    {label}
+                  </Button>
+                ))}
+                {row.score_feedback_at ? (
+                  <span className="ml-auto text-[10px] text-muted-foreground">
+                    Saved {formatDistanceToNow(new Date(row.score_feedback_at), { addSuffix: true })}
+                  </span>
+                ) : null}
               </div>
 
               <h3 className="text-[13px] font-semibold leading-snug text-foreground">{row.title}</h3>

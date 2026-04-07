@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 
+const STATUS_VALUES = new Set(["new", "responded", "converted", "irrelevant"])
+const SCORE_FEEDBACK_VALUES = new Set(["too_high", "ok", "too_low"])
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -18,19 +21,22 @@ export async function PATCH(
       status?: string
       response_platform?: string | null
       response_notes?: string | null
+      score_feedback?: string | null
     }
 
-    const status = typeof body.status === "string" ? body.status.trim() : ""
-    const allowed = new Set(["new", "responded", "converted", "irrelevant"])
-    if (!allowed.has(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
-    }
+    const updates: Record<string, unknown> = {}
 
-    const updates: Record<string, unknown> = { status }
-    if (status === "responded") {
-      updates.responded_at = new Date().toISOString()
-    } else {
-      updates.responded_at = null
+    if (body.status !== undefined) {
+      const status = typeof body.status === "string" ? body.status.trim() : ""
+      if (!STATUS_VALUES.has(status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+      }
+      updates.status = status
+      if (status === "responded") {
+        updates.responded_at = new Date().toISOString()
+      } else {
+        updates.responded_at = null
+      }
     }
 
     if (body.response_platform !== undefined) {
@@ -50,6 +56,23 @@ export async function PATCH(
           : typeof n === "string"
             ? n.trim().slice(0, 4000) || null
             : null
+    }
+
+    if (body.score_feedback !== undefined) {
+      const raw = body.score_feedback
+      if (raw === null || raw === "") {
+        updates.score_feedback = null
+        updates.score_feedback_at = null
+      } else if (typeof raw === "string" && SCORE_FEEDBACK_VALUES.has(raw.trim())) {
+        updates.score_feedback = raw.trim()
+        updates.score_feedback_at = new Date().toISOString()
+      } else {
+        return NextResponse.json({ error: "Invalid score_feedback" }, { status: 400 })
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No updates" }, { status: 400 })
     }
 
     const { data, error } = await supabase
