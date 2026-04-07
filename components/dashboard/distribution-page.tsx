@@ -43,6 +43,7 @@ import { GtmMotionPanel } from "@/components/dashboard/gtm-motion-panel"
 import { ReadersDigestPanel } from "@/components/dashboard/readers-digest-panel"
 import { GtmChannelsPanel } from "@/components/dashboard/gtm-channels-panel"
 import { GtmPricingPanel } from "@/components/dashboard/gtm-pricing-panel"
+import { authClient } from "@/lib/better-auth-client"
 import { loadGtmHubState, saveGtmHubState, type GtmHubState } from "@/lib/gtm-hub"
 
 type AnalyseConversionResponse = {
@@ -83,6 +84,9 @@ async function copyText(text: string) {
 
 export function DistributionPage() {
   const { toast } = useToast()
+  const { data: session, isPending: sessionPending } = authClient.useSession()
+  const userId = session?.user?.id ?? null
+
   const [state, setState] = useState<DistributionState | null>(null)
   const [senderName, setSenderName] = useState("Founder")
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -102,15 +106,19 @@ export function DistributionPage() {
   /** Top-level GTM facet (lookalike, motion, reader's digest, channels, pricing, branding, content calendar). */
   const [facetTab, setFacetTab] = useState("lookalike")
   const [mainTab, setMainTab] = useState("profile")
-  const [gtmHub, setGtmHub] = useState<GtmHubState>(() => loadGtmHubState())
+  const [gtmHub, setGtmHub] = useState<GtmHubState | null>(null)
 
   useEffect(() => {
-    setState(loadDistributionState())
-  }, [])
+    if (sessionPending) return
+    setState(loadDistributionState(userId))
+    setGtmHub(loadGtmHubState(userId))
+    formHydrated.current = false
+  }, [sessionPending, userId])
 
   useEffect(() => {
-    saveGtmHubState(gtmHub)
-  }, [gtmHub])
+    if (!gtmHub || sessionPending) return
+    saveGtmHubState(gtmHub, userId)
+  }, [gtmHub, userId, sessionPending])
 
   useEffect(() => {
     if (!state || formHydrated.current) return
@@ -136,10 +144,13 @@ export function DistributionPage() {
       .catch(() => {})
   }, [])
 
-  const persist = useCallback((next: DistributionState) => {
-    setState(next)
-    saveDistributionState(next)
-  }, [])
+  const persist = useCallback(
+    (next: DistributionState) => {
+      setState(next)
+      saveDistributionState(next, userId)
+    },
+    [userId],
+  )
 
   useEffect(() => {
     const onApollo = (e: Event) => {
@@ -148,7 +159,7 @@ export function DistributionPage() {
       setState((prev) => {
         if (!prev) return prev
         const merged = { ...prev, matches: detail }
-        saveDistributionState(merged)
+        saveDistributionState(merged, userId)
         return merged
       })
       toast({
@@ -160,7 +171,7 @@ export function DistributionPage() {
     }
     window.addEventListener("junoDistributionApolloMatches", onApollo)
     return () => window.removeEventListener("junoDistributionApolloMatches", onApollo)
-  }, [toast])
+  }, [toast, userId])
 
   const matchesCount = state?.matches.length ?? 0
 
@@ -375,7 +386,7 @@ export function DistributionPage() {
   }
 
 
-  if (!state) {
+  if (sessionPending || !state || gtmHub === null) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
         Loading…
@@ -706,7 +717,7 @@ export function DistributionPage() {
                   id="conv-name"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="David Murphy"
+                  placeholder="Full name"
                 />
               </div>
               <div className="space-y-1.5">
@@ -715,7 +726,7 @@ export function DistributionPage() {
                   id="conv-title"
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Partner, Scaling Services"
+                  placeholder="Title or function"
                 />
               </div>
               <div className="space-y-1.5">
@@ -724,7 +735,7 @@ export function DistributionPage() {
                   id="conv-company"
                   value={form.company}
                   onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                  placeholder="Acme Advisory"
+                  placeholder="Company name"
                 />
               </div>
               <div className="space-y-1.5">
@@ -733,7 +744,7 @@ export function DistributionPage() {
                   id="conv-loc"
                   value={form.location}
                   onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="Ireland"
+                  placeholder="City or region"
                 />
               </div>
               <div className="space-y-1.5">

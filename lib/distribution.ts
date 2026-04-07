@@ -1,11 +1,17 @@
 /**
  * Distribution / lookalike engine — client-side state + CSV import.
- * Defaults match the Juno lookalike reference UI; persist via localStorage.
+ * Persist via localStorage, scoped per signed-in user (see distributionStorageKey).
  */
 
 import { buildApolloPeopleSearchUrl } from "@/lib/apollo-search-url"
 
+/** @deprecated Old global key (shared across accounts on the same browser). Removed from reads; wiped on GTM load. */
 export const DISTRIBUTION_STORAGE_KEY = "juno-distribution-v1"
+
+export function distributionStorageKey(userId: string | null | undefined): string {
+  const id = userId?.trim()
+  return id ? `juno-distribution-v2:${id}` : "juno-distribution-v2:anon"
+}
 
 export type ConvertedLead = {
   name: string
@@ -80,6 +86,7 @@ export function similarSavedLeadSecondaryLine(l: SimilarSavedLead): string {
 }
 
 export type DistributionState = {
+  activeLookalikeProfileId?: string | null
   convertedLead: ConvertedLead
   lookalike: LookalikeCriteria
   rationale: string
@@ -97,59 +104,36 @@ export type DistributionState = {
   conversionHistory: ConversionHistoryEntry[]
 }
 
+/** Empty starter state — no sample names or ICP (avoid looking like another account's data). */
 export const DEFAULT_DISTRIBUTION: DistributionState = {
   activeLookalikeProfileId: null,
   convertedLead: {
-    name: "David Murphy",
-    roleTitle: "Partner, Scaling Services",
-    company: "Brownper",
-    location: "Ireland",
-    channel: "LinkedIn InMail",
-    responseTime: "Same day",
-    multiplierNote:
-      "HIGH — advisory partners serve 10–20 startup clients each.",
+    name: "",
+    roleTitle: "",
+    company: "",
+    location: "",
+    channel: "",
+    responseTime: "",
+    multiplierNote: "",
   },
   lookalike: {
-    targetTitles: ["Partner", "Director", "Head of Assurance", "Head of Advisory"],
-    companyTypes: [
-      "Management Consulting",
-      "Accounting",
-      "Professional Services",
-      "Advisory",
-    ],
-    geography: ["Ireland", "United Kingdom"],
-    companySize: ["11–50", "51–200", "201–500"],
+    targetTitles: [],
+    companyTypes: [],
+    geography: [],
+    companySize: [],
   },
-  rationale:
-    "Advisory firm partners oversee audit readiness for multiple startup clients. Converting one partner opens 10–20 potential end-users. The Big Four credibility hook resonates because they come from the same world. LinkedIn InMail works because these people expect professional outreach on the platform.",
+  rationale: "",
   searchQueries: {
     linkedinSalesNav: "",
     apollo: "",
     linkedinBoolean: "",
   },
   templates: {
-    inmail: `Hi {name},
-
-I noticed you're {title} at {company} — we're building Juno for teams like yours who sit across audit readiness for multiple clients.
-
-Quick context: I'm ex–Big Four; we're seeing advisory partners use our agents to cut prep time without losing rigour. Worth a 15-min look if you're scaling assurance work across portfolios?
-
-— {sender_name}`,
-    coldEmail: `Subject: Audit readiness across your portfolio — quick intro
-
-Hi {name},
-
-I'm reaching out because {company} sits in the advisory lane we built Juno for — partners who carry audit readiness for many clients at once.
-
-We help finance and advisory teams automate first-line research, drafting, and monitoring so senior people stay on judgement calls. Happy to share how firms in {location} are using it.
-
-15 minutes this week?
-
-Best,
-{sender_name}`,
+    inmail: "",
+    coldEmail: "",
   },
   matches: [],
-  pitchAngle: "Advisory partners who carry audit readiness across multiple startup clients.",
+  pitchAngle: "",
   insightsHeadline: "",
   similarExistingLeads: [],
   conversionHistory: [],
@@ -251,13 +235,19 @@ export function hydrateDistribution(partial: Partial<DistributionState> | null):
   return merged
 }
 
-export function loadDistributionState(): DistributionState {
+export function loadDistributionState(userId?: string | null): DistributionState {
   if (typeof window === "undefined") return structuredClone(DEFAULT_DISTRIBUTION)
   try {
-    const raw = localStorage.getItem(DISTRIBUTION_STORAGE_KEY)
+    try {
+      localStorage.removeItem(DISTRIBUTION_STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+    const key = distributionStorageKey(userId)
+    const raw = localStorage.getItem(key)
     if (!raw) {
       const fresh = hydrateDistribution(null)
-      localStorage.setItem(DISTRIBUTION_STORAGE_KEY, JSON.stringify(fresh))
+      localStorage.setItem(key, JSON.stringify(fresh))
       return fresh
     }
     const parsed = JSON.parse(raw) as Partial<DistributionState>
@@ -267,9 +257,9 @@ export function loadDistributionState(): DistributionState {
   }
 }
 
-export function saveDistributionState(state: DistributionState) {
+export function saveDistributionState(state: DistributionState, userId?: string | null) {
   if (typeof window === "undefined") return
-  localStorage.setItem(DISTRIBUTION_STORAGE_KEY, JSON.stringify(state))
+  localStorage.setItem(distributionStorageKey(userId), JSON.stringify(state))
 }
 
 function parseCsvLine(line: string): string[] {

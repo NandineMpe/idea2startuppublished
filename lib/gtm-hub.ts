@@ -1,8 +1,14 @@
 /**
  * GTM hub — channel mix, motion strategy, pricing model (client localStorage).
+ * Scoped per signed-in user via gtmHubStorageKey.
  */
 
 export const GTM_HUB_STORAGE_KEY = "juno-gtm-hub-v1"
+
+export function gtmHubStorageKey(userId: string | null | undefined): string {
+  const id = userId?.trim()
+  return id ? `juno-gtm-hub-v2:${id}` : "juno-gtm-hub-v2:anon"
+}
 
 export const CHANNEL_MIX_KEYS = [
   "outbound",
@@ -104,10 +110,16 @@ export function hydrateGtmHub(partial: Partial<GtmHubState> | null): GtmHubState
   }
 }
 
-export function loadGtmHubState(): GtmHubState {
+export function loadGtmHubState(userId?: string | null): GtmHubState {
   if (typeof window === "undefined") return structuredClone(DEFAULT_GTM_HUB)
   try {
-    const raw = localStorage.getItem(GTM_HUB_STORAGE_KEY)
+    try {
+      localStorage.removeItem(GTM_HUB_STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+    const key = gtmHubStorageKey(userId)
+    const raw = localStorage.getItem(key)
     if (!raw) return structuredClone(DEFAULT_GTM_HUB)
     return hydrateGtmHub(JSON.parse(raw) as Partial<GtmHubState>)
   } catch {
@@ -115,9 +127,9 @@ export function loadGtmHubState(): GtmHubState {
   }
 }
 
-export function saveGtmHubState(state: GtmHubState) {
+export function saveGtmHubState(state: GtmHubState, userId?: string | null) {
   if (typeof window === "undefined") return
-  localStorage.setItem(GTM_HUB_STORAGE_KEY, JSON.stringify(state))
+  localStorage.setItem(gtmHubStorageKey(userId), JSON.stringify(state))
 }
 
 /** Sum of channel mix weights (may be ≠ 100). */
