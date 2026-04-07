@@ -402,8 +402,8 @@ export function IntentSignalsPanel() {
           <p className="mt-0.5 max-w-2xl text-[12px] text-muted-foreground">
             Reddit threads matched to your saved company context. Runs on a schedule (every 4 hours) and on demand.
             Suggested replies appear here if you want to join the conversation, but the main goal is learning what
-            buyers actually want. Use <strong className="text-foreground/90">Score fit</strong> so later runs can
-            match how you judge relevance.
+            buyers actually want. Use <strong className="text-foreground/90">Score fit</strong> or{" "}
+            <strong className="text-foreground/90">Not relevant</strong> so later runs can match how you judge relevance.
           </p>
         </div>
 
@@ -760,6 +760,7 @@ export function IntentSignalsPanel() {
                     variant="ghost"
                     className="text-muted-foreground"
                     disabled={actionId === row.id}
+                    title="Moves this thread out of New and tells the next scoring run to treat similar threads as a weaker fit"
                     onClick={() => void markIrrelevant(row.id)}
                   >
                     Not relevant
