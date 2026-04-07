@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Radio,
   Search,
+  SendHorizonal,
   ShieldAlert,
   Sparkles,
   TrendingUp,
@@ -19,6 +20,7 @@ import {
 import { formatDistanceToNow } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -183,6 +185,17 @@ export function BehavioralUpdatesPanel() {
   const [saveTargetsLoading, setSaveTargetsLoading] = useState(false)
   const [targetsHint, setTargetsHint] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  // Question / ask-the-data state
+  const [question, setQuestion] = useState("")
+  const [querying, setQuerying] = useState(false)
+  const [queryResult, setQueryResult] = useState<{
+    answer: string
+    keyFindings: string[]
+    threads: { title: string; url: string; subreddit: string | null; relevance_score: number | null }[]
+    signalsSearched: number
+  } | null>(null)
+  const [queryError, setQueryError] = useState<string | null>(null)
 
   const loadData = useCallback(
     async (subredditValue: string, showSpinner = false) => {
@@ -352,6 +365,33 @@ export function BehavioralUpdatesPanel() {
       setError(scanError instanceof Error ? scanError.message : "Could not queue the Reddit scan.")
     } finally {
       setScanning(false)
+    }
+  }
+
+  async function askQuestion() {
+    if (!question.trim() || querying) return
+    setQuerying(true)
+    setQueryError(null)
+    setQueryResult(null)
+    try {
+      const res = await fetch("/api/intelligence/behavioral-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: question.trim() }),
+      })
+      let json: { answer?: string; keyFindings?: string[]; threads?: { title: string; url: string; subreddit: string | null; relevance_score: number | null }[]; signalsSearched?: number; error?: string } = {}
+      try { json = await res.json() } catch { /* non-JSON */ }
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : "Query failed")
+      setQueryResult({
+        answer: json.answer ?? "",
+        keyFindings: json.keyFindings ?? [],
+        threads: (json.threads ?? []) as { title: string; url: string; subreddit: string | null; relevance_score: number | null }[],
+        signalsSearched: json.signalsSearched ?? 0,
+      })
+    } catch (e) {
+      setQueryError(e instanceof Error ? e.message : "Query failed")
+    } finally {
+      setQuerying(false)
     }
   }
 
@@ -574,12 +614,12 @@ export function BehavioralUpdatesPanel() {
             {selectedSubreddit === "all" && (data?.subredditsInSynthesisBatch?.length ?? 0) > 0 ? (
               <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
                 In this batch:{" "}
-                {(data.subredditsInSynthesisBatch ?? [])
+                {(data?.subredditsInSynthesisBatch ?? [])
                   .slice(0, 10)
                   .map((s) => `r/${s}`)
                   .join(", ")}
-                {(data.subredditsInSynthesisBatch ?? []).length > 10
-                  ? ` +${(data.subredditsInSynthesisBatch ?? []).length - 10} more`
+                {(data?.subredditsInSynthesisBatch ?? []).length > 10
+                  ? ` +${(data?.subredditsInSynthesisBatch ?? []).length - 10} more`
                   : ""}
               </p>
             ) : null}
@@ -685,6 +725,92 @@ export function BehavioralUpdatesPanel() {
                   </Link>
                 </div>
               </div>
+            </div>
+
+            {/* Ask the data */}
+            <div className="rounded-xl border border-border bg-background/80 p-4 shadow-sm">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ask the data</p>
+              <p className="mt-1 text-[13px] font-medium text-foreground">Search Reddit conversations with a question</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                Ask anything about what you have collected — buying stages, company types, objections, pricing signals.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void askQuestion() }}
+                  placeholder="e.g. At what stage are companies buying audit services?"
+                  className="h-9 text-[13px]"
+                  disabled={querying}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => void askQuestion()}
+                  disabled={querying || !question.trim()}
+                  className="shrink-0 gap-2"
+                >
+                  {querying ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizonal className="h-4 w-4" />}
+                  {querying ? "Searching…" : "Ask"}
+                </Button>
+              </div>
+
+              {queryError ? (
+                <p className="mt-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                  {queryError}
+                </p>
+              ) : null}
+
+              {queryResult ? (
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <p className="text-[12px] font-medium text-foreground">Answer</p>
+                    <p className="mt-2 text-[13px] leading-relaxed text-foreground/90">{queryResult.answer}</p>
+                    {queryResult.keyFindings.length > 0 ? (
+                      <ul className="mt-3 space-y-1.5">
+                        {queryResult.keyFindings.map((finding) => (
+                          <li key={finding} className="flex items-start gap-2 text-[12px] leading-relaxed text-foreground/85">
+                            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                            {finding}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      Searched {queryResult.signalsSearched} stored Reddit threads
+                    </p>
+                  </div>
+
+                  {queryResult.threads.length > 0 ? (
+                    <div>
+                      <p className="mb-2 text-[12px] font-medium text-foreground">Evidence threads</p>
+                      <div className="space-y-2">
+                        {queryResult.threads.map((thread) => (
+                          <div key={thread.url} className="rounded-lg border border-border/70 bg-muted/15 px-3 py-2">
+                            <a
+                              href={thread.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group inline-flex items-start gap-1 text-[12px] font-medium text-foreground hover:text-primary hover:underline"
+                            >
+                              <span>{thread.title}</span>
+                              <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary" />
+                            </a>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+                              {thread.subreddit ? (
+                                <a href={`https://reddit.com/r/${thread.subreddit}`} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">
+                                  r/{thread.subreddit}
+                                </a>
+                              ) : null}
+                              {thread.relevance_score != null ? <span>{thread.relevance_score}/10</span> : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <Accordion type="single" collapsible defaultValue="switching-forces" className="rounded-xl border border-border bg-background/80 shadow-sm">
