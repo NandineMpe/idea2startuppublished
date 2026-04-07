@@ -87,6 +87,8 @@ type BehavioralUpdatesData = BehavioralSummary & {
   generatedAt: string
   /** From latest behavioral_updates run metadata (e.g. no_candidates). */
   lastScanOutcome?: string | null
+  /** When the latest behavioral_updates row was written (any outcome). */
+  lastBehavioralArtifactAt?: string | null
 }
 
 type SubredditSuggestion = { name: string; reason: string }
@@ -411,6 +413,18 @@ export function BehavioralUpdatesPanel() {
                 <p className="mt-1 text-[11px] leading-relaxed opacity-90">
                   The job finished, but we could not load posts from Reddit for your targets (subreddit feeds and fallback search both came back empty). That is usually Reddit blocking or throttling server requests, an empty or invalid subreddit list, or no posts in your lookback window. It is not a keyword filter on your side. Check pinned subreddit names, try{" "}
                   <code className="text-[10px]">INTENT_LOOKBACK_DAYS</code>, or run the scan again later.
+                </p>
+                <p className="mt-2 border-t border-amber-500/20 pt-2 text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground/90">Diagnostics</span>
+                  {" · "}
+                  Last saved run:{" "}
+                  {data.lastBehavioralArtifactAt ? formatRelative(data.lastBehavioralArtifactAt) : "unknown"}
+                  {" · "}
+                  Inngest function <code className="rounded bg-background/80 px-1 py-px text-[10px]">cro-intent-scanner</code>
+                  {" · "}
+                  Search run logs for{" "}
+                  <code className="rounded bg-background/80 px-1 py-px text-[10px]">[intent-monitor]</code>{" "}
+                  (HTTP 403 or 429 means Reddit blocked the server).
                 </p>
               </div>
             ) : null}

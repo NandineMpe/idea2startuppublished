@@ -93,6 +93,7 @@ export async function GET(req: Request) {
       { data: threadsData, error: threadsError },
       { data: summarySignalsData, error: summarySignalsError },
       { data: subredditRows, error: subredditError },
+      { data: latestBehavioralRows, error: latestBehavioralError },
     ] = await Promise.all([
       threadsQuery,
       summarySignalsQuery,
@@ -103,34 +104,21 @@ export async function GET(req: Request) {
         .eq("platform", "reddit")
         .order("discovered_at", { ascending: false })
         .limit(80),
-    ])
-
-    let cachedRows: Array<{ inputs: unknown; created_at: string }> | null = null
-    let cachedError: unknown = null
-
-    if (!selectedSubreddit && !forceLiveSummary) {
-      const cachedResponse = await supabase
+      supabase
         .from("ai_outputs")
         .select("inputs, created_at, metadata")
         .eq("user_id", user.id)
         .eq("tool", "behavioral_updates")
         .order("created_at", { ascending: false })
-        .limit(1)
-
-      cachedRows = (cachedResponse.data ?? null) as Array<{
-        inputs: unknown
-        created_at: string
-        metadata: unknown
-      }> | null
-      cachedError = cachedResponse.error
-    }
+        .limit(1),
+    ])
 
     if (threadsError) return jsonApiError(500, threadsError, "behavioral-updates GET threads")
     if (summarySignalsError) {
       return jsonApiError(500, summarySignalsError, "behavioral-updates GET summary-signals")
     }
     if (subredditError) return jsonApiError(500, subredditError, "behavioral-updates GET subreddits")
-    if (cachedError) return jsonApiError(500, cachedError, "behavioral-updates GET cached")
+    if (latestBehavioralError) return jsonApiError(500, latestBehavioralError, "behavioral-updates GET latest artifact")
 
     const threads = (threadsData ?? []) as BehavioralUpdatesThread[]
     const summarySignals = (summarySignalsData ?? []) as BehavioralUpdatesThread[]
@@ -143,12 +131,18 @@ export async function GET(req: Request) {
       a.localeCompare(b),
     )
 
-    const cachedSummary = cachedRows?.[0] ? parseCachedSummary(cachedRows[0].inputs) : null
-    const cachedMeta = cachedRows?.[0]?.metadata
+    const latestBehavioral = latestBehavioralRows?.[0] ?? null
+    const cachedSummary =
+      latestBehavioral && !selectedSubreddit && !forceLiveSummary
+        ? parseCachedSummary(latestBehavioral.inputs)
+        : null
+    const cachedMeta = latestBehavioral?.metadata
     const lastScanOutcome =
       cachedMeta && typeof cachedMeta === "object" && "scan_outcome" in cachedMeta
         ? String((cachedMeta as Record<string, unknown>).scan_outcome ?? "").trim() || null
         : null
+    const lastBehavioralArtifactAt =
+      typeof latestBehavioral?.created_at === "string" ? latestBehavioral.created_at : null
     const summary =
       cachedSummary && !selectedSubreddit
         ? cachedSummary
@@ -185,6 +179,7 @@ export async function GET(req: Request) {
           cachedSummary && !selectedSubreddit && !forceLiveSummary ? "cached" : "live",
         generatedAt: new Date().toISOString(),
         lastScanOutcome,
+        lastBehavioralArtifactAt,
       },
     })
   } catch (error) {
