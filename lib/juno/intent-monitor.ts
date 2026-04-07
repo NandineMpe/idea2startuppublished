@@ -6,6 +6,62 @@ import {
 } from "@/lib/juno/intent-lookback"
 
 const REDDIT_BASE = "https://www.reddit.com"
+const REDDIT_OAUTH_BASE = "https://oauth.reddit.com"
+
+// In-memory token cache — valid for one Vercel function instance lifetime
+let _cachedToken: { token: string; expiresAt: number } | null = null
+
+async function getRedditAccessToken(): Promise<string | null> {
+  const clientId = process.env.REDDIT_CLIENT_ID?.trim()
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET?.trim()
+  const username = process.env.REDDIT_USERNAME?.trim() || "juno_bot"
+
+  if (!clientId || !clientSecret) return null
+
+  // Return cached token if still valid (with 60s buffer)
+  if (_cachedToken && Date.now() < _cachedToken.expiresAt - 60_000) {
+    return _cachedToken.token
+  }
+
+  try {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
+    const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": `server:JunoIntentMonitor:1.0 (by /u/${username})`,
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(10_000),
+    })
+
+    if (!res.ok) {
+      console.warn(`[intent-monitor] Reddit OAuth token request failed: HTTP ${res.status}`)
+      return null
+    }
+
+    const data = (await res.json()) as { access_token?: string; expires_in?: number }
+    if (!data.access_token) return null
+
+    _cachedToken = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+    }
+    return _cachedToken.token
+  } catch (e) {
+    console.warn("[intent-monitor] Reddit OAuth token error:", e)
+    return null
+  }
+}
+
+function redditFetchHeaders(token: string | null, username: string): HeadersInit {
+  const ua = `server:JunoIntentMonitor:1.0 (by /u/${username})`
+  if (token) {
+    return { Authorization: `Bearer ${token}`, "User-Agent": ua }
+  }
+  return { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" }
+}
 
 export type IntentPlatform = "reddit" | "x" | "hn" | "quora" | "linkedin"
 
@@ -126,22 +182,25 @@ function pushRedditPost(
 
 /**
  * Crawl a subreddit's /new feed (no keyword gate — all posts within the time window).
- * Keywords are matched as metadata enrichment only.
+ * Uses OAuth token when available (required on Vercel — Reddit blocks anonymous cloud IPs).
  */
 async function crawlSubredditPosts(
   subreddit: string,
   keywords: string[],
   cutoff: number,
+  token: string | null,
 ): Promise<IntentSignal[]> {
+  const username = process.env.REDDIT_USERNAME?.trim() || "juno_bot"
   const signals: IntentSignal[] = []
+  const base = token ? REDDIT_OAUTH_BASE : REDDIT_BASE
   try {
-    const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/new.json?limit=100&raw_json=1`
+    const url = `${base}/r/${encodeURIComponent(subreddit)}/new.json?limit=100&raw_json=1`
     const res = await fetch(url, {
-      headers: { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" },
+      headers: redditFetchHeaders(token, username),
       signal: AbortSignal.timeout(15_000),
     })
     if (!res.ok) {
-      console.warn(`[intent-monitor] crawl r/${subreddit}: HTTP ${res.status}`)
+      console.warn(`[intent-monitor] crawl r/${subreddit}: HTTP ${res.status}${token ? " (OAuth)" : " (anon — set REDDIT_CLIENT_ID/SECRET)"}`)
       return []
     }
     const data = await res.json()
@@ -156,8 +215,8 @@ async function crawlSubredditPosts(
 
 /**
  * Full-feed crawl: reads all recent posts from each subreddit within the lookback window.
- * No keyword gate — every post within the time window is included.
- * Keywords are used as metadata enrichment for downstream LLM scoring.
+ * Authenticates via Reddit OAuth (client_credentials) — required for Vercel/cloud deployments
+ * where anonymous Reddit requests are blocked. Set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET.
  */
 export async function crawlRedditForIntent(
   subreddits: string[],
@@ -171,9 +230,17 @@ export async function crawlRedditForIntent(
     uniqSubs = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))].slice(0, 8)
   }
 
+  // Fetch OAuth token once for the entire crawl batch
+  const token = await getRedditAccessToken()
+  if (!token) {
+    console.warn("[intent-monitor] No Reddit OAuth token — REDDIT_CLIENT_ID/SECRET not set. Requests will be blocked on cloud IPs.")
+  } else {
+    console.log(`[intent-monitor] Reddit OAuth ready, crawling ${uniqSubs.length} subreddits.`)
+  }
+
   const signals: IntentSignal[] = []
   for (const subreddit of uniqSubs) {
-    const posts = await crawlSubredditPosts(subreddit, keywords, cutoff)
+    const posts = await crawlSubredditPosts(subreddit, keywords, cutoff, token)
     signals.push(...posts)
     await sleep(1100)
   }
