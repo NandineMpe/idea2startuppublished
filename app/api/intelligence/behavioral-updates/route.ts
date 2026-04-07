@@ -43,6 +43,8 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url)
     const subredditParam = searchParams.get("subreddit")
+    const forceLiveSummary =
+      searchParams.get("refresh") === "1" || searchParams.get("refresh")?.toLowerCase() === "true"
     const selectedSubreddit =
       subredditParam && subredditParam.trim() && subredditParam.trim().toLowerCase() !== "all"
         ? subredditParam.trim()
@@ -106,7 +108,7 @@ export async function GET(req: Request) {
     let cachedRows: Array<{ inputs: unknown; created_at: string }> | null = null
     let cachedError: unknown = null
 
-    if (!selectedSubreddit) {
+    if (!selectedSubreddit && !forceLiveSummary) {
       const cachedResponse = await supabase
         .from("ai_outputs")
         .select("inputs, created_at")
@@ -143,10 +145,20 @@ export async function GET(req: Request) {
         ? cachedSummary
         : await summarizeRedditRecon(context, summarySignals)
 
+    const subredditsInSynthesisBatch = [
+      ...new Set(
+        summarySignals
+          .map((s) => (typeof s.subreddit === "string" ? s.subreddit.trim().toLowerCase() : ""))
+          .filter(Boolean),
+      ),
+    ].sort((a, b) => a.localeCompare(b))
+
     return NextResponse.json({
       data: {
         ...summary,
         companyName: context.profile.name,
+        synthesisCombined: !selectedSubreddit,
+        subredditsInSynthesisBatch,
         conversationCount: summarySignals.length,
         latestThreadAt: summarySignals[0]?.discovered_at ?? null,
         contextSources: buildContextSources(context),
@@ -160,7 +172,8 @@ export async function GET(req: Request) {
         redditIntentSaved: context.profile.reddit_intent_subreddits,
         redditScanDefaults: defaults,
         threads,
-        summarySource: cachedSummary && !selectedSubreddit ? "cached" : "live",
+        summarySource:
+          cachedSummary && !selectedSubreddit && !forceLiveSummary ? "cached" : "live",
         generatedAt: new Date().toISOString(),
       },
     })

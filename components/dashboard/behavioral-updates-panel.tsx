@@ -78,6 +78,10 @@ type BehavioralUpdatesData = BehavioralSummary & {
   /** Saved scan targets; null means each run uses context-derived suggestions plus defaults. */
   redditIntentSaved: string[] | null
   redditScanDefaults: string[]
+  /** True when the LLM summary is built from all Reddit signals together (no subreddit filter). */
+  synthesisCombined?: boolean
+  /** Distinct subreddits present in the batch used for the overview (up to 24 recent signals). */
+  subredditsInSynthesisBatch?: string[]
   threads: BehavioralThread[]
   summarySource: "cached" | "live"
   generatedAt: string
@@ -170,11 +174,14 @@ export function BehavioralUpdatesPanel() {
       setError(null)
 
       try {
-        const query =
-          subredditValue && subredditValue !== "all"
-            ? `?subreddit=${encodeURIComponent(subredditValue)}`
-            : ""
-        const res = await fetch(`/api/intelligence/behavioral-updates${query}`, {
+        const params = new URLSearchParams()
+        if (subredditValue && subredditValue !== "all") {
+          params.set("subreddit", subredditValue)
+        } else if (showSpinner) {
+          params.set("refresh", "1")
+        }
+        const q = params.toString()
+        const res = await fetch(`/api/intelligence/behavioral-updates${q ? `?${q}` : ""}`, {
           cache: "no-store",
         })
         const json = (await res.json().catch(() => ({}))) as BehavioralUpdatesResponse
@@ -516,6 +523,23 @@ export function BehavioralUpdatesPanel() {
             <p className="mt-1 text-lg font-semibold text-foreground">
               {selectedSubreddit === "all" ? "All subreddits" : `r/${selectedSubreddit}`}
             </p>
+            {selectedSubreddit === "all" && data?.synthesisCombined ? (
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                One synthesis across every subreddit in the batch below (not separate summaries per sub).
+              </p>
+            ) : null}
+            {selectedSubreddit === "all" && (data?.subredditsInSynthesisBatch?.length ?? 0) > 0 ? (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                In this batch:{" "}
+                {(data.subredditsInSynthesisBatch ?? [])
+                  .slice(0, 10)
+                  .map((s) => `r/${s}`)
+                  .join(", ")}
+                {(data.subredditsInSynthesisBatch ?? []).length > 10
+                  ? ` +${(data.subredditsInSynthesisBatch ?? []).length - 10} more`
+                  : ""}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-xl border border-border bg-background/80 px-4 py-3">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Latest thread</p>
