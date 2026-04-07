@@ -26,6 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 type BehavioralTheme = {
   title: string
@@ -118,40 +124,47 @@ function ResearchListCard({
   description,
   items,
   icon,
+  accordionValue,
 }: {
   title: string
   description: string
   items: string[]
   icon: typeof Brain
+  accordionValue: string
 }) {
   const Icon = icon
 
   return (
-    <div className="rounded-xl border border-border bg-background/80 p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{description}</p>
-        </div>
-      </div>
-
-      <ul className="mt-3 space-y-2">
-        {items.length > 0 ? (
-          items.map((item) => (
-            <li key={item} className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[12px] leading-relaxed text-foreground/90">
-              {item}
-            </li>
-          ))
-        ) : (
-          <li className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2 text-[12px] text-muted-foreground">
-            No signal yet.
-          </li>
-        )}
-      </ul>
-    </div>
+    <Accordion type="single" collapsible defaultValue={accordionValue} className="rounded-xl border border-border bg-background/80 shadow-sm">
+      <AccordionItem value={accordionValue} className="border-none">
+        <AccordionTrigger className="px-4 py-3 hover:no-underline">
+          <div className="flex items-center gap-3 text-left">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Icon className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-foreground">{title}</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{description}</p>
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="px-4 pb-4">
+          <ul className="space-y-2">
+            {items.length > 0 ? (
+              items.map((item) => (
+                <li key={item} className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[12px] leading-relaxed text-foreground/90">
+                  {item}
+                </li>
+              ))
+            ) : (
+              <li className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2 text-[12px] text-muted-foreground">
+                No signal yet.
+              </li>
+            )}
+          </ul>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
   )
 }
 
@@ -674,94 +687,77 @@ export function BehavioralUpdatesPanel() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <ResearchListCard
-                title="Push of the present"
-                description="What is painful enough about the current way that buyers want out."
-                items={data.pushOfPresent}
-                icon={ShieldAlert}
-              />
-              <ResearchListCard
-                title="Pull of the new"
-                description="What a new solution promises that feels exciting or relieving."
-                items={data.pullOfNew}
-                icon={Sparkles}
-              />
-              <ResearchListCard
-                title="Anxiety of the new"
-                description="What could make them hesitate even when the old workflow is painful."
-                items={data.anxietyOfNew}
-                icon={Filter}
-              />
-              <ResearchListCard
-                title="Allegiance to the old"
-                description="What keeps them loyal to the current stack, habits, or process."
-                items={data.allegianceToOld}
-                icon={Wrench}
-              />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-3">
-              <ResearchListCard
-                title="How they solve it today"
-                description="Current stack, process, and makeshift operating system."
-                items={data.currentSolutions}
-                icon={Wrench}
-              />
-              <ResearchListCard
-                title="Friction points"
-                description="Where the current process breaks down or feels disproportionately costly."
-                items={data.frictionPoints}
-                icon={ShieldAlert}
-              />
-              <ResearchListCard
-                title="Workarounds"
-                description="The hacks, patches, and backup systems they built to survive."
-                items={data.workarounds}
-                icon={MessageCircle}
-              />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-4">
-              <ResearchListCard
-                title="Discovery paths"
-                description="How they find new products, peers, or alternatives."
-                items={data.discoveryPaths}
-                icon={Search}
-              />
-              <ResearchListCard
-                title="Buying process"
-                description="How evaluation and internal buy-in seem to happen."
-                items={data.buyingProcess}
-                icon={Filter}
-              />
-              <ResearchListCard
-                title="Pain points"
-                description="What keeps them up at night and makes the problem feel urgent."
-                items={data.painPoints}
-                icon={ShieldAlert}
-              />
-              <ResearchListCard
-                title="Gains"
-                description="What success looks like when the workflow finally works."
-                items={data.gains}
-                icon={TrendingUp}
-              />
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-xl border border-border bg-background/80 p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Latest evidence</p>
-                    <h3 className="mt-1 text-base font-semibold text-foreground">Threads behind the synthesis</h3>
+            <Accordion type="single" collapsible defaultValue="switching-forces" className="rounded-xl border border-border bg-background/80 shadow-sm">
+              <AccordionItem value="switching-forces" className="border-none">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="text-left">
+                    <p className="text-[13px] font-semibold text-foreground">Switching forces</p>
+                    <p className="text-[11px] text-muted-foreground">Push, pull, anxiety, and allegiance</p>
                   </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {data.threads.length} shown
-                  </Badge>
-                </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <ResearchListCard title="Push of the present" description="What is painful enough about the current way that buyers want out." items={data.pushOfPresent} icon={ShieldAlert} accordionValue="push" />
+                    <ResearchListCard title="Pull of the new" description="What a new solution promises that feels exciting or relieving." items={data.pullOfNew} icon={Sparkles} accordionValue="pull" />
+                    <ResearchListCard title="Anxiety of the new" description="What could make them hesitate even when the old workflow is painful." items={data.anxietyOfNew} icon={Filter} accordionValue="anxiety" />
+                    <ResearchListCard title="Allegiance to the old" description="What keeps them loyal to the current stack, habits, or process." items={data.allegianceToOld} icon={Wrench} accordionValue="allegiance" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-                <div className="mt-4 space-y-3">
+            <Accordion type="single" collapsible defaultValue="operations" className="rounded-xl border border-border bg-background/80 shadow-sm">
+              <AccordionItem value="operations" className="border-none">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="text-left">
+                    <p className="text-[13px] font-semibold text-foreground">How they operate today</p>
+                    <p className="text-[11px] text-muted-foreground">Current solutions, friction, and workarounds</p>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="grid gap-3 xl:grid-cols-3">
+                    <ResearchListCard title="How they solve it today" description="Current stack, process, and makeshift operating system." items={data.currentSolutions} icon={Wrench} accordionValue="solutions" />
+                    <ResearchListCard title="Friction points" description="Where the current process breaks down or feels disproportionately costly." items={data.frictionPoints} icon={ShieldAlert} accordionValue="friction" />
+                    <ResearchListCard title="Workarounds" description="The hacks, patches, and backup systems they built to survive." items={data.workarounds} icon={MessageCircle} accordionValue="workarounds" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible defaultValue="buying" className="rounded-xl border border-border bg-background/80 shadow-sm">
+              <AccordionItem value="buying" className="border-none">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="text-left">
+                    <p className="text-[13px] font-semibold text-foreground">Buying behaviour</p>
+                    <p className="text-[11px] text-muted-foreground">Discovery, evaluation, pain points, and gains</p>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <div className="grid gap-3 xl:grid-cols-4">
+                    <ResearchListCard title="Discovery paths" description="How they find new products, peers, or alternatives." items={data.discoveryPaths} icon={Search} accordionValue="discovery" />
+                    <ResearchListCard title="Buying process" description="How evaluation and internal buy-in seem to happen." items={data.buyingProcess} icon={Filter} accordionValue="buyingprocess" />
+                    <ResearchListCard title="Pain points" description="What keeps them up at night and makes the problem feel urgent." items={data.painPoints} icon={ShieldAlert} accordionValue="pain" />
+                    <ResearchListCard title="Gains" description="What success looks like when the workflow finally works." items={data.gains} icon={TrendingUp} accordionValue="gains" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible defaultValue="evidence" className="rounded-xl border border-border bg-background/80 shadow-sm">
+              <AccordionItem value="evidence" className="border-none">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="flex w-full items-center justify-between pr-2 text-left">
+                    <div>
+                      <p className="text-[13px] font-semibold text-foreground">Threads behind the synthesis</p>
+                      <p className="text-[11px] text-muted-foreground">Latest evidence from Reddit</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {data.threads.length} shown
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                <div className="space-y-3">
                   {data.threads.length > 0 ? (
                     data.threads.map((thread) => (
                       <div key={thread.id} className="rounded-lg border border-border/70 bg-muted/20 p-3">
@@ -821,38 +817,43 @@ export function BehavioralUpdatesPanel() {
                     </div>
                   )}
                 </div>
-              </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-              <div className="rounded-xl border border-border bg-background/80 p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">What to do with this</p>
-                <h3 className="mt-1 text-base font-semibold text-foreground">Next moves</h3>
-                <ul className="mt-4 space-y-2">
-                  {data.nextMoves.length > 0 ? (
-                    data.nextMoves.map((move) => (
-                      <li
-                        key={move}
-                        className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[12px] leading-relaxed text-foreground/90"
-                      >
-                        {move}
+            <Accordion type="single" collapsible defaultValue="nextmoves" className="rounded-xl border border-border bg-background/80 shadow-sm">
+              <AccordionItem value="nextmoves" className="border-none">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                  <div className="text-left">
+                    <p className="text-[13px] font-semibold text-foreground">Next moves</p>
+                    <p className="text-[11px] text-muted-foreground">What to do with this research</p>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <ul className="space-y-2">
+                    {data.nextMoves.length > 0 ? (
+                      data.nextMoves.map((move) => (
+                        <li key={move} className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-[12px] leading-relaxed text-foreground/90">
+                          {move}
+                        </li>
+                      ))
+                    ) : (
+                      <li className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2 text-[12px] text-muted-foreground">
+                        Next-step recommendations will appear here after the next synthesis.
                       </li>
-                    ))
-                  ) : (
-                    <li className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2 text-[12px] text-muted-foreground">
-                      Next-step recommendations will appear here after the next synthesis.
-                    </li>
-                  )}
-                </ul>
-
-                <div className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-3">
-                  <p className="text-[12px] font-medium text-foreground">How to use this panel</p>
-                  <ul className="mt-2 space-y-2 text-[12px] leading-relaxed text-muted-foreground">
-                    <li>Use the cross-subreddit view to understand recurring buying triggers.</li>
-                    <li>Switch to one subreddit like `r/CFO` to isolate a tighter buyer narrative.</li>
-                    <li>Turn repeated friction into messaging, roadmap hypotheses, and interview prompts.</li>
+                    )}
                   </ul>
-                </div>
-              </div>
-            </div>
+                  <div className="mt-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <p className="text-[12px] font-medium text-foreground">How to use this panel</p>
+                    <ul className="mt-2 space-y-2 text-[12px] leading-relaxed text-muted-foreground">
+                      <li>Use the cross-subreddit view to understand recurring buying triggers.</li>
+                      <li>Switch to one subreddit like r/CFO to isolate a tighter buyer narrative.</li>
+                      <li>Turn repeated friction into messaging, roadmap hypotheses, and interview prompts.</li>
+                    </ul>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </>
         ) : null}
       </div>
