@@ -73,6 +73,14 @@ export async function GET() {
       .order("discovered_at", { ascending: false })
       .limit(1)
 
+    const { count: hotIntentCount } = await supabase
+      .from("intent_signals")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("platform", "reddit")
+      .eq("status", "new")
+      .gte("relevance_score", 8)
+
     // Pipeline status - last run per type
     const pipelineStatus: Record<string, string | null> = {
       cbs: null,
@@ -153,6 +161,7 @@ export async function GET() {
         ? toLegacyFeedRow(staffMeetingRows[0] as AiOutputDbRow)
         : null,
       commentDraftCount,
+      hotIntentCount: hotIntentCount ?? 0,
     })
   } catch (err) {
     console.error("Intelligence feed error:", err)

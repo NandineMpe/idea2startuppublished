@@ -151,7 +151,7 @@ export function IntentSignalsPanel() {
   const [scanHint, setScanHint] = useState<string | null>(null)
   const [copyId, setCopyId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<"new" | "responded" | "irrelevant">("new")
+  const [statusFilter, setStatusFilter] = useState<"new" | "hot" | "responded" | "irrelevant">("new")
   const [logReplyRow, setLogReplyRow] = useState<IntentSignalRow | null>(null)
   const [logChannel, setLogChannel] = useState<string>("reddit_comment")
   const [logNotes, setLogNotes] = useState("")
@@ -217,20 +217,31 @@ export function IntentSignalsPanel() {
 
   const statusCounts = useMemo(() => {
     let newC = 0
+    let hot = 0
     let responded = 0
     let irrelevant = 0
     for (const r of rows) {
-      if (r.status === "new") newC += 1
-      else if (r.status === "responded") responded += 1
+      if (r.status === "new") {
+        newC += 1
+        if ((r.relevance_score ?? 0) >= 8) hot += 1
+      } else if (r.status === "responded") responded += 1
       else if (r.status === "irrelevant") irrelevant += 1
     }
-    return { new: newC, responded, irrelevant }
+    return { new: newC, hot, responded, irrelevant }
   }, [rows])
 
-  const filteredRows = useMemo(
-    () => rows.filter((row) => row.status === statusFilter),
-    [rows, statusFilter],
-  )
+  const filteredRows = useMemo(() => {
+    const byRelevanceDesc = (a: IntentSignalRow, b: IntentSignalRow) =>
+      (b.relevance_score ?? 0) - (a.relevance_score ?? 0)
+
+    if (statusFilter === "new") {
+      return [...rows.filter((row) => row.status === "new")].sort(byRelevanceDesc)
+    }
+    if (statusFilter === "hot") {
+      return [...rows.filter((row) => row.status === "new" && (row.relevance_score ?? 0) >= 8)].sort(byRelevanceDesc)
+    }
+    return rows.filter((row) => row.status === statusFilter)
+  }, [rows, statusFilter])
 
   function openLogReply(row: IntentSignalRow) {
     const p = row.response_platform?.trim()
@@ -373,7 +384,7 @@ export function IntentSignalsPanel() {
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card">
+    <section id="reddit-intent-signals" className="scroll-mt-24 overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">CRO - Type 2</p>
@@ -409,6 +420,7 @@ export function IntentSignalsPanel() {
         {(
           [
             { key: "new" as const, label: "New" },
+            { key: "hot" as const, label: "Hot" },
             { key: "responded" as const, label: "Replied" },
             { key: "irrelevant" as const, label: "Not relevant" },
           ] as const
@@ -418,9 +430,13 @@ export function IntentSignalsPanel() {
             type="button"
             size="sm"
             variant={statusFilter === key ? "secondary" : "ghost"}
-            className="h-8 text-[12px]"
+            className={cn(
+              "h-8 gap-1 text-[12px]",
+              key === "hot" && statusFilter === "hot" && "border border-orange-500/30 bg-orange-500/15 text-orange-900 dark:text-orange-100",
+            )}
             onClick={() => setStatusFilter(key)}
           >
+            {key === "hot" ? <Flame className="h-3.5 w-3.5 shrink-0" /> : null}
             {label} ({statusCounts[key]})
           </Button>
         ))}
@@ -521,6 +537,22 @@ export function IntentSignalsPanel() {
       </div>
 
       <div className="max-h-[min(70vh,720px)] space-y-4 overflow-y-auto p-4 pt-3">
+        {statusFilter === "new" && statusCounts.hot > 0 ? (
+          <div className="rounded-md border border-orange-500/25 bg-orange-500/10 px-3 py-2 text-[12px] text-orange-950 dark:text-orange-100/95">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <Flame className="h-3.5 w-3.5 shrink-0" />
+              {statusCounts.hot} hot signal{statusCounts.hot === 1 ? "" : "s"} (score 8+) in New
+            </span>
+            <button
+              type="button"
+              className="ml-2 text-primary underline decoration-primary/50 underline-offset-2 hover:text-primary/90"
+              onClick={() => setStatusFilter("hot")}
+            >
+              Open Hot inbox
+            </button>
+          </div>
+        ) : null}
+
         {filteredRows.length === 0 && !loading && (
           <p className="text-sm text-muted-foreground">
             {statusFilter === "new" ? (
@@ -532,6 +564,14 @@ export function IntentSignalsPanel() {
                   company context
                 </a>
                 .
+              </>
+            ) : statusFilter === "hot" ? (
+              <>
+                No hot signals right now. Hot means new threads with relevance score 8 or higher. Check{" "}
+                <button type="button" className="text-primary underline underline-offset-2" onClick={() => setStatusFilter("new")}>
+                  New
+                </button>{" "}
+                for the full queue.
               </>
             ) : statusFilter === "responded" ? (
               <>Nothing in Replied yet. Use <strong className="text-foreground/90">Log reply</strong> on a new signal to record where you posted and optional notes.</>

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { useEffect } from "react"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { BehavioralUpdatesPanel } from "@/components/dashboard/behavioral-updates-panel"
+import { IntentSignalsPanel } from "@/components/dashboard/intent-signals-panel"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
 import { SecurityAlertsSummary } from "@/components/dashboard/security-alerts-summary"
 
@@ -80,6 +81,10 @@ export default function DashboardPage() {
 
           <motion.div variants={item}>
             <BehavioralUpdatesPanel />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <IntentSignalsPanel />
           </motion.div>
 
           <motion.div variants={item} className="rounded-lg border border-dashed border-border bg-muted/20 p-5">

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Circle,
   Cpu,
+  Flame,
   FlaskConical,
   Loader2,
   Play,
@@ -49,6 +50,8 @@ type FeedSnapshot = {
   leads: LegacyAiFeedRow[]
   behavioralUpdates: BehavioralSnapshot | null
   radar: LegacyAiFeedRow | null
+  /** New Reddit signals with relevance_score >= 8 */
+  hotIntentCount: number
 }
 
 const PIPELINES: Pipeline[] = [
@@ -69,7 +72,7 @@ const PIPELINES: Pipeline[] = [
     title: "Behavioral updates",
     subtitle: "Reddit customer research across target subreddits: pains, workarounds, buying behavior, and switching forces.",
     schedule: "Scheduled - every 4h",
-    href: "/dashboard#behavioral-updates",
+    href: "/dashboard#reddit-intent-signals",
     icon: FlaskConical,
     accent: "text-sky-600 bg-sky-500/10 border-sky-500/20",
     statusKey: "intent",
@@ -148,7 +151,7 @@ const LOG_LINES: Record<string, string[]> = {
     "Scoring threads against your ICP and product context...",
     "Synthesizing customer behavior and switching forces...",
     "Saving behavioral updates and thread evidence...",
-    "Finished. Open Behavioral updates below.",
+    "Finished. Open Reddit intent signals below.",
   ],
 }
 
@@ -253,9 +256,20 @@ function PipelineLatestOutput({
     const research = feed.behavioralUpdates
     if (!research) {
       return (
-        <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
-          No behavioral snapshot saved yet. Run the Reddit scan and the latest customer research will appear here.
-        </p>
+        <div className="space-y-2">
+          <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
+            No behavioral snapshot saved yet. Run the Reddit scan and the latest customer research will appear here.
+          </p>
+          {feed.hotIntentCount > 0 ? (
+            <PipelineTitleLink
+              href="/dashboard#reddit-intent-signals"
+              className="flex items-center gap-1.5 rounded-md border border-orange-500/25 bg-orange-500/10 px-2 py-1.5 text-[11px] font-medium text-orange-800 dark:text-orange-200/95"
+            >
+              <Flame className="h-3.5 w-3.5 shrink-0" />
+              {feed.hotIntentCount} hot signal{feed.hotIntentCount === 1 ? "" : "s"} (score 8+) in Reddit intent signals
+            </PipelineTitleLink>
+          ) : null}
+        </div>
       )
     }
 
@@ -294,9 +308,18 @@ function PipelineLatestOutput({
             </p>
           ) : null}
           <p className="text-[11px] text-muted-foreground">
-            Open <span className="text-foreground/90">Behavioral updates</span> below for subreddit filters,
-            switching forces, and raw thread evidence.
+            Open <span className="text-foreground/90">Behavioral updates</span> for subreddit filters and synthesis.
+            High-score threads live in <span className="text-foreground/90">Reddit intent signals</span> below.
           </p>
+          {feed.hotIntentCount > 0 ? (
+            <PipelineTitleLink
+              href="/dashboard#reddit-intent-signals"
+              className="flex items-center gap-1.5 rounded-md border border-orange-500/25 bg-orange-500/10 px-2 py-1.5 text-[11px] font-medium text-orange-800 dark:text-orange-200/95"
+            >
+              <Flame className="h-3.5 w-3.5 shrink-0" />
+              {feed.hotIntentCount} hot signal{feed.hotIntentCount === 1 ? "" : "s"} (score 8+)
+            </PipelineTitleLink>
+          ) : null}
         </CollapsibleContent>
       </Collapsible>
     )
@@ -382,6 +405,7 @@ export function IntelligencePipelines() {
         leads: json.leads ?? [],
         behavioralUpdates: json.behavioralUpdates ?? null,
         radar: json.radar ?? null,
+        hotIntentCount: typeof json.hotIntentCount === "number" ? json.hotIntentCount : 0,
       })
       return nextStatus
     } catch {
@@ -598,13 +622,22 @@ export function IntelligencePipelines() {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <PipelineTitleLink
                       href={pipeline.href}
                       className="truncate text-[13px] font-semibold text-foreground hover:text-primary"
                     >
                       {pipeline.title}
                     </PipelineTitleLink>
+                    {pipeline.id === "intent" && feed && feed.hotIntentCount > 0 ? (
+                      <PipelineTitleLink
+                        href="/dashboard#reddit-intent-signals"
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-800 dark:text-orange-200/90"
+                      >
+                        <Flame className="h-3 w-3" />
+                        {feed.hotIntentCount} hot
+                      </PipelineTitleLink>
+                    ) : null}
                     <Circle
                       className={cn(
                         "h-2 w-2 shrink-0 fill-current",

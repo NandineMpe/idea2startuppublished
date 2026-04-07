@@ -148,10 +148,6 @@ export const intentScanner = inngest.createFunction(
       [...toSave].sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 16),
     )
 
-    if (hot.length > 0) {
-      console.log(`[intent-scanner] user=${userId} hot signals: ${hot.length}`, hot.map((h) => h.url))
-    }
-
     let saved = 0
     await step.run("persist-signals", async () => {
       for (const s of toSave) {

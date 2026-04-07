@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useContext, createContext } from "react"
+import { useState, useContext, createContext, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { OrganizationSwitcher } from "@/components/dashboard/organization-switcher"
 
@@ -52,6 +52,25 @@ export function useSidebar() {
 export function DashboardSidebar() {
   const pathname = usePathname() ?? ""
   const [expanded, setExpanded] = useState(true)
+  const [hotIntentCount, setHotIntentCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch("/api/intelligence/feed", { cache: "no-store" })
+        if (!res.ok) return
+        const json = (await res.json()) as { hotIntentCount?: number }
+        const n = typeof json.hotIntentCount === "number" ? json.hotIntentCount : 0
+        if (!cancelled) setHotIntentCount(n)
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   return (
     <SidebarContext.Provider value={{ expanded, setExpanded }}>
@@ -93,13 +112,16 @@ export function DashboardSidebar() {
             const isActive = navItem.exact
               ? pathname === navItem.href
               : pathname === navItem.href || pathname.startsWith(navItem.href + "/")
+            const showHotBadge = navItem.exact && navItem.href === "/dashboard" && hotIntentCount > 0
+
             return (
               <Link
                 key={navItem.href}
-                href={navItem.href}
+                href={showHotBadge ? "/dashboard#reddit-intent-signals" : navItem.href}
                 className={cn(
                   "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors",
                   expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
+                  showHotBadge && !expanded && "relative",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -113,7 +135,19 @@ export function DashboardSidebar() {
                     expanded ? "h-4 w-4" : "h-[18px] w-[18px]",
                   )}
                 />
-                {expanded && <span className="truncate">{navItem.title}</span>}
+                {expanded && (
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate">{navItem.title}</span>
+                    {showHotBadge ? (
+                      <span className="shrink-0 rounded-full bg-orange-500/20 px-1.5 py-px text-[10px] font-semibold tabular-nums text-orange-800 dark:text-orange-200">
+                        {hotIntentCount > 99 ? "99+" : hotIntentCount}
+                      </span>
+                    ) : null}
+                  </span>
+                )}
+                {!expanded && showHotBadge ? (
+                  <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-orange-500 ring-2 ring-card" />
+                ) : null}
               </Link>
             )
           })}
