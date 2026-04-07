@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
   ArrowUpRight,
   Briefcase,
@@ -11,7 +12,7 @@ import {
   Loader2,
   Play,
 } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { formatDistanceToNow } from "date-fns"
 import type { LegacyAiFeedRow } from "@/lib/ai-outputs-legacy"
 import type { RedditBehavioralSummary } from "@/lib/juno/reddit-recon"
@@ -89,6 +90,46 @@ const PIPELINES: Pipeline[] = [
     triggerNote: "Scheduled only - runs ~06:00",
   },
 ]
+
+function PipelineTitleLink({
+  href,
+  className,
+  children,
+}: {
+  href: string
+  className?: string
+  children: ReactNode
+}) {
+  const pathname = usePathname()
+  const hashIdx = href.indexOf("#")
+  const pathOnly = hashIdx >= 0 ? href.slice(0, hashIdx) : href
+  const hash = hashIdx >= 0 ? href.slice(hashIdx + 1) : ""
+
+  if (hash && pathOnly === "/dashboard") {
+    return (
+      <Link
+        href={href}
+        scroll={false}
+        className={className}
+        onClick={(e) => {
+          if (pathname === "/dashboard") {
+            e.preventDefault()
+            document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" })
+            window.history.replaceState(null, "", `#${hash}`)
+          }
+        }}
+      >
+        {children}
+      </Link>
+    )
+  }
+
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  )
+}
 
 const LOG_LINES: Record<string, string[]> = {
   cbs: [
@@ -558,9 +599,12 @@ export function IntelligencePipelines() {
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Link href={pipeline.href} className="truncate text-[13px] font-semibold text-foreground hover:text-primary">
+                    <PipelineTitleLink
+                      href={pipeline.href}
+                      className="truncate text-[13px] font-semibold text-foreground hover:text-primary"
+                    >
                       {pipeline.title}
-                    </Link>
+                    </PipelineTitleLink>
                     <Circle
                       className={cn(
                         "h-2 w-2 shrink-0 fill-current",

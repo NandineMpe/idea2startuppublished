@@ -3,10 +3,20 @@
 import { motion } from "framer-motion"
 import { BookOpen, ArrowUpRight } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useEffect } from "react"
 import { FounderDailyFeed } from "@/components/dashboard/founder-daily-feed"
 import { BehavioralUpdatesPanel } from "@/components/dashboard/behavioral-updates-panel"
 import { IntelligencePipelines } from "@/components/dashboard/intelligence-pipelines"
 import { SecurityAlertsSummary } from "@/components/dashboard/security-alerts-summary"
+
+function scrollToHashFragment() {
+  const id = typeof window !== "undefined" ? window.location.hash?.replace(/^#/, "").trim() : ""
+  if (!id) return
+  window.requestAnimationFrame(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  })
+}
 
 const container = {
   hidden: { opacity: 0 },
@@ -22,6 +32,20 @@ const item = {
 }
 
 export default function DashboardPage() {
+  const pathname = usePathname()
+
+  useEffect(() => {
+    scrollToHashFragment()
+    window.addEventListener("hashchange", scrollToHashFragment)
+    return () => window.removeEventListener("hashchange", scrollToHashFragment)
+  }, [])
+
+  useEffect(() => {
+    if (pathname !== "/dashboard") return
+    const t = window.setTimeout(() => scrollToHashFragment(), 50)
+    return () => window.clearTimeout(t)
+  }, [pathname])
+
   return (
     <motion.div
       initial="hidden"

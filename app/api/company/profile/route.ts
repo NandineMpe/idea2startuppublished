@@ -246,7 +246,17 @@ export async function PUT(request: Request) {
       organization: organization ?? null,
     })
   } catch (error) {
-    console.error("Company profile PUT error:", error)
-    return NextResponse.json({ error: "Failed to save profile" }, { status: 500 })
+    const raw = error instanceof Error ? error.message : String(error)
+    if (/reddit_intent_subreddits|Could not find the.*column/i.test(raw)) {
+      logApiError("company profile PUT (missing column)", error)
+      return NextResponse.json(
+        {
+          error:
+            "Could not save subreddit settings. Run Supabase migration 045 (adds column reddit_intent_subreddits), then try again.",
+        },
+        { status: 500 },
+      )
+    }
+    return jsonApiError(500, error, "company profile PUT")
   }
 }

@@ -274,6 +274,7 @@ export function BehavioralUpdatesPanel() {
   async function saveSubredditTargets() {
     setSaveTargetsLoading(true)
     setTargetsHint(null)
+    setError(null)
     try {
       const body =
         useAutoSubreddits || pinnedSubreddits.length === 0
@@ -287,7 +288,10 @@ export function BehavioralUpdatesPanel() {
       })
       const json = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) {
-        throw new Error(typeof json.error === "string" ? json.error : "Could not save subreddit targets.")
+        setError(
+          typeof json.error === "string" ? json.error : "Could not save subreddit targets.",
+        )
+        return
       }
       setTargetsHint(
         useAutoSubreddits || pinnedSubreddits.length === 0
@@ -296,7 +300,7 @@ export function BehavioralUpdatesPanel() {
       )
       void loadData(selectedSubreddit, true)
     } catch (e) {
-      setTargetsHint(e instanceof Error ? e.message : "Save failed.")
+      setError(e instanceof Error ? e.message : "Save failed.")
     } finally {
       setSaveTargetsLoading(false)
     }
@@ -337,7 +341,7 @@ export function BehavioralUpdatesPanel() {
   return (
     <section
       id="behavioral-updates"
-      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+      className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       <div className="border-b border-border bg-muted/20 px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
