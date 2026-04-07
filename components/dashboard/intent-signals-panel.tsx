@@ -4,9 +4,48 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns"
 import { Bookmark, Check, Copy, ExternalLink, Flame, Loader2, MessageCircle, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 const SAVED_SIGNALS_STORAGE_KEY = "juno.intent-signals.saved"
+
+const REPLY_LOG_CHANNELS = [
+  { value: "reddit_comment", label: "Reddit (comment on thread)" },
+  { value: "hn_reply", label: "Hacker News" },
+  { value: "linkedin_dm", label: "LinkedIn DM" },
+  { value: "x_reply", label: "X (Twitter)" },
+  { value: "direct_email", label: "Email" },
+  { value: "other", label: "Other or not posted yet" },
+] as const
+
+function formatResponsePlatform(v: string | null | undefined): string {
+  const m: Record<string, string> = {
+    reddit_comment: "Reddit comment",
+    hn_reply: "Hacker News",
+    linkedin_dm: "LinkedIn DM",
+    x_reply: "X",
+    direct_email: "Email",
+    other: "Other",
+  }
+  const s = v?.trim() ?? ""
+  return m[s] || (s ? s.replace(/_/g, " ") : "")
+}
 
 export type IntentSignalRow = {
   id: string
@@ -25,6 +64,8 @@ export type IntentSignalRow = {
   urgency: string | null
   matched_keywords: string[] | null
   status: string
+  responded_at: string | null
+  response_notes: string | null
   discovered_at: string
 }
 
@@ -110,6 +151,10 @@ export function IntentSignalsPanel() {
   const [scanHint, setScanHint] = useState<string | null>(null)
   const [copyId, setCopyId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<"new" | "responded" | "irrelevant">("new")
+  const [logReplyRow, setLogReplyRow] = useState<IntentSignalRow | null>(null)
+  const [logChannel, setLogChannel] = useState<string>("reddit_comment")
+  const [logNotes, setLogNotes] = useState("")
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadSilent = useCallback(async () => {
@@ -169,7 +214,39 @@ export function IntentSignalsPanel() {
   }, [rows])
 
   const savedGroups = useMemo(() => groupSavedSignals(savedRows), [savedRows])
-  const active = rows.filter((row) => row.status === "new")
+
+  const statusCounts = useMemo(() => {
+    let newC = 0
+    let responded = 0
+    let irrelevant = 0
+    for (const r of rows) {
+      if (r.status === "new") newC += 1
+      else if (r.status === "responded") responded += 1
+      else if (r.status === "irrelevant") irrelevant += 1
+    }
+    return { new: newC, responded, irrelevant }
+  }, [rows])
+
+  const filteredRows = useMemo(
+    () => rows.filter((row) => row.status === statusFilter),
+    [rows, statusFilter],
+  )
+
+  function openLogReply(row: IntentSignalRow) {
+    const p = row.response_platform?.trim()
+    const valid = p && REPLY_LOG_CHANNELS.some((c) => c.value === p)
+    if (valid) {
+      setLogChannel(p!)
+    } else if (row.platform === "reddit") {
+      setLogChannel("reddit_comment")
+    } else if (row.platform === "hn") {
+      setLogChannel("hn_reply")
+    } else {
+      setLogChannel("other")
+    }
+    setLogNotes(row.response_notes?.trim() ?? "")
+    setLogReplyRow(row)
+  }
 
   function isSaved(row: IntentSignalRow) {
     return savedRows.some((savedRow) => savedRow.id === row.id)
@@ -249,6 +326,8 @@ export function IntentSignalsPanel() {
     id: string,
     body: {
       status: "new" | "responded" | "converted" | "irrelevant"
+      response_platform?: string | null
+      response_notes?: string | null
     },
   ) {
     setActionId(id)
@@ -267,8 +346,26 @@ export function IntentSignalsPanel() {
     }
   }
 
-  async function markResponded(id: string) {
-    await updateSignal(id, { status: "responded" })
+  async function submitLogReply() {
+    if (!logReplyRow) return
+    setActionId(logReplyRow.id)
+    try {
+      const res = await fetch(`/api/intelligence/intent-signals/${logReplyRow.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "responded",
+          response_platform: logChannel,
+          response_notes: logNotes.trim() || null,
+        }),
+      })
+      if (res.ok) {
+        setLogReplyRow(null)
+        await loadSilent()
+      }
+    } finally {
+      setActionId(null)
+    }
   }
 
   async function markIrrelevant(id: string) {
@@ -305,6 +402,28 @@ export function IntentSignalsPanel() {
           </Button>
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Inbox</span>
+        {(
+          [
+            { key: "new" as const, label: "New" },
+            { key: "responded" as const, label: "Replied" },
+            { key: "irrelevant" as const, label: "Not relevant" },
+          ] as const
+        ).map(({ key, label }) => (
+          <Button
+            key={key}
+            type="button"
+            size="sm"
+            variant={statusFilter === key ? "secondary" : "ghost"}
+            className="h-8 text-[12px]"
+            onClick={() => setStatusFilter(key)}
+          >
+            {label} ({statusCounts[key]})
+          </Button>
+        ))}
       </div>
 
       <div className="space-y-2 px-4 pt-2">
@@ -402,21 +521,27 @@ export function IntentSignalsPanel() {
       </div>
 
       <div className="max-h-[min(70vh,720px)] space-y-4 overflow-y-auto p-4 pt-3">
-        {active.length === 0 && !loading && (
+        {filteredRows.length === 0 && !loading && (
           <p className="text-sm text-muted-foreground">
-            No new Reddit signals yet. Use <strong className="text-foreground/90">Scan Reddit now</strong> or wait for
-            the schedule. Saved posts stay pinned in the ribbon above for later follow-up. If scans never return rows,
-            confirm Inngest is receiving events (Vercel has <code className="text-[11px]">INNGEST_*</code> keys) and{" "}
-            <code className="text-[11px]">OPENROUTER_API_KEY</code> or{" "}
-            <code className="text-[11px]">LLM_API_KEY</code> for scoring. Add audit or compliance phrases in{" "}
-            <a href="/dashboard/context" className="text-primary hover:underline">
-              company context
-            </a>
-            .
+            {statusFilter === "new" ? (
+              <>
+                No new Reddit signals yet. Use <strong className="text-foreground/90">Scan Reddit now</strong> or wait for
+                the schedule. Saved posts stay pinned in the ribbon above. If scans never return rows, confirm Inngest
+                (Vercel <code className="text-[11px]">INNGEST_*</code>) and LLM keys for scoring. Tune phrases in{" "}
+                <a href="/dashboard/context" className="text-primary hover:underline">
+                  company context
+                </a>
+                .
+              </>
+            ) : statusFilter === "responded" ? (
+              <>Nothing in Replied yet. Use <strong className="text-foreground/90">Log reply</strong> on a new signal to record where you posted and optional notes.</>
+            ) : (
+              <>No threads marked not relevant.</>
+            )}
           </p>
         )}
 
-        {active.map((row) => {
+        {filteredRows.map((row) => {
           const score = row.relevance_score ?? 0
           const hot = score >= 8
           const when = formatDistanceToNow(new Date(row.discovered_at), { addSuffix: true })
@@ -469,6 +594,26 @@ export function IntentSignalsPanel() {
                     Suggested response
                   </p>
                   <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground">{reply}</p>
+                  {row.status === "new" && row.response_platform && (
+                    <p className="mt-2 text-[10px] text-emerald-900/80 dark:text-emerald-200/70">
+                      Model channel hint: {formatResponsePlatform(row.response_platform)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {row.status === "responded" && (row.responded_at || row.response_platform || row.response_notes?.trim()) && (
+                <div className="rounded-md border border-border/80 bg-background/80 px-2.5 py-2">
+                  <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">Reply log</p>
+                  <p className="text-[12px] text-foreground/90">
+                    {row.responded_at
+                      ? `Logged ${formatDistanceToNow(new Date(row.responded_at), { addSuffix: true })}`
+                      : "Marked as replied"}
+                    {row.response_platform ? ` · ${formatResponsePlatform(row.response_platform)}` : ""}
+                  </p>
+                  {row.response_notes?.trim() ? (
+                    <p className="mt-1.5 whitespace-pre-wrap text-[12px] text-muted-foreground">{row.response_notes}</p>
+                  ) : null}
                 </div>
               )}
 
@@ -513,31 +658,88 @@ export function IntentSignalsPanel() {
                   </Button>
                 )}
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={actionId === row.id}
-                  onClick={() => void markResponded(row.id)}
-                >
-                  Mark responded
-                </Button>
+                {row.status === "new" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="default"
+                    disabled={actionId === row.id}
+                    onClick={() => openLogReply(row)}
+                  >
+                    Log reply
+                  </Button>
+                )}
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  disabled={actionId === row.id}
-                  onClick={() => void markIrrelevant(row.id)}
-                >
-                  Not relevant
-                </Button>
+                {row.status === "new" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    disabled={actionId === row.id}
+                    onClick={() => void markIrrelevant(row.id)}
+                  >
+                    Not relevant
+                  </Button>
+                )}
               </div>
             </article>
           )
         })}
       </div>
+
+      <Dialog open={!!logReplyRow} onOpenChange={(open) => !open && setLogReplyRow(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Log your reply</DialogTitle>
+            <DialogDescription>
+              Say where you posted (or that you did not). Saves to the database and moves this thread to Replied.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="log-channel">Channel</Label>
+              <Select value={logChannel} onValueChange={setLogChannel}>
+                <SelectTrigger id="log-channel" className="text-[13px]">
+                  <SelectValue placeholder="Pick channel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPLY_LOG_CHANNELS.map((c) => (
+                    <SelectItem key={c.value} value={c.value} className="text-[13px]">
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="log-notes">Notes (optional)</Label>
+              <Textarea
+                id="log-notes"
+                placeholder="Example: left a comment, or DM only, or thread archived"
+                value={logNotes}
+                onChange={(e) => setLogNotes(e.target.value)}
+                rows={3}
+                className="resize-y text-[13px]"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setLogReplyRow(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitLogReply()}
+              disabled={!logReplyRow || actionId === logReplyRow.id}
+              className="gap-2"
+            >
+              {actionId === logReplyRow?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

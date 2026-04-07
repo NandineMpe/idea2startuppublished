@@ -16,6 +16,7 @@ export async function PATCH(
 
     const body = (await req.json().catch(() => ({}))) as {
       status?: string
+      response_platform?: string | null
       response_notes?: string | null
     }
 
@@ -28,9 +29,27 @@ export async function PATCH(
     const updates: Record<string, unknown> = { status }
     if (status === "responded") {
       updates.responded_at = new Date().toISOString()
+    } else {
+      updates.responded_at = null
     }
+
+    if (body.response_platform !== undefined) {
+      const raw = body.response_platform
+      if (raw === null || raw === "") {
+        updates.response_platform = null
+      } else if (typeof raw === "string") {
+        updates.response_platform = raw.trim().slice(0, 80) || null
+      }
+    }
+
     if (body.response_notes !== undefined) {
-      updates.response_notes = body.response_notes
+      const n = body.response_notes
+      updates.response_notes =
+        n === null || n === ""
+          ? null
+          : typeof n === "string"
+            ? n.trim().slice(0, 4000) || null
+            : null
     }
 
     const { data, error } = await supabase
