@@ -1,4 +1,9 @@
 import { COMPETITOR_KEYWORDS } from "@/lib/juno/intent-keywords"
+import {
+  getIntentLookbackDays,
+  getIntentLookbackMs,
+  redditSearchTimeParam,
+} from "@/lib/juno/intent-lookback"
 
 const REDDIT_BASE = "https://www.reddit.com"
 
@@ -114,7 +119,11 @@ function pushRedditPost(
 /**
  * Site-wide Reddit search (not restricted to one subreddit) — higher recall.
  */
-async function scanRedditGlobal(keywords: string[], cutoff: number): Promise<IntentSignal[]> {
+async function scanRedditGlobal(
+  keywords: string[],
+  cutoff: number,
+  redditT: ReturnType<typeof redditSearchTimeParam>,
+): Promise<IntentSignal[]> {
   const signals: IntentSignal[] = []
   const orParts = keywords
     .filter((k) => k.length > 2)
@@ -124,7 +133,7 @@ async function scanRedditGlobal(keywords: string[], cutoff: number): Promise<Int
   if (!q.trim()) return []
 
   try {
-    const searchUrl = `${REDDIT_BASE}/search.json?q=${encodeURIComponent(q)}&sort=new&t=week&limit=25`
+    const searchUrl = `${REDDIT_BASE}/search.json?q=${encodeURIComponent(q)}&sort=new&t=${redditT}&limit=25`
     const res = await fetch(searchUrl, {
       headers: { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" },
       signal: AbortSignal.timeout(15_000),
@@ -149,7 +158,9 @@ export async function scanRedditForIntent(
   subreddits: string[],
 ): Promise<IntentSignal[]> {
   const signals: IntentSignal[] = []
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const lookbackDays = getIntentLookbackDays()
+  const redditT = redditSearchTimeParam(lookbackDays)
+  const cutoff = Date.now() - getIntentLookbackMs()
   const uniqSubs = [...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean))].slice(0, 12)
   const kwSlice = keywords.slice(0, 12)
 
@@ -161,7 +172,7 @@ export async function scanRedditForIntent(
     if (!q.trim()) continue
 
     try {
-      const searchUrl = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=week&limit=20`
+      const searchUrl = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/search.json?q=${encodeURIComponent(q)}&restrict_sr=1&sort=new&t=${redditT}&limit=20`
 
       const res = await fetch(searchUrl, {
         headers: { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" },
@@ -183,7 +194,7 @@ export async function scanRedditForIntent(
     await sleep(1100)
   }
 
-  const global = await scanRedditGlobal(keywords, cutoff)
+  const global = await scanRedditGlobal(keywords, cutoff, redditT)
   return deduplicateSignals([...signals, ...global])
 }
 
@@ -198,11 +209,11 @@ type HnHit = {
 }
 
 /**
- * HN Algolia — comments and stories from the last ~7 days.
+ * HN Algolia — comments and stories within the configured lookback window.
  */
 export async function scanHNForIntent(keywords: string[]): Promise<IntentSignal[]> {
   const signals: IntentSignal[] = []
-  const sinceSec = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+  const sinceSec = Math.floor((Date.now() - getIntentLookbackMs()) / 1000)
   const kwSlice = keywords.slice(0, 8)
 
   for (const keyword of kwSlice) {
