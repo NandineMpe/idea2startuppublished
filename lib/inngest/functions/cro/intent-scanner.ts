@@ -1,6 +1,7 @@
 import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
-import { buildKeywordList, REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
+import { buildKeywordList } from "@/lib/juno/intent-keywords"
+import { resolveSubredditsForIntentScan } from "@/lib/juno/reddit-subreddit-suggest"
 import { scanRedditForIntent } from "@/lib/juno/intent-monitor"
 import { scoreIntentSignals, type ScoredIntent } from "@/lib/juno/intent-scoring"
 import { summarizeRedditRecon, type RedditReconSignal } from "@/lib/juno/reddit-recon"
@@ -107,8 +108,12 @@ export const intentScanner = inngest.createFunction(
 
     const keywords = buildKeywordList(context.extracted.keywords)
 
+    const subreddits = await step.run("resolve-subreddits", () =>
+      resolveSubredditsForIntentScan(context),
+    )
+
     const redditSignals = await step.run("scan-reddit", () =>
-      scanRedditForIntent(keywords, REDDIT_SUBREDDITS),
+      scanRedditForIntent(keywords, subreddits),
     )
 
     const raw = [...redditSignals]

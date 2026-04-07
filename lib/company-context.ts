@@ -88,7 +88,23 @@ export interface CompanyProfile {
   vault_context_sync_error: string | null
   whatsapp_number?: string | null
   whatsapp_verified?: boolean | null
+  /** Lowercase subreddit names for Reddit intent scans; null means derive each run from context plus defaults. */
+  reddit_intent_subreddits: string[] | null
   raw: Record<string, unknown>
+}
+
+/** Normalize profile/API JSON into lowercase subreddit slugs, or null if empty. */
+export function parseRedditIntentSubreddits(value: unknown): string[] | null {
+  if (value == null) return null
+  if (!Array.isArray(value)) return null
+  const out: string[] = []
+  for (const item of value) {
+    if (typeof item !== "string") continue
+    const s = item.trim().replace(/^r\//i, "")
+    if (/^[A-Za-z0-9_]{2,32}$/.test(s)) out.push(s.toLowerCase())
+  }
+  const uniq = [...new Set(out)]
+  return uniq.length > 0 ? uniq.slice(0, 16) : null
 }
 
 export type CompanyAssetType = "pitch_deck" | "document" | "scrape" | "other"
@@ -407,6 +423,7 @@ function mapRowToCompanyProfile(row: Record<string, unknown>): CompanyProfile {
     vault_context_sync_error: (row.vault_context_sync_error as string | null | undefined) ?? null,
     whatsapp_number: (row.whatsapp_number as string | null | undefined) ?? null,
     whatsapp_verified: Boolean(row.whatsapp_verified),
+    reddit_intent_subreddits: parseRedditIntentSubreddits(row.reddit_intent_subreddits),
     raw: row,
   }
 }

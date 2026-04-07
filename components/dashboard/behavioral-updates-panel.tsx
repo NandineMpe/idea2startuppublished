@@ -75,10 +75,17 @@ type BehavioralUpdatesData = BehavioralSummary & {
   vaultConnected: boolean
   selectedSubreddit: string | null
   subreddits: string[]
+  /** Saved scan targets; null means each run uses context-derived suggestions plus defaults. */
+  redditIntentSaved: string[] | null
+  redditScanDefaults: string[]
   threads: BehavioralThread[]
   summarySource: "cached" | "live"
   generatedAt: string
 }
+
+type SubredditSuggestion = { name: string; reason: string }
+
+const MAX_SCAN_SUBREDDITS = 12
 
 type BehavioralUpdatesResponse = {
   data?: BehavioralUpdatesData
@@ -148,6 +155,12 @@ export function BehavioralUpdatesPanel() {
   const [scanHint, setScanHint] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedSubreddit, setSelectedSubreddit] = useState("all")
+  const [useAutoSubreddits, setUseAutoSubreddits] = useState(true)
+  const [pinnedSubreddits, setPinnedSubreddits] = useState<string[]>([])
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const [suggestions, setSuggestions] = useState<SubredditSuggestion[]>([])
+  const [saveTargetsLoading, setSaveTargetsLoading] = useState(false)
+  const [targetsHint, setTargetsHint] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   const loadData = useCallback(
@@ -171,6 +184,14 @@ export function BehavioralUpdatesPanel() {
         }
 
         setData(json.data)
+        const saved = json.data.redditIntentSaved
+        if (saved === null || saved === undefined) {
+          setUseAutoSubreddits(true)
+          setPinnedSubreddits([])
+        } else {
+          setUseAutoSubreddits(false)
+          setPinnedSubreddits(saved)
+        }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Could not load behavioral updates.")
       } finally {
@@ -197,6 +218,82 @@ export function BehavioralUpdatesPanel() {
     const values = data?.subreddits ?? []
     return ["all", ...values.filter((value) => value && value.toLowerCase() !== "all")]
   }, [data?.subreddits])
+
+  async function runSuggestSubreddits() {
+    setSuggestLoading(true)
+    setTargetsHint(null)
+    setSuggestions([])
+    try {
+      const res = await fetch("/api/intelligence/reddit-subreddits", {
+        method: "POST",
+        cache: "no-store",
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        suggestions?: SubredditSuggestion[]
+        error?: string
+      }
+      if (!res.ok) {
+        throw new Error(typeof json.error === "string" ? json.error : "Could not suggest subreddits.")
+      }
+      setSuggestions(json.suggestions ?? [])
+      if ((json.suggestions ?? []).length === 0) {
+        setTargetsHint("No suggestions returned. Check LLM configuration or try again after adding more context.")
+      }
+    } catch (e) {
+      setTargetsHint(e instanceof Error ? e.message : "Suggestion failed.")
+    } finally {
+      setSuggestLoading(false)
+    }
+  }
+
+  function togglePinnedSub(name: string) {
+    const n = name.toLowerCase().trim().replace(/^r\//i, "")
+    if (!/^[a-z0-9_]{2,32}$/.test(n)) return
+    setPinnedSubreddits((prev) => {
+      const has = prev.includes(n)
+      if (has) return prev.filter((s) => s !== n)
+      if (prev.length >= MAX_SCAN_SUBREDDITS) return prev
+      return [...prev, n]
+    })
+  }
+
+  function mergeSuggestionsIntoPins() {
+    setPinnedSubreddits((prev) => {
+      const merged = [...new Set([...prev, ...suggestions.map((s) => s.name.toLowerCase())])]
+      return merged.slice(0, MAX_SCAN_SUBREDDITS)
+    })
+  }
+
+  async function saveSubredditTargets() {
+    setSaveTargetsLoading(true)
+    setTargetsHint(null)
+    try {
+      const body =
+        useAutoSubreddits || pinnedSubreddits.length === 0
+          ? { reddit_intent_subreddits: null }
+          : { reddit_intent_subreddits: pinnedSubreddits.slice(0, MAX_SCAN_SUBREDDITS) }
+
+      const res = await fetch("/api/company/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        throw new Error(typeof json.error === "string" ? json.error : "Could not save subreddit targets.")
+      }
+      setTargetsHint(
+        useAutoSubreddits || pinnedSubreddits.length === 0
+          ? "Scanner will pick subreddits from your context each run (merged with built-in defaults)."
+          : `Saved ${pinnedSubreddits.length} subreddit targets for scans.`,
+      )
+      void loadData(selectedSubreddit, true)
+    } catch (e) {
+      setTargetsHint(e instanceof Error ? e.message : "Save failed.")
+    } finally {
+      setSaveTargetsLoading(false)
+    }
+  }
 
   async function triggerScan() {
     setScanning(true)
@@ -292,6 +389,120 @@ export function BehavioralUpdatesPanel() {
             </Button>
           </div>
         </div>
+
+        {data ? (
+          <div className="mt-4 rounded-xl border border-border/70 bg-muted/10 p-3 sm:p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0 space-y-2">
+                <p className="text-[12px] font-medium text-foreground">Subreddits for scans</p>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Choose automatic picks from your company context each run, or pin a list. Pinned lists cap at{" "}
+                  {MAX_SCAN_SUBREDDITS} communities.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={useAutoSubreddits ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-[11px]"
+                    onClick={() => {
+                      setUseAutoSubreddits(true)
+                      setPinnedSubreddits([])
+                    }}
+                  >
+                    Automatic from context
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!useAutoSubreddits ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 text-[11px]"
+                    onClick={() => setUseAutoSubreddits(false)}
+                  >
+                    Pin my list
+                  </Button>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 gap-1.5 text-[11px]"
+                  disabled={suggestLoading || useAutoSubreddits}
+                  onClick={() => void runSuggestSubreddits()}
+                  title={useAutoSubreddits ? "Switch to Pin my list to apply suggestions" : undefined}
+                >
+                  {suggestLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Suggest from context
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-[11px]"
+                  disabled={saveTargetsLoading}
+                  onClick={() => void saveSubredditTargets()}
+                >
+                  {saveTargetsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Save scan targets
+                </Button>
+              </div>
+            </div>
+
+            {!useAutoSubreddits ? (
+              <div className="mt-3 space-y-2">
+                <p className="text-[11px] text-muted-foreground">Tap to toggle. Pool includes defaults, signals, and saved picks.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(data?.subreddits ?? []).map((sub) => {
+                    const active = pinnedSubreddits.includes(sub.toLowerCase())
+                    return (
+                      <button
+                        key={sub}
+                        type="button"
+                        onClick={() => togglePinnedSub(sub)}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                          active
+                            ? "border-primary bg-primary/15 text-foreground"
+                            : "border-border bg-background/80 text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        r/{sub}
+                      </button>
+                    )
+                  })}
+                </div>
+                {suggestions.length > 0 ? (
+                  <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[11px] font-medium text-foreground">Latest suggestions</p>
+                      <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={mergeSuggestionsIntoPins}>
+                        Add all to pins
+                      </Button>
+                    </div>
+                    <ul className="mt-2 space-y-2">
+                      {suggestions.map((s) => (
+                        <li key={s.name} className="text-[11px] leading-relaxed">
+                          <button
+                            type="button"
+                            className="font-medium text-primary hover:underline"
+                            onClick={() => togglePinnedSub(s.name)}
+                          >
+                            r/{s.name}
+                          </button>
+                          <span className="text-muted-foreground"> — {s.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {targetsHint ? (
+              <p className="mt-3 text-[11px] text-muted-foreground">{targetsHint}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-xl border border-border bg-background/80 px-4 py-3">

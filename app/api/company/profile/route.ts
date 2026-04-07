@@ -3,6 +3,7 @@ import { jsonApiError, logApiError } from "@/lib/api-error-response"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
+import { parseRedditIntentSubreddits } from "@/lib/company-context"
 import { resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
@@ -204,6 +205,15 @@ export async function PUT(request: Request) {
 
     if (hasOwn(body, "vault_context_sync_error")) {
       patch.vault_context_sync_error = body.vault_context_sync_error ?? null
+    }
+
+    if (hasOwn(body, "reddit_intent_subreddits")) {
+      const raw = body.reddit_intent_subreddits
+      if (raw === null || raw === undefined) {
+        patch.reddit_intent_subreddits = null
+      } else {
+        patch.reddit_intent_subreddits = parseRedditIntentSubreddits(raw)
+      }
     }
 
     const table = workspace ? "client_workspace_profiles" : "company_profile"

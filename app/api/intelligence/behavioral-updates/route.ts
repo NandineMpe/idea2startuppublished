@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { getCompanyContext } from "@/lib/company-context"
+import { REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
 import {
   coerceBehavioralSummary,
   summarizeRedditRecon,
@@ -127,13 +128,14 @@ export async function GET(req: Request) {
 
     const threads = (threadsData ?? []) as BehavioralUpdatesThread[]
     const summarySignals = (summarySignalsData ?? []) as BehavioralUpdatesThread[]
-    const subreddits = [
-      ...new Set(
-        (subredditRows ?? [])
-          .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim() : ""))
-          .filter(Boolean),
-      ),
-    ]
+    const fromSignals = (subredditRows ?? [])
+      .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
+      .filter(Boolean)
+    const saved = context.profile.reddit_intent_subreddits ?? []
+    const defaults = REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
+    const subreddits = [...new Set([...saved, ...fromSignals, ...defaults])].sort((a, b) =>
+      a.localeCompare(b),
+    )
 
     const cachedSummary = cachedRows?.[0] ? parseCachedSummary(cachedRows[0].inputs) : null
     const summary =
@@ -155,6 +157,8 @@ export async function GET(req: Request) {
         vaultConnected: Boolean(context.profile.github_vault_repo.trim()),
         selectedSubreddit,
         subreddits,
+        redditIntentSaved: context.profile.reddit_intent_subreddits,
+        redditScanDefaults: defaults,
         threads,
         summarySource: cachedSummary && !selectedSubreddit ? "cached" : "live",
         generatedAt: new Date().toISOString(),

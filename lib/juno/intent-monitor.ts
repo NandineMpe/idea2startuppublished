@@ -150,7 +150,7 @@ export async function scanRedditForIntent(
 ): Promise<IntentSignal[]> {
   const signals: IntentSignal[] = []
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const uniqSubs = [...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean))].slice(0, 8)
+  const uniqSubs = [...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean))].slice(0, 12)
   const kwSlice = keywords.slice(0, 12)
 
   for (const subreddit of uniqSubs) {
