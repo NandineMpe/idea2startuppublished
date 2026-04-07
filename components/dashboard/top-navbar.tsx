@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import {
   Search,
   Bell,
-  Mail,
   Settings,
   LogOut,
   User as UserIcon,
@@ -12,7 +11,6 @@ import {
   CreditCard,
   Gift,
 } from "lucide-react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -27,6 +25,7 @@ import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/better-auth-client"
 import { createClient } from "@/lib/supabase/client"
 import { InviteFriendsDialog } from "@/components/dashboard/invite-friends-dialog"
+import { ComposeEmailSheet } from "@/components/dashboard/compose-email-sheet"
 import { User } from "@supabase/supabase-js"
 
 export function TopNavbar() {
@@ -83,15 +82,7 @@ export function TopNavbar() {
           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
         </Button>
 
-        <Button variant="ghost" size="sm" className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-foreground" asChild>
-          <Link
-            href="/dashboard/integrations"
-            title="Email and integrations (Gmail and more)"
-            aria-label="Open email and integrations"
-          >
-            <Mail className="h-4 w-4" />
-          </Link>
-        </Button>
+        <ComposeEmailSheet />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
