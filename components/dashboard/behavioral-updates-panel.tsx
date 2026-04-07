@@ -765,25 +765,31 @@ export function BehavioralUpdatesPanel() {
                   {data.threads.length > 0 ? (
                     data.threads.map((thread) => (
                       <div key={thread.id} className="rounded-lg border border-border/70 bg-muted/20 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-medium text-foreground">{thread.title}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <a
+                              href={thread.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="group inline-flex items-start gap-1 text-[12px] font-medium text-foreground hover:text-primary hover:underline"
+                            >
+                              <span>{thread.title}</span>
+                              <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary" />
+                            </a>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                              <span>{thread.subreddit ? `r/${thread.subreddit}` : "reddit"}</span>
+                              <a
+                                href={`https://reddit.com/r/${thread.subreddit}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-foreground hover:underline"
+                              >
+                                {thread.subreddit ? `r/${thread.subreddit}` : "reddit"}
+                              </a>
                               <span>{thread.signal_type.replace(/_/g, " ")}</span>
                               <span>{thread.relevance_score ?? "?"}/10</span>
                               <span>{formatRelative(thread.discovered_at)}</span>
                             </div>
                           </div>
-                          <a
-                            href={thread.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                            aria-label={`Open ${thread.title}`}
-                          >
-                            <ArrowUpRight className="h-4 w-4" />
-                          </a>
                         </div>
 
                         {thread.body ? (
