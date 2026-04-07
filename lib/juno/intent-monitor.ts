@@ -87,6 +87,7 @@ function pushRedditPost(
   searchTerm: string,
   cutoff: number,
   subredditLabel: string,
+  requireKeywords = true,
 ) {
   const d = post.data
   if (!d || post.kind !== "t3") return
@@ -96,8 +97,15 @@ function pushRedditPost(
   const title = String(d.title ?? "")
   const selftext = String(d.selftext ?? "")
   const combined = `${title} ${selftext}`
-  const matched = matchedOrSearchTerm(combined, keywords, searchTerm)
-  if (matched.length === 0) return
+
+  let matched: string[]
+  if (requireKeywords) {
+    matched = matchedOrSearchTerm(combined, keywords, searchTerm)
+    if (matched.length === 0) return
+  } else {
+    // Keyword match as metadata enrichment only — don't gate on it
+    matched = matchKeywords(combined, keywords)
+  }
 
   const permalink = String(d.permalink ?? "")
   const url = permalink.startsWith("http") ? permalink : `https://www.reddit.com${permalink}`
@@ -114,6 +122,57 @@ function pushRedditPost(
     matchedKeywords: matched.slice(0, 12),
     discoveredAt: new Date().toISOString(),
   })
+}
+
+/**
+ * Crawl a subreddit's /new feed (no keyword gate — all posts within the time window).
+ * Keywords are matched as metadata enrichment only.
+ */
+async function crawlSubredditPosts(
+  subreddit: string,
+  keywords: string[],
+  cutoff: number,
+): Promise<IntentSignal[]> {
+  const signals: IntentSignal[] = []
+  try {
+    const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/new.json?limit=100`
+    const res = await fetch(url, {
+      headers: { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    for (const post of parseRedditListing(data)) {
+      pushRedditPost(signals, post, keywords, "", cutoff, subreddit, false)
+    }
+  } catch (e) {
+    console.warn(`[intent-monitor] crawl r/${subreddit}:`, e)
+  }
+  return signals
+}
+
+/**
+ * Full-feed crawl: reads all recent posts from each subreddit within the lookback window.
+ * No keyword gate — every post within the time window is included.
+ * Keywords are used as metadata enrichment for downstream LLM scoring.
+ */
+export async function crawlRedditForIntent(
+  subreddits: string[],
+  keywords: string[],
+): Promise<IntentSignal[]> {
+  const cutoff = Date.now() - getIntentLookbackMs()
+  const uniqSubs = [
+    ...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean)),
+  ].slice(0, 8)
+
+  const signals: IntentSignal[] = []
+  for (const subreddit of uniqSubs) {
+    const posts = await crawlSubredditPosts(subreddit, keywords, cutoff)
+    signals.push(...posts)
+    await sleep(1100)
+  }
+
+  return deduplicateSignals(signals)
 }
 
 /**

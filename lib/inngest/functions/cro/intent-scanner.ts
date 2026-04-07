@@ -8,7 +8,7 @@ import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList } from "@/lib/juno/intent-keywords"
 import { resolveSubredditsForIntentScan } from "@/lib/juno/reddit-subreddit-suggest"
-import { scanRedditForIntent } from "@/lib/juno/intent-monitor"
+import { crawlRedditForIntent } from "@/lib/juno/intent-monitor"
 import { buildIntentScoreCalibrationBlock } from "@/lib/juno/intent-score-calibration"
 import { scoreIntentSignals, type ScoredIntent } from "@/lib/juno/intent-scoring"
 import { summarizeRedditRecon, type RedditReconSignal } from "@/lib/juno/reddit-recon"
@@ -122,10 +122,12 @@ export const intentScanner = inngest.createFunction(
     )
 
     const redditSignals = await step.run("scan-reddit", () =>
-      scanRedditForIntent(keywords, subreddits),
+      crawlRedditForIntent(subreddits, keywords),
     )
 
-    const raw = [...redditSignals]
+    // Pre-rank by Reddit upvote score so highest-engagement posts go to LLM first
+    const raw = [...redditSignals].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+
     if (raw.length === 0) {
       const summary = await step.run("summarize-behavioral-updates-empty", () =>
         summarizeRedditRecon(context, []),
@@ -145,11 +147,10 @@ export const intentScanner = inngest.createFunction(
         saved: 0,
         reason: "no_candidates" as const,
         diagnostics: {
-          keywordCount: keywords.length,
           subredditCount: subreddits.length,
           subredditsPreview: subreddits.slice(0, 8),
           hint:
-            "Reddit returned no posts that matched keyword filters in the lookback window, or subreddit search failed (rate limit, block). Check saved subreddit names, company keywords, INTENT_LOOKBACK_DAYS, and Vercel logs for [intent-monitor].",
+            "Reddit returned no posts in the lookback window. Check saved subreddit names, INTENT_LOOKBACK_DAYS, and Vercel logs for [intent-monitor].",
         },
       }
     }
@@ -159,7 +160,7 @@ export const intentScanner = inngest.createFunction(
     )
 
     const scored = await step.run("score-intents", () =>
-      scoreIntentSignals(raw.slice(0, 40), context, { calibrationBlock }),
+      scoreIntentSignals(raw.slice(0, 80), context, { calibrationBlock }),
     )
 
     const toSave = scored.filter((s) => s.relevanceScore >= 4)
