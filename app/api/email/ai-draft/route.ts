@@ -15,40 +15,46 @@ export const dynamic = "force-dynamic"
  * and returns an AI-drafted { subject, body }.
  */
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!isLlmConfigured()) {
-    return NextResponse.json({ error: "LLM not configured" }, { status: 503 })
-  }
+    if (!isLlmConfigured()) {
+      return NextResponse.json({ error: "LLM not configured" }, { status: 503 })
+    }
 
-  const body = (await req.json()) as { to?: string; toName?: string; hint?: string }
-  const to = body.to?.trim()
-  if (!to) return NextResponse.json({ error: "to is required" }, { status: 400 })
+    const body = (await req.json()) as { to?: string; toName?: string; hint?: string }
+    const to = body.to?.trim()
+    if (!to) return NextResponse.json({ error: "to is required" }, { status: 400 })
 
-  const toName = body.toName?.trim() || null
-  const hint = body.hint?.trim() || ""
+    const toName = body.toName?.trim() || null
+    const hint = body.hint?.trim() || ""
 
-  // Extract company domain from email for research
-  const domain = to.includes("@") ? to.split("@")[1].replace(/^www\./, "") : to
+    // Extract company domain from email for research
+    const domain = to.includes("@") ? to.split("@")[1].replace(/^www\./, "") : to
 
-  // Load sender company context and research recipient in parallel
-  const [context, research] = await Promise.all([
-    getCompanyContext(user.id, { queryHint: "outreach email cold email ICP", refreshVault: "if_stale" }),
-    researchCompany(domain, hint, null),
-  ])
+    // Load sender company context and research recipient in parallel
+    const [context, research] = await Promise.all([
+      getCompanyContext(user.id, { queryHint: "outreach email cold email ICP", refreshVault: "if_stale" }),
+      researchCompany(domain, hint, null).catch(() => ({
+        summary: "",
+        aiStance: "",
+        newsHooks: [] as string[],
+        outreachAngle: "",
+      })),
+    ])
 
-  if (!context) {
-    return NextResponse.json({ error: "Company context not found — fill in your Context page first." }, { status: 400 })
-  }
+    if (!context) {
+      return NextResponse.json({ error: "Company context not found — fill in your Context page first." }, { status: 400 })
+    }
 
-  const p = context.profile
-  const voice = p.brand_voice_dna?.trim() || p.brand_voice?.trim() || ""
+    const p = context.profile
+    const voice = p.brand_voice_dna?.trim() || p.brand_voice?.trim() || ""
 
-  const prompt = `Write a short cold outreach email from a startup founder.
+    const prompt = `Write a short cold outreach email from a startup founder.
 
 ${context.promptBlock}
 
@@ -81,13 +87,12 @@ RULES:
 
 Return JSON only: {"subject":"...","body":"..."}`
 
-  const { text } = await generateText({
-    model: qwenModel(),
-    maxOutputTokens: 1200,
-    messages: [{ role: "user", content: appendWritingRules(prompt) }],
-  })
+    const { text } = await generateText({
+      model: qwenModel(),
+      maxOutputTokens: 1200,
+      messages: [{ role: "user", content: appendWritingRules(prompt) }],
+    })
 
-  try {
     const parsed = JSON.parse(text?.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
       subject?: string
       body?: string
@@ -96,7 +101,8 @@ Return JSON only: {"subject":"...","body":"..."}`
       subject: String(parsed.subject ?? "").slice(0, 300),
       body: String(parsed.body ?? ""),
     })
-  } catch {
+  } catch (err) {
+    console.error("[ai-draft] error:", err)
     return NextResponse.json({ error: "Draft generation failed — try again." }, { status: 500 })
   }
 }

@@ -52,7 +52,8 @@ export function ComposeEmailSheet() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: form.to, toName: form.toName || undefined, hint: form.hint || undefined }),
       })
-      const data = await res.json() as { subject?: string; body?: string; error?: string }
+      let data: { subject?: string; body?: string; error?: string } = {}
+      try { data = await res.json() } catch { /* non-JSON body */ }
       if (!res.ok) throw new Error(data.error ?? "Draft failed")
       setForm((f) => ({ ...f, subject: data.subject ?? f.subject, body: data.body ?? f.body }))
     } catch (e) {
