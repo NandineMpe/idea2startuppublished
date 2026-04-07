@@ -1,4 +1,4 @@
-import { COMPETITOR_KEYWORDS } from "@/lib/juno/intent-keywords"
+import { COMPETITOR_KEYWORDS, REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
 import {
   getIntentLookbackDays,
   getIntentLookbackMs,
@@ -161,7 +161,10 @@ export async function scanRedditForIntent(
   const lookbackDays = getIntentLookbackDays()
   const redditT = redditSearchTimeParam(lookbackDays)
   const cutoff = Date.now() - getIntentLookbackMs()
-  const uniqSubs = [...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean))].slice(0, 12)
+  let uniqSubs = [...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean))].slice(0, 12)
+  if (uniqSubs.length === 0) {
+    uniqSubs = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))].slice(0, 12)
+  }
   const kwSlice = keywords.slice(0, 12)
 
   for (const subreddit of uniqSubs) {

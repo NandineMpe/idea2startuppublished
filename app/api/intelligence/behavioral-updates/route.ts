@@ -111,13 +111,17 @@ export async function GET(req: Request) {
     if (!selectedSubreddit && !forceLiveSummary) {
       const cachedResponse = await supabase
         .from("ai_outputs")
-        .select("inputs, created_at")
+        .select("inputs, created_at, metadata")
         .eq("user_id", user.id)
         .eq("tool", "behavioral_updates")
         .order("created_at", { ascending: false })
         .limit(1)
 
-      cachedRows = (cachedResponse.data ?? null) as Array<{ inputs: unknown; created_at: string }> | null
+      cachedRows = (cachedResponse.data ?? null) as Array<{
+        inputs: unknown
+        created_at: string
+        metadata: unknown
+      }> | null
       cachedError = cachedResponse.error
     }
 
@@ -140,6 +144,11 @@ export async function GET(req: Request) {
     )
 
     const cachedSummary = cachedRows?.[0] ? parseCachedSummary(cachedRows[0].inputs) : null
+    const cachedMeta = cachedRows?.[0]?.metadata
+    const lastScanOutcome =
+      cachedMeta && typeof cachedMeta === "object" && "scan_outcome" in cachedMeta
+        ? String((cachedMeta as Record<string, unknown>).scan_outcome ?? "").trim() || null
+        : null
     const summary =
       cachedSummary && !selectedSubreddit
         ? cachedSummary
@@ -175,6 +184,7 @@ export async function GET(req: Request) {
         summarySource:
           cachedSummary && !selectedSubreddit && !forceLiveSummary ? "cached" : "live",
         generatedAt: new Date().toISOString(),
+        lastScanOutcome,
       },
     })
   } catch (error) {

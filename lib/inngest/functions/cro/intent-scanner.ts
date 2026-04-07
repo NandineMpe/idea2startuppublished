@@ -34,8 +34,9 @@ async function saveBehavioralUpdatesArtifact(params: {
   companyName: string
   signals: RedditReconSignal[]
   summary: Awaited<ReturnType<typeof summarizeRedditRecon>>
+  scanOutcome?: "no_candidates" | "ok"
 }) {
-  const { userId, companyName, signals, summary } = params
+  const { userId, companyName, signals, summary, scanOutcome } = params
   const dateStr = new Date().toISOString().slice(0, 10)
   const uniqueSubreddits = [...new Set(signals.map((signal) => signal.subreddit).filter(Boolean) as string[])]
   const latestSignalAt =
@@ -62,6 +63,7 @@ async function saveBehavioralUpdatesArtifact(params: {
       signal_count: signals.length,
       latest_signal_at: latestSignalAt,
       subreddits: uniqueSubreddits,
+      ...(scanOutcome ? { scan_outcome: scanOutcome } : {}),
     },
   })
 
@@ -134,9 +136,22 @@ export const intentScanner = inngest.createFunction(
           companyName: context.profile.name.trim(),
           signals: [],
           summary,
+          scanOutcome: "no_candidates",
         }),
       )
-      return { userId, scanned: 0, saved: 0, reason: "no_candidates" }
+      return {
+        userId,
+        scanned: 0,
+        saved: 0,
+        reason: "no_candidates" as const,
+        diagnostics: {
+          keywordCount: keywords.length,
+          subredditCount: subreddits.length,
+          subredditsPreview: subreddits.slice(0, 8),
+          hint:
+            "Reddit returned no posts that matched keyword filters in the lookback window, or subreddit search failed (rate limit, block). Check saved subreddit names, company keywords, INTENT_LOOKBACK_DAYS, and Vercel logs for [intent-monitor].",
+        },
+      }
     }
 
     const calibrationBlock = await step.run("load-score-calibration", () =>

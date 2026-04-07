@@ -83,7 +83,10 @@ export async function resolveSubredditsForIntentScan(context: CompanyContext): P
     const cleaned = [...new Set(saved.map((s) => normalizeSubName(s)).filter(Boolean) as string[])].map((s) =>
       s.toLowerCase(),
     )
-    return cleaned.slice(0, 12)
+    if (cleaned.length > 0) {
+      return cleaned.slice(0, 12)
+    }
+    // Saved list had only invalid names — fall through to AI + defaults instead of scanning zero subs.
   }
 
   const suggested = await suggestSubredditsFromContext(context)

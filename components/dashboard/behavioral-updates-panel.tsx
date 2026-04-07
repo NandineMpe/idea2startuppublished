@@ -85,6 +85,8 @@ type BehavioralUpdatesData = BehavioralSummary & {
   threads: BehavioralThread[]
   summarySource: "cached" | "live"
   generatedAt: string
+  /** From latest behavioral_updates run metadata (e.g. no_candidates). */
+  lastScanOutcome?: string | null
 }
 
 type SubredditSuggestion = { name: string; reason: string }
@@ -403,6 +405,16 @@ export function BehavioralUpdatesPanel() {
 
         {data ? (
           <div className="mt-4 rounded-xl border border-border/70 bg-muted/10 p-3 sm:p-4">
+            {data.lastScanOutcome === "no_candidates" ? (
+              <div className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-950 dark:text-amber-100/95">
+                <p className="font-medium">Last Reddit scan found no matching threads</p>
+                <p className="mt-1 text-[11px] leading-relaxed opacity-90">
+                  The job finished, but Reddit search returned no posts that passed keyword filters in your lookback window, or the JSON API failed (rate limit, block). Confirm pinned subreddit names, enrich company context keywords, check{" "}
+                  <code className="text-[10px]">INTENT_LOOKBACK_DAYS</code>, or run the scan again later.
+                </p>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 space-y-2">
                 <p className="text-[12px] font-medium text-foreground">Subreddits for scans</p>
