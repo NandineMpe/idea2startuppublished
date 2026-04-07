@@ -8,7 +8,7 @@ import { inngest } from "@/lib/inngest/client"
 import { getCompanyContext } from "@/lib/company-context"
 import { buildKeywordList } from "@/lib/juno/intent-keywords"
 import { resolveSubredditsForIntentScan } from "@/lib/juno/reddit-subreddit-suggest"
-import { crawlRedditForIntent } from "@/lib/juno/intent-monitor"
+import { crawlRedditForIntent, scanRedditForIntent } from "@/lib/juno/intent-monitor"
 import { buildIntentScoreCalibrationBlock } from "@/lib/juno/intent-score-calibration"
 import { scoreIntentSignals, type ScoredIntent } from "@/lib/juno/intent-scoring"
 import { summarizeRedditRecon, type RedditReconSignal } from "@/lib/juno/reddit-recon"
@@ -121,9 +121,12 @@ export const intentScanner = inngest.createFunction(
       resolveSubredditsForIntentScan(context),
     )
 
-    const redditSignals = await step.run("scan-reddit", () =>
-      crawlRedditForIntent(subreddits, keywords),
-    )
+    const redditSignals = await step.run("scan-reddit", async () => {
+      const crawled = await crawlRedditForIntent(subreddits, keywords)
+      if (crawled.length > 0) return crawled
+      // Crawl uses /new.json; server IPs are often blocked or return empty. Search is a second path.
+      return scanRedditForIntent(keywords, subreddits)
+    })
 
     // Pre-rank by Reddit upvote score so highest-engagement posts go to LLM first
     const raw = [...redditSignals].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
@@ -147,10 +150,11 @@ export const intentScanner = inngest.createFunction(
         saved: 0,
         reason: "no_candidates" as const,
         diagnostics: {
+          keywordCount: keywords.length,
           subredditCount: subreddits.length,
           subredditsPreview: subreddits.slice(0, 8),
           hint:
-            "Reddit returned no posts in the lookback window. Check saved subreddit names, INTENT_LOOKBACK_DAYS, and Vercel logs for [intent-monitor].",
+            "Crawl (/new) and search both returned zero posts. Often Reddit blocks server IPs (403/429), or there are no posts in the lookback in those subs. Check names, INTENT_LOOKBACK_DAYS, Inngest logs for [intent-monitor].",
         },
       }
     }

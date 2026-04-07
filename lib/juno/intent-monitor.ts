@@ -135,12 +135,15 @@ async function crawlSubredditPosts(
 ): Promise<IntentSignal[]> {
   const signals: IntentSignal[] = []
   try {
-    const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/new.json?limit=100`
+    const url = `${REDDIT_BASE}/r/${encodeURIComponent(subreddit)}/new.json?limit=100&raw_json=1`
     const res = await fetch(url, {
       headers: { "User-Agent": "JunoIntentMonitor/1.0 (contact: app)" },
       signal: AbortSignal.timeout(15_000),
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn(`[intent-monitor] crawl r/${subreddit}: HTTP ${res.status}`)
+      return []
+    }
     const data = await res.json()
     for (const post of parseRedditListing(data)) {
       pushRedditPost(signals, post, keywords, "", cutoff, subreddit, false)
@@ -161,9 +164,12 @@ export async function crawlRedditForIntent(
   keywords: string[],
 ): Promise<IntentSignal[]> {
   const cutoff = Date.now() - getIntentLookbackMs()
-  const uniqSubs = [
+  let uniqSubs = [
     ...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean)),
   ].slice(0, 8)
+  if (uniqSubs.length === 0) {
+    uniqSubs = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))].slice(0, 8)
+  }
 
   const signals: IntentSignal[] = []
   for (const subreddit of uniqSubs) {

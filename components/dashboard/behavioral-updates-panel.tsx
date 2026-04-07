@@ -407,9 +407,9 @@ export function BehavioralUpdatesPanel() {
           <div className="mt-4 rounded-xl border border-border/70 bg-muted/10 p-3 sm:p-4">
             {data.lastScanOutcome === "no_candidates" ? (
               <div className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-[12px] text-amber-950 dark:text-amber-100/95">
-                <p className="font-medium">Last Reddit scan found no matching threads</p>
+                <p className="font-medium">Last Reddit scan returned no threads to score</p>
                 <p className="mt-1 text-[11px] leading-relaxed opacity-90">
-                  The job finished, but Reddit search returned no posts that passed keyword filters in your lookback window, or the JSON API failed (rate limit, block). Confirm pinned subreddit names, enrich company context keywords, check{" "}
+                  The job finished, but we could not load posts from Reddit for your targets (subreddit feeds and fallback search both came back empty). That is usually Reddit blocking or throttling server requests, an empty or invalid subreddit list, or no posts in your lookback window. It is not a keyword filter on your side. Check pinned subreddit names, try{" "}
                   <code className="text-[10px]">INTENT_LOOKBACK_DAYS</code>, or run the scan again later.
                 </p>
               </div>
