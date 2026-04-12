@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { coerceBehavioralSummary } from "@/lib/juno/reddit-recon"
 import { createClient } from "@/lib/supabase/server"
 import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
+import { supabaseAdmin } from "@/lib/supabase"
 
 const OUT_FIELDS = "id, tool, title, inputs, output, metadata, created_at"
 
@@ -10,6 +12,33 @@ export async function GET() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    // ── Workspace mode: return workspace profile context instead of owner ai_outputs ──
+    const activeWorkspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
+    if (activeWorkspace) {
+      const { data: wsProfile } = await supabaseAdmin
+        .from("client_workspace_profiles")
+        .select("company_name, company_description, problem, solution, target_market, traction, knowledge_base_md, founder_name, stage, icp, competitors, priorities, risks, keywords")
+        .eq("workspace_id", activeWorkspace.id)
+        .maybeSingle()
+
+      // Return a workspace-scoped response — no owner ai_outputs
+      return NextResponse.json({
+        workspaceScope: true,
+        workspaceId: activeWorkspace.id,
+        workspaceName: activeWorkspace.displayName,
+        workspaceProfile: wsProfile ?? null,
+        brief: null,
+        leads: [],
+        behavioralUpdates: null,
+        contentQueue: [],
+        radar: null,
+        pipelineStatus: {},
+        staffMeeting: null,
+        commentDraftCount: 0,
+        hotIntentCount: 0,
+      })
+    }
 
     // Latest daily brief
     const { data: briefRows } = await supabase

@@ -142,10 +142,29 @@ type FounderDailyFeedProps = {
   subtitle?: string
 }
 
+type WorkspaceProfile = {
+  company_name?: string | null
+  company_description?: string | null
+  problem?: string | null
+  solution?: string | null
+  target_market?: string | null
+  traction?: string | null
+  founder_name?: string | null
+  stage?: string | null
+  icp?: string[]
+  competitors?: string[]
+  priorities?: string[]
+  risks?: string[]
+  keywords?: string[]
+}
+
 export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFeedProps) {
   const [brief, setBrief] = useState<FeedRow | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [workspaceScope, setWorkspaceScope] = useState(false)
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null)
+  const [workspaceProfile, setWorkspaceProfile] = useState<WorkspaceProfile | null>(null)
 
   const fetchFeed = useCallback(async () => {
     setLoading(true)
@@ -153,7 +172,17 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
       const res = await fetch("/api/intelligence/feed")
       if (!res.ok) return
       const data = await res.json()
-      setBrief(data.brief ?? null)
+      if (data.workspaceScope) {
+        setWorkspaceScope(true)
+        setWorkspaceName(data.workspaceName ?? null)
+        setWorkspaceProfile(data.workspaceProfile ?? null)
+        setBrief(null)
+      } else {
+        setWorkspaceScope(false)
+        setWorkspaceName(null)
+        setWorkspaceProfile(null)
+        setBrief(data.brief ?? null)
+      }
       setLastRefresh(new Date())
     } finally {
       setLoading(false)
@@ -182,11 +211,13 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
           <p className="text-[13px] text-muted-foreground mt-0.5">
             {subtitle !== undefined
               ? subtitle
-              : hasBrief
-                ? `CBS brief · ${briefAge}`
-                : loading
-                  ? "Loading…"
-                  : "No brief yet — CBS pipeline runs at 05:00"}
+              : loading
+                ? "Loading…"
+                : workspaceScope
+                  ? `${workspaceName ?? "Client"} workspace context`
+                  : hasBrief
+                    ? `CBS brief · ${briefAge}`
+                    : "No brief yet — CBS pipeline runs at 05:00"}
           </p>
         </div>
         <button
@@ -203,6 +234,72 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : workspaceScope ? (
+          <div className="space-y-4">
+            {workspaceProfile ? (
+              <>
+                {workspaceProfile.company_description && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Company</p>
+                    <p className="text-[13px] text-foreground leading-relaxed">{workspaceProfile.company_description}</p>
+                  </div>
+                )}
+                {workspaceProfile.problem && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Problem</p>
+                    <p className="text-[13px] text-foreground/90 leading-relaxed">{workspaceProfile.problem}</p>
+                  </div>
+                )}
+                {workspaceProfile.solution && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Solution</p>
+                    <p className="text-[13px] text-foreground/90 leading-relaxed">{workspaceProfile.solution}</p>
+                  </div>
+                )}
+                {workspaceProfile.traction && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Traction</p>
+                    <p className="text-[13px] text-foreground/90 leading-relaxed">{workspaceProfile.traction}</p>
+                  </div>
+                )}
+                {workspaceProfile.icp && workspaceProfile.icp.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">ICP</p>
+                    <ul className="space-y-1">
+                      {workspaceProfile.icp.map((item, i) => (
+                        <li key={i} className="text-[12px] text-foreground/80 flex gap-1.5">
+                          <span className="text-primary shrink-0">→</span>{item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {workspaceProfile.competitors && workspaceProfile.competitors.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Competitors</p>
+                    <p className="text-[12px] text-foreground/80">{workspaceProfile.competitors.join(", ")}</p>
+                  </div>
+                )}
+                {workspaceProfile.priorities && workspaceProfile.priorities.length > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Priorities (90 days)</p>
+                    <ul className="space-y-1">
+                      {workspaceProfile.priorities.map((p, i) => (
+                        <li key={i} className="text-[12px] text-foreground/80 flex gap-1.5">
+                          <span className="text-primary shrink-0">{i + 1}.</span>{p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-[13px] text-muted-foreground">No context submitted for {workspaceName ?? "this workspace"} yet.</p>
+                <p className="text-[12px] text-muted-foreground/70 mt-1">Share the intake link to collect their company context.</p>
+              </div>
+            )}
           </div>
         ) : !hasBrief ? (
           <div className="py-8 text-center">
