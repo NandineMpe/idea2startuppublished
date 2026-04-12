@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContextPrompt(user?.id)
+    const companyContext = await getCompanyContextPrompt(user?.id, { useCookieWorkspace: true })
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const systemPrompt = slidePrompts[slideType] || "You are an expert pitch deck consultant. Create compelling content for a pitch deck slide."

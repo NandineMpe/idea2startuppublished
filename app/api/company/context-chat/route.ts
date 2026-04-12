@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     typeof body.brainSummary === "string" && body.brainSummary.trim()
       ? body.brainSummary.slice(0, 12000)
       : ""
-  const companyCtx = await getCompanyContext(user.id, { refreshVault: "always" }).catch(() => null)
+  const companyCtx = await getCompanyContext(user.id, { refreshVault: "always", useCookieWorkspace: true }).catch(() => null)
   const founderName = companyCtx?.profile.founder_name?.trim() || clientFounderName
 
   const bootstrap =
