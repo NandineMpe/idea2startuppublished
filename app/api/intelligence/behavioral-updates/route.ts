@@ -123,11 +123,14 @@ export async function GET(req: Request) {
 
     const threads = (threadsData ?? []) as BehavioralUpdatesThread[]
     const summarySignals = (summarySignalsData ?? []) as BehavioralUpdatesThread[]
-    const fromSignals = (subredditRows ?? [])
-      .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
-      .filter(Boolean)
+    const isWorkspaceScope = context.scope === "workspace"
+    const fromSignals = isWorkspaceScope
+      ? [] // don't bleed owner's past scan subreddits into workspace view
+      : (subredditRows ?? [])
+          .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
+          .filter(Boolean)
     const saved = context.profile.reddit_intent_subreddits ?? []
-    const defaults = REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
+    const defaults = isWorkspaceScope ? [] : REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
     const subreddits = [...new Set([...saved, ...fromSignals, ...defaults])].sort((a, b) =>
       a.localeCompare(b),
     )
