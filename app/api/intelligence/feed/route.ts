@@ -40,12 +40,12 @@ export async function GET() {
       })
     }
 
-    // Latest daily brief
+    // Latest daily brief (includes seeded market briefs)
     const { data: briefRows } = await supabase
       .from("ai_outputs")
       .select(OUT_FIELDS)
       .eq("user_id", user.id)
-      .eq("tool", "daily_brief")
+      .in("tool", ["daily_brief", "competitor-snapshot"])
       .order("created_at", { ascending: false })
       .limit(1)
 

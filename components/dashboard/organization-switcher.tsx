@@ -61,10 +61,6 @@ export function OrganizationSwitcher({ expanded }: { expanded: boolean }) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Client workspaces
-  const [workspaces, setWorkspaces] = useState<ClientWorkspace[]>([])
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null)
-
   const [createOpen, setCreateOpen] = useState(false)
   const [teamName, setTeamName] = useState("")
   const [createBusy, setCreateBusy] = useState(false)
@@ -79,23 +75,13 @@ export function OrganizationSwitcher({ expanded }: { expanded: boolean }) {
 
   const load = useCallback(async () => {
     try {
-      const [orgRes, wsRes] = await Promise.all([
-        fetch("/api/organizations", { credentials: "include" }),
-        fetch("/api/workspaces", { credentials: "include" }),
-      ])
-      const orgData = (await orgRes.json()) as {
+      const res = await fetch("/api/organizations", { credentials: "include" })
+      const orgData = (await res.json()) as {
         organizations?: Org[]
         activeOrganizationId?: string | null
       }
       setOrgs(orgData.organizations ?? [])
       setActiveId(orgData.activeOrganizationId ?? null)
-
-      const wsData = (await wsRes.json()) as {
-        workspaces?: ClientWorkspace[]
-        activeWorkspaceId?: string | null
-      }
-      setWorkspaces(wsData.workspaces ?? [])
-      setActiveWorkspaceId(wsData.activeWorkspaceId ?? null)
     } catch {
       setOrgs([])
     } finally {
@@ -151,19 +137,6 @@ export function OrganizationSwitcher({ expanded }: { expanded: boolean }) {
     })
     if (res.ok) {
       setActiveId(orgId)
-      router.refresh()
-    }
-  }
-
-  async function onSelectWorkspace(workspaceId: string | null) {
-    const res = await fetch("/api/workspaces/select", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ workspaceId }),
-    })
-    if (res.ok) {
-      setActiveWorkspaceId(workspaceId)
       router.refresh()
     }
   }
@@ -255,8 +228,7 @@ export function OrganizationSwitcher({ expanded }: { expanded: boolean }) {
     )
   }
 
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
-  const triggerLabel = activeWorkspace?.displayName ?? activeOrg?.displayName ?? "Workspace"
+  const triggerLabel = activeOrg?.displayName ?? "Workspace"
 
   return (
     <>
@@ -307,35 +279,6 @@ export function OrganizationSwitcher({ expanded }: { expanded: boolean }) {
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
-
-            {workspaces.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  Client workspaces
-                </DropdownMenuLabel>
-                {activeWorkspaceId && (
-                  <DropdownMenuItem
-                    onSelect={() => void onSelectWorkspace(null)}
-                    className="text-sm gap-2"
-                  >
-                    <span className="truncate text-muted-foreground">↩ Your company</span>
-                  </DropdownMenuItem>
-                )}
-                {workspaces.map((w) => (
-                  <DropdownMenuItem
-                    key={w.id}
-                    onSelect={() => void onSelectWorkspace(w.id)}
-                    className={cn("text-sm gap-2", activeWorkspaceId === w.id && "font-medium")}
-                  >
-                    <span className="truncate flex-1">{w.displayName}</span>
-                    {activeWorkspaceId === w.id && (
-                      <span className="text-[10px] text-emerald-500 shrink-0">active</span>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </>
-            )}
 
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setCreateOpen(true)} className="gap-2">

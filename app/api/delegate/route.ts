@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContextPrompt(user?.id, { useCookieWorkspace: true })
+    const companyContext = await getCompanyContextPrompt(user?.id, {})
     const startupContext = context?.trim() || companyContext || "Not provided"
 
     // ── Step 1: Use Claude to plan the delegation ──────────────────────────

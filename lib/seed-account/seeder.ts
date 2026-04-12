@@ -58,8 +58,8 @@ ${knowledgeBase}
 
   const outputs: Array<{ tool: string; title: string; prompt: string }> = [
     {
-      tool: "market-brief",
-      title: "Morning Market Brief",
+      tool: "daily_brief",
+      title: `Morning Market Brief — ${profile.company_name}`,
       prompt: `You are Juno, an AI agent for ${profile.company_name}.
 Write a sharp morning market brief for ${profile.founder_name}.
 Cover: (1) one key market trend affecting their space, (2) one signal from their ICP segment, (3) one competitor move worth watching.
@@ -76,8 +76,8 @@ Keep it under 300 words. Be direct.
 Context:\n${contextBlock}`,
     },
     {
-      tool: "content-draft",
-      title: "3 Content Drafts — LinkedIn",
+      tool: "content_linkedin",
+      title: `3 LinkedIn Drafts — ${profile.company_name}`,
       prompt: `You are Juno, an AI agent for ${profile.company_name}.
 Write 3 short LinkedIn posts for ${profile.founder_name}.
 Each post should feel like it comes from a founder who thinks publicly about the problem they are solving.

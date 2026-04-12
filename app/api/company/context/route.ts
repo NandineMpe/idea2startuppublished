@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ context: "" })
     }
 
-    const ctx = await getCompanyContext(user.id, { useCookieWorkspace: true })
+    const ctx = await getCompanyContext(user.id, {})
     const context = ctx?.promptBlock ?? ""
 
     return NextResponse.json({

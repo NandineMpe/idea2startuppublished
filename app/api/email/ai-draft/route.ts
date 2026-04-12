@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // Load sender company context and research recipient in parallel
     const [context, research] = await Promise.all([
-      getCompanyContext(user.id, { queryHint: "outreach email cold email ICP", refreshVault: "if_stale", useCookieWorkspace: true }),
+      getCompanyContext(user.id, { queryHint: "outreach email cold email ICP", refreshVault: "if_stale" }),
       researchCompany(domain, hint, null).catch(() => ({
         summary: "",
         aiStance: "",

@@ -180,7 +180,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("seeded_invites")
-    .select("id, target_email, target_name, target_company, seeded_at, email_sent_at, claimed_at, email_preview")
+    .select("id, target_email, target_name, target_company, seeded_at, email_sent_at, claimed_at, email_preview, token")
     .order("seeded_at", { ascending: false })
     .limit(100)
 

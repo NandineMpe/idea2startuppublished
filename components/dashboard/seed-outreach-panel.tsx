@@ -64,6 +64,7 @@ interface SeededInvite {
   seeded_at: string
   email_sent_at: string | null
   claimed_at: string | null
+  token: string | null
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -457,7 +458,7 @@ function InviteLog() {
             <p className="font-medium text-foreground truncate">{inv.target_name} — {inv.target_company}</p>
             <p className="text-muted-foreground text-xs truncate">{inv.target_email}</p>
           </div>
-          <div className="shrink-0 ml-4">
+          <div className="shrink-0 ml-4 flex items-center gap-2">
             {inv.claimed_at ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                 <CheckCircle2 className="h-3 w-3" /> Claimed
@@ -470,6 +471,16 @@ function InviteLog() {
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <Clock className="h-3 w-3" /> Seeded
               </span>
+            )}
+            {inv.token && (
+              <a
+                href={`/admin/preview/${inv.token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+              >
+                Preview
+              </a>
             )}
           </div>
         </div>

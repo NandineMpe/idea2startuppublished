@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    const companyContext = await getCompanyContextPrompt(user?.id, { useCookieWorkspace: true, queryHint: ideaDescription })
+    const companyContext = await getCompanyContextPrompt(user?.id, { queryHint: ideaDescription })
     const companyBlock = companyContext?.trim() ? `# COMPANY CONTEXT\n${companyContext}\n\n` : ""
 
     const prompt = `
