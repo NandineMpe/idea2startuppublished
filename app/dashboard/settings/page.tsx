@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Bell, Building2, ChevronRight, Palette, Shield, User } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Bell, Building2, ChevronRight, Palette, Send, Shield, User } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -10,10 +10,19 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { WorkspaceManager } from "@/components/dashboard/workspace-manager"
+import { SeedOutreachPanel } from "@/components/dashboard/seed-outreach-panel"
 
 export default function SettingsPage() {
   const [name, setName] = useState("Alex Johnson")
   const [email, setEmail] = useState("alex@ideatostartup.io")
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    // Check if current user is the admin — server returns 403 for non-admins
+    fetch("/api/admin/seed-account", { credentials: "include" })
+      .then((r) => { if (r.ok || r.status === 200) setIsAdmin(true) })
+      .catch(() => {})
+  }, [])
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [pushNotifications, setPushNotifications] = useState(true)
   const [marketingEmails, setMarketingEmails] = useState(false)
@@ -64,6 +73,15 @@ export default function SettingsPage() {
             <Building2 className="h-4 w-4 mr-2" />
             Workspaces
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger
+              value="outreach"
+              className="rounded-full data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none text-foreground"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Outreach
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
@@ -315,6 +333,12 @@ export default function SettingsPage() {
         <TabsContent value="workspaces" className="space-y-6">
           <WorkspaceManager />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="outreach" className="space-y-6">
+            <SeedOutreachPanel />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

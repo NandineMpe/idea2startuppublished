@@ -79,6 +79,7 @@ type IntakePayload = {
   traction?: string
   differentiators?: string
   contextNotes?: string
+  knowledgeBaseMd?: string  // full LLM export / Obsidian vault content
 }
 
 export async function GET(
@@ -118,6 +119,10 @@ export async function POST(
     }
 
     const body = (await request.json().catch(() => ({}))) as IntakePayload
+    const knowledgeBaseMd = typeof body.knowledgeBaseMd === "string"
+      ? body.knowledgeBaseMd.trim().slice(0, 200000)  // 200k char cap
+      : null
+
     const payload = {
       contactName: asString(body.contactName),
       contactEmail: asString(body.contactEmail),
@@ -165,11 +170,14 @@ export async function POST(
           role: "user",
           content: appendWritingRules(`Extract structured company data from this shared client intake.
 Use only the information provided. Do not invent metrics, traction, or credentials.
+${knowledgeBaseMd ? "A full knowledge base document has been provided — treat it as the highest-fidelity source." : ""}
 
 INTAKE FORM:
 ${JSON.stringify(payload, null, 2)}
 
 ${websiteText ? `WEBSITE TEXT:\n${websiteText}` : "WEBSITE TEXT: none"}
+
+${knowledgeBaseMd ? `KNOWLEDGE BASE DOCUMENT (uploaded by founder):\n${knowledgeBaseMd.slice(0, 12000)}` : ""}
 
 Return JSON only in this shape:
 {
@@ -247,6 +255,12 @@ Return JSON only in this shape:
       differentiators: asString(strategy.differentiators) ?? payload.differentiators,
       priorities,
       risks,
+      // If a full context doc was uploaded, store it as the knowledge base
+      // so every agent in this workspace reads it immediately
+      ...(knowledgeBaseMd ? {
+        knowledge_base_md: knowledgeBaseMd,
+        knowledge_base_updated_at: new Date().toISOString(),
+      } : {}),
     }
 
     const { error: profileError } = await supabaseAdmin

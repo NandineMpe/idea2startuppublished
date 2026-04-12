@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { CheckCircle2, Loader2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { CheckCircle2, FileText, Loader2, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ type IntakeState = {
   traction: string
   differentiators: string
   contextNotes: string
+  knowledgeBaseMd: string  // full LLM export / Obsidian md file content
 }
 
 const EMPTY_FORM: IntakeState = {
@@ -47,6 +48,7 @@ const EMPTY_FORM: IntakeState = {
   traction: "",
   differentiators: "",
   contextNotes: "",
+  knowledgeBaseMd: "",
 }
 
 export function SharedIntakeForm({ token }: { token: string }) {
@@ -57,6 +59,47 @@ export function SharedIntakeForm({ token }: { token: string }) {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<IntakeState>(EMPTY_FORM)
+
+  // File upload state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null)
+  const [uploadedWordCount, setUploadedWordCount] = useState<number>(0)
+  const [fileError, setFileError] = useState<string | null>(null)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileError(null)
+
+    const allowed = [".md", ".txt", ".markdown"]
+    const ext = "." + file.name.split(".").pop()?.toLowerCase()
+    if (!allowed.includes(ext)) {
+      setFileError("Only .md, .markdown, or .txt files are supported.")
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setFileError("File must be under 2 MB.")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length
+      setUploadedFileName(file.name)
+      setUploadedWordCount(wordCount)
+      updateField("knowledgeBaseMd", text)
+    }
+    reader.readAsText(file)
+  }
+
+  function clearFile() {
+    setUploadedFileName(null)
+    setUploadedWordCount(0)
+    setFileError(null)
+    updateField("knowledgeBaseMd", "")
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -297,6 +340,68 @@ export function SharedIntakeForm({ token }: { token: string }) {
               placeholder="Anything else Juno should know? Priorities, risks, competitors, founder background, vocabulary, constraints."
               value={form.contextNotes}
               onChange={(event) => updateField("contextNotes", event.target.value)}
+            />
+          </CardContent>
+        </Card>
+
+        {/* LLM context file upload */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Full context document <span className="text-muted-foreground font-normal text-sm ml-1">(optional but powerful)</span></CardTitle>
+            <CardDescription>
+              If you have an AI-generated summary of your startup — from ChatGPT, Claude, Notion AI, or your own Obsidian vault — upload it here.
+              Juno will treat it as the primary knowledge base for this workspace. The richer this document, the sharper every output.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Tips */}
+            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">How to get this document</p>
+              <ul className="space-y-1 list-none">
+                <li>→ Open ChatGPT or Claude and paste: <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">"Summarise everything you know about my startup — product, market, team, goals — as a detailed markdown document."</span></li>
+                <li>→ Copy the response, save as <span className="font-mono text-xs">context.md</span>, upload below.</li>
+                <li>→ Or export directly from Notion, Obsidian, or any notes app as <span className="font-mono text-xs">.md</span> or <span className="font-mono text-xs">.txt</span>.</li>
+              </ul>
+            </div>
+
+            {/* Drop zone */}
+            {!uploadedFileName ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors px-6 py-10 flex flex-col items-center gap-3 text-center cursor-pointer"
+              >
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Upload your context file</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">.md, .markdown, or .txt — max 2 MB</p>
+                </div>
+              </button>
+            ) : (
+              <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{uploadedFileName}</p>
+                    <p className="text-xs text-muted-foreground">{uploadedWordCount.toLocaleString()} words — Juno will use this as the primary knowledge base</p>
+                  </div>
+                </div>
+                <button type="button" onClick={clearFile} className="text-muted-foreground hover:text-foreground ml-4">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {fileError && (
+              <p className="text-sm text-destructive">{fileError}</p>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.markdown,.txt"
+              className="hidden"
+              onChange={handleFileChange}
             />
           </CardContent>
         </Card>
