@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Loader2, Send, CheckCircle2, AlertCircle,
   ExternalLink, Clock, Users, Search, ChevronDown, ChevronUp,
+  FileText, Upload, X,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -204,6 +205,32 @@ function SeedForm() {
     companyUrl: "", linkedinUrl: "", sendEmail: true,
   })
 
+  // Context doc upload (skips Exa research when provided)
+  const fileInputRef                          = useRef<HTMLInputElement>(null)
+  const [knowledgeBaseMd, setKnowledgeBaseMd] = useState<string>("")
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null)
+  const [uploadedWordCount, setUploadedWordCount] = useState<number>(0)
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      setKnowledgeBaseMd(text)
+      setUploadedFileName(file.name)
+      setUploadedWordCount(text.trim().split(/\s+/).filter(Boolean).length)
+    }
+    reader.readAsText(file)
+  }
+
+  function clearFile() {
+    setKnowledgeBaseMd("")
+    setUploadedFileName(null)
+    setUploadedWordCount(0)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
   const [previewStatus, setPreviewStatus] = useState<StepStatus>("idle")
   const [preview, setPreview]             = useState<FounderPreview | null>(null)
   const [previewError, setPreviewError]   = useState<string | null>(null)
@@ -229,10 +256,11 @@ function SeedForm() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          founderName: form.founderName,
-          companyName: form.companyName,
-          companyUrl:  form.companyUrl,
-          linkedinUrl: form.linkedinUrl || undefined,
+          founderName:      form.founderName,
+          companyName:      form.companyName,
+          companyUrl:       form.companyUrl,
+          linkedinUrl:      form.linkedinUrl || undefined,
+          ...(knowledgeBaseMd ? { knowledgeBaseMd } : {}),
         }),
       })
       const data = await res.json() as { error?: string } & Partial<FounderPreview>
@@ -256,7 +284,7 @@ function SeedForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, ...(knowledgeBaseMd ? { knowledgeBaseMd } : {}) }),
       })
       const data = await res.json() as { ok?: boolean; error?: string } & Partial<SeedResult>
       if (!res.ok) { setSeedStatus("error"); setSeedError(data.error ?? "Seed failed"); return }
@@ -279,6 +307,40 @@ function SeedForm() {
         <Field label="LinkedIn (optional)" value={form.linkedinUrl} onChange={(v) => setForm(f => ({...f, linkedinUrl: v}))} placeholder="https://linkedin.com/in/..." type="url" disabled={previewStatus === "running"} />
       </div>
 
+      {/* Context doc upload — skips Exa research entirely */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">
+          Context document <span className="text-muted-foreground font-normal">(optional — skips web research, uses your doc instead)</span>
+        </p>
+        {!uploadedFileName ? (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors px-4 py-5 flex items-center gap-3 cursor-pointer text-left"
+          >
+            <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-sm text-muted-foreground">Upload <span className="font-mono">.md</span> or <span className="font-mono">.txt</span> context file</p>
+              <p className="text-xs text-muted-foreground/60 mt-0.5">If you have a pre-written founder context doc, upload it here</p>
+            </div>
+          </button>
+        ) : (
+          <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5 text-primary shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">{uploadedFileName}</p>
+                <p className="text-xs text-muted-foreground">{uploadedWordCount.toLocaleString()} words — will skip Exa research and use this as the knowledge base</p>
+              </div>
+            </div>
+            <button type="button" onClick={clearFile} className="text-muted-foreground hover:text-foreground ml-4 shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt" className="hidden" onChange={handleFileChange} />
+      </div>
+
       {/* Step 1 button */}
       <Button
         onClick={runPreview}
@@ -287,8 +349,8 @@ function SeedForm() {
         className="border-primary/30 hover:bg-primary/10 text-foreground"
       >
         {previewStatus === "running"
-          ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Researching… (~30s)</>
-          : <><Search className="mr-2 h-4 w-4" />Preview what Juno found</>}
+          ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{knowledgeBaseMd ? "Extracting from doc…" : "Researching… (~30s)"}</>
+          : <><Search className="mr-2 h-4 w-4" />{knowledgeBaseMd ? "Preview extracted profile" : "Preview what Juno found"}</>}
       </Button>
 
       {previewError && (

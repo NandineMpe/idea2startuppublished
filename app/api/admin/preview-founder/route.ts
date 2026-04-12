@@ -36,25 +36,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const founderName = typeof body.founderName === "string" ? body.founderName.trim() : ""
-  const companyName = typeof body.companyName === "string" ? body.companyName.trim() : ""
-  const companyUrl  = typeof body.companyUrl  === "string" ? body.companyUrl.trim()  : ""
-  const linkedinUrl = typeof body.linkedinUrl === "string" ? body.linkedinUrl.trim() : undefined
+  const founderName     = typeof body.founderName     === "string" ? body.founderName.trim()     : ""
+  const companyName     = typeof body.companyName     === "string" ? body.companyName.trim()     : ""
+  const companyUrl      = typeof body.companyUrl      === "string" ? body.companyUrl.trim()      : ""
+  const linkedinUrl     = typeof body.linkedinUrl     === "string" ? body.linkedinUrl.trim()     : undefined
+  const knowledgeBaseMd = typeof body.knowledgeBaseMd === "string" ? body.knowledgeBaseMd.trim() : undefined
 
   if (!founderName || !companyName || !companyUrl) {
     return NextResponse.json({ error: "founderName, companyName, companyUrl required" }, { status: 400 })
   }
 
   try {
-    const bundle = await researchFounder({
-      targetEmail: "preview@placeholder.com",
-      founderName,
-      companyName,
-      companyUrl,
-      linkedinUrl,
-    })
+    let synthesis: import("@/lib/seed-account/synthesizer").SynthesisResult
 
-    const synthesis = await synthesizeFromResearch(bundle)
+    if (knowledgeBaseMd) {
+      const { synthesizeFromKnowledgeBase } = await import("@/lib/seed-account/synthesizer")
+      synthesis = await synthesizeFromKnowledgeBase({ founderName, companyName, companyUrl, knowledgeBaseMd })
+    } else {
+      const bundle = await researchFounder({
+        targetEmail: "preview@placeholder.com",
+        founderName, companyName, companyUrl, linkedinUrl,
+      })
+      synthesis = await synthesizeFromResearch(bundle)
+    }
     const { profile, emailPreview } = synthesis
 
     return NextResponse.json({

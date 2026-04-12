@@ -277,19 +277,55 @@ Return ONLY valid JSON (no fences):
   }
 }
 
-// ─── main export ──────────────────────────────────────────────────────────────
+// ─── main export: from Exa research ──────────────────────────────────────────
 
 export async function synthesizeFromResearch(bundle: ResearchBundle): Promise<SynthesisResult> {
   const rawText = collapseBundle(bundle)
 
-  // profile first, then knowledge base (needs profile facts for grounding)
   const profile = await synthesizeProfile(bundle, rawText)
   const knowledgeBaseMd = await synthesizeKnowledgeBase(bundle, profile, rawText)
-
-  // attach knowledge base to profile
   profile.knowledge_base_md = knowledgeBaseMd
 
   const emailPreview = await synthesizeEmailPreview(bundle, profile)
+  return { profile, emailPreview }
+}
+
+// ─── fast path: from pre-built knowledge base doc ────────────────────────────
+//
+// Used when we already have a rich context document (e.g. corgi-context.md)
+// and want to skip Exa research entirely. Extracts structured fields from the
+// doc, then generates email preview bullets from those fields.
+
+export async function synthesizeFromKnowledgeBase(params: {
+  founderName: string
+  companyName: string
+  companyUrl: string
+  knowledgeBaseMd: string
+}): Promise<SynthesisResult> {
+  const { founderName, companyName, companyUrl, knowledgeBaseMd } = params
+
+  // Use the doc as the raw text for profile extraction
+  const mockBundle: ResearchBundle = {
+    founderName,
+    companyName,
+    companyUrl,
+    websitePages: [],
+    founderProfile: "",
+    pressSnippets: [],
+    productHuntText: "",
+    twitterPosts: [],
+    jobPostings: [],
+    competitorSnippets: [],
+  }
+
+  // Extract structured profile fields from the knowledge base doc
+  const profile = await synthesizeProfile(mockBundle, knowledgeBaseMd)
+
+  // Use the provided doc directly as the knowledge base — don't re-synthesize
+  profile.knowledge_base_md = knowledgeBaseMd
+
+  // Generate the 3 email bullets from the extracted profile
+  const emailPreview = await synthesizeEmailPreview(mockBundle, profile)
 
   return { profile, emailPreview }
 }

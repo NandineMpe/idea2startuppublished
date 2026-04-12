@@ -70,13 +70,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const targetEmail  = typeof body.targetEmail  === "string" ? body.targetEmail.trim()  : ""
-  const founderName  = typeof body.founderName  === "string" ? body.founderName.trim()  : ""
-  const companyName  = typeof body.companyName  === "string" ? body.companyName.trim()  : ""
-  const companyUrl   = typeof body.companyUrl   === "string" ? body.companyUrl.trim()   : ""
-  const linkedinUrl  = typeof body.linkedinUrl  === "string" ? body.linkedinUrl.trim()  : undefined
-  const twitterUrl   = typeof body.twitterUrl   === "string" ? body.twitterUrl.trim()   : undefined
-  const sendEmail    = body.sendEmail !== false // default true
+  const targetEmail      = typeof body.targetEmail      === "string" ? body.targetEmail.trim()      : ""
+  const founderName      = typeof body.founderName      === "string" ? body.founderName.trim()      : ""
+  const companyName      = typeof body.companyName      === "string" ? body.companyName.trim()      : ""
+  const companyUrl       = typeof body.companyUrl       === "string" ? body.companyUrl.trim()       : ""
+  const linkedinUrl      = typeof body.linkedinUrl      === "string" ? body.linkedinUrl.trim()      : undefined
+  const twitterUrl       = typeof body.twitterUrl       === "string" ? body.twitterUrl.trim()       : undefined
+  const sendEmail        = body.sendEmail !== false
+  // Pre-built context doc — skips Exa research + LLM synthesis entirely
+  const knowledgeBaseMd  = typeof body.knowledgeBaseMd  === "string" ? body.knowledgeBaseMd.trim()  : undefined
 
   if (!targetEmail || !founderName || !companyName || !companyUrl) {
     return NextResponse.json(
@@ -98,18 +100,21 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 1. Research
-    const bundle = await researchFounder({
-      targetEmail,
-      founderName,
-      companyName,
-      companyUrl,
-      linkedinUrl,
-      twitterUrl,
-    })
+    let synthesis: import("@/lib/seed-account/synthesizer").SynthesisResult
 
-    // 2. Synthesize
-    const synthesis = await synthesizeFromResearch(bundle)
+    if (knowledgeBaseMd) {
+      // ── Fast path: pre-built context doc supplied — extract structure from it ──
+      const { synthesizeFromKnowledgeBase } = await import("@/lib/seed-account/synthesizer")
+      synthesis = await synthesizeFromKnowledgeBase({
+        founderName, companyName, companyUrl, knowledgeBaseMd,
+      })
+    } else {
+      // ── Full path: Exa research + LLM synthesis ──
+      const bundle = await researchFounder({
+        targetEmail, founderName, companyName, companyUrl, linkedinUrl, twitterUrl,
+      })
+      synthesis = await synthesizeFromResearch(bundle)
+    }
 
     // 3. Seed DB
     const seedResult = await seedFounderAccount(
