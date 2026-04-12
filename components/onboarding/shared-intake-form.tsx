@@ -238,125 +238,18 @@ export function SharedIntakeForm({ token }: { token: string }) {
       </div>
 
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Who should we anchor this to?</CardTitle>
-            <CardDescription>Basic contact details help us keep the context grounded.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">
-            <Input
-              placeholder="Your name"
-              value={form.contactName}
-              onChange={(event) => updateField("contactName", event.target.value)}
-            />
-            <Input
-              type="email"
-              placeholder="you@company.com"
-              value={form.contactEmail}
-              onChange={(event) => updateField("contactEmail", event.target.value)}
-            />
-            <Input
-              placeholder="Founder / lead name"
-              value={form.founderName}
-              onChange={(event) => updateField("founderName", event.target.value)}
-            />
-            <Input
-              placeholder="Company name"
-              value={form.companyName}
-              onChange={(event) => updateField("companyName", event.target.value)}
-            />
-          </CardContent>
-        </Card>
 
+        {/* ── Full context document — TOP, primary path ── */}
         <Card>
           <CardHeader>
-            <CardTitle>Company basics</CardTitle>
+            <CardTitle>Upload your context document</CardTitle>
             <CardDescription>
-              A website is optional, but useful. The richer fields below matter more.
+              The fastest way to give Juno full context. Upload a markdown or text file and you're done — no need to fill in anything below.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input
-              type="url"
-              placeholder="https://company.com"
-              value={form.websiteUrl}
-              onChange={(event) => updateField("websiteUrl", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[120px]"
-              placeholder="What does the company do? Give the clearest plain-English description you can."
-              value={form.companyDescription}
-              onChange={(event) => updateField("companyDescription", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[120px]"
-              placeholder="What problem are you solving, and for whom?"
-              value={form.problem}
-              onChange={(event) => updateField("problem", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[120px]"
-              placeholder="What is the product or service? How does it solve the problem?"
-              value={form.solution}
-              onChange={(event) => updateField("solution", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[110px]"
-              placeholder="Who is the target customer? Title, company type, buyer, or end user."
-              value={form.targetMarket}
-              onChange={(event) => updateField("targetMarket", event.target.value)}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Commercial context</CardTitle>
-            <CardDescription>
-              These details make the generated output feel specific instead of generic.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              className="min-h-[100px]"
-              placeholder="How does the business make money?"
-              value={form.businessModel}
-              onChange={(event) => updateField("businessModel", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[100px]"
-              placeholder="Any traction so far? Revenue, customers, pilots, growth, proof points."
-              value={form.traction}
-              onChange={(event) => updateField("traction", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[100px]"
-              placeholder="What makes you meaningfully different from alternatives?"
-              value={form.differentiators}
-              onChange={(event) => updateField("differentiators", event.target.value)}
-            />
-            <Textarea
-              className="min-h-[140px]"
-              placeholder="Anything else Juno should know? Priorities, risks, competitors, founder background, vocabulary, constraints."
-              value={form.contextNotes}
-              onChange={(event) => updateField("contextNotes", event.target.value)}
-            />
-          </CardContent>
-        </Card>
-
-        {/* LLM context file upload */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Full context document <span className="text-muted-foreground font-normal text-sm ml-1">(optional but powerful)</span></CardTitle>
-            <CardDescription>
-              If you have an AI-generated summary of your startup — from ChatGPT, Claude, Notion AI, or your own Obsidian vault — upload it here.
-              Juno will treat it as the primary knowledge base for this workspace. The richer this document, the sharper every output.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Tips */}
             <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">How to get this document</p>
+              <p className="font-medium text-foreground">How to create this document</p>
               <ul className="space-y-1 list-none">
                 <li>→ Open ChatGPT or Claude and paste: <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">"Summarise everything you know about my startup — product, market, team, goals — as a detailed markdown document."</span></li>
                 <li>→ Copy the response, save as <span className="font-mono text-xs">context.md</span>, upload below.</li>
@@ -364,7 +257,6 @@ export function SharedIntakeForm({ token }: { token: string }) {
               </ul>
             </div>
 
-            {/* Drop zone */}
             {!uploadedFileName ? (
               <button
                 type="button"
@@ -392,9 +284,7 @@ export function SharedIntakeForm({ token }: { token: string }) {
               </div>
             )}
 
-            {fileError && (
-              <p className="text-sm text-destructive">{fileError}</p>
-            )}
+            {fileError && <p className="text-sm text-destructive">{fileError}</p>}
 
             <input
               ref={fileInputRef}
@@ -406,6 +296,57 @@ export function SharedIntakeForm({ token }: { token: string }) {
           </CardContent>
         </Card>
 
+        {/* ── Manual fields — only shown when no file uploaded ── */}
+        {!uploadedFileName && (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <p className="text-xs text-muted-foreground shrink-0">or fill in manually</p>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Who should we anchor this to?</CardTitle>
+                <CardDescription>Basic contact details help us keep the context grounded.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <Input placeholder="Your name" value={form.contactName} onChange={(e) => updateField("contactName", e.target.value)} />
+                <Input type="email" placeholder="you@company.com" value={form.contactEmail} onChange={(e) => updateField("contactEmail", e.target.value)} />
+                <Input placeholder="Founder / lead name" value={form.founderName} onChange={(e) => updateField("founderName", e.target.value)} />
+                <Input placeholder="Company name" value={form.companyName} onChange={(e) => updateField("companyName", e.target.value)} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Company basics</CardTitle>
+                <CardDescription>A website is optional, but useful. The richer fields below matter more.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Input type="url" placeholder="https://company.com" value={form.websiteUrl} onChange={(e) => updateField("websiteUrl", e.target.value)} />
+                <Textarea className="min-h-[120px]" placeholder="What does the company do? Give the clearest plain-English description you can." value={form.companyDescription} onChange={(e) => updateField("companyDescription", e.target.value)} />
+                <Textarea className="min-h-[120px]" placeholder="What problem are you solving, and for whom?" value={form.problem} onChange={(e) => updateField("problem", e.target.value)} />
+                <Textarea className="min-h-[120px]" placeholder="What is the product or service? How does it solve the problem?" value={form.solution} onChange={(e) => updateField("solution", e.target.value)} />
+                <Textarea className="min-h-[110px]" placeholder="Who is the target customer? Title, company type, buyer, or end user." value={form.targetMarket} onChange={(e) => updateField("targetMarket", e.target.value)} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Commercial context</CardTitle>
+                <CardDescription>These details make the generated output feel specific instead of generic.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea className="min-h-[100px]" placeholder="How does the business make money?" value={form.businessModel} onChange={(e) => updateField("businessModel", e.target.value)} />
+                <Textarea className="min-h-[100px]" placeholder="Any traction so far? Revenue, customers, pilots, growth, proof points." value={form.traction} onChange={(e) => updateField("traction", e.target.value)} />
+                <Textarea className="min-h-[100px]" placeholder="What makes you meaningfully different from alternatives?" value={form.differentiators} onChange={(e) => updateField("differentiators", e.target.value)} />
+                <Textarea className="min-h-[140px]" placeholder="Anything else Juno should know? Priorities, risks, competitors, founder background, vocabulary, constraints." value={form.contextNotes} onChange={(e) => updateField("contextNotes", e.target.value)} />
+              </CardContent>
+            </Card>
+          </>
+        )}
+
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
@@ -415,10 +356,7 @@ export function SharedIntakeForm({ token }: { token: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void handleSubmit()} disabled={submitting}>
             {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving context
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving context</>
             ) : (
               "Save company context"
             )}

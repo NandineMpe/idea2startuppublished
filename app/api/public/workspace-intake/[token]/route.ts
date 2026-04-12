@@ -139,7 +139,7 @@ export async function POST(
       contextNotes: asString(body.contextNotes),
     }
 
-    const hasContext = Object.values(payload).some(Boolean)
+    const hasContext = Object.values(payload).some(Boolean) || Boolean(knowledgeBaseMd)
     if (!hasContext) {
       return NextResponse.json(
         { error: "Please add at least some company context before submitting." },
