@@ -17,11 +17,8 @@ function normalizedText(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
-async function getWorkspaceForRequest(userId: string, request: Request) {
-  const url = new URL(request.url)
-  const scope = url.searchParams.get("scope")
-  if (scope === "owner") return null
-  return resolveWorkspaceSelection(userId, { useCookieWorkspace: true })
+async function getWorkspaceForRequest(_userId: string, _request: Request) {
+  return null
 }
 
 export async function GET(request: Request) {

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       getCompanyContext(user.id, {
         queryHint: "reddit customer research buying process pain points",
         refreshVault: "if_stale",
-        useCookieWorkspace: true,
+        
       }),
       supabase
         .from("intent_signals")

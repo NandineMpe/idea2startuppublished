@@ -16,7 +16,7 @@ async function getOfficeHoursCompanyContext(userId: string) {
   const load = getCompanyContext(userId, {
     refreshVault: "if_stale",
     useCookieOrganization: true,
-    useCookieWorkspace: true,
+    
   }).catch(() => null)
 
   const timeout = new Promise<null>((resolve) => {

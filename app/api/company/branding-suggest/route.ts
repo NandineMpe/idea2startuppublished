@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     const companyBlock = await getCompanyContextPrompt(user.id, {
       queryHint: "brand voice messaging founder background customers product compliance",
-      useCookieWorkspace: true,
+      
     })
 
     if (!companyBlock.trim()) {

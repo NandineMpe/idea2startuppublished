@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     const context = await getCompanyContext(user.id, {
       queryHint: "reddit customer frustrations buying process workarounds discovery and product gaps",
       refreshVault: "if_stale",
-      useCookieWorkspace: true,
+      
     })
 
     if (!context) {

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const companyCtx = await getCompanyContext(userId, {
       queryHint: lastMessage.slice(0, 500) || "company strategy product market",
       refreshVault: "always",
-      useCookieWorkspace: true,
+      
     })
     const companyBlock =
       companyCtx?.promptBlock?.trim()
