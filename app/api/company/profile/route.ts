@@ -21,7 +21,7 @@ async function getWorkspaceForRequest(userId: string, request: Request) {
   const url = new URL(request.url)
   const scope = url.searchParams.get("scope")
   if (scope === "owner") return null
-  return resolveWorkspaceSelection(userId)
+  return resolveWorkspaceSelection(userId, { useCookieWorkspace: true })
 }
 
 export async function GET(request: Request) {

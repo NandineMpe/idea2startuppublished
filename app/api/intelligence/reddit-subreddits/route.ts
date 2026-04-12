@@ -16,6 +16,7 @@ export async function GET() {
     const context = await getCompanyContext(user.id, {
       queryHint: "reddit customer pain product gaps audit compliance finance accounting software ICP",
       refreshVault: "if_stale",
+      useCookieWorkspace: true,
     })
 
     if (!context) {
@@ -45,6 +46,7 @@ export async function POST() {
     const context = await getCompanyContext(user.id, {
       queryHint: "reddit customer pain product gaps audit compliance finance accounting software ICP",
       refreshVault: "if_stale",
+      useCookieWorkspace: true,
     })
 
     if (!context) {
