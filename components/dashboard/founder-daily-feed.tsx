@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
+  Star,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
@@ -50,6 +51,15 @@ type FeedRow = {
   created_at: string
 }
 
+type StarredFeedItem = {
+  id: string
+  section: string
+  savedAt: string
+  item: BriefItem
+}
+
+const STARRED_FEED_STORAGE_KEY = "juno.signal-feed.starred"
+
 const SECTIONS: {
   key: keyof BriefDashboard
   label: string
@@ -63,7 +73,48 @@ const SECTIONS: {
   { key: "funding", label: "Funding", icon: Banknote, description: "Competitor and adjacent rounds to watch." },
 ]
 
-function FeedItem({ item }: { item: BriefItem }) {
+function itemStableId(item: BriefItem, sectionKey: keyof BriefDashboard) {
+  const headline = item.headline ?? item.title ?? ""
+  const source = item.source ?? ""
+  const url = item.url ?? ""
+  return `${sectionKey}::${headline}::${source}::${url}`.toLowerCase()
+}
+
+function readStarredFeedItems() {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = window.localStorage.getItem(STARRED_FEED_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (row): row is StarredFeedItem =>
+        !!row &&
+        typeof row === "object" &&
+        typeof (row as StarredFeedItem).id === "string" &&
+        typeof (row as StarredFeedItem).section === "string" &&
+        typeof (row as StarredFeedItem).savedAt === "string" &&
+        typeof (row as StarredFeedItem).item === "object",
+    )
+  } catch {
+    return []
+  }
+}
+
+function writeStarredFeedItems(rows: StarredFeedItem[]) {
+  if (typeof window === "undefined") return
+  window.localStorage.setItem(STARRED_FEED_STORAGE_KEY, JSON.stringify(rows))
+}
+
+function FeedItem({
+  item,
+  starred = false,
+  onToggleStar,
+}: {
+  item: BriefItem
+  starred?: boolean
+  onToggleStar?: () => void
+}) {
   const headline = item.headline ?? item.title ?? "Untitled"
   const url = item.url
   const source = item.source ?? ""
@@ -129,6 +180,26 @@ function FeedItem({ item }: { item: BriefItem }) {
         {url && (
           <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/50 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
         )}
+        {onToggleStar ? (
+          <button
+            type="button"
+            aria-label={starred ? "Unstar update" : "Star update"}
+            title={starred ? "Unstar update" : "Star update"}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onToggleStar()
+            }}
+            className={cn(
+              "rounded p-1 transition-colors",
+              starred
+                ? "text-amber-500 hover:text-amber-600"
+                : "text-muted-foreground/60 hover:text-foreground",
+            )}
+          >
+            <Star className={cn("h-3.5 w-3.5", starred && "fill-current")} />
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -165,6 +236,38 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
   const [workspaceScope, setWorkspaceScope] = useState(false)
   const [workspaceName, setWorkspaceName] = useState<string | null>(null)
   const [workspaceProfile, setWorkspaceProfile] = useState<WorkspaceProfile | null>(null)
+  const [starredItems, setStarredItems] = useState<StarredFeedItem[]>([])
+
+  useEffect(() => {
+    setStarredItems(readStarredFeedItems())
+  }, [])
+
+  const persistStarredItems = useCallback((next: StarredFeedItem[]) => {
+    setStarredItems(next)
+    writeStarredFeedItems(next)
+  }, [])
+
+  const isStarred = useCallback(
+    (id: string) => starredItems.some((row) => row.id === id),
+    [starredItems],
+  )
+
+  const toggleStarred = useCallback(
+    (section: keyof BriefDashboard, sectionLabel: string, item: BriefItem) => {
+      const id = itemStableId(item, section)
+      const alreadyStarred = starredItems.some((row) => row.id === id)
+      if (alreadyStarred) {
+        persistStarredItems(starredItems.filter((row) => row.id !== id))
+        return
+      }
+      const next: StarredFeedItem[] = [
+        { id, section: sectionLabel, savedAt: new Date().toISOString(), item },
+        ...starredItems,
+      ]
+      persistStarredItems(next.slice(0, 120))
+    },
+    [persistStarredItems, starredItems],
+  )
 
   const fetchFeed = useCallback(async () => {
     setLoading(true)
@@ -309,7 +412,33 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
             </p>
           </div>
         ) : (
-          SECTIONS.map((section) => {
+          <>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Starred updates
+                  <span className="font-normal normal-case ml-1.5 text-[11px]">· {starredItems.length}</span>
+                </h3>
+              </div>
+              {starredItems.length === 0 ? (
+                <p className="text-[12px] text-muted-foreground/70 italic py-2 px-1 border border-dashed border-border rounded-md bg-muted/20">
+                  Star an update to keep it handy for later.
+                </p>
+              ) : (
+                <div className="space-y-1 divide-y divide-border/60">
+                  {starredItems.map((row) => (
+                    <FeedItem
+                      key={row.id}
+                      item={row.item}
+                      starred={isStarred(row.id)}
+                      onToggleStar={() => persistStarredItems(starredItems.filter((item) => item.id !== row.id))}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {SECTIONS.map((section) => {
             const Icon = section.icon
             const items: BriefItem[] = (dashboard[section.key] as BriefItem[] | undefined) ?? []
             return (
@@ -332,13 +461,19 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
                 ) : (
                   <div className="space-y-1 divide-y divide-border/60">
                     {items.map((item, i) => (
-                      <FeedItem key={i} item={item} />
+                      <FeedItem
+                        key={i}
+                        item={item}
+                        starred={isStarred(itemStableId(item, section.key))}
+                        onToggleStar={() => toggleStarred(section.key, section.label, item)}
+                      />
                     ))}
                   </div>
                 )}
               </div>
             )
-          })
+            })}
+          </>
         )}
       </div>
     </section>

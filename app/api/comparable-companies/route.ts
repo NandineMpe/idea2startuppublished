@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { checkAndIncrementApiRateLimit } from "@/lib/api-rate-limit"
+import { getServerEnv } from "@/lib/server-env"
 import { createClient } from "@/lib/supabase/server"
 
 const RATE_FEATURE = "comparable_companies"
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const manusApiKey = process.env.MANUS_API_KEY?.trim()
+    const manusApiKey = getServerEnv("MANUS_API_KEY")
     if (!manusApiKey) {
       return NextResponse.json(
         { error: "Comparable companies is not configured." },

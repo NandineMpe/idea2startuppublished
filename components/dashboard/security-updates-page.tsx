@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Shield, Loader2, RefreshCw, AlertTriangle, Github } from "lucide-react"
+import { Shield, Loader2, RefreshCw, AlertTriangle, Github, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -149,6 +149,71 @@ function formatAgo(iso: string) {
   if (h < 48) return `${h} hour${h === 1 ? "" : "s"} ago`
   const d = Math.floor(h / 24)
   return `${d} day${d === 1 ? "" : "s"} ago`
+}
+
+/** Outer fence length so pasted snippets can include triple backticks without breaking. */
+function fencedCodeBlock(label: string, text: string | null | undefined): string {
+  const inner = (text ?? "").replace(/\r\n/g, "\n").trimEnd()
+  if (!inner) return ""
+  let fence = "```"
+  while (inner.includes(fence)) {
+    fence += "`"
+  }
+  const cap = label.trim() ? `${label}\n` : ""
+  return `${cap}${fence}\n${inner}\n${fence}\n`
+}
+
+/** Full finding text for pasting into Cursor or a ticket. */
+function formatFindingClipboardText(f: FindingRow): string {
+  const loc =
+    f.file_path != null && f.file_path !== ""
+      ? `${f.file_path}${f.line_number != null ? `:${f.line_number}` : ""}`
+      : "—"
+  const lines: string[] = [
+    "### Security update (Juno)",
+    "",
+    `**Title:** ${f.title || "Finding"}`,
+    `**Severity:** ${(f.severity ?? "unknown").toUpperCase()}`,
+    `**Status:** ${f.status}`,
+    `**Finding ID:** ${f.id}`,
+  ]
+  if (f.verification_status) lines.push(`**Verification:** ${f.verification_status}`)
+  if (typeof f.confidence === "number") lines.push(`**Confidence:** ${f.confidence}/10`)
+  if (f.phase_name) lines.push(`**Phase:** ${f.phase_name}`)
+  if (f.category) lines.push(`**Category:** ${f.category}`)
+  lines.push(`**Location:** ${loc}`)
+  if (f.created_at) lines.push(`**Reported:** ${f.created_at}`)
+  lines.push("")
+  if (f.code_snippet?.trim()) {
+    lines.push("### Vulnerable code")
+    lines.push("")
+    lines.push(fencedCodeBlock("", f.code_snippet))
+  }
+  if (f.description?.trim()) {
+    lines.push("### Description")
+    lines.push("")
+    lines.push(f.description.trim())
+    lines.push("")
+  }
+  if (f.exploit_scenario?.trim()) {
+    lines.push("### Exploit scenario")
+    lines.push("")
+    lines.push(f.exploit_scenario.trim())
+    lines.push("")
+  }
+  if (f.fix_suggestion?.trim() || f.fix_effort || f.fix_code?.trim()) {
+    lines.push("### Recommended fix")
+    lines.push("")
+    if (f.fix_effort) lines.push(`**Estimated effort:** ${f.fix_effort}`)
+    if (f.fix_suggestion?.trim()) lines.push(f.fix_suggestion.trim())
+    if (f.fix_code?.trim()) {
+      lines.push("")
+      lines.push("**Suggested fix code:**")
+      lines.push("")
+      lines.push(fencedCodeBlock("", f.fix_code))
+    }
+  }
+  return lines.join("\n").trimEnd() + "\n"
 }
 
 export function SecurityUpdatesPage() {
@@ -392,6 +457,41 @@ export function SecurityUpdatesPage() {
       await load()
     } catch {
       toast({ title: "Network error.", variant: "destructive" })
+    }
+  }
+
+  async function copyFindingDetails(f: FindingRow) {
+    const text = formatFindingClipboardText(f)
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({ title: "Copied", description: "Full finding is on the clipboard. Paste it into Cursor." })
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Your browser may block clipboard access. Try again or copy sections manually.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  async function copyAllVisibleFindings(rows: FindingRow[]) {
+    if (rows.length === 0) return
+    const text = rows.map((row) => formatFindingClipboardText(row)).join("\n\n---\n\n")
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({
+        title: "Copied",
+        description:
+          rows.length === 1
+            ? "Full finding is on the clipboard."
+            : `${rows.length} findings on the clipboard. Paste into Cursor.`,
+      })
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Your browser may block clipboard access. Try again or copy one finding at a time.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -737,6 +837,18 @@ export function SecurityUpdatesPage() {
         <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => void load()} disabled={loading}>
           Refresh
         </Button>
+        {!loading && filtered.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => void copyAllVisibleFindings(filtered)}
+          >
+            <Copy className="h-3.5 w-3.5" aria-hidden />
+            Copy all visible
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -765,22 +877,34 @@ export function SecurityUpdatesPage() {
             return (
               <Card key={f.id} className="border-border/90 overflow-hidden">
                 <CardHeader className="pb-2 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn("inline-flex h-2 w-2 rounded-full shrink-0", st.dot)} aria-hidden />
-                    <Badge variant="outline" className={cn("text-[11px] font-medium", st.badge)}>
-                      {(f.severity ?? "medium").toUpperCase()}
-                    </Badge>
-                    {f.phase_name && (
-                      <span className="text-[11px] text-muted-foreground">Phase: {f.phase_name}</span>
-                    )}
-                    {typeof f.confidence === "number" && (
-                      <span className="text-[11px] text-muted-foreground">{f.confidence}/10</span>
-                    )}
-                    {f.verification_status && (
-                      <Badge variant="secondary" className="text-[10px]">
-                        {f.verification_status}
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className={cn("inline-flex h-2 w-2 rounded-full shrink-0 mt-1.5", st.dot)} aria-hidden />
+                      <Badge variant="outline" className={cn("text-[11px] font-medium", st.badge)}>
+                        {(f.severity ?? "medium").toUpperCase()}
                       </Badge>
-                    )}
+                      {f.phase_name && (
+                        <span className="text-[11px] text-muted-foreground">Phase: {f.phase_name}</span>
+                      )}
+                      {typeof f.confidence === "number" && (
+                        <span className="text-[11px] text-muted-foreground">{f.confidence}/10</span>
+                      )}
+                      {f.verification_status && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {f.verification_status}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 shrink-0 gap-1.5 text-xs"
+                      onClick={() => void copyFindingDetails(f)}
+                    >
+                      <Copy className="h-3.5 w-3.5" aria-hidden />
+                      Copy for Cursor
+                    </Button>
                   </div>
                   <CardTitle className="text-base font-semibold leading-snug">{f.title || "Finding"}</CardTitle>
                   <p className="text-xs text-muted-foreground font-mono">

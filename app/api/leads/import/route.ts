@@ -17,7 +17,7 @@ import type { LookalikeDimensions } from "@/types/lookalike"
 /** Keep low so each job’s score + outreach fit within typical serverless limits. */
 const MAX_JOBS_PER_REQUEST = 5
 
-/** Distribution CSV / web: one Claude call per row — keep batch small. */
+/** Distribution CSV / web: one LLM call per row — keep batch small. */
 const MAX_DISTRIBUTION_LEADS_PER_REQUEST = 8
 
 /** Apollo extension: slightly larger batches (same maxDuration). */

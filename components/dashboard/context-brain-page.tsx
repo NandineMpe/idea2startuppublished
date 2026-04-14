@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { BookMarked, ChevronDown, ChevronRight, FileDown, FileText, FileUp, Github, Loader2, RefreshCw, Save, Trash2, Unplug } from "lucide-react"
+import { BookMarked, ChevronDown, ChevronRight, FileDown, FileText, FileUp, Github, Loader2, RefreshCw, Save, Sparkles, Trash2, Unplug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -334,6 +334,7 @@ export function ContextBrainPage() {
   const [erasingKb, setErasingKb] = useState(false)
   const [contextScope, setContextScope] = useState<"owner" | "workspace" | null>(null)
   const [workspaceLabel, setWorkspaceLabel] = useState<string | null>(null)
+  const [extractingProfile, setExtractingProfile] = useState(false)
 
   async function refresh() {
     try {
@@ -459,6 +460,40 @@ export function ContextBrainPage() {
       })
     } finally {
       setErasingKb(false)
+    }
+  }
+
+  async function extractProfileFromDocument() {
+    if (!markdown.trim()) {
+      toast({ title: "No document", description: "Save a knowledge base document first.", variant: "destructive" })
+      return
+    }
+    if (markdownDirty) {
+      const ok = window.confirm("Save the document first before extracting? (Click OK to save and extract, Cancel to abort.)")
+      if (!ok) return
+      await saveMarkdown()
+    }
+    setExtractingProfile(true)
+    try {
+      const res = await fetch("/api/company/extract-profile", {
+        method: "POST",
+        credentials: "include",
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(json.error || "Extraction failed")
+      await refresh()
+      toast({
+        title: "Profile extracted from document",
+        description: "Company profile fields have been populated from your knowledge base.",
+      })
+    } catch (e) {
+      toast({
+        title: "Could not extract profile",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      })
+    } finally {
+      setExtractingProfile(false)
     }
   }
 
@@ -608,6 +643,18 @@ export function ContextBrainPage() {
             <Button type="button" onClick={() => void saveMarkdown()} disabled={savingMd || !markdownDirty} className="gap-1.5">
               {savingMd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={extractingProfile || savingMd || !markdown.trim()}
+              onClick={() => void extractProfileFromDocument()}
+              title="Use AI to extract company profile fields (name, problem, solution, etc.) from this document"
+            >
+              {extractingProfile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Extract profile from document
             </Button>
             {markdown && (
               <Button type="button" variant="ghost" size="sm" onClick={() => { setMarkdown(""); setMarkdownDirty(true) }} className="text-muted-foreground gap-1.5">

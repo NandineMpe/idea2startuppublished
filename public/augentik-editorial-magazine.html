@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Augentik Editorial Magazine</title>
+  <meta
+    name="description"
+    content="A 10-page horizontal-swipe editorial magazine for Augentik: AI-powered GAAP, SEC, and SOX guidance for finance and accounting teams."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    :root {
+      --ink: #05111f;
+      --navy: #060e1f;
+      --navy-soft: #0a1830;
+      --paper: #f5f1e9;
+      --text-dark: #08101b;
+      --text-light: #f6fbff;
+      --muted-dark: rgba(8, 16, 27, 0.68);
+      --muted-light: rgba(246, 251, 255, 0.68);
+      --line-light: rgba(255, 255, 255, 0.18);
+      --line-dark: rgba(5, 17, 31, 0.16);
+      --accent-blue: #4f8ef7;
+      --accent-teal: #00d4aa;
+      --display: "Instrument Serif", Georgia, serif;
+      --sans: "Inter", Arial, sans-serif;
+      --mono: "JetBrains Mono", "Courier New", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--navy);
+      color: var(--text-dark);
+      font-family: var(--sans);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: 0.05;
+      background-image: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.9) 0 0.6px, transparent 0.7px),
+        radial-gradient(circle at 70% 35%, rgba(255, 255, 255, 0.55) 0 0.7px, transparent 0.8px),
+        radial-gradient(circle at 45% 80%, rgba(255, 255, 255, 0.65) 0 0.5px, transparent 0.6px);
+      background-size: 190px 190px, 230px 230px, 170px 170px;
+      mix-blend-mode: screen;
+    }
+
+    .magazine {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      overscroll-behavior-x: contain;
+      touch-action: pan-x;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .magazine::-webkit-scrollbar {
+      display: none;
+    }
+
+    .page {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      flex: 0 0 100vw;
+      scroll-snap-align: start;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .page::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(140deg, rgba(255, 255, 255, 0.06), transparent 28%),
+        linear-gradient(320deg, rgba(255, 255, 255, 0.05), transparent 34%);
+      opacity: 0.35;
+    }
+
+    .page-dark {
+      color: var(--text-light);
+    }
+
+    .page-dark::after {
+      background:
+        linear-gradient(135deg, rgba(79, 142, 247, 0.12), transparent 34%),
+        linear-gradient(315deg, rgba(0, 212, 170, 0.08), transparent 38%);
+      opacity: 1;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      line-height: 1.4;
+      opacity: 0.82;
+    }
+
+    .display {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(4.8rem, 10vw, 9.6rem);
+      line-height: 0.92;
+      letter-spacing: -0.05em;
+      font-weight: 400;
+    }
+
+    .display-tight {
+      font-size: clamp(3.8rem, 7.8vw, 7rem);
+    }
+
+    .page-title {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(2.2rem, 4vw, 4.25rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      font-weight: 400;
+    }
+
+    .deck {
+      margin: 0;
+      font-size: clamp(1rem, 1.55vw, 1.4rem);
+      line-height: 1.45;
+      max-width: 34rem;
+    }
+
+    .deck-tight {
+      max-width: 26rem;
+    }
+
+    .mono-line {
+      font-family: var(--mono);
+      font-size: 0.84rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stat {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(7rem, 16vw, 14rem);
+      line-height: 0.8;
+      letter-spacing: -0.07em;
+      font-weight: 400;
+    }
+
+    .stat-label {
+      margin: 0;
+      font-size: 0.96rem;
+      line-height: 1.45;
+      letter-spacing: 0.03em;
+      max-width: 14rem;
+      text-transform: uppercase;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .page-meta {
+      position: absolute;
+      top: 2rem;
+      right: 2rem;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .page-number {
+      position: absolute;
+      right: 2rem;
+      bottom: 2rem;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    .rule {
+      width: 100%;
+      height: 1px;
+      background: currentColor;
+      opacity: 0.18;
+    }
+
+    .cover {
+      background:
+        radial-gradient(circle at 20% 18%, rgba(79, 142, 247, 0.28), transparent 24%),
+        radial-gradient(circle at 84% 22%, rgba(0, 212, 170, 0.2), transparent 24%),
+        linear-gradient(145deg, #071524, #060e1f 58%, #09162b 100%);
+    }
+
+    .cover-grid,
+    .problem-grid,
+    .solution-grid,
+    .audience-grid,
+    .origin-grid,
+    .back-grid {
+      display: grid;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cover-grid {
+      grid-template-columns: 1.12fr 0.88fr;
+    }
+
+    .cover-copy,
+    .cover-proof,
+    .problem-anchor,
+    .solution-anchor,
+    .solution-steps,
+    .audience-anchor,
+    .origin-anchor,
+    .origin-copy,
+    .back-copy,
+    .back-cta {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      padding: 3rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cover-proof {
+      border-left: 1px solid var(--line-light);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 38%),
+        linear-gradient(160deg, rgba(0, 212, 170, 0.08), rgba(0, 0, 0, 0));
+    }
+
+    .brand-stamp {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.8rem;
+      font-size: 0.92rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .brand-stamp::before {
+      content: "";
+      width: 0.9rem;
+      height: 0.9rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      box-shadow: 0 0 30px rgba(79, 142, 247, 0.7);
+    }
+
+    .cover-list,
+    .problem-list,
+    .step-list,
+    .proof-list,
+    .short-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .cover-list li,
+    .problem-list li,
+    .step-list li,
+    .proof-list li,
+    .short-list li {
+      display: flex;
+      gap: 0.8rem;
+      line-height: 1.35;
+    }
+
+    .cover-list li::before,
+    .problem-list li::before,
+    .proof-list li::before,
+    .short-list li::before {
+      content: "+";
+      color: var(--accent-teal);
+      font-family: var(--mono);
+      opacity: 0.9;
+    }
+
+    .problem {
+      background:
+        linear-gradient(90deg, var(--paper) 0 41%, #dbe8f9 41% 100%);
+    }
+
+    .problem-grid {
+      grid-template-columns: 0.92fr 1.08fr;
+    }
+
+    .problem-anchor {
+      border-right: 1px solid var(--line-dark);
+    }
+
+    .problem-anchor::before {
+      content: "";
+      position: absolute;
+      inset: 1.5rem;
+      border: 1px solid rgba(8, 16, 27, 0.08);
+    }
+
+    .problem-quadrants,
+    .audience-roles,
+    .launch-grid,
+    .comparison-columns {
+      display: grid;
+      width: 100%;
+      height: 100%;
+    }
+
+    .problem-quadrants {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .quadrant,
+    .feature-panel,
+    .feature-stat,
+    .role-panel,
+    .compare-column,
+    .launch-band,
+    .tech-panel {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .quadrant {
+      padding: 2.4rem;
+      border-left: 1px solid rgba(8, 16, 27, 0.12);
+      border-top: 1px solid rgba(8, 16, 27, 0.12);
+    }
+
+    .problem-quadrants .quadrant:nth-child(1),
+    .problem-quadrants .quadrant:nth-child(2) {
+      border-top: none;
+    }
+
+    .problem-quadrants .quadrant:nth-child(1),
+    .problem-quadrants .quadrant:nth-child(3) {
+      border-left: none;
+    }
+
+    .quadrant h3,
+    .feature-panel h3,
+    .role-panel h3,
+    .compare-column h3,
+    .launch-band h3,
+    .tech-panel h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    .quadrant p,
+    .feature-panel p,
+    .role-panel p,
+    .compare-column p,
+    .launch-band p,
+    .tech-panel p,
+    .origin-copy p {
+      margin: 0;
+      font-size: 0.98rem;
+      line-height: 1.46;
+      color: var(--muted-dark);
+    }
+
+    .solution {
+      background:
+        linear-gradient(90deg, #09162b 0 39%, transparent 39%),
+        linear-gradient(135deg, #e8f3ff, #f6fafc 55%, #dff8f1 100%);
+    }
+
+    .solution-grid {
+      grid-template-columns: 0.9fr 1.1fr;
+    }
+
+    .solution-anchor {
+      color: var(--text-light);
+      border-right: 1px solid var(--line-light);
+    }
+
+    .step-list li {
+      position: relative;
+      padding-left: 3.8rem;
+      min-height: 3.6rem;
+      align-items: center;
+    }
+
+    .step-list li::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 0;
+      top: 0.05rem;
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      color: var(--text-light);
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      box-shadow: 0 10px 30px rgba(79, 142, 247, 0.35);
+    }
+
+    .features {
+      background:
+        linear-gradient(140deg, #edf4ff, #f8f1ea 54%, #ddfbf3 100%);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      width: 100%;
+      height: 100%;
+    }
+
+    .feature-panel,
+    .feature-stat {
+      padding: 2.35rem;
+      border-top: 1px solid rgba(8, 16, 27, 0.11);
+      border-left: 1px solid rgba(8, 16, 27, 0.11);
+    }
+
+    .feature-stat {
+      grid-row: span 2;
+      background:
+        linear-gradient(180deg, rgba(79, 142, 247, 0.08), rgba(255, 255, 255, 0));
+    }
+
+    .features-grid > *:nth-child(-n + 3) {
+      border-top: none;
+    }
+
+    .features-grid > *:nth-child(1),
+    .features-grid > *:nth-child(4) {
+      border-left: none;
+    }
+
+    .audience {
+      background:
+        linear-gradient(90deg, #d5e8ff 0 34%, #f6f3ee 34% 100%);
+    }
+
+    .audience-grid {
+      grid-template-columns: 0.84fr 1.16fr;
+    }
+
+    .audience-anchor {
+      border-right: 1px solid var(--line-dark);
+    }
+
+    .audience-roles {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+    }
+
+    .role-panel {
+      padding: 2.15rem;
+      border-left: 1px solid rgba(8, 16, 27, 0.11);
+      border-top: 1px solid rgba(8, 16, 27, 0.11);
+    }
+
+    .audience-roles > *:nth-child(-n + 2) {
+      border-top: none;
+    }
+
+    .audience-roles > *:nth-child(1),
+    .audience-roles > *:nth-child(3),
+    .audience-roles > *:nth-child(5) {
+      border-left: none;
+    }
+
+    .competition {
+      background:
+        radial-gradient(circle at 18% 18%, rgba(79, 142, 247, 0.16), transparent 24%),
+        radial-gradient(circle at 82% 78%, rgba(0, 212, 170, 0.14), transparent 26%),
+        linear-gradient(150deg, #0a1221, #08111d 52%, #071625 100%);
+      color: var(--text-light);
+    }
+
+    .competition-grid {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      width: 100%;
+      height: 100%;
+    }
+
+    .competition-head,
+    .tech-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 2rem;
+    }
+
+    .competition-head {
+      padding: 2.8rem 3rem 2rem;
+      border-bottom: 1px solid var(--line-light);
+    }
+
+    .comparison-columns {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .compare-column {
+      padding: 2.15rem;
+      border-left: 1px solid var(--line-light);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    }
+
+    .compare-column:first-child {
+      border-left: none;
+    }
+
+    .compare-column h3,
+    .competition-head .page-title,
+    .competition-head .deck,
+    .compare-column p,
+    .tech-head .page-title,
+    .tech-head .deck,
+    .tech-panel h3,
+    .tech-panel p {
+      color: var(--text-light);
+    }
+
+    .compare-column p,
+    .tech-panel p {
+      color: var(--muted-light);
+    }
+
+    .compare-mark {
+      font-family: var(--display);
+      font-size: clamp(3.5rem, 7vw, 6rem);
+      line-height: 0.8;
+      letter-spacing: -0.06em;
+      opacity: 0.16;
+    }
+
+    .compare-column strong {
+      color: var(--text-light);
+      font-weight: 700;
+    }
+
+    .origin {
+      background:
+        linear-gradient(90deg, #f2dfdc 0 42%, #f6efe7 42% 100%);
+    }
+
+    .origin-grid {
+      grid-template-columns: 0.82fr 1.18fr;
+    }
+
+    .origin-anchor {
+      border-right: 1px solid var(--line-dark);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+    }
+
+    .origin-copy .short-list li::before {
+      color: var(--accent-blue);
+    }
+
+    .origin-copy .proof-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .origin-copy .proof-list li {
+      flex-direction: column;
+      gap: 0.55rem;
+      padding: 1rem 0 0;
+      border-top: 1px solid rgba(8, 16, 27, 0.1);
+    }
+
+    .origin-copy .proof-list li::before {
+      content: attr(data-label);
+      color: rgba(8, 16, 27, 0.88);
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      letter-spacing: 0.12em;
+    }
+
+    .launch {
+      background:
+        linear-gradient(135deg, #eaf4ff, #ecf8f5 60%, #f5efe8 100%);
+    }
+
+    .launch-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .launch-band {
+      padding: 2.8rem 2.4rem;
+      border-left: 1px solid rgba(8, 16, 27, 0.11);
+    }
+
+    .launch-band:first-child {
+      border-left: none;
+    }
+
+    .launch-url {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--mono);
+      font-size: 0.83rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(8, 16, 27, 0.88);
+    }
+
+    .launch-url::before {
+      content: "";
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+    }
+
+    .tech {
+      background:
+        radial-gradient(circle at 82% 18%, rgba(79, 142, 247, 0.18), transparent 22%),
+        radial-gradient(circle at 12% 78%, rgba(0, 212, 170, 0.14), transparent 24%),
+        linear-gradient(145deg, #08111d, #091726 56%, #0b1624 100%);
+      color: var(--text-light);
+    }
+
+    .tech-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr 1fr;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tech-head {
+      grid-column: 1 / -1;
+      padding: 2.7rem 3rem 1.8rem;
+      border-bottom: 1px solid var(--line-light);
+    }
+
+    .tech-panel {
+      padding: 2.35rem;
+      border-left: 1px solid var(--line-light);
+      border-top: 1px solid var(--line-light);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+    }
+
+    .tech-panel:nth-child(2),
+    .tech-panel:nth-child(4) {
+      border-left: none;
+    }
+
+    .tech-panel:nth-child(2),
+    .tech-panel:nth-child(3) {
+      border-top: none;
+    }
+
+    .tech-code {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: rgba(246, 251, 255, 0.7);
+      opacity: 0.8;
+    }
+
+    .back {
+      background:
+        radial-gradient(circle at 20% 22%, rgba(79, 142, 247, 0.2), transparent 24%),
+        radial-gradient(circle at 82% 74%, rgba(0, 212, 170, 0.18), transparent 22%),
+        linear-gradient(155deg, #07101f, #06101c 52%, #091928 100%);
+      color: var(--text-light);
+    }
+
+    .back-grid {
+      grid-template-columns: 1.08fr 0.92fr;
+    }
+
+    .back-cta {
+      border-left: 1px solid var(--line-light);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+    }
+
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.42rem;
+      width: min(16rem, 100%);
+      aspect-ratio: 1;
+      padding: 0.55rem;
+      border: 1px solid var(--line-light);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .qr-grid span {
+      border-radius: 0.22rem;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .qr-grid span.fill {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      box-shadow: 0 0 16px rgba(79, 142, 247, 0.24);
+    }
+
+    .nav-dots {
+      position: fixed;
+      left: 50%;
+      bottom: 1.2rem;
+      z-index: 10;
+      transform: translateX(-50%);
+      display: inline-flex;
+      gap: 0.55rem;
+      padding: 0.62rem 0.8rem;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      background: rgba(6, 14, 31, 0.58);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav-dots button {
+      width: 0.72rem;
+      height: 0.72rem;
+      padding: 0;
+      border: none;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.26);
+      cursor: pointer;
+      transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .nav-dots button:hover,
+    .nav-dots button:focus-visible {
+      outline: none;
+      transform: scale(1.08);
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .nav-dots button.is-active {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+      box-shadow: 0 0 18px rgba(79, 142, 247, 0.44);
+    }
+
+    .accent-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.82rem;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .accent-chip::before {
+      content: "";
+      width: 0.42rem;
+      height: 0.42rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
+    }
+
+    @media (max-width: 1080px) {
+      .cover-copy,
+      .cover-proof,
+      .problem-anchor,
+      .solution-anchor,
+      .solution-steps,
+      .audience-anchor,
+      .origin-anchor,
+      .origin-copy,
+      .back-copy,
+      .back-cta {
+        padding: 2.35rem;
+      }
+
+      .page-meta,
+      .page-number {
+        right: 1.5rem;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .page-meta {
+        top: 1.4rem;
+        right: 1.4rem;
+      }
+
+      .page-number {
+        right: 1.4rem;
+        bottom: 1.25rem;
+      }
+
+      .cover-grid,
+      .problem-grid,
+      .solution-grid,
+      .audience-grid,
+      .origin-grid,
+      .back-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .cover-proof,
+      .problem-anchor,
+      .solution-anchor,
+      .audience-anchor,
+      .origin-anchor,
+      .back-cta {
+        border-left: none;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .problem-anchor,
+      .audience-anchor,
+      .origin-anchor {
+        border-top: none;
+        border-bottom: 1px solid var(--line-dark);
+      }
+
+      .solution-anchor {
+        border-top: none;
+        border-bottom: 1px solid var(--line-light);
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 0.88fr repeat(3, 1fr);
+      }
+
+      .feature-stat {
+        grid-column: 1 / -1;
+        grid-row: auto;
+      }
+
+      .features-grid > *:nth-child(-n + 2) {
+        border-top: none;
+      }
+
+      .features-grid > *:nth-child(1),
+      .features-grid > *:nth-child(3),
+      .features-grid > *:nth-child(5),
+      .features-grid > *:nth-child(7) {
+        border-left: none;
+      }
+
+      .audience-roles,
+      .launch-grid,
+      .comparison-columns {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .audience-roles {
+        grid-template-rows: repeat(3, 1fr);
+      }
+
+      .launch-grid {
+        grid-template-rows: 1fr 1fr;
+      }
+
+      .launch-band:nth-child(3) {
+        grid-column: 1 / -1;
+        border-left: none;
+        border-top: 1px solid rgba(8, 16, 27, 0.11);
+      }
+
+      .compare-column:nth-child(3),
+      .compare-column:nth-child(4) {
+        border-top: 1px solid var(--line-light);
+      }
+
+      .compare-column:nth-child(3) {
+        border-left: none;
+      }
+
+      .origin-copy .proof-list {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .cover-copy,
+      .cover-proof,
+      .problem-anchor,
+      .solution-anchor,
+      .solution-steps,
+      .feature-panel,
+      .feature-stat,
+      .audience-anchor,
+      .role-panel,
+      .compare-column,
+      .origin-anchor,
+      .origin-copy,
+      .launch-band,
+      .tech-head,
+      .tech-panel,
+      .back-copy,
+      .back-cta {
+        padding: 1.5rem;
+      }
+
+      .page-title {
+        font-size: clamp(2rem, 7vw, 3rem);
+      }
+
+      .deck {
+        font-size: 0.96rem;
+      }
+
+      .problem-quadrants,
+      .tech-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-quadrants {
+        grid-template-rows: repeat(4, 1fr);
+      }
+
+      .quadrant {
+        border-left: none;
+      }
+
+      .quadrant:nth-child(n + 2) {
+        border-top: 1px solid rgba(8, 16, 27, 0.12);
+      }
+
+      .competition-head,
+      .tech-head {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .comparison-columns,
+      .launch-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .compare-column,
+      .launch-band {
+        border-left: none;
+      }
+
+      .compare-column:nth-child(n + 2),
+      .launch-band:nth-child(n + 2) {
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+      }
+
+      .launch-band:nth-child(3) {
+        border-top: 1px solid rgba(8, 16, 27, 0.11);
+      }
+
+      .tech-grid {
+        grid-template-rows: auto repeat(4, 1fr);
+      }
+
+      .tech-panel {
+        border-left: none;
+      }
+
+      .tech-panel:nth-child(n + 3) {
+        border-top: 1px solid rgba(255, 255, 255, 0.16);
+      }
+
+      .nav-dots {
+        bottom: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="magazine" id="magazine" aria-label="Augentik editorial magazine">
+    <section class="page cover page-dark" data-page="0" aria-label="Cover">
+      <div class="page-meta">Cover</div>
+      <div class="cover-grid">
+        <div class="cover-copy">
+          <div>
+            <div class="brand-stamp">Issue 01 / Founder Narrative / augentik.com</div>
+            <div style="height: 1.4rem;"></div>
+            <p class="eyebrow">Augentik / Financial compliance / GAAP / SEC / SOX</p>
+            <h1 class="display">Augentik</h1>
+            <p class="page-title display-tight" style="margin-top: 1rem;">Financial compliance on autopilot.</p>
+            <p class="deck" style="margin-top: 1.4rem;">
+              A finance-native AI platform for regulated accounting work: expert-level guidance on GAAP,
+              SEC, and SOX questions, grounded in the rule and cited to the paragraph.
+            </p>
+          </div>
+          <div style="display: grid; gap: 1rem;">
+            <div class="rule"></div>
+            <p class="mono-line">Built for workflows where precision is not optional.</p>
+          </div>
+        </div>
+        <div class="cover-proof">
+          <div style="display: grid; justify-items: end; gap: 1.2rem;">
+            <div class="accent-chip">Purpose-built for finance teams</div>
+            <p class="stat">99%</p>
+            <p class="stat-label">FinanceBenchmark score, with every answer tied back to the source text.</p>
+          </div>
+          <ul class="cover-list">
+            <li>Purpose-built for finance and accounting teams, not generic chat workflows.</li>
+            <li>Answers are cited to the paragraph for memo prep, review, and audit support.</li>
+            <li>Product surface spans US GAAP, SEC guidance, and SOX readiness in one flow.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="page-number">01 / 10</div>
+    </section>
+
+    <section class="page problem" data-page="1" aria-label="Problem">
+      <div class="page-meta">Problem</div>
+      <div class="problem-grid">
+        <div class="problem-anchor">
+          <div>
+            <p class="eyebrow">The Problem</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">There is no slack for bad answers.</h2>
+            <p class="deck deck-tight" style="margin-top: 1.1rem; color: var(--muted-dark);">
+              Finance and accounting teams do not just need speed. They need answers that survive review,
+              support a position, and hold up under audit pressure.
+            </p>
+          </div>
+          <div>
+            <p class="stat">0</p>
+            <p class="stat-label" style="color: var(--text-dark);">room for hallucinations in regulated finance workflows</p>
+          </div>
+        </div>
+        <div class="problem-quadrants">
+          <article class="quadrant">
+            <div>
+              <p class="mono-line">01 / Research drag</p>
+              <h3 style="margin-top: 0.9rem;">Manual lookup loops</h3>
+            </div>
+            <p>Technical questions still pull senior operators into long chains of standards research, screenshots, and internal clarification.</p>
+          </article>
+          <article class="quadrant">
+            <div>
+              <p class="mono-line">02 / Audit pressure</p>
+              <h3 style="margin-top: 0.9rem;">Late-stage scramble</h3>
+            </div>
+            <p>When review hits, memo prep, evidence gathering, and position defense compress into the same narrow window.</p>
+          </article>
+          <article class="quadrant">
+            <div>
+              <p class="mono-line">03 / Burnout tax</p>
+              <h3 style="margin-top: 0.9rem;">Overtime and context switching</h3>
+            </div>
+            <p>The hidden cost is team attention: slower closes, more escalation, and avoidable after-hours work around close and reporting.</p>
+          </article>
+          <article class="quadrant">
+            <div>
+              <p class="mono-line">04 / Fee leakage</p>
+              <h3 style="margin-top: 0.9rem;">Advisory spend as patchwork</h3>
+            </div>
+            <p>Outside experts still get pulled in because the answer has to be defensible, cited, and safe to circulate.</p>
+          </article>
+        </div>
+      </div>
+      <div class="page-number">02 / 10</div>
+    </section>
+
+    <section class="page solution" data-page="2" aria-label="Solution">
+      <div class="page-meta">Solution</div>
+      <div class="solution-grid">
+        <div class="solution-anchor">
+          <div>
+            <p class="eyebrow">The Solution</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">Turn research into a cited operating loop.</h2>
+          </div>
+          <div>
+            <p class="stat">3</p>
+            <p class="stat-label">modes in one product: US GAAP, SEC guidance, and SOX readiness</p>
+          </div>
+        </div>
+        <div class="solution-steps">
+          <div>
+            <p class="mono-line">How it works</p>
+            <ul class="step-list" style="margin-top: 1.4rem;">
+              <li data-step="01">Ask a finance question the way the team actually thinks about it, in plain English.</li>
+              <li data-step="02">Get a domain-specific answer grounded only in the official guidance, with citations to the paragraph.</li>
+              <li data-step="03">Move straight into the defensible output: memo prep, documented position, audit evidence, or next-step review.</li>
+            </ul>
+          </div>
+          <div style="display: grid; gap: 1rem;">
+            <div class="rule" style="background: rgba(8, 16, 27, 0.14);"></div>
+            <p class="mono-line" style="color: rgba(8, 16, 27, 0.78);">From question -> rule -> position -> evidence</p>
+          </div>
+        </div>
+      </div>
+      <div class="page-number">03 / 10</div>
+    </section>
+
+    <section class="page features" data-page="3" aria-label="Features">
+      <div class="page-meta">Features</div>
+      <div class="features-grid">
+        <article class="feature-stat">
+          <div>
+            <p class="eyebrow">Core Features</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">What the product actually ships.</h2>
+          </div>
+          <div>
+            <p class="stat">6</p>
+            <p class="stat-label" style="color: var(--text-dark);">foundational capabilities, all tied to defensible accounting work</p>
+          </div>
+        </article>
+        <article class="feature-panel">
+          <div>
+            <p class="mono-line">01</p>
+            <h3 style="margin-top: 0.85rem;">ASC paragraph citations</h3>
+          </div>
+          <p>US GAAP interpretation with citations that point to the exact paragraph needed for review and documentation.</p>
+        </article>
+        <article class="feature-panel">
+          <div>
+            <p class="mono-line">02</p>
+            <h3 style="margin-top: 0.85rem;">SEC cross-reference</h3>
+          </div>
+          <p>Regulatory guidance mapped to rules, forms, and filing logic so teams do not guess their way through disclosure work.</p>
+        </article>
+        <article class="feature-panel">
+          <div>
+            <p class="mono-line">03</p>
+            <h3 style="margin-top: 0.85rem;">SOX readiness</h3>
+          </div>
+          <p>Purpose-built support for control narratives, compliance posture, and the work that has to stand up under scrutiny.</p>
+        </article>
+        <article class="feature-panel">
+          <div>
+            <p class="mono-line">04</p>
+            <h3 style="margin-top: 0.85rem;">Audit support</h3>
+          </div>
+          <p>Defensible memo preparation and evidence support for both internal and external audit preparation.</p>
+        </article>
+        <article class="feature-panel">
+          <div>
+            <p class="mono-line">05</p>
+            <h3 style="margin-top: 0.85rem;">Continuous monitoring</h3>
+          </div>
+          <p>Compliance work becomes an ongoing operating layer instead of a once-a-quarter panic cycle.</p>
+        </article>
+      </div>
+      <div class="page-number">04 / 10</div>
+    </section>
+
+    <section class="page audience" data-page="4" aria-label="Audience">
+      <div class="page-meta">Audience</div>
+      <div class="audience-grid">
+        <div class="audience-anchor">
+          <div>
+            <p class="eyebrow">Audience</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">Who feels this pain first.</h2>
+            <p class="deck deck-tight" style="margin-top: 1.1rem; color: var(--muted-dark);">
+              Growth-stage and enterprise finance teams working inside GAAP, SEC, and SOX requirements,
+              where the cost of a weak answer is bigger than the time it saved.
+            </p>
+          </div>
+          <div>
+            <p class="stat">6</p>
+            <p class="stat-label" style="color: var(--text-dark);">buyer and operator roles already named on the live site</p>
+          </div>
+        </div>
+        <div class="audience-roles">
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">01</p>
+              <h3 style="margin-top: 0.85rem;">CFOs</h3>
+            </div>
+            <p>Need speed, defensibility, and confidence when the answer affects reporting or investor communication.</p>
+          </article>
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">02</p>
+              <h3 style="margin-top: 0.85rem;">Controllers</h3>
+            </div>
+            <p>Carry the burden of accuracy when close, reporting, and memo documentation all hit at once.</p>
+          </article>
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">03</p>
+              <h3 style="margin-top: 0.85rem;">VP Finance</h3>
+            </div>
+            <p>Need a faster way to turn technical guidance into an operational decision the team can act on.</p>
+          </article>
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">04</p>
+              <h3 style="margin-top: 0.85rem;">Technical accounting</h3>
+            </div>
+            <p>Care about paragraph-level accuracy, not broad summaries that still require another review cycle.</p>
+          </article>
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">05</p>
+              <h3 style="margin-top: 0.85rem;">Internal audit and tax</h3>
+            </div>
+            <p>Need a clear path from rule interpretation to evidence support without rebuilding context every time.</p>
+          </article>
+          <article class="role-panel">
+            <div>
+              <p class="mono-line">06</p>
+              <h3 style="margin-top: 0.85rem;">Compliance officers</h3>
+            </div>
+            <p>Need continuous clarity on what changed, what matters, and what is safe to stand behind.</p>
+          </article>
+        </div>
+      </div>
+      <div class="page-number">05 / 10</div>
+    </section>
+
+    <section class="page competition page-dark" data-page="5" aria-label="Competition">
+      <div class="page-meta">Competition</div>
+      <div class="competition-grid">
+        <div class="competition-head">
+          <div>
+            <p class="eyebrow">Competition</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">The real comparison set is not one thing.</h2>
+          </div>
+          <p class="deck">
+            Teams patch together manual research, general AI, and legacy tools. Augentik wins by being purpose-built for
+            regulated finance work instead of being adjacent to it.
+          </p>
+        </div>
+        <div class="comparison-columns">
+          <article class="compare-column">
+            <div>
+              <div class="compare-mark">01</div>
+              <h3>Manual research</h3>
+            </div>
+            <p>
+              Strong on trust, weak on speed. Every answer costs analyst hours, interrupts senior finance staff,
+              and stretches the path to a defensible memo.
+            </p>
+          </article>
+          <article class="compare-column">
+            <div>
+              <div class="compare-mark">02</div>
+              <h3>General AI</h3>
+            </div>
+            <p>
+              Fast but unsafe for regulated workflows. <strong>Guessing is the bug.</strong> That is why the product story
+              leans so hard on source-grounded answers and zero hallucinations.
+            </p>
+          </article>
+          <article class="compare-column">
+            <div>
+              <div class="compare-mark">03</div>
+              <h3>Legacy point tools</h3>
+            </div>
+            <p>
+              Deep in one lane, fragmented across the workflow. Teams still do the synthesis,
+              stitching, and defensibility work themselves.
+            </p>
+          </article>
+          <article class="compare-column">
+            <div>
+              <div class="compare-mark gradient-text">0</div>
+              <h3>Augentik</h3>
+            </div>
+            <p>
+              Domain-specific models, official guidance grounding, paragraph citations, and outputs meant for review,
+              audit support, and continuous compliance work.
+            </p>
+          </article>
+        </div>
+      </div>
+      <div class="page-number">06 / 10</div>
+    </section>
+
+    <section class="page origin" data-page="6" aria-label="Origin Story">
+      <div class="page-meta">Origin Story</div>
+      <div class="origin-grid">
+        <div class="origin-anchor">
+          <div>
+            <p class="eyebrow">Origin Story</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">Built because finance work breaks generic AI.</h2>
+          </div>
+          <div>
+            <p class="stat">2024</p>
+            <p class="stat-label" style="color: var(--text-dark);">founding year listed on the live Augentik site</p>
+          </div>
+        </div>
+        <div class="origin-copy">
+          <div>
+            <p class="deck" style="max-width: 40rem;">
+              The thesis is simple: general-purpose tools are fine right up until the workflow becomes regulated.
+              Finance teams need answers that survive review, not polished guesses. So Augentik starts with the rules,
+              stays in domain, and makes the citation part of the product, not an afterthought.
+            </p>
+            <ul class="short-list" style="margin-top: 1.6rem;">
+              <li>Start from the actual guidance, not a broad model memory.</li>
+              <li>Design for memo prep, audit evidence, and position support from the start.</li>
+              <li>Treat compliance as a living operating layer, not a quarterly scramble.</li>
+            </ul>
+          </div>
+          <ul class="proof-list" style="margin-top: 2rem;">
+            <li data-label="Thesis">Precision is the product in regulated finance workflows.</li>
+            <li data-label="Positioning">Purpose-built for GAAP, SEC, and SOX, not general Q&amp;A.</li>
+            <li data-label="Promise">Every answer should be safe enough to move into documentation.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="page-number">07 / 10</div>
+    </section>
+
+    <section class="page launch" data-page="7" aria-label="Launch and Traction">
+      <div class="page-meta">Launch / Traction</div>
+      <div class="launch-grid">
+        <article class="launch-band">
+          <div>
+            <p class="eyebrow">Signal 01</p>
+            <h3 style="margin-top: 0.85rem;">Benchmark proof</h3>
+          </div>
+          <div>
+            <p class="stat">99%</p>
+            <p>FinanceBenchmark score called out on the live site as the clearest proof that this is not generic AI in a finance wrapper.</p>
+          </div>
+        </article>
+        <article class="launch-band">
+          <div>
+            <p class="eyebrow">Signal 02</p>
+            <h3 style="margin-top: 0.85rem;">Live demo doors</h3>
+          </div>
+          <div>
+            <p class="stat">2</p>
+            <div style="display: grid; gap: 0.8rem;">
+              <span class="launch-url">tryaugentik.com/try</span>
+              <span class="launch-url">tryaugentik.com/trySEC</span>
+            </div>
+          </div>
+        </article>
+        <article class="launch-band">
+          <div>
+            <p class="eyebrow">Signal 03</p>
+            <h3 style="margin-top: 0.85rem;">Friction to first use</h3>
+          </div>
+          <div>
+            <p class="stat">0</p>
+            <p>No sign-up required for the limited-use demos called out in the FAQ. The product is already inviting direct proof.</p>
+            <div style="margin-top: 1rem;" class="launch-url">augentik.com</div>
+          </div>
+        </article>
+      </div>
+      <div class="page-number">08 / 10</div>
+    </section>
+
+    <section class="page tech page-dark" data-page="8" aria-label="Tech">
+      <div class="page-meta">Tech</div>
+      <div class="tech-grid">
+        <div class="tech-head">
+          <div>
+            <p class="eyebrow">Tech</p>
+            <h2 class="page-title" style="margin-top: 0.8rem;">A stack built around defensibility.</h2>
+          </div>
+          <p class="deck">
+            The product claim only works if the system treats official guidance as the source of truth
+            and makes the path from question to cited output legible.
+          </p>
+        </div>
+        <article class="tech-panel">
+          <div>
+            <p class="mono-line">Layer 01</p>
+            <h3 style="margin-top: 0.85rem;">Domain-specific models</h3>
+          </div>
+          <p>Not a broad chatbot tuned with finance copy. The positioning is explicit: models designed for finance and accounting reasoning.</p>
+        </article>
+        <article class="tech-panel">
+          <div>
+            <p class="mono-line">Layer 02</p>
+            <h3 style="margin-top: 0.85rem;">Official guidance grounding</h3>
+          </div>
+          <p>US GAAP, SEC regulations, and SOX requirements are the product surface. The answer should not outrun the rule.</p>
+        </article>
+        <article class="tech-panel">
+          <div>
+            <p class="mono-line">Layer 03</p>
+            <h3 style="margin-top: 0.85rem;">Citation engine</h3>
+          </div>
+          <p>Paragraph-level references convert an answer from interesting to usable inside review, audit, and memo workflows.</p>
+        </article>
+        <article class="tech-panel">
+          <div>
+            <p class="mono-line">Layer 04</p>
+            <h3 style="margin-top: 0.85rem;">Workflow outputs</h3>
+          </div>
+          <p>Memo preparation, documented positions, audit evidence support, and continuous compliance monitoring close the loop.</p>
+        </article>
+      </div>
+      <div class="page-number">09 / 10</div>
+      <div style="position: absolute; left: 3rem; bottom: 2.2rem;" class="tech-code">
+        ask(question) -> ground(rule text) -> cite(paragraph) -> defend(position)
+      </div>
+    </section>
+
+    <section class="page back page-dark" data-page="9" aria-label="Back Cover">
+      <div class="page-meta">Back Cover</div>
+      <div class="back-grid">
+        <div class="back-copy">
+          <div>
+            <p class="eyebrow">Back Cover</p>
+            <h2 class="display display-tight" style="margin-top: 0.8rem;">Ask what the team would normally research manually.</h2>
+            <p class="deck" style="margin-top: 1.3rem;">
+              Augentik positions itself as the operating layer between finance teams and compliance work:
+              fast enough to move with the close, precise enough to survive the audit trail.
+            </p>
+          </div>
+          <div style="display: grid; gap: 1rem;">
+            <div class="rule"></div>
+            <p class="mono-line">Primary URL / augentik.com</p>
+          </div>
+        </div>
+        <div class="back-cta">
+          <div style="display: grid; gap: 1rem;">
+            <div class="accent-chip">Request exclusive access</div>
+            <p class="page-title" style="font-size: clamp(2rem, 3.6vw, 3.6rem);">Proof beats promises.</p>
+            <ul class="proof-list">
+              <li>Explore the product narrative at <strong>augentik.com</strong>.</li>
+              <li>Try the live demos without sign-up friction.</li>
+              <li>Bring compliance work out of the scramble loop.</li>
+            </ul>
+          </div>
+          <div style="display: grid; justify-items: start; gap: 1.1rem;">
+            <div class="qr-grid" aria-hidden="true">
+              <span class="fill"></span><span class="fill"></span><span></span><span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span>
+              <span class="fill"></span><span></span><span></span><span class="fill"></span><span class="fill"></span><span></span><span class="fill"></span>
+              <span></span><span class="fill"></span><span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span><span></span>
+              <span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span><span></span><span></span><span class="fill"></span>
+              <span></span><span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span><span></span><span class="fill"></span>
+              <span class="fill"></span><span></span><span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span><span></span>
+              <span class="fill"></span><span class="fill"></span><span></span><span class="fill"></span><span></span><span class="fill"></span><span class="fill"></span>
+            </div>
+            <p class="mono-line">Arrow keys active / swipe to browse / dots below</p>
+          </div>
+        </div>
+      </div>
+      <div class="page-number">10 / 10</div>
+    </section>
+  </main>
+
+  <nav class="nav-dots" aria-label="Page navigation">
+    <button type="button" data-target="0" class="is-active" aria-label="Go to cover"></button>
+    <button type="button" data-target="1" aria-label="Go to problem"></button>
+    <button type="button" data-target="2" aria-label="Go to solution"></button>
+    <button type="button" data-target="3" aria-label="Go to features"></button>
+    <button type="button" data-target="4" aria-label="Go to audience"></button>
+    <button type="button" data-target="5" aria-label="Go to competition"></button>
+    <button type="button" data-target="6" aria-label="Go to origin story"></button>
+    <button type="button" data-target="7" aria-label="Go to launch and traction"></button>
+    <button type="button" data-target="8" aria-label="Go to tech"></button>
+    <button type="button" data-target="9" aria-label="Go to back cover"></button>
+  </nav>
+
+  <script>
+    (function () {
+      const magazine = document.getElementById("magazine");
+      const pages = Array.from(document.querySelectorAll(".page"));
+      const dots = Array.from(document.querySelectorAll(".nav-dots button"));
+      let currentIndex = 0;
+
+      function goToPage(index) {
+        const clamped = Math.max(0, Math.min(index, pages.length - 1));
+        magazine.scrollTo({
+          left: clamped * window.innerWidth,
+          behavior: "smooth"
+        });
+      }
+
+      function setActive(index) {
+        currentIndex = index;
+        dots.forEach((dot, dotIndex) => {
+          dot.classList.toggle("is-active", dotIndex === index);
+        });
+      }
+
+      dots.forEach((dot) => {
+        dot.addEventListener("click", () => {
+          goToPage(Number(dot.dataset.target || 0));
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          goToPage(currentIndex + 1);
+        }
+
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          goToPage(currentIndex - 1);
+        }
+
+        if (event.key === "Home") {
+          event.preventDefault();
+          goToPage(0);
+        }
+
+        if (event.key === "End") {
+          event.preventDefault();
+          goToPage(pages.length - 1);
+        }
+      });
+
+      magazine.addEventListener(
+        "wheel",
+        (event) => {
+          if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+            event.preventDefault();
+            magazine.scrollBy({
+              left: event.deltaY,
+              behavior: "smooth"
+            });
+          }
+        },
+        { passive: false }
+      );
+
+      let scrollTimer = null;
+      magazine.addEventListener("scroll", () => {
+        window.clearTimeout(scrollTimer);
+        scrollTimer = window.setTimeout(() => {
+          const index = Math.round(magazine.scrollLeft / window.innerWidth);
+          setActive(index);
+        }, 30);
+      });
+
+      window.addEventListener("resize", () => {
+        goToPage(currentIndex);
+      });
+    })();
+  </script>
+  </main>
+</body>
+</html>

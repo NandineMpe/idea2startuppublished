@@ -17,8 +17,35 @@ const TIER1_RSS: RssSource[] = [
   { source: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/", tier: 1 },
   { source: "WIRED AI", url: "https://www.wired.com/feed/tag/ai/latest/rss", tier: 1 },
   { source: "MIT Technology Review", url: "https://www.technologyreview.com/feed/", tier: 1 },
+  {
+    source: "a16z Speedrun",
+    url: "https://speedrun.substack.com/feed",
+    tier: 1,
+  },
   { source: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/technology-lab", tier: 1 },
   { source: "HN AI", url: "https://hnrss.org/newest?q=AI", tier: 1 },
+]
+
+// B2B sales, CFO, and startup go-to-market intelligence sources
+const B2B_SALES_RSS: RssSource[] = [
+  { source: "Sales Hacker", url: "https://www.saleshacker.com/feed/", tier: 2 },
+  { source: "HN B2B Sales", url: "https://hnrss.org/newest?q=B2B+sales", tier: 2 },
+  { source: "HN Cold Email", url: "https://hnrss.org/newest?q=cold+email+outreach", tier: 2 },
+  { source: "HN Sales Demo", url: "https://hnrss.org/newest?q=sales+demo", tier: 2 },
+  { source: "HN CFO", url: "https://hnrss.org/newest?q=CFO+finance+SaaS", tier: 2 },
+  { source: "TechCrunch Startups", url: "https://techcrunch.com/category/startups/feed/", tier: 2 },
+  { source: "First Round Review", url: "https://review.firstround.com/feed.xml", tier: 2 },
+  { source: "OpenView Partners", url: "https://openviewpartners.com/blog/feed/", tier: 2 },
+]
+
+// Reddit JSON feeds for B2B sales, CFO communities, and startup GTM conversations
+const B2B_REDDIT_SOURCES: Array<{ subreddit: string; label: string; tier: 1 | 2 | 3 | 4 | 5 }> = [
+  { subreddit: "sales", label: "r/sales", tier: 2 },
+  { subreddit: "b2bsales", label: "r/b2bsales", tier: 2 },
+  { subreddit: "CFO", label: "r/CFO", tier: 2 },
+  { subreddit: "startups", label: "r/startups", tier: 2 },
+  { subreddit: "Entrepreneur", label: "r/Entrepreneur", tier: 3 },
+  { subreddit: "saas", label: "r/SaaS", tier: 2 },
 ]
 
 function stripHtml(input: string): string {
@@ -84,27 +111,81 @@ function toRawItem(source: RssSource, item: { title: string; link: string; descr
   }
 }
 
+async function fetchRssSource(source: RssSource): Promise<RawItem[]> {
+  try {
+    const res = await fetch(source.url, { headers: { "User-Agent": "JunoContentFeed/1.0" } })
+    if (!res.ok) return []
+    const xml = await res.text()
+    const parsed = xml.includes("<entry") ? parseAtomEntries(xml) : parseRssItems(xml)
+    return parsed
+      .map((item) => toRawItem(source, item))
+      .filter((item): item is RawItem => Boolean(item))
+  } catch {
+    return []
+  }
+}
+
+async function fetchRedditB2BItems(): Promise<RawItem[]> {
+  const results = await Promise.all(
+    B2B_REDDIT_SOURCES.map(async ({ subreddit, label, tier }) => {
+      try {
+        // Use Reddit's .json endpoint sorted by hot to surface active discussions
+        const res = await fetch(
+          `https://www.reddit.com/r/${subreddit}/hot.json?limit=15`,
+          {
+            headers: {
+              "User-Agent": "JunoB2BFeed/1.0 (sales intelligence)",
+              Accept: "application/json",
+            },
+          },
+        )
+        if (!res.ok) return [] as RawItem[]
+        const data = await res.json()
+        const posts = data?.data?.children ?? []
+        return (posts as Array<{ data: Record<string, unknown> }>)
+          .map(({ data: post }) => {
+            const title = String(post.title ?? "").trim().slice(0, 240)
+            const url = post.url
+              ? String(post.url).trim()
+              : `https://www.reddit.com${String(post.permalink ?? "").trim()}`
+            const permalink = `https://www.reddit.com${String(post.permalink ?? "").trim()}`
+            const selftext = String(post.selftext ?? "").trim().slice(0, 500)
+            const createdUtc = typeof post.created_utc === "number" ? post.created_utc : Date.now() / 1000
+            const publishedAt = new Date(createdUtc * 1000)
+            const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60)
+            if (!title || ageHours > 168) return null
+            const score = typeof post.score === "number" ? post.score : 0
+            // Only surface posts with meaningful engagement
+            if (score < 5) return null
+            return {
+              id: crypto.createHash("sha256").update(permalink).digest("hex").slice(0, 24),
+              title,
+              // Link back to Reddit discussion (more useful than outbound link for sales signals)
+              url: permalink,
+              source: label,
+              tier,
+              publishedAt: publishedAt.toISOString(),
+              snippet: selftext || `Reddit discussion in ${label} — ${score} upvotes`,
+            } satisfies RawItem
+          })
+          .filter((item): item is RawItem => Boolean(item))
+      } catch {
+        return [] as RawItem[]
+      }
+    }),
+  )
+  return results.flat()
+}
+
 export async function fetchTier1Sources(): Promise<RawItem[]> {
-  const [rssResults, twitterItems] = await Promise.all([
-    Promise.all(
-      TIER1_RSS.map(async (source) => {
-        try {
-          const res = await fetch(source.url, { headers: { "User-Agent": "JunoContentFeed/1.0" } })
-          if (!res.ok) return [] as RawItem[]
-          const xml = await res.text()
-          const parsed = xml.includes("<entry") ? parseAtomEntries(xml) : parseRssItems(xml)
-          return parsed
-            .map((item) => toRawItem(source, item))
-            .filter((item): item is RawItem => Boolean(item))
-        } catch {
-          return [] as RawItem[]
-        }
-      }),
-    ),
+  const [tier1Results, b2bRssResults, twitterItems, redditB2BItems] = await Promise.all([
+    Promise.all(TIER1_RSS.map(fetchRssSource)),
+    Promise.all(B2B_SALES_RSS.map(fetchRssSource)),
     fetchTwitterAiTechRawItems().catch(() => [] as RawItem[]),
+    fetchRedditB2BItems().catch(() => [] as RawItem[]),
   ])
 
-  const results = [...rssResults, twitterItems]
+  const results = [...tier1Results, ...b2bRssResults, twitterItems, redditB2BItems]
   const unique = new Map<string, RawItem>()
   for (const item of results.flat()) {
     if (!unique.has(item.url)) unique.set(item.url, item)

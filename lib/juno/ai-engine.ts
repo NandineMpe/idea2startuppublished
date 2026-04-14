@@ -1,6 +1,6 @@
 /**
  * Juno AI engine — LinkedIn, lead fit, outreach, trends, comments.
- * Uses full CompanyContext.promptBlock with the configured LLM (default Qwen 3.6).
+ * Uses full CompanyContext.promptBlock with the configured LLM (default Qwen via qwenModel()).
  */
 
 import type { CompanyContext } from "@/lib/company-context"

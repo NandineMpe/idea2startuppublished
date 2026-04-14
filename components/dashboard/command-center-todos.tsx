@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -15,6 +15,10 @@ import {
   Trash2,
   ExternalLink,
   ChevronDown,
+  FlaskConical,
+  CheckCircle2,
+  Loader2,
+  ChevronRight,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -88,6 +92,16 @@ const TEMPLATE_TODOS: TemplateTodo[] = [
   },
 ]
 
+type ResearchStatus = "pending" | "running" | "done" | "error" | null
+
+type TodoResearch = {
+  status: ResearchStatus
+  summary?: string
+  keyFindings?: string[]
+  actionItems?: string[]
+  sources?: Array<{ title: string; url: string; relevance: string }>
+}
+
 type CustomTodo = { id: string; title: string; done: boolean }
 
 type StoredShape = {
@@ -130,6 +144,9 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
   const [hydrated, setHydrated] = useState(false)
   const [checklistCollapsed, setChecklistCollapsed] = useState(false)
   const [profileHint, setProfileHint] = useState<"loading" | "empty" | "ok">("loading")
+  const [research, setResearch] = useState<Record<string, TodoResearch>>({})
+  const [expandedResearch, setExpandedResearch] = useState<Record<string, boolean>>({})
+  const pollTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   useEffect(() => {
     const s = loadStored()
@@ -185,6 +202,68 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
     }
   }, [])
 
+  const pollResearch = useCallback(async (todoId: string, attempt = 0) => {
+    try {
+      const res = await fetch(`/api/todo-research?todoId=${encodeURIComponent(todoId)}`)
+      if (!res.ok) return
+      const { research: data } = await res.json() as { research: { status: string; summary?: string; key_findings?: string[]; action_items?: string[]; sources?: Array<{ title: string; url: string; relevance: string }> } | null }
+      if (!data) return
+      setResearch((prev) => ({
+        ...prev,
+        [todoId]: {
+          status: data.status as ResearchStatus,
+          summary: data.summary,
+          keyFindings: data.key_findings,
+          actionItems: data.action_items,
+          sources: data.sources,
+        },
+      }))
+      if (data.status === "pending" || data.status === "running") {
+        // Poll with backoff: 3s, 5s, 8s, 12s, then every 15s
+        const delays = [3000, 5000, 8000, 12000]
+        const delay = delays[attempt] ?? 15000
+        if (attempt < 20) {
+          pollTimers.current[todoId] = setTimeout(() => pollResearch(todoId, attempt + 1), delay)
+        }
+      }
+    } catch {
+      // silent
+    }
+  }, [])
+
+  const triggerResearch = useCallback(async (todoId: string, todoText: string) => {
+    if (!process.env.NEXT_PUBLIC_INNGEST_ENABLED && typeof window !== "undefined") {
+      // Check if inngest is available by attempting the call
+    }
+    setResearch((prev) => ({ ...prev, [todoId]: { status: "pending" } }))
+    try {
+      await fetch("/api/todo-research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ todoId, todoText }),
+      })
+      // Start polling
+      pollTimers.current[todoId] = setTimeout(() => pollResearch(todoId, 0), 3000)
+    } catch {
+      setResearch((prev) => ({ ...prev, [todoId]: { status: "error" } }))
+    }
+  }, [pollResearch])
+
+  // On hydration, kick off polling for any todos that have in-progress research
+  useEffect(() => {
+    if (!hydrated || custom.length === 0) return
+    for (const todo of custom) {
+      const r = research[todo.id]
+      if (r && (r.status === "pending" || r.status === "running")) {
+        pollResearch(todo.id, 0)
+      }
+    }
+    return () => {
+      for (const timer of Object.values(pollTimers.current)) clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated])
+
   const toggle = useCallback((id: string, next: boolean) => {
     setChecked((prev) => ({ ...prev, [id]: next }))
   }, [])
@@ -195,7 +274,9 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
     const id = `custom-${crypto.randomUUID()}`
     setCustom((prev) => [...prev, { id, title: t, done: false }])
     setNewTitle("")
-  }, [newTitle])
+    // Trigger deep research for the new todo asynchronously
+    triggerResearch(id, t)
+  }, [newTitle, triggerResearch])
 
   const removeCustom = useCallback((id: string) => {
     setCustom((prev) => prev.filter((x) => x.id !== id))
@@ -204,6 +285,15 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
       delete n[id]
       return n
     })
+    setResearch((prev) => {
+      const n = { ...prev }
+      delete n[id]
+      return n
+    })
+    if (pollTimers.current[id]) {
+      clearTimeout(pollTimers.current[id])
+      delete pollTimers.current[id]
+    }
   }, [])
 
   const templateDone = TEMPLATE_TODOS.filter((t) => checked[t.id]).length
@@ -339,48 +429,153 @@ export function CommandCenterTodos({ className }: { className?: string } = {}) {
         })}
 
         <AnimatePresence initial={false}>
-          {sortedCustom.map((c) => (
-            <motion.li
-              key={c.id}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="rounded-lg px-2 py-2 flex gap-2.5 items-start hover:bg-accent/40 group border border-dashed border-border/80"
-            >
-              <div className="pt-0.5">
-                <Checkbox
-                  checked={c.done}
-                  onCheckedChange={(v) =>
-                    setCustom((prev) =>
-                      prev.map((x) => (x.id === c.id ? { ...x, done: v === true } : x)),
-                    )
-                  }
-                  aria-label={`Toggle ${c.title}`}
-                />
-              </div>
-              <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
-                <span
-                  className={cn(
-                    "text-[13px] text-foreground leading-tight",
-                    c.done && "line-through text-muted-foreground",
-                  )}
-                >
-                  {c.title}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeCustom(c.id)}
-                  aria-label="Remove task"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </motion.li>
-          ))}
+          {sortedCustom.map((c) => {
+            const r = research[c.id]
+            const isExpanded = expandedResearch[c.id]
+            return (
+              <motion.li
+                key={c.id}
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="rounded-lg px-2 py-2 flex flex-col gap-1.5 hover:bg-accent/40 group border border-dashed border-border/80"
+              >
+                <div className="flex gap-2.5 items-start">
+                  <div className="pt-0.5">
+                    <Checkbox
+                      checked={c.done}
+                      onCheckedChange={(v) =>
+                        setCustom((prev) =>
+                          prev.map((x) => (x.id === c.id ? { ...x, done: v === true } : x)),
+                        )
+                      }
+                      aria-label={`Toggle ${c.title}`}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+                    <span
+                      className={cn(
+                        "text-[13px] text-foreground leading-tight",
+                        c.done && "line-through text-muted-foreground",
+                      )}
+                    >
+                      {c.title}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeCustom(c.id)}
+                      aria-label="Remove task"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Research status badge */}
+                {r && (
+                  <div className="ml-7">
+                    {(r.status === "pending" || r.status === "running") && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Researching…</span>
+                      </div>
+                    )}
+                    {r.status === "done" && r.summary && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpandedResearch((prev) => ({ ...prev, [c.id]: !prev[c.id] }))
+                          }
+                          className="flex items-center gap-1.5 text-[11px] text-primary hover:text-primary/80 font-medium"
+                        >
+                          <CheckCircle2 className="h-3 w-3 shrink-0" />
+                          <span>Research ready</span>
+                          <ChevronRight
+                            className={cn(
+                              "h-3 w-3 transition-transform",
+                              isExpanded && "rotate-90",
+                            )}
+                          />
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.18 }}
+                              className="overflow-hidden mt-2 space-y-2"
+                            >
+                              <p className="text-[11px] text-muted-foreground leading-relaxed">{r.summary}</p>
+                              {r.keyFindings && r.keyFindings.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide font-medium mb-1">Key findings</p>
+                                  <ul className="space-y-0.5">
+                                    {r.keyFindings.map((f, i) => (
+                                      <li key={i} className="text-[11px] text-foreground/80 leading-snug flex gap-1.5">
+                                        <FlaskConical className="h-3 w-3 shrink-0 mt-0.5 text-primary/60" />
+                                        {f}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {r.actionItems && r.actionItems.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide font-medium mb-1">Action items</p>
+                                  <ol className="space-y-0.5 list-decimal list-inside">
+                                    {r.actionItems.map((a, i) => (
+                                      <li key={i} className="text-[11px] text-foreground/80 leading-snug">{a}</li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+                              {r.sources && r.sources.length > 0 && (
+                                <div>
+                                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide font-medium mb-1">Sources</p>
+                                  <ul className="space-y-0.5">
+                                    {r.sources.map((s, i) => (
+                                      <li key={i} className="text-[11px] flex gap-1 items-start">
+                                        <a
+                                          href={s.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-primary hover:underline truncate"
+                                        >
+                                          {s.title}
+                                        </a>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                    {r.status === "error" && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-destructive/70">
+                        <span>Research failed</span>
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() => triggerResearch(c.id, c.title)}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.li>
+            )
+          })}
         </AnimatePresence>
             </ul>
           </motion.div>

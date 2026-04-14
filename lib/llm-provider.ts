@@ -1,3 +1,7 @@
+/**
+ * Default app LLM: Qwen via an OpenAI-compatible API (DashScope, OpenRouter, or custom LLM_BASE_URL).
+ * Use `qwenModel()` with the Vercel AI SDK (`generateText`, `streamText`, etc.).
+ */
 import { createOpenAI } from "@ai-sdk/openai"
 
 const DASHSCOPE_BASE_INTL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -5,9 +9,11 @@ const DASHSCOPE_BASE_US = "https://dashscope-us.aliyuncs.com/compatible-mode/v1"
 const DASHSCOPE_BASE_CN = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 const DASHSCOPE_BASE_HK = "https://cn-hongkong.dashscope.aliyuncs.com/compatible-mode/v1"
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+/** DashScope stable alias (Qwen-Plus tier; not tied to removed qwen3.6-plus SKUs). */
 const DEFAULT_DASHSCOPE_QWEN_MODEL = "qwen-plus"
-const DEFAULT_OPENROUTER_QWEN_MODEL = "qwen/qwen3.6-plus"
-const KNOWN_UNSUPPORTED_DASHSCOPE_MODELS = new Set(["qwen/qwen3.6-plus", "qwen3-235b-a22b"])
+/** OpenRouter: Qwen 3.5 tier (avoid qwen3.6 if your account no longer offers it). */
+const DEFAULT_OPENROUTER_QWEN_MODEL = "qwen/qwen3.5-plus"
+const KNOWN_UNSUPPORTED_DASHSCOPE_MODELS = new Set(["qwen3-235b-a22b"])
 
 function dashscopeBaseFromEnv(): string | null {
   const region = process.env.DASHSCOPE_REGION?.trim().toLowerCase()
@@ -24,16 +30,17 @@ function isDashScopeBaseUrl(baseUrl: string): boolean {
 
 function normalizeDashScopeModelId(modelId: string): string {
   const trimmed = modelId.trim()
-  return KNOWN_UNSUPPORTED_DASHSCOPE_MODELS.has(trimmed) ? DEFAULT_DASHSCOPE_QWEN_MODEL : trimmed
+  if (trimmed === "qwen/qwen3.6-plus" || trimmed === "qwen3.6-plus") return DEFAULT_DASHSCOPE_QWEN_MODEL
+  if (trimmed === "qwen3-235b-a22b") return DEFAULT_DASHSCOPE_QWEN_MODEL
+  return trimmed
 }
 
 /** DashScope-only names that OpenRouter and other hosts reject (see server_error Unsupported model). */
 function normalizeNonDashScopeModelId(modelId: string): string {
   const trimmed = modelId.trim()
   if (trimmed === "qwen3-235b-a22b") return DEFAULT_OPENROUTER_QWEN_MODEL
-  if (KNOWN_UNSUPPORTED_DASHSCOPE_MODELS.has(trimmed) && trimmed !== "qwen/qwen3.6-plus") {
-    return DEFAULT_OPENROUTER_QWEN_MODEL
-  }
+  if (trimmed === "qwen/qwen3.6-plus" || trimmed === "qwen3.6-plus") return DEFAULT_OPENROUTER_QWEN_MODEL
+  if (KNOWN_UNSUPPORTED_DASHSCOPE_MODELS.has(trimmed)) return DEFAULT_OPENROUTER_QWEN_MODEL
   return trimmed
 }
 
@@ -78,7 +85,7 @@ export function isLlmConfigured(): boolean {
 /**
  * Model id for the provider.
  * DashScope default: qwen-plus.
- * OpenRouter default: qwen/qwen3.6-plus.
+ * OpenRouter default: qwen/qwen3.5-plus.
  * Override with QWEN_MODEL env var.
  */
 export function getDefaultModelId(): string {

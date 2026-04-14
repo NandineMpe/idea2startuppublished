@@ -27,7 +27,7 @@ export const DISMISS_SELECT_OPTIONS = DISMISS_PRESET_IDS.map((id) => ({
   label: DISMISS_PRESET_LABELS[id],
 }))
 
-/** Build the single line we store and show to Claude. */
+/** Build the single line we store and show to the LLM (Qwen). */
 export function buildDismissalReasonText(
   reasonPreset: string | undefined | null,
   reasonDetail: string | undefined | null,
@@ -43,7 +43,7 @@ export function buildDismissalReasonText(
   return "Dismissed (no reason given)"
 }
 
-/** Paragraph for Claude: recent founder rejections + inference hint. */
+/** Paragraph for the LLM: recent founder rejections + inference hint. */
 export function formatDismissalFeedbackForPrompt(reasonLines: string[]): string {
   const lines = reasonLines.filter((s) => s.trim().length > 0)
   if (lines.length === 0) return ""

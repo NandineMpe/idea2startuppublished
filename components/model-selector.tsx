@@ -9,13 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const models = [
   {
-    value: "qwen-3.6",
-    label: "Qwen 3.6",
+    value: "qwen-plus",
+    label: "Qwen Plus",
     apiRoute: "/api/chat",
   },
   {
-    value: "qwen-3.6-alt",
-    label: "Qwen 3.6 (Alt)",
+    value: "deepseek-chat",
+    label: "DeepSeek",
     apiRoute: "/api/chat/deepseek",
   },
 ]

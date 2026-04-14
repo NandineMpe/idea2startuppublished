@@ -96,7 +96,7 @@ export type DistributionState = {
   /** Winning angle — used when personalizing imported rows */
   pitchAngle: string
   segmentTag?: string
-  /** Dashboard banner driven by Claude + conversion history */
+  /** Dashboard banner driven by the LLM + conversion history */
   insightsHeadline: string
   proactiveMessage?: string
   similarLeadsCount?: number

@@ -79,7 +79,7 @@ export function scoreLeadAgainstProfile(lead: LeadForScoring, profile: Lookalike
   return Math.round((totalScore / totalWeight) * 10) / 10
 }
 
-/** Maps 0–10 heuristic to 0–100 for blending with Claude fit scores. */
+/** Maps 0–10 heuristic to 0–100 for blending with LLM fit scores. */
 export function heuristicToPercent(score: number): number {
   return Math.min(100, Math.max(0, Math.round(score * 10)))
 }

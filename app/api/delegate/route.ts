@@ -9,7 +9,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { qwenModel } from "@/lib/llm-provider"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { createClient } from "@/lib/supabase/server"
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const companyContext = await getCompanyContextPrompt(user?.id, {})
     const startupContext = context?.trim() || companyContext || "Not provided"
 
-    // ── Step 1: Use Claude to plan the delegation ──────────────────────────
+    // ── Step 1: Use Qwen to plan the delegation ─────────────────────────────
     const userPrompt = `STRATEGIC GOAL: ${goal}\n\nSTARTUP CONTEXT:\n${startupContext}`
 
     const { text: planText } = await generateText({

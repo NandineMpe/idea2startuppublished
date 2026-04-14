@@ -7,7 +7,7 @@ export type ScrapedItem = {
   url: string
 }
 
-/** Normalized shape for Claude scoring (maps from ScrapedItem). */
+/** Normalized shape for LLM scoring (maps from ScrapedItem). */
 export type RawItem = {
   title: string
   description: string
@@ -29,7 +29,7 @@ export type CompetitorEvent = {
   competitorUrl?: string | null
 }
 
-/** After Claude scores against full CompanyContext.promptBlock. */
+/** After the LLM scores against full CompanyContext.promptBlock. */
 export type ScoredItem = RawItem & {
   relevanceScore: number
   urgency: "breaking" | "today" | "this_week"

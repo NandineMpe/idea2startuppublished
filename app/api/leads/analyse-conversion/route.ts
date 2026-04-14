@@ -76,7 +76,7 @@ async function loadLeadSnippets(
 /**
  * POST /api/leads/analyse-conversion
  * Body: { name, title, company, location?, whyItWorked?, channel?, responseTime? }
- * Returns lookalike profile, queries, templates, insights — Claude-powered.
+ * Returns lookalike profile, queries, templates, insights — Qwen-powered.
  */
 export async function POST(req: NextRequest) {
   const auth = await resolveUserId(req)

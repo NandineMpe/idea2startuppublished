@@ -24,6 +24,8 @@ export { staffMeetingFanOut, staffMeeting } from "./staff-meeting"
 
 export { junoPing } from "./ping"
 export { contextVaultSync, contextVaultSyncFanOut } from "./context-vault-sync"
+export { contentFeedManualDigest } from "./content-intelligence-feed"
+export { todoResearch } from "./todo-research"
 
 import { commentEngine, contentEngine, relationshipTracker } from "./cmo-content-engine"
 import { dailyBrief, dailyBriefFanOut } from "./cbs-daily-brief"
@@ -36,6 +38,8 @@ import { platformPoster, techRadar } from "./cto-tech-radar"
 import { securityScan, securityScanFanOut } from "./cto-security-scan"
 import { staffMeetingFanOut, staffMeeting } from "./staff-meeting"
 import { junoPing } from "./ping"
+import { contentFeedManualDigest } from "./content-intelligence-feed"
+import { todoResearch } from "./todo-research"
 
 /** All Inngest functions registered by `app/api/inngest/route.ts`. */
 export const inngestFunctions = [
@@ -61,4 +65,6 @@ export const inngestFunctions = [
   intentScanner,
   staffMeetingFanOut,
   staffMeeting,
+  contentFeedManualDigest,
+  todoResearch,
 ]

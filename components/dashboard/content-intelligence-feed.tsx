@@ -197,14 +197,6 @@ export function ContentIntelligenceFeed() {
         />
       </div>
 
-      {briefing?.summary ? (
-        <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
-          <p className="text-[12px] font-medium text-foreground">Summary</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">{briefing.summary}</p>
-          <p className="mt-2 text-[12px] text-foreground">Top hook: {briefing.top_hook}</p>
-        </div>
-      ) : null}
-
       <div className="mt-4 space-y-4">
         {[
           { label: "Collab opportunities", items: sections.collab },
