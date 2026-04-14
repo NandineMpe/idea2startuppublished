@@ -247,8 +247,8 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
           <Link href="/dashboard/integrations" className="text-primary underline underline-offset-2 hover:text-primary/90">
             Integrations
           </Link>{" "}
-          so sync can use your account. Otherwise the server needs{" "}
-          <span className="font-mono text-[11px]">GITHUB_VAULT_TOKEN</span> in Vercel env.
+          (Pipedream). The linked GitHub user must be able to read this repo (same org or collaborator). Otherwise set{" "}
+          <span className="font-mono text-[11px]">GITHUB_VAULT_TOKEN</span> in Vercel with repo access.
         </p>
       </div>
       <div className="space-y-1.5">

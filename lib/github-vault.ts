@@ -116,7 +116,25 @@ async function describeRepoOrBranchError(
   owner: string,
   repo: string,
   branch: string,
+  /** When set (Pipedream), use authenticated repo metadata. Anonymous metadata 404s on private repos. */
+  fetchJson?: (url: string) => Promise<unknown>,
 ): Promise<string> {
+  if (fetchJson) {
+    try {
+      const raw = await fetchJson(base)
+      const json = raw as { default_branch?: string }
+      if (json && typeof json.default_branch === "string") {
+        if (json.default_branch !== branch) {
+          return `Branch "${branch}" not found for ${owner}/${repo}. Try "${json.default_branch}" instead.`
+        }
+        return `Branch "${branch}" not found for ${owner}/${repo}.`
+      }
+    } catch {
+      // repo missing or no access via linked account
+    }
+    return `Cannot read ${owner}/${repo} with your Integrations → GitHub connection. Check owner/repo spelling, repo name, and that the GitHub user you connected in Pipedream has access (private repos need that same account). You can also set GITHUB_VAULT_TOKEN on the server.`
+  }
+
   const meta = await getRepoMetadata(base, token)
   if (meta.found) {
     if (meta.defaultBranch && meta.defaultBranch !== branch) {
@@ -127,7 +145,7 @@ async function describeRepoOrBranchError(
 
   return token
     ? `Repo "${owner}/${repo}" was not found, or the configured server token cannot access it.`
-    : `Repo "${owner}/${repo}" was not found. For a private vault, connect GitHub or set a server GitHub token.`
+    : `Repo "${owner}/${repo}" was not found. For a private vault, connect GitHub under Integrations (Pipedream) or set GITHUB_VAULT_TOKEN on the server.`
 }
 
 function normalizePrefix(prefix: string | undefined): string {
@@ -200,7 +218,7 @@ export async function fetchGithubVaultMarkdown(
     )
     if (!branchResult.ok) {
       if (branchResult.status === 404 || branchResult.error.includes("404") || branchResult.error.includes("Not Found")) {
-        return { files: [], error: await describeRepoOrBranchError(base, token, owner, repo, branch) }
+        return { files: [], error: await describeRepoOrBranchError(base, token, owner, repo, branch, fetchJson) }
       }
       return { files: [], error: branchResult.error }
     }
@@ -306,7 +324,7 @@ export async function listGithubVaultMarkdownPaths(
       return {
         entries: [],
         error: branchResult.status === 404 || branchResult.error.includes("404") || branchResult.error.includes("Not Found")
-          ? await describeRepoOrBranchError(base, token, owner, repo, branch)
+          ? await describeRepoOrBranchError(base, token, owner, repo, branch, fetchJson)
           : branchResult.error,
       }
     }
