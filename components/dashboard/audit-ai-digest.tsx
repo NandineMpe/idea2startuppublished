@@ -175,7 +175,7 @@ export function AuditAiDigest() {
           <div className="py-12 text-center">
             <p className="text-[13px] text-destructive">{error}</p>
             <p className="text-[12px] text-muted-foreground mt-1">
-              Hit "Compile digest" to pull 45 days of AI-in-audit signals from X, RSS, and Google News, then synthesize via Qwen.
+              Hit "Compile digest" to pull 45 days of AI-in-audit signals from RSS (including Google News search feeds), then synthesize via Qwen.
             </p>
           </div>
         ) : !digest ? (
@@ -183,7 +183,7 @@ export function AuditAiDigest() {
             <BookOpen className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-[14px] text-foreground font-medium">No digest compiled yet</p>
             <p className="text-[12px] text-muted-foreground mt-1 max-w-md mx-auto">
-              This compiles 45 days of AI-in-audit signals from X, news feeds, and Google News into an in-depth magazine feature.
+              This compiles 45 days of AI-in-audit signals from RSS feeds into an in-depth magazine feature.
               KPMG, Deloitte, EY, PwC, regulators, the full picture.
             </p>
           </div>

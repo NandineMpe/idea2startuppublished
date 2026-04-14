@@ -71,7 +71,7 @@ export async function POST() {
     return NextResponse.json({
       digest: null,
       error:
-        "No audit AI items found. Add BYCRAWL_API_KEY in production for X and Google News, or wait for RSS feeds to return matching stories.",
+        "No audit AI items matched in the last 45 days. RSS feeds may be slow or filters may be tight. Try again later.",
     })
   }
 
