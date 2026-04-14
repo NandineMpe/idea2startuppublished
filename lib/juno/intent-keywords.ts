@@ -39,6 +39,17 @@ export const INTENT_KEYWORDS_SECONDARY: string[] = [
   "audit trail",
 ]
 
+/** GTM and buyer-behavior phrases (search fallback and matched keyword metadata) */
+export const INTENT_KEYWORDS_OUTREACH: string[] = [
+  "B2B sales",
+  "cold email",
+  "cold outreach",
+  "sales outreach",
+  "demo email",
+  "book a demo",
+  "vendor email",
+]
+
 export const COMPETITOR_KEYWORDS: string[] = [
   "FloQast",
   "AuditBoard",
@@ -49,19 +60,34 @@ export const COMPETITOR_KEYWORDS: string[] = [
   "BlackLine",
 ]
 
-/** Default subreddits for audit / finance / startup buyers */
+/**
+ * Default pool for Reddit intent scans (no r/ prefix). Deduped lowercase at merge time.
+ * Mix finance/compliance buyers with B2B sales and operator communities (outreach, demos, GTM).
+ */
 export const REDDIT_SUBREDDITS: string[] = [
   "accounting",
-  "Accounting",
-  "CFO",
-  "Bookkeeping",
+  "bookkeeping",
+  "cpa",
+  "tax",
   "auditing",
-  "CPA",
-  "startups",
-  "SaaS",
   "fintech",
+  "startups",
+  "saas",
+  "entrepreneur",
   "smallbusiness",
-  "Entrepreneur",
+  "CFOs",
+  "sales",
+  "revops",
+]
+
+/** Always merged first when not using a user-pinned list — keeps GTM and buyer voice in the 12-sub cap. */
+export const REDDIT_SUBREDDIT_SCAN_PRIORITY: string[] = [
+  "cfos",
+  "sales",
+  "saas",
+  "startups",
+  "accounting",
+  "fintech",
 ]
 
 /** Short high-recall tokens — paired with longer phrases so searches still return rows */
@@ -72,6 +98,8 @@ export const INTENT_SHORT_TOKENS: string[] = [
   "audit prep",
   "internal controls",
   "controller",
+  "outreach",
+  "demo",
 ]
 
 export function buildKeywordList(profileKeywords: string[] | undefined): string[] {
@@ -82,6 +110,7 @@ export function buildKeywordList(profileKeywords: string[] | undefined): string[
   const merged = [
     ...new Set([
       ...INTENT_SHORT_TOKENS,
+      ...INTENT_KEYWORDS_OUTREACH,
       ...INTENT_KEYWORDS_SECONDARY.slice(0, 8),
       ...INTENT_KEYWORDS_PRIMARY,
       ...fromProfile,

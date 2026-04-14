@@ -225,9 +225,9 @@ export async function crawlRedditForIntent(
   const cutoff = Date.now() - getIntentLookbackMs()
   let uniqSubs = [
     ...new Set(subreddits.map((s) => s.replace(/^r\//, "").trim()).filter(Boolean)),
-  ].slice(0, 8)
+  ].slice(0, 12)
   if (uniqSubs.length === 0) {
-    uniqSubs = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))].slice(0, 8)
+    uniqSubs = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))].slice(0, 12)
   }
 
   // Fetch OAuth token once for the entire crawl batch

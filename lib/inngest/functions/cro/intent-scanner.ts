@@ -106,7 +106,8 @@ export const intentScanner = inngest.createFunction(
 
     const context = await step.run("load-context", () =>
       getCompanyContext(userId, {
-        queryHint: "reddit customer pain product gaps audit compliance finance accounting software ICP",
+        queryHint:
+          "reddit customer pain product gaps audit compliance finance accounting software ICP B2B sales outreach cold email demo CFO buying",
         refreshVault: "if_stale",
       }),
     )

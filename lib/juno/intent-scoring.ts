@@ -94,6 +94,7 @@ For EACH signal, return one object in a JSON array with this exact shape:
 Scoring guide:
 - 9-10: Actively looking for what we build or exact pain we solve.
 - 7-8: Strong problem-signal we can help with.
+- 6-8: Buyers or finance leaders describing how they evaluate vendors, what they ignore (cold email, demo asks), or how they want to be reached. Count this when it informs ICP or outreach, not only product features.
 - 5-6: Related; could add value carefully.
 - 4: Tangential but worth a glance; we may still save for review.
 - Below 4: skip (we will filter).

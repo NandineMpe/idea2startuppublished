@@ -2,7 +2,7 @@ import { generateText } from "ai"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import type { CompanyContext } from "@/lib/company-context"
-import { REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
+import { REDDIT_SUBREDDITS, REDDIT_SUBREDDIT_SCAN_PRIORITY } from "@/lib/juno/intent-keywords"
 
 export type SubredditSuggestion = { name: string; reason: string }
 
@@ -41,7 +41,9 @@ ICP: ${icp.join(", ").slice(0, 500)}
 Context (compressed):
 ${promptBlock.slice(0, 6000)}
 
-Return a JSON array only. No markdown. Each item: {"name":"subredditName","reason":"one sentence why buyers show up here"}. Use 8 to 12 items. Names must be real subreddit slugs (letters, numbers, underscore only). No r/ prefix. Prefer communities where buyers complain, compare tools, or ask for recommendations.`
+Include at least a few communities where B2B buyers and operators talk about real workflows: how they buy software, what they ignore (cold email, demos), finance leadership, and startup sales motion. Not only product feature threads.
+
+Return a JSON array only. No markdown. Each item: {"name":"subredditName","reason":"one sentence why buyers show up here"}. Use 8 to 12 items. Names must be real subreddit slugs (letters, numbers, underscore only). No r/ prefix. Prefer communities where buyers complain, compare tools, ask for recommendations, or vent about vendors and outreach.`
 
   try {
     const { text } = await generateText({
@@ -91,6 +93,7 @@ export async function resolveSubredditsForIntentScan(context: CompanyContext): P
 
   const suggested = await suggestSubredditsFromContext(context)
   const fromAi = suggested.map((s) => s.name.toLowerCase())
-  const merged = [...new Set([...fromAi, ...REDDIT_SUBREDDITS.map((s) => s.toLowerCase())])]
+  const defaultsLower = [...new Set(REDDIT_SUBREDDITS.map((s) => s.toLowerCase()))]
+  const merged = [...new Set([...REDDIT_SUBREDDIT_SCAN_PRIORITY, ...fromAi, ...defaultsLower])]
   return merged.slice(0, 12)
 }
