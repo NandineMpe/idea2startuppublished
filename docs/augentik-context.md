@@ -1,4 +1,4 @@
-# Augentik — Juno context
+# Augentik: Juno context
 
 *Brief for agents and new team members. Replaces the previous Corgi-labeled draft in this workspace.*
 
@@ -97,17 +97,17 @@ Illustrative snapshot aligned to current strategy narrative:
 
 ## Founding team
 
-**Nico Laqua — CEO & CTO**  
+**Nico Laqua, CEO & CTO**  
 Columbia, Rabi Scholar. Before Augentik: founded Basket (gaming publisher, 200M+ MAU scale). Forbes 30 Under 30 (2024). AI/VR work 2018–2020. Computational biology with Hamilton Smith on complex systems thinking applied to financial risk.
 
-**Emily Yuan — Co-founder & COO**  
+**Emily Yuan, Co-founder & COO**  
 Stanford CS. Built with Nico at Basket. Runs operations and GTM.
 
 **Team scale:** ~70, offices SF (HQ), Salt Lake City, Dallas, Chicago, Atlanta.
 
 ---
 
-## Thesis — why this, why now
+## Thesis: why this, why now
 
 The U.S. P&C stack for SMB and growth-stage tech is still mostly 1970s plumbing plus human relay. Licensing is the real moat; we invested in licenses so we could rebuild the stack instead of wallpapering legacy.
 
