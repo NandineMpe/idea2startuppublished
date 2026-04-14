@@ -37,7 +37,7 @@ type View = "chat" | "history"
 const WELCOME: Message = {
   role: "assistant",
   content:
-    "Hi. Ask about your company, market, or recent briefs. Scheduled jobs still run on their own.",
+    "Hi. Ask anything (strategy, GTM, product, or unrelated). When you are signed in, replies use your company profile. This thread is only for this button, not Context → Update context.",
 }
 
 function formatRelativeTime(dateStr: string) {
@@ -179,14 +179,50 @@ export default function FloatingJuno() {
         }),
       })
 
-      if (!res.ok) throw new Error("Failed to get response")
+      const raw = await res.text()
+      let data: { text?: string; error?: string } = {}
+      try {
+        data = raw ? (JSON.parse(raw) as { text?: string; error?: string }) : {}
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `Could not read the response (HTTP ${res.status}). Try again in a moment.`,
+          },
+        ])
+        return
+      }
 
-      const data = await res.json()
-      setMessages((prev) => [...prev, { role: "assistant", content: data.text }])
+      if (!res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              data.error?.trim() ||
+              (res.status === 500
+                ? "Server error. If this keeps happening, check that LLM API keys are set for this app."
+                : `Request failed (HTTP ${res.status}). Try again.`),
+          },
+        ])
+        return
+      }
+
+      const reply = data.text?.trim()
+      if (!reply) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "Got an empty reply. Try asking again?" },
+        ])
+        return
+      }
+
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }])
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I hit a snag. Let's try that again?" },
+        { role: "assistant", content: "Network error. Check your connection and try again." },
       ])
     } finally {
       setIsLoading(false)
@@ -228,7 +264,7 @@ export default function FloatingJuno() {
                   </p>
                   {view === "chat" && (
                     <p className="text-[10px] text-muted-foreground leading-tight">
-                      Sidebar only · not Context page
+                      Any topic · company context when signed in
                     </p>
                   )}
                   {view === "history" && (
@@ -393,7 +429,7 @@ export default function FloatingJuno() {
                     <div className="p-3 border-t border-border shrink-0">
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Ask Juno anything..."
+                          placeholder="Ask anything..."
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleSend()}

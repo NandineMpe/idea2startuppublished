@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     const promptWithContext = companyBlock + lastMessage
 
     const systemPrompt =
-      "You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader - you challenge assumptions and push for clarity. Be concise, insightful, and actionable."
+      "You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader - you challenge assumptions and push for clarity. Be concise, insightful, and actionable. Answer the user's question even if it is not about startups (brief and practical). When company context is provided, use it; when it is not, still help."
 
     const conversationMessages = [
       ...messages.slice(0, -1).map((m: { role: string; content: string }) => ({
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       model: qwenModel(),
       system: mergeSystemWithWritingRules(systemPrompt),
       messages: conversationMessages,
-      maxTokens: 1000,
+      maxOutputTokens: 1500,
     })
 
     if (userId && sessionId && text) {
