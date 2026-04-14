@@ -17,8 +17,16 @@ function normalizedText(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null
 }
 
-async function getWorkspaceForRequest(_userId: string, _request: Request) {
-  return null
+/**
+ * Must match `/api/company/context-view` and `brain-ledger`: when a workspace is selected (cookie),
+ * profile reads/writes go to `client_workspace_profiles`, not `company_profile`.
+ */
+async function getWorkspaceForRequest(userId: string, request: Request) {
+  const url = new URL(request.url)
+  if (url.searchParams.get("scope") === "owner") {
+    return null
+  }
+  return resolveWorkspaceSelection(userId, { useCookieWorkspace: true })
 }
 
 export async function GET(request: Request) {

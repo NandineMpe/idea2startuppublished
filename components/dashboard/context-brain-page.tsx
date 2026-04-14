@@ -282,6 +282,8 @@ export function ContextBrainPage() {
   const [markdown, setMarkdown] = useState("")
   const [markdownDirty, setMarkdownDirty] = useState(false)
   const [savingMd, setSavingMd] = useState(false)
+  const [contextScope, setContextScope] = useState<"owner" | "workspace" | null>(null)
+  const [workspaceLabel, setWorkspaceLabel] = useState<string | null>(null)
 
   async function refresh() {
     try {
@@ -294,11 +296,20 @@ export function ContextBrainPage() {
         setLedger(j.data ?? null)
       }
       if (ctxRes.ok) {
-        const j = (await ctxRes.json()) as { data: ContextData }
+        const j = (await ctxRes.json()) as {
+          data: ContextData
+          scope?: string
+          workspace?: { displayName?: string; companyName?: string | null } | null
+        }
         const d = j.data ?? emptyContextData()
         setContextData(d)
         setMarkdown(d.knowledge.markdown)
         setMarkdownDirty(false)
+        setContextScope(j.scope === "workspace" ? "workspace" : "owner")
+        const w = j.workspace
+        setWorkspaceLabel(
+          w ? String(w.displayName || w.companyName || "").trim() || null : null,
+        )
       }
     } catch {
       toast({ title: "Could not load brain data", variant: "destructive" })
@@ -353,11 +364,18 @@ export function ContextBrainPage() {
     <div className="mx-auto max-w-3xl space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">Company Brain</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Everything Juno knows about your business — live context trail below.
           </p>
+          {contextScope === "workspace" && workspaceLabel ? (
+            <p className="mt-2 text-[12px] text-amber-800 dark:text-amber-200/90 leading-snug rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+              You have a team workspace selected ({workspaceLabel}). Saves here go to{" "}
+              <span className="font-medium">that workspace</span>, not your personal founder profile. Switch team in the
+              sidebar to edit the other.
+            </p>
+          ) : null}
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} className="gap-1.5 shrink-0">
           <RefreshCw className="h-3.5 w-3.5" />
