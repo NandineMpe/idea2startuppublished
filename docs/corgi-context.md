@@ -1,5 +1,7 @@
 # Corgi — Juno Context
 
+> **Note:** For the **Augentik Team** workspace in production, use `docs/augentik-context.md` and `docs/augentik-profile-payload.json` so Juno does not mix Corgi branding with Augentik.
+
 *Written as the founder. This is the brief I'd give to a new team member or agent on day one.*
 
 ---

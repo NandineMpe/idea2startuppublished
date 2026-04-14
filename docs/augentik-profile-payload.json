@@ -1,0 +1,56 @@
+{
+  "company_name": "Augentik",
+  "tagline": "Augentik is the first full-stack, AI-native insurance carrier built for technology startups. We own underwriting, pricing, policy administration, claims, and reinsurance — no broker in the middle. Founders get a full quote and bound certificate in under 10 minutes.",
+  "company_description": "Augentik is the first full-stack, AI-native insurance carrier built for technology startups. We own underwriting, pricing, policy administration, claims, and reinsurance — no broker in the middle. Founders get a full quote and bound certificate in under 10 minutes. Tagline: business insurance at the speed of compute.",
+  "problem": "Startups move at a pace the insurance industry was never designed to serve. Traditional insurance takes 3–6 weeks, involves 8–12 human touchpoints, and runs on legacy systems built for corporate risk managers — not founders closing seed rounds or signing enterprise contracts.",
+  "solution": "A full-stack insurance carrier with AI-native underwriting, modular coverage (GL, D&O, Tech E&O, Cyber, EPLI, Media Liability, AI Liability, Hired & Non-Owned Auto, Fiduciary Liability, Reps & Warranties), and a digital-first experience built for technical founders.",
+  "target_market": "Venture-backed technology startups, pre-seed through Series B+, in 49 U.S. states. Trigger events: funding rounds, enterprise contracts, first hires, lease signings.",
+  "vertical": "Insurtech, financial infrastructure, startup enablement",
+  "industry": "Insurtech",
+  "stage": "Series B",
+  "traction": "40,000+ active customers. $40M+ ARR as of December 2025. Full carrier license July 2025. Captive reinsurer license late 2025. $108M raised at $630M valuation January 2026. Under 1% annual churn.",
+  "business_model": "Annual premiums collected directly as a licensed carrier. Revenue from underwriting profit and investment income on float. Average customer pays roughly $1,000/year.",
+  "thesis": "The insurance industry is a $1T+ market running on 1970s infrastructure. AI changes unit economics — manual underwriting that took weeks can run in seconds when the stack is native. Startups are the fastest-growing and most underserved segment. We invested in licenses so we could rebuild the stack instead of bolting onto legacy.",
+  "differentiators": "Full-stack carrier (not broker or MGA). Sub-10 minute quote-to-bound. AI-native underwriting, modular coverage, AI Liability category leadership, founder-first UX, ownership of risk and float. Instrumented quote-to-bind and claims feedback loop to defend unit economics.",
+  "founder_name": "Nico Laqua",
+  "founder_background": "CEO & CTO. Columbia (Rabi Scholar). Previously founded Basket (gaming publisher at 200M+ MAU scale). Forbes 30 Under 30 (2024). Co-founder Emily Yuan (COO): Stanford CS, operations and GTM. ~70 person team; SF HQ plus Salt Lake City, Dallas, Chicago, Atlanta.",
+  "icp": [
+    "Venture-backed tech startups, pre-seed through Series B+, 49 U.S. states",
+    "Founders who need speed: post-funding D&O, pre-enterprise cyber, first-hire EPLI",
+    "Technical buyers who want clarity, not a 40-page PDF from a broker"
+  ],
+  "competitors": [
+    "Vouch",
+    "Embroker",
+    "Founder Shield",
+    "Koop",
+    "Incumbent carriers (Hiscox, Markel, and similar)"
+  ],
+  "keywords": [
+    "Augentik",
+    "insurtech",
+    "startup insurance",
+    "AI underwriting",
+    "full-stack carrier",
+    "D&O",
+    "cyber insurance",
+    "AI liability",
+    "venture-backed startups",
+    "quote to bind",
+    "bind rate",
+    "loss ratio"
+  ],
+  "priorities": [
+    "Productionize the AI underwriting feedback loop: quote → bind → claim → root cause → model and rules signals (closed-loop telemetry)",
+    "Defend unit economics: bind rate on quotes, post-bind declinations, segment loss ratios, data mismatch detection",
+    "GTM scale: partnerships with YC, a16z, Sequoia, and similar for portfolio distribution",
+    "Enterprise readiness: Client Success capacity for Series B+ accounts alongside digital-first core"
+  ],
+  "risks": [
+    "Regulatory complexity across 49 states; a major state dispute could slow growth",
+    "Reinsurance and capital markets; hard markets compress margin",
+    "Underwriting accuracy: mispriced segments or bind-then-decline from misclassified risk",
+    "Talent: rare mix of insurance regulation depth and modern engineering",
+    "Brand and distribution outside core founder networks without deliberate GTM"
+  ]
+}
