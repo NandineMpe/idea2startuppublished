@@ -12,7 +12,7 @@ export type UpcomingConversationTopic = {
   notes: string
   /** URLs — one per line */
   links: string
-  /** Supporting media: file locations, B-roll notes, “clip at 0:45”, etc. */
+  /** Supporting media: file locations, B-roll notes, "clip at 0:45", etc. */
   mediaNotes: string
   /** ISO date (YYYY-MM-DD) or empty */
   scheduledDate: string

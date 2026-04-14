@@ -30,6 +30,9 @@ const BRAND_TAB_KEYS = [
 
 type FounderBrandTabKey = (typeof BRAND_TAB_KEYS)[number]
 
+/** Tabs that use the long-form notes textarea (excludes public presence, which has its own panel). */
+type BrandNotesTabKey = Exclude<FounderBrandTabKey, "publicPresence">
+
 const TAB_HINT: Record<
   FounderBrandTabKey,
   { title: string; hint: string; placeholder: string }
@@ -48,7 +51,7 @@ const TAB_HINT: Record<
   },
   publicPresence: {
     title: "Public presence",
-    hint: "TikTok digest, your scheduled topics (with links & media), then other channels — LinkedIn, talks, newsletter, podcast.",
+    hint: "TikTok digest, your scheduled topics (with links and media), then other channels: LinkedIn, talks, newsletter, podcast.",
     placeholder:
       "Primary channels and rough cadence (e.g. LinkedIn 2×/week)…\n\nFormats you enjoy vs. drain you…\n\nAudience you write for on each surface…",
   },
@@ -435,7 +438,7 @@ export function FounderBrandPageContent() {
     saveFounderBrandState(data)
   }, [data])
 
-  function patch(key: FounderBrandTabKey, value: string) {
+  function patch(key: BrandNotesTabKey, value: string) {
     setData((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -448,7 +451,7 @@ export function FounderBrandPageContent() {
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Founder brand</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Daily AI strategic review — plus your pitch notes, strategy, and presence.
+          Daily AI strategic review, plus your pitch notes, strategy, and presence.
         </p>
       </div>
 

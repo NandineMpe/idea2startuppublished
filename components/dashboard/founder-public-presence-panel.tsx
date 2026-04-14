@@ -56,7 +56,10 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
         digestBody: json.digest ?? "",
         lastDigestAt: json.generatedAt ?? new Date().toISOString(),
       })
-      toast({ title: "Digest ready", description: "Snapshot for AI + AI at work — edit and turn into shorts." })
+      toast({
+        title: "Digest ready",
+        description: "Snapshot for AI and AI at work. Edit and turn into shorts.",
+      })
     } catch (e) {
       toast({
         title: "Digest failed",
@@ -83,7 +86,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
             <h2 className="mt-1 text-[15px] font-semibold text-foreground">Digest for short-form</h2>
             <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
               Juno runs a <span className="font-medium text-foreground">snapshot synthesis</span> of what matters in
-              general AI and <span className="font-medium text-foreground">AI in the world of work</span> — releases,
+              general AI and <span className="font-medium text-foreground">AI in the world of work</span>: releases,
               discourse, and hooks you can react to. This is intentionally{" "}
               <span className="font-medium text-foreground">not</span> audit or compliance intelligence (unlike other
               Juno scans). Live TikTok scraping can plug in later; today you get a briefing you can film from.
@@ -122,7 +125,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
           </div>
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
-          Scheduling runs server-side next — use <span className="font-medium text-foreground">Run digest now</span>{" "}
+          Scheduling runs server-side next. Use <span className="font-medium text-foreground">Run digest now</span>{" "}
           today.
         </p>
 
@@ -159,7 +162,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
             id="tiktok-digest-body"
             value={td.digestBody}
             onChange={(e) => patchTiktok({ digestBody: e.target.value })}
-            placeholder="Run digest now to fill this — then edit, cut into scripts, or stash ideas."
+            placeholder="Run digest now to fill this, then edit, cut into scripts, or stash ideas."
             rows={12}
             className="min-h-[220px] resize-y font-mono text-[12px] leading-relaxed"
           />
@@ -173,7 +176,7 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
           Other channels &amp; cadence
         </Label>
         <p className="text-[12px] text-muted-foreground">
-          LinkedIn, talks, newsletter, podcast — where else you show up beyond short-form.
+          LinkedIn, talks, newsletter, podcast: where else you show up beyond short-form.
         </p>
         <Textarea
           id="fb-publicPresence"

@@ -65,7 +65,7 @@ export function UpcomingTopicsPlanner({ data, setData }: Props) {
           </p>
           <h2 className="mt-1 text-[15px] font-semibold text-foreground">Upcoming topics &amp; conversations</h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
-            Plan what you want to talk about next — live, podcast, TikTok, or customer calls. Add links and media notes
+            Plan what you want to talk about next (live, podcast, TikTok, or customer calls). Add links and media notes
             so nothing is scattered across tabs the day you record.
           </p>
         </div>
@@ -137,7 +137,7 @@ export function UpcomingTopicsPlanner({ data, setData }: Props) {
                       id={`topic-notes-${t.id}`}
                       value={t.notes}
                       onChange={(e) => updateTopic(t.id, { notes: e.target.value })}
-                      placeholder="Angle, who it’s for, one CTA…"
+                      placeholder="Angle, audience, one CTA…"
                       rows={3}
                       className="resize-y text-[13px] leading-relaxed"
                     />
@@ -151,7 +151,7 @@ export function UpcomingTopicsPlanner({ data, setData }: Props) {
                       id={`topic-links-${t.id}`}
                       value={t.links}
                       onChange={(e) => updateTopic(t.id, { links: e.target.value })}
-                      placeholder="One URL per line — articles, papers, product pages, tweets…"
+                      placeholder="One URL per line: articles, papers, product pages, tweets…"
                       rows={3}
                       className="resize-y font-mono text-[12px] leading-relaxed"
                     />
@@ -165,7 +165,7 @@ export function UpcomingTopicsPlanner({ data, setData }: Props) {
                       id={`topic-media-${t.id}`}
                       value={t.mediaNotes}
                       onChange={(e) => updateTopic(t.id, { mediaNotes: e.target.value })}
-                      placeholder="Loom / Drive links, B-roll notes, screenshots, “use clip at 0:45”…"
+                      placeholder="Loom / Drive links, B-roll notes, screenshots, use clip at 0:45…"
                       rows={2}
                       className="resize-y text-[13px] leading-relaxed"
                     />

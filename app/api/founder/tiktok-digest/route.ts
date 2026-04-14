@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { qwenModel } from "@/lib/llm-provider"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { jsonApiError } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
@@ -8,7 +8,7 @@ import { appendWritingRules } from "@/lib/copy-writing-rules"
  * POST /api/founder/tiktok-digest
  * Synthesizes a digest for short-form (TikTok-style) founder content:
  * general AI + AI in the world of work — explicitly not audit/compliance.
- * Live TikTok scraping is not wired; Claude produces a current snapshot synthesis.
+ * Live TikTok scraping is not wired; the model produces a snapshot synthesis.
  */
 export async function POST(req: Request) {
   try {
@@ -33,10 +33,10 @@ export async function POST(req: Request) {
 TODAY (UTC date): ${today}
 
 SCOPE (strict):
-- Include: general AI — models, labs, releases, benchmarks, open weights, major product launches.
-- Include heavily: AI in the world of WORK — copilots, workplace agents, productivity, hiring, skills, "AI native" teams, future of work, enterprise adoption.
-- Include: trending DISCUSSION angles people argue about (safety, hype, job impact, open vs closed) — keep it practical for a founder's POV.
-- EXCLUDE: audit, compliance, SOC2, financial audit, assurance, regulatory audit — this digest is NOT for that domain. If something touches regulation, only mention it if it is broadly about AI policy, not audit workflows.
+- Include: general AI (models, labs, releases, benchmarks, open weights, major product launches).
+- Include heavily: AI in the world of WORK (copilots, workplace agents, productivity, hiring, skills, AI native teams, future of work, enterprise adoption).
+- Include: trending DISCUSSION angles people argue about (safety, hype, job impact, open vs closed), practical for a founder POV.
+- EXCLUDE: audit, compliance, SOC2, financial audit, assurance, regulatory audit. This digest is NOT for that domain. If something touches regulation, only mention it if it is broadly about AI policy, not audit workflows.
 
 ${focus ? `Founder optional focus: ${focus}\n` : ""}
 
@@ -47,10 +47,10 @@ Output markdown with these sections:
 ## Hooks for your next shorts
 (3–6 concrete hook ideas, each one line)
 
-Be concise and scannable. Label the top with one line: "Snapshot synthesis (not live TikTok scrape) — use as a briefing for what to film or react to this week."
+Be concise and scannable. Label the top with one line: "Snapshot synthesis (not live TikTok scrape). Use as a briefing for what to film or react to this week."
 
 No preamble outside the markdown.`),
-      maxTokens: 2500,
+      maxOutputTokens: 2500,
     })
 
     return NextResponse.json({ digest: text.trim(), generatedAt: new Date().toISOString() })
