@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { ContentIntelligenceFeed } from "@/components/dashboard/content-intelligence-feed"
 import { UpcomingTopicsPlanner } from "@/components/dashboard/upcoming-topics-planner"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -76,6 +77,15 @@ export function FounderPublicPresencePanel({ hint, placeholder, data, setData }:
   return (
     <div className="space-y-6">
       <p className="text-[13px] leading-relaxed text-muted-foreground">{hint}</p>
+
+      <div className="space-y-2">
+        <p className="text-[12px] font-medium text-foreground">Intelligence feed</p>
+        <p className="text-[12px] text-muted-foreground">
+          Filter RSS signals, run the server digest, and triage stories (pillar, status, score). Use the optional angle
+          when you trigger a run.
+        </p>
+        <ContentIntelligenceFeed />
+      </div>
 
       <div className="rounded-xl border border-border bg-gradient-to-br from-fuchsia-500/[0.06] via-card to-cyan-500/[0.06] p-5 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

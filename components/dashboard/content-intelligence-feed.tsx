@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -28,6 +29,13 @@ type Briefing = {
   top_hook: string
 }
 
+function storyMatchesQuery(story: Story, q: string): boolean {
+  const needle = q.trim().toLowerCase()
+  if (!needle) return true
+  const hay = `${story.title} ${story.hook} ${story.source} ${story.why_it_matters ?? ""}`.toLowerCase()
+  return hay.includes(needle)
+}
+
 function isCollabStory(story: Story): boolean {
   const topics = (story.connected_topics ?? []).map((t) => t.toLowerCase())
   if (topics.includes("collab_opportunity")) return true
@@ -47,6 +55,7 @@ export function ContentIntelligenceFeed() {
   const [status, setStatus] = useState("all")
   const [minScore, setMinScore] = useState("4")
   const [angle, setAngle] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
 
   async function load() {
     setLoading(true)
@@ -69,15 +78,20 @@ export function ContentIntelligenceFeed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pillar, status, minScore])
 
+  const filteredStories = useMemo(
+    () => stories.filter((s) => storyMatchesQuery(s, searchQuery)),
+    [stories, searchQuery],
+  )
+
   const sections = useMemo(
     () => ({
-      collab: stories.filter((s) => isCollabStory(s)).sort((a, b) => b.content_score - a.content_score),
-      breaking: stories.filter((s) => s.urgency === "breaking"),
-      ready: stories.filter((s) => s.content_score >= 7 && s.urgency !== "breaking"),
-      watch: stories.filter((s) => s.content_score >= 4 && s.content_score < 7),
-      deep: stories.filter((s) => s.pillar === "deep_dive"),
+      collab: filteredStories.filter((s) => isCollabStory(s)).sort((a, b) => b.content_score - a.content_score),
+      breaking: filteredStories.filter((s) => s.urgency === "breaking"),
+      ready: filteredStories.filter((s) => s.content_score >= 7 && s.urgency !== "breaking"),
+      watch: filteredStories.filter((s) => s.content_score >= 4 && s.content_score < 7),
+      deep: filteredStories.filter((s) => s.pillar === "deep_dive"),
     }),
-    [stories],
+    [filteredStories],
   )
 
   async function runDigestNow() {
@@ -127,6 +141,22 @@ export function ContentIntelligenceFeed() {
         <Button size="sm" onClick={() => void runDigestNow()} disabled={running}>
           {running ? "Triggering..." : "Run digest now"}
         </Button>
+      </div>
+
+      <div className="relative mt-3">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <Label htmlFor="content-feed-search" className="sr-only">
+          Search stories
+        </Label>
+        <input
+          id="content-feed-search"
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-[13px] ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Search stories by title, hook, or source…"
+          autoComplete="off"
+        />
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
