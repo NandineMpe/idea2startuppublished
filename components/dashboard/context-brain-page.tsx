@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { BookMarked, ChevronDown, ChevronRight, FileText, FileUp, Github, Loader2, RefreshCw, Save, Trash2, Unplug } from "lucide-react"
+import { BookMarked, ChevronDown, ChevronRight, FileDown, FileText, FileUp, Github, Loader2, RefreshCw, Save, Trash2, Unplug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -330,6 +330,8 @@ export function ContextBrainPage() {
   const [markdown, setMarkdown] = useState("")
   const [markdownDirty, setMarkdownDirty] = useState(false)
   const [savingMd, setSavingMd] = useState(false)
+  const [importingVault, setImportingVault] = useState(false)
+  const [erasingKb, setErasingKb] = useState(false)
   const [contextScope, setContextScope] = useState<"owner" | "workspace" | null>(null)
   const [workspaceLabel, setWorkspaceLabel] = useState<string | null>(null)
 
@@ -394,6 +396,69 @@ export function ContextBrainPage() {
       toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
     } finally {
       setSavingMd(false)
+    }
+  }
+
+  const vaultHasCache =
+    Boolean(contextData.vault.connected) &&
+    (Boolean(contextData.vault.lastSyncedAt) || (contextData.vault.fileCount ?? 0) > 0)
+
+  async function importVaultIntoKnowledgeBase() {
+    if (markdown.trim()) {
+      const ok = window.confirm(
+        "Replace the text in this box with your cached vault digest? Save afterward if you edit again.",
+      )
+      if (!ok) return
+    }
+    setImportingVault(true)
+    try {
+      const res = await fetch("/api/company/knowledge-from-vault", {
+        method: "POST",
+        credentials: "include",
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(json.error || "Import failed")
+      await refresh()
+      toast({
+        title: "Imported vault into knowledge base",
+        description: "This is the same text Juno already had under Vault context, now also stored as your primary document.",
+      })
+    } catch (e) {
+      toast({
+        title: "Could not import",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      })
+    } finally {
+      setImportingVault(false)
+    }
+  }
+
+  async function eraseSavedKnowledgeBase() {
+    const ok = window.confirm(
+      "Delete the saved knowledge base document for this workspace? The vault cache is unchanged. You cannot undo this from here.",
+    )
+    if (!ok) return
+    setErasingKb(true)
+    try {
+      const res = await fetch("/api/company/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ knowledge_base_md: "" }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) throw new Error(json.error || "Failed to erase")
+      await refresh()
+      toast({ title: "Saved document cleared" })
+    } catch (e) {
+      toast({
+        title: "Could not erase",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      })
+    } finally {
+      setErasingKb(false)
     }
   }
 
@@ -496,16 +561,35 @@ export function ContextBrainPage() {
       <Section title="Knowledge Base Document" defaultOpen={true}>
         <div className="space-y-4">
           <p className="text-[13px] text-muted-foreground leading-relaxed">
-            Ask any AI (ChatGPT, Qwen, Gemini) to generate a company overview in markdown, then paste or upload it here.
+            This box is your <span className="text-foreground/90">primary markdown document</span> Juno stores in the database. Vault sync above fills a{" "}
+            <span className="text-foreground/90">separate</span> cached digest for prompts. They do not auto-merge. Paste or upload your own overview here, or pull the vault digest into this box with the button below.
+          </p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">
+            To replace old text: use <span className="font-medium text-foreground/90">Erase saved document</span>, then paste and <span className="font-medium text-foreground/90">Save</span>. Or edit and Save over it.
+          </p>
+          <p className="text-[13px] text-muted-foreground leading-relaxed">
+            Ask any AI (ChatGPT, Qwen, Gemini) for a company overview in markdown, then paste or upload it here.
           </p>
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground font-mono leading-relaxed">
             &quot;Generate everything you know about my company [name] as a detailed markdown document covering our product, market, traction, team, and strategy.&quot;
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
               <FileUp className="h-3.5 w-3.5" />
               Upload .md file
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={!vaultHasCache || importingVault || savingMd}
+              onClick={() => void importVaultIntoKnowledgeBase()}
+              title={!vaultHasCache ? "Sync the vault first so there is a cached digest to import." : undefined}
+            >
+              {importingVault ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+              Import vault into this document
             </Button>
             {contextData.knowledge.updatedAt && (
               <span className="text-xs text-muted-foreground">Last saved {formatDateTime(contextData.knowledge.updatedAt)}</span>
@@ -520,7 +604,7 @@ export function ContextBrainPage() {
             className="min-h-[280px] font-mono text-[13px] leading-relaxed resize-y"
           />
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button type="button" onClick={() => void saveMarkdown()} disabled={savingMd || !markdownDirty} className="gap-1.5">
               {savingMd ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save
@@ -528,9 +612,20 @@ export function ContextBrainPage() {
             {markdown && (
               <Button type="button" variant="ghost" size="sm" onClick={() => { setMarkdown(""); setMarkdownDirty(true) }} className="text-muted-foreground gap-1.5">
                 <Trash2 className="h-3.5 w-3.5" />
-                Clear
+                Clear draft
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground gap-1.5"
+              disabled={erasingKb || savingMd}
+              onClick={() => void eraseSavedKnowledgeBase()}
+            >
+              {erasingKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Erase saved document
+            </Button>
           </div>
         </div>
       </Section>

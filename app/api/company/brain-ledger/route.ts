@@ -159,7 +159,7 @@ export async function GET() {
     }
 
     const uid = user.id
-    const workspace = await resolveWorkspaceSelection(uid)
+    const workspace = await resolveWorkspaceSelection(uid, { useCookieWorkspace: true })
 
     if (workspace) {
       const [{ data: profile }, { data: assets }] = await Promise.all([

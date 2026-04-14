@@ -17,7 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const workspace = await resolveWorkspaceSelection(user.id)
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
     if (workspace) {
       const { data } = await supabaseAdmin
         .from("client_workspace_profiles")
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     const branch = typeof body.branch === "string" && body.branch.trim() ? body.branch.trim() : "main"
     const folders = normalizeVaultFolders(body.folders)
 
-    const workspace = await resolveWorkspaceSelection(user.id)
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
     if (workspace) {
       if (!repo) {
         const { error: clearErr } = await supabaseAdmin
