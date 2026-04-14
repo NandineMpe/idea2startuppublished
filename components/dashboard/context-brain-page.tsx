@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
 import { BookMarked, ChevronDown, ChevronRight, FileText, FileUp, Github, Loader2, RefreshCw, Save, Trash2, Unplug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,6 +21,19 @@ function formatDateTime(iso: string | null | undefined): string {
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—"
   return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" })
+}
+
+/** Accepts `owner/repo` or a full `https://github.com/...` URL (same rules as server). */
+function normalizeVaultRepoInput(raw: string): string {
+  const s = raw.trim()
+  if (!s) return ""
+  const stripped = s
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
+    .replace(/\.git$/i, "")
+    .replace(/^\/+|\/+$/g, "")
+  const parts = stripped.split("/").filter(Boolean)
+  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`
+  return s
 }
 
 function toolLabel(tool: string): string {
@@ -169,9 +183,11 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [form, setForm] = useState({ repo: "", branch: "main", foldersText: "company\njuno\nresearch" })
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null)
+  const [lastFileCount, setLastFileCount] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch("/api/settings/github-vault")
+    fetch("/api/settings/github-vault", { credentials: "include" })
       .then((r) => r.json())
       .then((data) => {
         setForm({
@@ -179,6 +195,8 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
           branch: data.branch ?? "main",
           foldersText: Array.isArray(data.folders) ? data.folders.join("\n") : "company\njuno\nresearch",
         })
+        setLastSyncError(typeof data.syncError === "string" ? data.syncError : null)
+        setLastFileCount(typeof data.fileCount === "number" ? data.fileCount : null)
       })
       .catch(() => {})
   }, [])
@@ -186,11 +204,13 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
   async function save(syncAfterSave: boolean) {
     syncAfterSave ? setSyncing(true) : setSaving(true)
     try {
+      const normalizedRepo = normalizeVaultRepoInput(form.repo)
       const res = await fetch("/api/settings/github-vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          repo: form.repo.trim() || null,
+          repo: normalizedRepo || null,
           branch: form.branch.trim() || "main",
           folders: normalizeVaultFolders(form.foldersText),
           sync: syncAfterSave,
@@ -198,6 +218,11 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Save failed")
+      if (normalizedRepo) {
+        setForm((f) => ({ ...f, repo: normalizedRepo }))
+      }
+      setLastSyncError(typeof data.syncError === "string" ? data.syncError : null)
+      setLastFileCount(typeof data.fileCount === "number" ? data.fileCount : null)
       toast({
         title: syncAfterSave ? `Vault synced — ${data.fileCount ?? 0} file(s) cached` : "Vault settings saved",
         description: typeof data.warning === "string" && data.warning ? data.warning : undefined,
@@ -213,11 +238,24 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
 
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-border/80 bg-muted/30 px-3 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
+        <p>
+          Enter the vault repo as <span className="font-mono text-foreground/90">owner/repo</span>, or paste the full GitHub URL. Juno reads markdown from that repo (Obsidian syncs here via git).
+        </p>
+        <p className="mt-2">
+          <span className="font-medium text-foreground/90">Private repo:</span> connect GitHub under{" "}
+          <Link href="/dashboard/integrations" className="text-primary underline underline-offset-2 hover:text-primary/90">
+            Integrations
+          </Link>{" "}
+          so sync can use your account. Otherwise the server needs{" "}
+          <span className="font-mono text-[11px]">GITHUB_VAULT_TOKEN</span> in Vercel env.
+        </p>
+      </div>
       <div className="space-y-1.5">
         <label className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">GitHub repo</label>
         <input
           className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-[13px] outline-none focus:ring-1 focus:ring-ring"
-          placeholder="owner/repo"
+          placeholder="your-org/your-vault or https://github.com/..."
           value={form.repo}
           onChange={(e) => setForm((f) => ({ ...f, repo: e.target.value }))}
         />
@@ -265,6 +303,16 @@ function VaultInlineSettings({ onSynced }: { onSynced: () => void }) {
           Disconnect
         </Button>
       </div>
+      {lastFileCount != null && lastFileCount >= 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          Last sync: {lastFileCount} markdown file{lastFileCount === 1 ? "" : "s"} cached for Juno context.
+        </p>
+      )}
+      {lastSyncError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+          {lastSyncError}
+        </div>
+      ) : null}
     </div>
   )
 }
