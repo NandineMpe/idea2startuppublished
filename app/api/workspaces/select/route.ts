@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { createClient } from "@/lib/supabase/server"
 import {
   ACTIVE_WORKSPACE_COOKIE,
@@ -24,6 +25,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const organization = await resolveOrganizationSelection(user.id, {
+      useCookieOrganization: true,
+    })
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const body = (await request.json().catch(() => ({}))) as { workspaceId?: string | null }
     const workspaceId = body.workspaceId?.trim() || null
 
@@ -33,7 +41,11 @@ export async function POST(request: Request) {
       return response
     }
 
-    const workspace = await getWorkspaceRecordByIdForOwner(user.id, workspaceId)
+    const workspace = await getWorkspaceRecordByIdForOwner(
+      user.id,
+      workspaceId,
+      organization.id,
+    )
     if (!workspace) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 })
     }

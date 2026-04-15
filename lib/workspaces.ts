@@ -1,11 +1,31 @@
 import { randomUUID } from "crypto"
 import { cookies } from "next/headers"
+import {
+  readActiveOrganizationIdFromCookie,
+  resolveOrganizationSelection,
+} from "@/lib/organizations"
 import { supabaseAdmin } from "@/lib/supabase"
 import type { WorkspaceContextStatus, WorkspaceSummary } from "@/types/workspace"
 
-const WORKSPACE_SELECT = [
+const WORKSPACE_SELECT_BASE = [
   "id",
   "owner_user_id",
+  "slug",
+  "share_token",
+  "display_name",
+  "contact_name",
+  "contact_email",
+  "company_name",
+  "context_status",
+  "last_context_submitted_at",
+  "created_at",
+  "updated_at",
+].join(", ")
+
+const WORKSPACE_SELECT_WITH_ORG = [
+  "id",
+  "owner_user_id",
+  "organization_id",
   "slug",
   "share_token",
   "display_name",
@@ -22,12 +42,19 @@ export const ACTIVE_WORKSPACE_COOKIE = "juno_active_workspace"
 
 export interface WorkspaceRecord extends WorkspaceSummary {
   ownerUserId: string
+  organizationId: string | null
   shareToken: string
 }
 
 function normalizeOptionalText(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+function isMissingOrganizationColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  if (error.code !== "42703") return false
+  return /organization_id/i.test(error.message ?? "")
 }
 
 function normalizeStatus(value: unknown): WorkspaceContextStatus {
@@ -51,6 +78,7 @@ function mapWorkspaceRow(row: Record<string, unknown>): WorkspaceRecord {
   return {
     id: String(row.id),
     ownerUserId: String(row.owner_user_id),
+    organizationId: normalizeOptionalText(row.organization_id as string | null | undefined),
     shareToken,
     slug: String(row.slug ?? ""),
     displayName: String(row.display_name ?? row.company_name ?? "Client workspace"),
@@ -105,12 +133,37 @@ export async function readActiveWorkspaceIdFromCookie(): Promise<string | null> 
   }
 }
 
-export async function listWorkspacesForOwner(ownerUserId: string): Promise<WorkspaceSummary[]> {
-  const { data, error } = await supabaseAdmin
+export async function listWorkspacesForOwner(
+  ownerUserId: string,
+  organizationId?: string | null,
+): Promise<WorkspaceSummary[]> {
+  let query = supabaseAdmin
     .from("client_workspaces")
-    .select(WORKSPACE_SELECT)
+    .select(WORKSPACE_SELECT_WITH_ORG)
     .eq("owner_user_id", ownerUserId)
     .order("updated_at", { ascending: false })
+
+  const scopedOrganizationId = normalizeOptionalText(organizationId)
+  if (scopedOrganizationId) {
+    query = query.eq("organization_id", scopedOrganizationId)
+  }
+
+  const { data, error } = await query
+
+  if (isMissingOrganizationColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabaseAdmin
+      .from("client_workspaces")
+      .select(WORKSPACE_SELECT_BASE)
+      .eq("owner_user_id", ownerUserId)
+      .order("updated_at", { ascending: false })
+
+    if (legacyError) {
+      console.error("[workspaces] listWorkspacesForOwner (legacy):", legacyError.message)
+      return []
+    }
+
+    return (legacyData ?? []).map((row) => mapWorkspaceRow(row as unknown as Record<string, unknown>))
+  }
 
   if (error) {
     console.error("[workspaces] listWorkspacesForOwner:", error.message)
@@ -123,16 +176,41 @@ export async function listWorkspacesForOwner(ownerUserId: string): Promise<Works
 export async function getWorkspaceRecordByIdForOwner(
   ownerUserId: string,
   workspaceId: string,
+  organizationId?: string | null,
 ): Promise<WorkspaceRecord | null> {
   const id = normalizeOptionalText(workspaceId)
   if (!id) return null
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("client_workspaces")
-    .select(WORKSPACE_SELECT)
+    .select(WORKSPACE_SELECT_WITH_ORG)
     .eq("id", id)
     .eq("owner_user_id", ownerUserId)
-    .maybeSingle()
+  
+  const scopedOrganizationId = normalizeOptionalText(organizationId)
+  if (scopedOrganizationId) {
+    query = query.eq("organization_id", scopedOrganizationId)
+  }
+
+  const { data, error } = await query.maybeSingle()
+
+  if (isMissingOrganizationColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabaseAdmin
+      .from("client_workspaces")
+      .select(WORKSPACE_SELECT_BASE)
+      .eq("id", id)
+      .eq("owner_user_id", ownerUserId)
+      .maybeSingle()
+
+    if (legacyError && legacyError.code !== "PGRST116") {
+      console.error("[workspaces] getWorkspaceRecordByIdForOwner (legacy):", legacyError.message)
+      return null
+    }
+
+    return legacyData
+      ? mapWorkspaceRow(legacyData as unknown as Record<string, unknown>)
+      : null
+  }
 
   if (error && error.code !== "PGRST116") {
     console.error("[workspaces] getWorkspaceRecordByIdForOwner:", error.message)
@@ -150,9 +228,26 @@ export async function getWorkspaceRecordByShareToken(
 
   const { data, error } = await supabaseAdmin
     .from("client_workspaces")
-    .select(WORKSPACE_SELECT)
+    .select(WORKSPACE_SELECT_WITH_ORG)
     .eq("share_token", token)
     .maybeSingle()
+
+  if (isMissingOrganizationColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabaseAdmin
+      .from("client_workspaces")
+      .select(WORKSPACE_SELECT_BASE)
+      .eq("share_token", token)
+      .maybeSingle()
+
+    if (legacyError && legacyError.code !== "PGRST116") {
+      console.error("[workspaces] getWorkspaceRecordByShareToken (legacy):", legacyError.message)
+      return null
+    }
+
+    return legacyData
+      ? mapWorkspaceRow(legacyData as unknown as Record<string, unknown>)
+      : null
+  }
 
   if (error && error.code !== "PGRST116") {
     console.error("[workspaces] getWorkspaceRecordByShareToken:", error.message)
@@ -167,6 +262,8 @@ export async function resolveWorkspaceSelection(
   options: {
     workspaceId?: string | null
     useCookieWorkspace?: boolean
+    organizationId?: string | null
+    useCookieOrganization?: boolean
   } = {},
 ): Promise<WorkspaceRecord | null> {
   const explicitId =
@@ -181,11 +278,30 @@ export async function resolveWorkspaceSelection(
 
   if (!candidateId) return null
 
-  return getWorkspaceRecordByIdForOwner(ownerUserId, candidateId)
+  const explicitOrganizationId =
+    options.organizationId === undefined
+      ? undefined
+      : normalizeOptionalText(options.organizationId)
+
+  const candidateOrganizationId =
+    explicitOrganizationId === undefined
+      ? options.useCookieOrganization === false
+        ? null
+        : (
+            (await readActiveOrganizationIdFromCookie()) ||
+            (await resolveOrganizationSelection(ownerUserId, {
+              useCookieOrganization: true,
+            }))?.id ||
+            null
+          )
+      : explicitOrganizationId
+
+  return getWorkspaceRecordByIdForOwner(ownerUserId, candidateId, candidateOrganizationId)
 }
 
 export async function createWorkspaceForOwner(params: {
   ownerUserId: string
+  organizationId?: string | null
   displayName: string
   contactName?: string | null
   contactEmail?: string | null
@@ -202,13 +318,38 @@ export async function createWorkspaceForOwner(params: {
     contact_name: normalizeOptionalText(params.contactName),
     contact_email: normalizeOptionalText(params.contactEmail),
     context_status: "draft",
+    organization_id: normalizeOptionalText(params.organizationId),
   }
 
   const { data, error } = await supabaseAdmin
     .from("client_workspaces")
     .insert(payload)
-    .select(WORKSPACE_SELECT)
+    .select(WORKSPACE_SELECT_WITH_ORG)
     .single()
+
+  if (isMissingOrganizationColumnError(error)) {
+    const legacyPayload = {
+      owner_user_id: params.ownerUserId,
+      slug,
+      share_token: shareToken,
+      display_name: displayName,
+      contact_name: normalizeOptionalText(params.contactName),
+      contact_email: normalizeOptionalText(params.contactEmail),
+      context_status: "draft",
+    }
+
+    const { data: legacyData, error: legacyError } = await supabaseAdmin
+      .from("client_workspaces")
+      .insert(legacyPayload)
+      .select(WORKSPACE_SELECT_BASE)
+      .single()
+
+    if (legacyError || !legacyData) {
+      throw new Error(legacyError?.message || "Failed to create workspace")
+    }
+
+    return mapWorkspaceRow(legacyData as unknown as Record<string, unknown>)
+  }
 
   if (error || !data) {
     throw new Error(error?.message || "Failed to create workspace")

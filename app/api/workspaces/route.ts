@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { resolveOrganizationSelection } from "@/lib/organizations"
 import { createClient } from "@/lib/supabase/server"
 import {
   createWorkspaceForOwner,
@@ -17,9 +18,20 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const organization = await resolveOrganizationSelection(user.id, {
+      useCookieOrganization: true,
+    })
+
+    if (!organization) {
+      return NextResponse.json({ workspaces: [], activeWorkspaceId: null })
+    }
+
     const [workspaces, activeWorkspace] = await Promise.all([
-      listWorkspacesForOwner(user.id),
-      resolveWorkspaceSelection(user.id),
+      listWorkspacesForOwner(user.id, organization.id),
+      resolveWorkspaceSelection(user.id, {
+        organizationId: organization.id,
+        useCookieOrganization: false,
+      }),
     ])
 
     return NextResponse.json({ workspaces, activeWorkspaceId: activeWorkspace?.id ?? null })
@@ -40,6 +52,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const organization = await resolveOrganizationSelection(user.id, {
+      useCookieOrganization: true,
+    })
+
+    if (!organization) {
+      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+    }
+
     const body = (await request.json().catch(() => ({}))) as {
       displayName?: string
       contactName?: string
@@ -53,6 +73,7 @@ export async function POST(request: Request) {
 
     const workspace = await createWorkspaceForOwner({
       ownerUserId: user.id,
+      organizationId: organization.id,
       displayName,
       contactName: body.contactName ?? null,
       contactEmail: body.contactEmail ?? null,

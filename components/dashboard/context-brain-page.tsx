@@ -519,9 +519,9 @@ export function ContextBrainPage() {
           </p>
           {contextScope === "workspace" && workspaceLabel ? (
             <p className="mt-2 text-[12px] text-amber-800 dark:text-amber-200/90 leading-snug rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2">
-              You have a team workspace selected ({workspaceLabel}). Saves here go to{" "}
-              <span className="font-medium">that workspace</span>, not your personal founder profile. Switch team in the
-              sidebar to edit the other.
+              You have a client workspace selected ({workspaceLabel}). Saves here go to{" "}
+              <span className="font-medium">that client workspace</span>, not your team or personal founder profile.
+              Use Settings → Workspaces to switch or clear it.
             </p>
           ) : null}
         </div>

@@ -4,6 +4,7 @@ import {
   ACTIVE_ORGANIZATION_COOKIE,
   getOrganizationByIdForUser,
 } from "@/lib/organizations"
+import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspaces"
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
     if (!raw) {
       const response = NextResponse.json({ activeOrganizationId: null, organization: null })
       response.cookies.set(ACTIVE_ORGANIZATION_COOKIE, "", { ...COOKIE_OPTIONS, maxAge: 0 })
+      response.cookies.set(ACTIVE_WORKSPACE_COOKIE, "", { ...COOKIE_OPTIONS, maxAge: 0 })
       return response
     }
 
@@ -43,6 +45,8 @@ export async function POST(request: Request) {
       organization,
     })
     response.cookies.set(ACTIVE_ORGANIZATION_COOKIE, organization.id, COOKIE_OPTIONS)
+    // Organization switch should reset active client workspace selection.
+    response.cookies.set(ACTIVE_WORKSPACE_COOKIE, "", { ...COOKIE_OPTIONS, maxAge: 0 })
     return response
   } catch (error) {
     console.error("[organizations/active POST]", error)
