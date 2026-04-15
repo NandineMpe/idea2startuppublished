@@ -3,6 +3,7 @@ import { jsonApiError, logApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { inngest } from "@/lib/inngest/client"
 import { resolveOrganizationSelection } from "@/lib/organizations"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 const PIPELINE_EVENTS: Record<string, string> = {
   cbs: "juno/brief.requested",
@@ -22,6 +23,17 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
+    if (workspace) {
+      return NextResponse.json(
+        {
+          error:
+            "A client workspace is active. To avoid contaminating your owner/company history, switch to your company scope before running this pipeline.",
+        },
+        { status: 409 },
+      )
+    }
 
     const body = (await req.json().catch(() => ({}))) as { pipeline?: string }
     const pipeline = typeof body.pipeline === "string" ? body.pipeline : ""

@@ -33,6 +33,27 @@ function parseCachedSummary(value: unknown): RedditBehavioralSummary | null {
   return coerceBehavioralSummary((value as Record<string, unknown>).summary)
 }
 
+function buildEmptyWorkspaceSummary(companyName: string): RedditBehavioralSummary {
+  return {
+    overview: `No Reddit evidence is saved yet for ${companyName}. This workspace is isolated, so owner-level scans are intentionally hidden.`,
+    sentiment:
+      "Add context and run scans from this workspace once workspace intelligence runs are enabled.",
+    themes: [],
+    pushOfPresent: [],
+    pullOfNew: [],
+    anxietyOfNew: [],
+    allegianceToOld: [],
+    currentSolutions: [],
+    frictionPoints: [],
+    workarounds: [],
+    discoveryPaths: [],
+    buyingProcess: [],
+    painPoints: [],
+    gains: [],
+    nextMoves: [],
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const supabase = await createClient()
@@ -63,6 +84,39 @@ export async function GET(req: Request) {
         { error: "Add your company context first so Reddit signals can be synthesized against it." },
         { status: 422 },
       )
+    }
+
+    if (context.scope === "workspace") {
+      const workspaceName =
+        context.workspaceDisplayName?.trim() || context.profile.name.trim() || "this workspace"
+
+      return NextResponse.json({
+        data: {
+          ...buildEmptyWorkspaceSummary(workspaceName),
+          companyName: workspaceName,
+          synthesisCombined: !selectedSubreddit,
+          subredditsInSynthesisBatch: [],
+          conversationCount: 0,
+          latestThreadAt: null,
+          contextSources: buildContextSources(context),
+          contextLastSyncedAt:
+            context.profile.vault_context_last_synced_at ??
+            context.profile.knowledge_base_updated_at ??
+            null,
+          vaultConnected: Boolean(context.profile.github_vault_repo.trim()),
+          selectedSubreddit,
+          subreddits: context.profile.reddit_intent_subreddits ?? [],
+          redditIntentSaved: context.profile.reddit_intent_subreddits,
+          redditScanDefaults: [],
+          threads: [],
+          summarySource: "live",
+          generatedAt: new Date().toISOString(),
+          lastScanOutcome: null,
+          lastBehavioralArtifactAt: null,
+          workspaceScope: true,
+          workspaceName,
+        },
+      })
     }
 
     let threadsQuery = supabase
@@ -123,14 +177,11 @@ export async function GET(req: Request) {
 
     const threads = (threadsData ?? []) as BehavioralUpdatesThread[]
     const summarySignals = (summarySignalsData ?? []) as BehavioralUpdatesThread[]
-    const isWorkspaceScope = context.scope === "workspace"
-    const fromSignals = isWorkspaceScope
-      ? [] // don't bleed owner's past scan subreddits into workspace view
-      : (subredditRows ?? [])
-          .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
-          .filter(Boolean)
+    const fromSignals = (subredditRows ?? [])
+      .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
+      .filter(Boolean)
     const saved = context.profile.reddit_intent_subreddits ?? []
-    const defaults = isWorkspaceScope ? [] : REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
+    const defaults = REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
     const subreddits = [...new Set([...saved, ...fromSignals, ...defaults])].sort((a, b) =>
       a.localeCompare(b),
     )

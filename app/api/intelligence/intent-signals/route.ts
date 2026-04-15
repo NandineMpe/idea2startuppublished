@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 export async function GET(req: Request) {
   try {
@@ -9,6 +10,15 @@ export async function GET(req: Request) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
+    if (workspace) {
+      return NextResponse.json({
+        signals: [],
+        workspaceScope: true,
+        workspaceName: workspace.displayName ?? workspace.companyName ?? "Client workspace",
+      })
+    }
 
     const { searchParams } = new URL(req.url)
     const platform = searchParams.get("platform")?.trim().toLowerCase() || null

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 const STATUS_VALUES = new Set(["new", "responded", "converted", "irrelevant"])
 const SCORE_FEEDBACK_VALUES = new Set(["too_high", "ok", "too_low"])
@@ -16,6 +17,17 @@ export async function PATCH(
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
+    if (workspace) {
+      return NextResponse.json(
+        {
+          error:
+            "This workspace is isolated from your owner-level Reddit inbox. Switch to your company scope to update historical intent signals.",
+        },
+        { status: 409 },
+      )
+    }
 
     const body = (await req.json().catch(() => ({}))) as {
       status?: string

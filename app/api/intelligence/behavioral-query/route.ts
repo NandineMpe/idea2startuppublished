@@ -36,20 +36,29 @@ export async function POST(req: NextRequest) {
     const question = body.question?.trim()
     if (!question) return NextResponse.json({ error: "question is required" }, { status: 400 })
 
-    const [context, { data: signals }] = await Promise.all([
-      getCompanyContext(user.id, {
-        queryHint: "reddit customer research buying process pain points",
-        refreshVault: "if_stale",
-        
-      }),
-      supabase
-        .from("intent_signals")
-        .select("id, title, body, url, subreddit, why_relevant, relevance_score, signal_type, discovered_at")
-        .eq("user_id", user.id)
-        .eq("platform", "reddit")
-        .order("relevance_score", { ascending: false })
-        .limit(60),
-    ])
+    const context = await getCompanyContext(user.id, {
+      queryHint: "reddit customer research buying process pain points",
+      refreshVault: "if_stale",
+      
+    })
+
+    if (context?.scope === "workspace") {
+      return NextResponse.json({
+        answer:
+          "This workspace is intentionally isolated from your owner-level Reddit archive. Run workspace scans to build a dedicated evidence set here.",
+        keyFindings: [],
+        threads: [],
+        signalsSearched: 0,
+      })
+    }
+
+    const { data: signals } = await supabase
+      .from("intent_signals")
+      .select("id, title, body, url, subreddit, why_relevant, relevance_score, signal_type, discovered_at")
+      .eq("user_id", user.id)
+      .eq("platform", "reddit")
+      .order("relevance_score", { ascending: false })
+      .limit(60)
 
     if (!signals || signals.length === 0) {
       return NextResponse.json({

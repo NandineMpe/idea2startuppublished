@@ -1,15 +1,109 @@
 import { NextResponse } from "next/server"
 import { coerceBehavioralSummary } from "@/lib/juno/reddit-recon"
 import { createClient } from "@/lib/supabase/server"
+import { resolveWorkspaceSelection } from "@/lib/workspaces"
 import { toLegacyFeedRow, type AiOutputDbRow } from "@/lib/ai-outputs-legacy"
 
 const OUT_FIELDS = "id, tool, title, inputs, output, metadata, created_at"
+
+function parseStringArray(value: unknown): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      }
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
 
 export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
+    if (workspace) {
+      const { data: workspaceProfile } = await supabase
+        .from("client_workspace_profiles")
+        .select(
+          "company_name, company_description, problem, solution, target_market, traction, founder_name, stage, icp, competitors, priorities, risks, keywords",
+        )
+        .eq("owner_user_id", user.id)
+        .eq("workspace_id", workspace.id)
+        .maybeSingle()
+
+      const profile = workspaceProfile
+        ? {
+            company_name:
+              typeof workspaceProfile.company_name === "string"
+                ? workspaceProfile.company_name
+                : null,
+            company_description:
+              typeof workspaceProfile.company_description === "string"
+                ? workspaceProfile.company_description
+                : null,
+            problem:
+              typeof workspaceProfile.problem === "string" ? workspaceProfile.problem : null,
+            solution:
+              typeof workspaceProfile.solution === "string" ? workspaceProfile.solution : null,
+            target_market:
+              typeof workspaceProfile.target_market === "string"
+                ? workspaceProfile.target_market
+                : null,
+            traction:
+              typeof workspaceProfile.traction === "string" ? workspaceProfile.traction : null,
+            founder_name:
+              typeof workspaceProfile.founder_name === "string"
+                ? workspaceProfile.founder_name
+                : null,
+            stage: typeof workspaceProfile.stage === "string" ? workspaceProfile.stage : null,
+            icp: parseStringArray(workspaceProfile.icp),
+            competitors: parseStringArray(workspaceProfile.competitors),
+            priorities: parseStringArray(workspaceProfile.priorities),
+            risks: parseStringArray(workspaceProfile.risks),
+            keywords: parseStringArray(workspaceProfile.keywords),
+          }
+        : null
+
+      return NextResponse.json({
+        workspaceScope: true,
+        workspaceId: workspace.id,
+        workspaceName: workspace.displayName ?? workspace.companyName ?? "Client workspace",
+        workspaceProfile: profile,
+        brief: null,
+        leads: [],
+        behavioralUpdates: null,
+        contentQueue: [],
+        radar: null,
+        pipelineStatus: {
+          cbs: null,
+          cro: null,
+          cmo: null,
+          cto: null,
+          intent: null,
+        },
+        staffMeeting: null,
+        commentDraftCount: 0,
+        hotIntentCount: 0,
+      })
+    }
 
     // Latest daily brief (includes seeded market briefs)
     const { data: briefRows } = await supabase
@@ -133,6 +227,7 @@ export async function GET() {
     }).length
 
     return NextResponse.json({
+      workspaceScope: false,
       brief: briefRows?.[0] ? toLegacyFeedRow(briefRows[0] as AiOutputDbRow) : null,
       leads: (leadRows ?? []).map((r) => toLegacyFeedRow(r as AiOutputDbRow)),
       behavioralUpdates:
