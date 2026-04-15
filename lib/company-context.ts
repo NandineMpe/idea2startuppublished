@@ -280,9 +280,13 @@ export async function getCompanyContextLight(
       workspaceId: options.workspaceId,
       useCookieWorkspace: options.useCookieWorkspace,
     })
+    const organization =
+      workspace === null
+        ? await resolveOrganizationSelection(userId, { useCookieOrganization: true })
+        : null
     const profile = workspace
       ? await loadWorkspaceProfile(supabase, userId, workspace.id)
-      : await loadProfile(supabase, userId)
+      : await loadProfile(supabase, organization?.id)
     const extracted = extractIntelligence(profile)
     return { profile, extracted }
   } catch (e) {

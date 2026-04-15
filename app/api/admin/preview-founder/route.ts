@@ -28,15 +28,6 @@ function normalizeDomain(value: string | undefined): string {
   return cleaned
 }
 
-function urlMatchesDomain(urlValue: string, domain: string): boolean {
-  try {
-    const host = normalizeDomain(new URL(urlValue).hostname)
-    return host === domain || host.endsWith(`.${domain}`)
-  } catch {
-    return false
-  }
-}
-
 async function requireAdmin(): Promise<{ userId: string } | { error: NextResponse }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -63,22 +54,23 @@ export async function POST(req: Request) {
   const companyDomain   =
     normalizeDomain(typeof body.companyDomain === "string" ? body.companyDomain : undefined) ||
     normalizeDomain(companyUrl)
+  const normalizedCompanyUrl = companyUrl || (companyDomain ? `https://${companyDomain}` : "")
   const linkedinUrl     = typeof body.linkedinUrl     === "string" ? body.linkedinUrl.trim()     : undefined
   const knowledgeBaseMd = typeof body.knowledgeBaseMd === "string" ? body.knowledgeBaseMd.trim() : undefined
 
-  if (!founderName || !companyName || !companyUrl) {
-    return NextResponse.json({ error: "founderName, companyName, companyUrl required" }, { status: 400 })
+  if (!founderName || !companyName) {
+    return NextResponse.json({ error: "founderName and companyName are required" }, { status: 400 })
+  }
+
+  if (!normalizedCompanyUrl) {
+    return NextResponse.json(
+      { error: "Provide either a website URL or a valid startup domain." },
+      { status: 400 },
+    )
   }
 
   if (!companyDomain) {
     return NextResponse.json({ error: "A valid startup domain is required (e.g. basis.com)." }, { status: 400 })
-  }
-
-  if (!urlMatchesDomain(companyUrl, companyDomain)) {
-    return NextResponse.json(
-      { error: "Company URL must match the startup domain you entered." },
-      { status: 400 },
-    )
   }
 
   try {
@@ -86,11 +78,20 @@ export async function POST(req: Request) {
 
     if (knowledgeBaseMd) {
       const { synthesizeFromKnowledgeBase } = await import("@/lib/seed-account/synthesizer")
-      synthesis = await synthesizeFromKnowledgeBase({ founderName, companyName, companyUrl, knowledgeBaseMd })
+      synthesis = await synthesizeFromKnowledgeBase({
+        founderName,
+        companyName,
+        companyUrl: normalizedCompanyUrl,
+        knowledgeBaseMd,
+      })
     } else {
       const bundle = await researchFounder({
         targetEmail: "preview@placeholder.com",
-        founderName, companyName, companyUrl, companyDomain, linkedinUrl,
+        founderName,
+        companyName,
+        companyUrl: normalizedCompanyUrl,
+        companyDomain,
+        linkedinUrl,
       })
       synthesis = await synthesizeFromResearch(bundle)
     }

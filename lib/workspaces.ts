@@ -67,9 +67,15 @@ function slugifyWorkspaceName(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
+    .slice(0, 50)
 
-  return slug || "workspace"
+  const base = slug || "workspace"
+  if (base.length >= 3) return base
+  return `ws-${base}`.slice(0, 50)
+}
+
+export function isValidWorkspaceSlug(slug: string): boolean {
+  return slug.length >= 3 && slug.length <= 50 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
 }
 
 function mapWorkspaceRow(row: Record<string, unknown>): WorkspaceRecord {
@@ -214,6 +220,53 @@ export async function getWorkspaceRecordByIdForOwner(
 
   if (error && error.code !== "PGRST116") {
     console.error("[workspaces] getWorkspaceRecordByIdForOwner:", error.message)
+    return null
+  }
+
+  return data ? mapWorkspaceRow(data as unknown as Record<string, unknown>) : null
+}
+
+export async function getWorkspaceRecordBySlugForOwner(
+  ownerUserId: string,
+  slug: string,
+  organizationId?: string | null,
+): Promise<WorkspaceRecord | null> {
+  const normalizedSlug = normalizeOptionalText(slug)?.toLowerCase() ?? null
+  if (!normalizedSlug) return null
+
+  let query = supabaseAdmin
+    .from("client_workspaces")
+    .select(WORKSPACE_SELECT_WITH_ORG)
+    .eq("slug", normalizedSlug)
+    .eq("owner_user_id", ownerUserId)
+
+  const scopedOrganizationId = normalizeOptionalText(organizationId)
+  if (scopedOrganizationId) {
+    query = query.eq("organization_id", scopedOrganizationId)
+  }
+
+  const { data, error } = await query.maybeSingle()
+
+  if (isMissingOrganizationColumnError(error)) {
+    const { data: legacyData, error: legacyError } = await supabaseAdmin
+      .from("client_workspaces")
+      .select(WORKSPACE_SELECT_BASE)
+      .eq("slug", normalizedSlug)
+      .eq("owner_user_id", ownerUserId)
+      .maybeSingle()
+
+    if (legacyError && legacyError.code !== "PGRST116") {
+      console.error("[workspaces] getWorkspaceRecordBySlugForOwner (legacy):", legacyError.message)
+      return null
+    }
+
+    return legacyData
+      ? mapWorkspaceRow(legacyData as unknown as Record<string, unknown>)
+      : null
+  }
+
+  if (error && error.code !== "PGRST116") {
+    console.error("[workspaces] getWorkspaceRecordBySlugForOwner:", error.message)
     return null
   }
 

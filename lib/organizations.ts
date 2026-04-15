@@ -27,11 +27,11 @@ function normalizeSlugInput(value: string): string {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
+    .slice(0, 50)
 }
 
 function isValidCustomSlug(slug: string): boolean {
-  return slug.length >= 3 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+  return slug.length >= 3 && slug.length <= 50 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
 }
 
 function slugifyName(value: string): string {
@@ -39,7 +39,7 @@ function slugifyName(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
+    .slice(0, 50)
 
   return slug || "team"
 }
@@ -186,7 +186,7 @@ export async function ensurePersonalOrganization(
 
   if (requestedSlug && !isValidCustomSlug(requestedSlug)) {
     throw new Error(
-      "Organization slug must be 3-48 chars, lowercase letters/numbers, and optional single hyphens.",
+      "Organization slug must be 3-50 chars, lowercase letters/numbers, and optional single hyphens.",
     )
   }
 

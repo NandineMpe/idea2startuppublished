@@ -13,7 +13,7 @@
  *   founderName: string        // full name
  *   companyName: string        // company name
  *   companyUrl: string         // https://...
- *   companyDomain: string      // e.g. basis.com (must match companyUrl host)
+ *   companyDomain: string      // e.g. basis.com (can differ from companyUrl host)
  *   organizationSlug: string   // startup account slug (unique)
  *   organizationName?: string  // optional display label (defaults to companyName)
  *   confirmStandalone: true    // explicit safety gate
@@ -62,20 +62,11 @@ function normalizeSlug(value: string | undefined): string {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
+    .slice(0, 50)
 }
 
 function slugLooksValid(value: string): boolean {
-  return value.length >= 3 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
-}
-
-function urlMatchesDomain(urlValue: string, domain: string): boolean {
-  try {
-    const host = normalizeDomain(new URL(urlValue).hostname)
-    return host === domain || host.endsWith(`.${domain}`)
-  } catch {
-    return false
-  }
+  return value.length >= 3 && value.length <= 50 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
 }
 
 // ─── admin guard ──────────────────────────────────────────────────────────────
@@ -127,12 +118,20 @@ export async function POST(req: Request) {
   const companyDomain =
     normalizeDomain(typeof body.companyDomain === "string" ? body.companyDomain : undefined) ||
     normalizeDomain(companyUrl)
+  const normalizedCompanyUrl = companyUrl || (companyDomain ? `https://${companyDomain}` : "")
   // Pre-built context doc — skips Exa research + LLM synthesis entirely
   const knowledgeBaseMd  = typeof body.knowledgeBaseMd  === "string" ? body.knowledgeBaseMd.trim()  : undefined
 
-  if (!targetEmail || !founderName || !companyName || !companyUrl) {
+  if (!targetEmail || !founderName || !companyName) {
     return NextResponse.json(
-      { error: "targetEmail, founderName, companyName, companyUrl are required" },
+      { error: "targetEmail, founderName, and companyName are required" },
+      { status: 400 },
+    )
+  }
+
+  if (!normalizedCompanyUrl) {
+    return NextResponse.json(
+      { error: "Provide either a website URL or a valid startup domain." },
       { status: 400 },
     )
   }
@@ -144,18 +143,11 @@ export async function POST(req: Request) {
     )
   }
 
-  if (!urlMatchesDomain(companyUrl, companyDomain)) {
-    return NextResponse.json(
-      { error: "Company URL must match the startup domain you entered." },
-      { status: 400 },
-    )
-  }
-
   if (organizationSlug && !slugLooksValid(organizationSlug)) {
     return NextResponse.json(
       {
         error:
-          "Organization slug must be 3-48 chars, lowercase letters/numbers, and optional single hyphens.",
+          "Organization slug must be 3-50 chars, lowercase letters/numbers, and optional single hyphens.",
       },
       { status: 400 },
     )
@@ -194,19 +186,36 @@ export async function POST(req: Request) {
       // ── Fast path: pre-built context doc supplied — extract structure from it ──
       const { synthesizeFromKnowledgeBase } = await import("@/lib/seed-account/synthesizer")
       synthesis = await synthesizeFromKnowledgeBase({
-        founderName, companyName, companyUrl, knowledgeBaseMd,
+        founderName,
+        companyName,
+        companyUrl: normalizedCompanyUrl,
+        knowledgeBaseMd,
       })
     } else {
       // ── Full path: Exa research + LLM synthesis ──
       const bundle = await researchFounder({
-        targetEmail, founderName, companyName, companyUrl, companyDomain, linkedinUrl, twitterUrl,
+        targetEmail,
+        founderName,
+        companyName,
+        companyUrl: normalizedCompanyUrl,
+        companyDomain,
+        linkedinUrl,
+        twitterUrl,
       })
       synthesis = await synthesizeFromResearch(bundle)
     }
 
     // 3. Seed DB
     const seedResult = await seedFounderAccount(
-      { targetEmail, founderName, companyName, companyUrl, companyDomain, linkedinUrl, twitterUrl },
+      {
+        targetEmail,
+        founderName,
+        companyName,
+        companyUrl: normalizedCompanyUrl,
+        companyDomain,
+        linkedinUrl,
+        twitterUrl,
+      },
       synthesis,
       auth.userId,
       { organizationSlug: organizationSlug || undefined, organizationName, companyDomain },
@@ -269,6 +278,26 @@ export async function POST(req: Request) {
 
 // ─── GET: list all seeded invites ─────────────────────────────────────────────
 
+type InviteStatus = "seeded" | "claimed" | "trial" | "active" | "expired"
+
+function inferInviteStatus(params: {
+  claimedAt: string | null
+  seededAt: string
+  billingStatus?: string | null
+}): InviteStatus {
+  if (!params.claimedAt) {
+    const seededAtMs = Date.parse(params.seededAt)
+    if (Number.isFinite(seededAtMs) && Date.now() - seededAtMs > 30 * 24 * 60 * 60 * 1000) {
+      return "expired"
+    }
+    return "seeded"
+  }
+
+  if (params.billingStatus === "on_trial") return "trial"
+  if (params.billingStatus === "active" || params.billingStatus === "paid") return "active"
+  return "claimed"
+}
+
 export async function GET() {
   const auth = await requireAdmin()
   if ("error" in auth) return auth.error
@@ -276,14 +305,117 @@ export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("seeded_invites")
     .select(
-      "id, target_email, target_name, target_company, seeded_at, email_sent_at, claimed_at, email_preview, token, organization_id",
+      "id, user_id, target_email, target_name, target_company, seeded_at, email_sent_at, claimed_at, email_preview, token, organization_id",
     )
     .order("seeded_at", { ascending: false })
-    .limit(100)
+    .limit(200)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ invites: data ?? [] })
+  const invites = data ?? []
+
+  const organizationIds = [
+    ...new Set(
+      invites
+        .map((invite) => (typeof invite.organization_id === "string" ? invite.organization_id : null))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ]
+
+  const userIds = [
+    ...new Set(
+      invites
+        .map((invite) => (typeof invite.user_id === "string" ? invite.user_id : null))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ]
+
+  const [organizationRows, billingRows] = await Promise.all([
+    organizationIds.length > 0
+      ? supabaseAdmin
+          .from("organizations")
+          .select("id, slug, display_name")
+          .in("id", organizationIds)
+      : Promise.resolve({ data: [], error: null }),
+    userIds.length > 0
+      ? supabaseAdmin.from("billing_accounts").select("user_id, status").in("user_id", userIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  const organizationById = new Map<string, { slug: string | null; name: string | null }>()
+  for (const row of organizationRows.data ?? []) {
+    organizationById.set(String(row.id), {
+      slug: typeof row.slug === "string" ? row.slug : null,
+      name: typeof row.display_name === "string" ? row.display_name : null,
+    })
+  }
+
+  const billingByUserId = new Map<string, string | null>()
+  for (const row of billingRows.data ?? []) {
+    billingByUserId.set(String(row.user_id), typeof row.status === "string" ? row.status : null)
+  }
+
+  const appUrl = resolveAppUrl()
+  const enrichedInvites = invites.map((invite) => {
+    const organizationId =
+      typeof invite.organization_id === "string" && invite.organization_id.trim()
+        ? invite.organization_id
+        : null
+    const userId = typeof invite.user_id === "string" ? invite.user_id : null
+    const organization = organizationId ? organizationById.get(organizationId) : undefined
+    const token =
+      typeof invite.token === "string" && invite.token.trim() ? invite.token.trim() : null
+
+    return {
+      ...invite,
+      status: inferInviteStatus({
+        claimedAt: typeof invite.claimed_at === "string" ? invite.claimed_at : null,
+        seededAt: String(invite.seeded_at ?? ""),
+        billingStatus: userId ? billingByUserId.get(userId) ?? null : null,
+      }),
+      organization_slug: organization?.slug ?? null,
+      organization_name: organization?.name ?? null,
+      claim_url: token ? `${appUrl}/claim/${encodeURIComponent(token)}` : null,
+    }
+  })
+
+  return NextResponse.json({ invites: enrichedInvites })
+}
+
+export async function DELETE(request: Request) {
+  const auth = await requireAdmin()
+  if ("error" in auth) return auth.error
+
+  const url = new URL(request.url)
+  const inviteId = url.searchParams.get("id")?.trim() ?? ""
+  if (!inviteId) {
+    return NextResponse.json({ error: "Invite id is required." }, { status: 400 })
+  }
+
+  const { data: invite, error: inviteError } = await supabaseAdmin
+    .from("seeded_invites")
+    .select("id, claimed_at")
+    .eq("id", inviteId)
+    .maybeSingle()
+
+  if (inviteError || !invite) {
+    return NextResponse.json({ error: "Invite not found." }, { status: 404 })
+  }
+
+  if (invite.claimed_at) {
+    return NextResponse.json({ error: "Claimed invites cannot be deleted." }, { status: 409 })
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from("seeded_invites")
+    .delete()
+    .eq("id", inviteId)
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true })
 }

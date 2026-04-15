@@ -252,6 +252,16 @@ export function WorkspaceManager() {
                           Open intake
                         </Button>
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            window.open(`/${workspace.slug}/dashboard`, "_blank", "noopener,noreferrer")
+                          }
+                        >
+                          <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                          Open dashboard
+                        </Button>
+                        <Button
                           size="sm"
                           onClick={() => void handleSelect(workspace.id)}
                           disabled={selectingId === workspace.id}

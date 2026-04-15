@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Loader2, Send, CheckCircle2, AlertCircle,
-  ExternalLink, Clock, Users, Search, ChevronDown, ChevronUp,
+  ExternalLink, Users, Search, ChevronDown, ChevronUp,
   FileText, Upload, X,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -62,6 +62,8 @@ interface SeedResult {
 interface SeededInvite {
   id: string
   organization_id?: string | null
+  organization_slug?: string | null
+  organization_name?: string | null
   target_email: string
   target_name: string
   target_company: string
@@ -69,6 +71,8 @@ interface SeededInvite {
   email_sent_at: string | null
   claimed_at: string | null
   token: string | null
+  claim_url?: string | null
+  status?: "seeded" | "claimed" | "trial" | "active" | "expired"
 }
 
 function normalizeDomain(value: string): string {
@@ -90,11 +94,11 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
+    .slice(0, 50)
 }
 
 function slugLooksValid(value: string): boolean {
-  return value.length >= 3 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
+  return value.length >= 3 && value.length <= 50 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -263,6 +267,10 @@ function SeedForm() {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!/\.md$/i.test(file.name)) {
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      return
+    }
     const reader = new FileReader()
     reader.onload = (ev) => {
       const text = ev.target?.result as string
@@ -292,7 +300,7 @@ function SeedForm() {
   const normalizedSlug = slugify(form.organizationSlug)
   const slugError =
     normalizedSlug && !slugLooksValid(normalizedSlug)
-      ? "Slug must be 3-48 chars: lowercase letters, numbers, single hyphens."
+      ? "Slug must be 3-50 chars: lowercase letters, numbers, single hyphens."
       : null
   const domainValidationActive = domainTouched || Boolean(form.companyDomain) || Boolean(form.companyUrl)
   const domainError =
@@ -446,7 +454,7 @@ function SeedForm() {
           >
             <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
             <div>
-              <p className="text-sm text-muted-foreground">Upload <span className="font-mono">.md</span> or <span className="font-mono">.txt</span> context file</p>
+              <p className="text-sm text-muted-foreground">Upload a <span className="font-mono">.md</span> context file</p>
               <p className="text-xs text-muted-foreground/60 mt-0.5">If you have a pre-written founder context doc, upload it here</p>
             </div>
           </button>
@@ -464,7 +472,7 @@ function SeedForm() {
             </button>
           </div>
         )}
-        <input ref={fileInputRef} type="file" accept=".md,.markdown,.txt" className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" accept=".md" className="hidden" onChange={handleFileChange} />
       </div>
 
       {/* Step 1 button */}
@@ -628,52 +636,166 @@ function SeedForm() {
 function InviteLog() {
   const [invites, setInvites] = useState<SeededInvite[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch("/api/admin/seed-account", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d: { invites?: SeededInvite[] }) => { setInvites(d.invites ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
+  const statusLabel: Record<NonNullable<SeededInvite["status"]>, string> = {
+    seeded: "Seeded",
+    claimed: "Claimed",
+    trial: "Trial",
+    active: "Active",
+    expired: "Expired",
+  }
+
+  const statusClassName: Record<NonNullable<SeededInvite["status"]>, string> = {
+    seeded: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    claimed: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    trial: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    expired: "bg-muted text-muted-foreground",
+  }
+
+  const loadInvites = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/admin/seed-account", { credentials: "include" })
+      const data = (await response.json().catch(() => ({}))) as { invites?: SeededInvite[] }
+      setInvites(data.invites ?? [])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  if (loading) return <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
-  if (invites.length === 0) return <p className="text-sm text-muted-foreground py-4">No seeded accounts yet.</p>
+  useEffect(() => {
+    void loadInvites()
+  }, [loadInvites])
+
+  async function handleDelete(inviteId: string) {
+    setDeletingId(inviteId)
+    try {
+      const response = await fetch(`/api/admin/seed-account?id=${encodeURIComponent(inviteId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      if (response.ok) {
+        await loadInvites()
+      }
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function handleCopy(text: string | null | undefined) {
+    if (!text) return
+    await navigator.clipboard.writeText(text)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (invites.length === 0) {
+    return <p className="text-sm text-muted-foreground py-4">No seeded accounts yet.</p>
+  }
 
   return (
-    <div className="space-y-2">
-      {invites.map((inv) => (
-        <div key={inv.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/10 px-4 py-3 text-sm">
-          <div className="min-w-0">
-            <p className="font-medium text-foreground truncate">{inv.target_name} — {inv.target_company}</p>
-            <p className="text-muted-foreground text-xs truncate">{inv.target_email}</p>
-          </div>
-          <div className="shrink-0 ml-4 flex items-center gap-2">
-            {inv.claimed_at ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                <CheckCircle2 className="h-3 w-3" /> Claimed
-              </span>
-            ) : inv.email_sent_at ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                <Send className="h-3 w-3" /> Emailed
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                <Clock className="h-3 w-3" /> Seeded
-              </span>
-            )}
-            {inv.token && (
-              <a
-                href={`/admin/preview/${inv.token}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
-              >
-                Preview
-              </a>
-            )}
-          </div>
-        </div>
-      ))}
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="min-w-full text-sm">
+        <thead className="bg-muted/20">
+          <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <th className="px-3 py-2">Company</th>
+            <th className="px-3 py-2">Slug</th>
+            <th className="px-3 py-2">Status</th>
+            <th className="px-3 py-2">Claim link</th>
+            <th className="px-3 py-2">Seeded</th>
+            <th className="px-3 py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invites.map((inv) => {
+            const status = inv.status ?? (inv.claimed_at ? "claimed" : "seeded")
+            const claimUrl = inv.claim_url ?? (inv.token ? `/claim/${inv.token}` : null)
+
+            return (
+              <tr key={inv.id} className="border-t border-border align-top">
+                <td className="px-3 py-3">
+                  <p className="font-medium text-foreground">{inv.target_company || inv.organization_name || "Unknown company"}</p>
+                  <p className="text-xs text-muted-foreground">{inv.target_name} | {inv.target_email}</p>
+                </td>
+                <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{inv.organization_slug || "-"}</td>
+                <td className="px-3 py-3">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusClassName[status]}`}>
+                    {statusLabel[status]}
+                  </span>
+                </td>
+                <td className="px-3 py-3">
+                  {claimUrl ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleCopy(claimUrl)}
+                        className="text-xs text-primary underline underline-offset-2"
+                      >
+                        Copy link
+                      </button>
+                      <a
+                        href={claimUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground underline underline-offset-2"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
+                </td>
+                <td className="px-3 py-3 text-xs text-muted-foreground">
+                  {new Date(inv.seeded_at).toLocaleString()}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {inv.token && (
+                      <a
+                        href={`/admin/preview/${inv.token}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground underline underline-offset-2"
+                      >
+                        Preview
+                      </a>
+                    )}
+                    {inv.organization_slug && (
+                      <a
+                        href={`/${inv.organization_slug}/dashboard`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground underline underline-offset-2"
+                      >
+                        View workspace
+                      </a>
+                    )}
+                    {!inv.claimed_at && (
+                      <button
+                        type="button"
+                        disabled={deletingId === inv.id}
+                        onClick={() => void handleDelete(inv.id)}
+                        className="text-xs text-destructive underline underline-offset-2 disabled:opacity-60"
+                      >
+                        {deletingId === inv.id ? "Deleting..." : "Delete"}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

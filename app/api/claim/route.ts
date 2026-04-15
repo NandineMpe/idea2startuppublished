@@ -107,6 +107,20 @@ export async function POST(req: Request) {
     typeof invite.organization_id === "string" && invite.organization_id.trim()
       ? invite.organization_id
       : null
+  let organizationSlug: string | null = null
+
+  if (organizationId) {
+    const { data: organization } = await supabaseAdmin
+      .from("organizations")
+      .select("slug")
+      .eq("id", organizationId)
+      .maybeSingle()
+
+    organizationSlug =
+      typeof organization?.slug === "string" && organization.slug.trim()
+        ? organization.slug.trim()
+        : null
+  }
 
   // Set password + confirm the user via admin API
   const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
@@ -127,7 +141,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    redirect: "/dashboard",
+    redirect: organizationSlug ? `/${organizationSlug}/dashboard` : "/dashboard",
     email: String(invite.target_email ?? ""),
     organizationId,
   })
