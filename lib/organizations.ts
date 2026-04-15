@@ -21,6 +21,19 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
   return trimmed ? trimmed : null
 }
 
+function normalizeSlugInput(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+}
+
+function isValidCustomSlug(slug: string): boolean {
+  return slug.length >= 3 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+}
+
 function slugifyName(value: string): string {
   const slug = value
     .toLowerCase()
@@ -160,7 +173,23 @@ export async function getOrganizationByIdForUser(
 /**
  * Ensures the user has a personal organization (for legacy accounts and new signups).
  */
-export async function ensurePersonalOrganization(userId: string): Promise<OrganizationRecord> {
+export async function ensurePersonalOrganization(
+  userId: string,
+  options: {
+    displayName?: string | null
+    requestedSlug?: string | null
+  } = {},
+): Promise<OrganizationRecord> {
+  const requestedName = normalizeOptionalText(options.displayName)
+  const requestedSlugRaw = normalizeOptionalText(options.requestedSlug)
+  const requestedSlug = requestedSlugRaw ? normalizeSlugInput(requestedSlugRaw) : null
+
+  if (requestedSlug && !isValidCustomSlug(requestedSlug)) {
+    throw new Error(
+      "Organization slug must be 3-48 chars, lowercase letters/numbers, and optional single hyphens.",
+    )
+  }
+
   const { data: existing, error: findErr } = await supabaseAdmin
     .from("organizations")
     .select("id, slug, display_name, is_personal, created_at")
@@ -169,15 +198,45 @@ export async function ensurePersonalOrganization(userId: string): Promise<Organi
     .maybeSingle()
 
   if (!findErr && existing) {
-    return mapOrgRow(existing as unknown as Record<string, unknown>)
+    const existingRow = existing as unknown as Record<string, unknown>
+    const existingSlug = String(existingRow.slug ?? "")
+    const existingName = String(existingRow.display_name ?? "")
+
+    const patch: Record<string, unknown> = {}
+    if (requestedName && requestedName !== existingName) {
+      patch.display_name = requestedName
+    }
+    if (requestedSlug && requestedSlug !== existingSlug) {
+      patch.slug = requestedSlug
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return mapOrgRow(existingRow)
+    }
+
+    const { data: updated, error: updateErr } = await supabaseAdmin
+      .from("organizations")
+      .update(patch)
+      .eq("id", String(existingRow.id))
+      .select("id, slug, display_name, is_personal, created_at")
+      .single()
+
+    if (updateErr || !updated) {
+      if (requestedSlug && /duplicate|unique|organizations_slug_key/i.test(updateErr?.message ?? "")) {
+        throw new Error(`Organization slug "${requestedSlug}" is already taken.`)
+      }
+      throw new Error(updateErr?.message || "Failed to update personal organization")
+    }
+
+    return mapOrgRow(updated as unknown as Record<string, unknown>)
   }
 
-  const slug = `u-${userId.replace(/-/g, "")}`
+  const slug = requestedSlug ?? `u-${userId.replace(/-/g, "")}`
   const { data: created, error: insErr } = await supabaseAdmin
     .from("organizations")
     .insert({
       slug,
-      display_name: "Personal",
+      display_name: requestedName ?? "Personal",
       is_personal: true,
       created_by_user_id: userId,
     })
@@ -185,6 +244,10 @@ export async function ensurePersonalOrganization(userId: string): Promise<Organi
     .single()
 
   if (insErr || !created) {
+    if (requestedSlug && /duplicate|unique|organizations_slug_key/i.test(insErr?.message ?? "")) {
+      throw new Error(`Organization slug "${requestedSlug}" is already taken.`)
+    }
+
     const { data: retry } = await supabaseAdmin
       .from("organizations")
       .select("id, slug, display_name, is_personal, created_at")

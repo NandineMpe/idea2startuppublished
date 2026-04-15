@@ -21,6 +21,7 @@ export interface ResearchInput {
   founderName: string
   companyName: string
   companyUrl: string
+  companyDomain?: string
   linkedinUrl?: string
   twitterUrl?: string
 }
@@ -42,6 +43,18 @@ function getExa(): Exa {
   const key = process.env.EXA_API?.trim() || process.env.EXA_API_KEY?.trim()
   if (!key) throw new Error("EXA_API_KEY is not set")
   return new Exa(key)
+}
+
+function normalizeDomain(value: string | undefined): string {
+  const raw = (value ?? "").trim().toLowerCase()
+  if (!raw) return ""
+
+  const withoutProtocol = raw.replace(/^https?:\/\//, "")
+  const hostOnly = withoutProtocol.split("/")[0]?.trim() ?? ""
+  const cleaned = hostOnly.replace(/^www\./, "").replace(/:\d+$/, "")
+  if (!cleaned) return ""
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned)) return ""
+  return cleaned
 }
 
 /** Pull text from a URL via Exa's contents endpoint. Returns "" on failure. */
@@ -77,7 +90,15 @@ async function searchAndFetch(
 
 export async function researchFounder(input: ResearchInput): Promise<ResearchBundle> {
   const exa = getExa()
-  const { founderName, companyName, companyUrl, linkedinUrl, twitterUrl } = input
+  const { founderName, companyName, companyUrl, companyDomain, linkedinUrl, twitterUrl } = input
+  const domain = normalizeDomain(companyDomain)
+    || (() => {
+      try {
+        return normalizeDomain(new URL(companyUrl).hostname)
+      } catch {
+        return ""
+      }
+    })()
 
   // Run all fetches in parallel — total wall time ~10-15s
   const [
@@ -92,7 +113,8 @@ export async function researchFounder(input: ResearchInput): Promise<ResearchBun
     // 1. Company website — crawl up to 8 pages rooted at their domain
     (async (): Promise<string[]> => {
       try {
-        const res = await exa.searchAndContents(`site:${new URL(companyUrl).hostname}`, {
+        const query = domain ? `site:${domain}` : companyUrl
+        const res = await exa.searchAndContents(query, {
           numResults: 8,
           text: { maxCharacters: 4000 },
           type: "keyword",

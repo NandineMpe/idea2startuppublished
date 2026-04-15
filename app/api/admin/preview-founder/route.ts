@@ -16,6 +16,27 @@ import { synthesizeFromResearch } from "@/lib/seed-account/synthesizer"
 export const maxDuration = 120
 export const dynamic = "force-dynamic"
 
+function normalizeDomain(value: string | undefined): string {
+  const raw = (value ?? "").trim().toLowerCase()
+  if (!raw) return ""
+
+  const withoutProtocol = raw.replace(/^https?:\/\//, "")
+  const hostOnly = withoutProtocol.split("/")[0]?.trim() ?? ""
+  const cleaned = hostOnly.replace(/^www\./, "").replace(/:\d+$/, "")
+  if (!cleaned) return ""
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned)) return ""
+  return cleaned
+}
+
+function urlMatchesDomain(urlValue: string, domain: string): boolean {
+  try {
+    const host = normalizeDomain(new URL(urlValue).hostname)
+    return host === domain || host.endsWith(`.${domain}`)
+  } catch {
+    return false
+  }
+}
+
 async function requireAdmin(): Promise<{ userId: string } | { error: NextResponse }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,11 +60,25 @@ export async function POST(req: Request) {
   const founderName     = typeof body.founderName     === "string" ? body.founderName.trim()     : ""
   const companyName     = typeof body.companyName     === "string" ? body.companyName.trim()     : ""
   const companyUrl      = typeof body.companyUrl      === "string" ? body.companyUrl.trim()      : ""
+  const companyDomain   =
+    normalizeDomain(typeof body.companyDomain === "string" ? body.companyDomain : undefined) ||
+    normalizeDomain(companyUrl)
   const linkedinUrl     = typeof body.linkedinUrl     === "string" ? body.linkedinUrl.trim()     : undefined
   const knowledgeBaseMd = typeof body.knowledgeBaseMd === "string" ? body.knowledgeBaseMd.trim() : undefined
 
   if (!founderName || !companyName || !companyUrl) {
     return NextResponse.json({ error: "founderName, companyName, companyUrl required" }, { status: 400 })
+  }
+
+  if (!companyDomain) {
+    return NextResponse.json({ error: "A valid startup domain is required (e.g. basis.com)." }, { status: 400 })
+  }
+
+  if (!urlMatchesDomain(companyUrl, companyDomain)) {
+    return NextResponse.json(
+      { error: "Company URL must match the startup domain you entered." },
+      { status: 400 },
+    )
   }
 
   try {
@@ -55,7 +90,7 @@ export async function POST(req: Request) {
     } else {
       const bundle = await researchFounder({
         targetEmail: "preview@placeholder.com",
-        founderName, companyName, companyUrl, linkedinUrl,
+        founderName, companyName, companyUrl, companyDomain, linkedinUrl,
       })
       synthesis = await synthesizeFromResearch(bundle)
     }

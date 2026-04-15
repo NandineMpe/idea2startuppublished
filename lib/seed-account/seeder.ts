@@ -22,8 +22,16 @@ import type { SynthesisResult } from "./synthesizer"
 export interface SeedResult {
   userId: string
   organizationId: string
+  organizationSlug: string
+  organizationName: string
   claimToken: string
   seededInviteId: string
+}
+
+interface SeedTenantOptions {
+  organizationSlug?: string
+  organizationName?: string
+  companyDomain?: string
 }
 
 // ─── claim token ──────────────────────────────────────────────────────────────
@@ -36,6 +44,7 @@ function generateClaimToken(): string {
 
 async function preRunOutputs(
   userId: string,
+  organizationId: string,
   profile: SynthesisResult["profile"],
   knowledgeBase: string,
 ): Promise<void> {
@@ -99,7 +108,11 @@ Context:\n${contextBlock}`,
           user_id: userId,
           tool,
           title,
-          inputs: { seeded: true, company: profile.company_name },
+          inputs: {
+            seeded: true,
+            company: profile.company_name,
+            organization_id: organizationId,
+          },
           output: text.trim(),
         })
       } catch (err) {
@@ -116,6 +129,7 @@ export async function seedFounderAccount(
   input: ResearchInput,
   synthesis: SynthesisResult,
   seededByUserId: string,
+  tenantOptions: SeedTenantOptions = {},
 ): Promise<SeedResult> {
   const { profile, emailPreview } = synthesis
 
@@ -137,8 +151,12 @@ export async function seedFounderAccount(
 
   const userId = authData.user.id
 
-  // 2. Ensure personal organization
-  const org = await ensurePersonalOrganization(userId)
+  // 2. Ensure a personal tenant for this founder and brand it to their startup.
+  const orgDisplayName = tenantOptions.organizationName?.trim() || profile.company_name || input.companyName
+  const org = await ensurePersonalOrganization(userId, {
+    displayName: orgDisplayName,
+    requestedSlug: tenantOptions.organizationSlug,
+  })
 
   // 3. Upsert company_profile
   const profileRow = {
@@ -176,37 +194,75 @@ export async function seedFounderAccount(
     vault_context_file_count: 12, // signals richness in the UI
   }
 
-  const { error: profileErr } = await supabaseAdmin
-    .from("company_profile")
-    .upsert(profileRow, { onConflict: "user_id" })
+  let profileErr: { message: string } | null = null
+  {
+    const { error } = await supabaseAdmin
+      .from("company_profile")
+      .upsert(profileRow, { onConflict: "organization_id" })
+    profileErr = error ? { message: error.message } : null
+  }
+
+  // Backward-compatible fallback for environments that still enforce legacy unique(user_id).
+  if (profileErr && /no unique|on conflict/i.test(profileErr.message)) {
+    const { error: legacyError } = await supabaseAdmin
+      .from("company_profile")
+      .upsert(profileRow, { onConflict: "user_id" })
+    profileErr = legacyError ? { message: legacyError.message } : null
+  }
 
   if (profileErr) {
     console.error("[seeder] company_profile upsert failed:", profileErr.message)
-    // non-fatal — user still exists, partial data is better than nothing
+    throw new Error(`Failed to save company profile: ${profileErr.message}`)
   }
 
   // 5. Pre-run ai_outputs
-  await preRunOutputs(userId, profile, profile.knowledge_base_md)
+  await preRunOutputs(userId, org.id, profile, profile.knowledge_base_md)
 
   // 6. Generate claim token + store in seeded_invites
   const claimToken = generateClaimToken()
 
-  const { data: invite, error: inviteErr } = await supabaseAdmin
-    .from("seeded_invites")
-    .insert({
-      user_id: userId,
-      target_email: input.targetEmail,
-      target_name: profile.founder_name || input.founderName,
-      target_company: profile.company_name,
-      target_url: input.companyUrl,
-      target_linkedin: input.linkedinUrl ?? null,
-      token: claimToken,
-      seeded_by: seededByUserId,
-      email_preview: emailPreview,
-      seed_data: { profile, research_sources: Object.keys(synthesis) },
-    })
-    .select("id")
-    .single()
+  const invitePayload = {
+    user_id: userId,
+    target_email: input.targetEmail,
+    target_name: profile.founder_name || input.founderName,
+    target_company: profile.company_name,
+    target_url: input.companyUrl,
+    target_linkedin: input.linkedinUrl ?? null,
+    organization_id: org.id,
+    token: claimToken,
+    seeded_by: seededByUserId,
+    email_preview: emailPreview,
+    seed_data: {
+      profile,
+      company_domain: tenantOptions.companyDomain ?? null,
+      organization_slug: org.slug,
+      research_sources: Object.keys(synthesis),
+    },
+  }
+
+  let invite: { id: string } | null = null
+  let inviteErr: { message: string } | null = null
+  {
+    const { data, error } = await supabaseAdmin
+      .from("seeded_invites")
+      .insert(invitePayload)
+      .select("id")
+      .single()
+    invite = data
+    inviteErr = error ? { message: error.message } : null
+  }
+
+  // Backward-compatible fallback for environments that have not applied the new column yet.
+  if (inviteErr && /organization_id/i.test(inviteErr.message)) {
+    const { organization_id: _orgId, ...legacyPayload } = invitePayload
+    const { data, error } = await supabaseAdmin
+      .from("seeded_invites")
+      .insert(legacyPayload)
+      .select("id")
+      .single()
+    invite = data
+    inviteErr = error ? { message: error.message } : null
+  }
 
   if (inviteErr || !invite) {
     throw new Error(`Failed to create seeded_invite: ${inviteErr?.message}`)
@@ -215,8 +271,9 @@ export async function seedFounderAccount(
   return {
     userId,
     organizationId: org.id,
+    organizationSlug: org.slug,
+    organizationName: org.displayName,
     claimToken,
     seededInviteId: invite.id,
   }
 }
-

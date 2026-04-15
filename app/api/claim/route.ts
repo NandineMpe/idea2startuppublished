@@ -64,11 +64,31 @@ export async function POST(req: Request) {
   }
 
   // Fetch invite
-  const { data: invite, error: inviteErr } = await supabaseAdmin
-    .from("seeded_invites")
-    .select("id, user_id, target_email, claimed_at, seeded_at")
-    .eq("token", token)
-    .maybeSingle()
+  const inviteSelect = "id, user_id, target_email, claimed_at, seeded_at, organization_id"
+  const legacyInviteSelect = "id, user_id, target_email, claimed_at, seeded_at"
+
+  let invite: Record<string, unknown> | null = null
+  let inviteErr: { message: string } | null = null
+  {
+    const primary = await supabaseAdmin
+      .from("seeded_invites")
+      .select(inviteSelect)
+      .eq("token", token)
+      .maybeSingle()
+
+    if (primary.error && /organization_id/i.test(primary.error.message)) {
+      const fallback = await supabaseAdmin
+        .from("seeded_invites")
+        .select(legacyInviteSelect)
+        .eq("token", token)
+        .maybeSingle()
+      invite = (fallback.data as Record<string, unknown> | null) ?? null
+      inviteErr = fallback.error ? { message: fallback.error.message } : null
+    } else {
+      invite = (primary.data as Record<string, unknown> | null) ?? null
+      inviteErr = primary.error ? { message: primary.error.message } : null
+    }
+  }
 
   if (inviteErr || !invite) {
     return NextResponse.json({ error: "Invalid token" }, { status: 404 })
@@ -82,7 +102,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invite expired", expired: true }, { status: 410 })
   }
 
-  const userId = invite.user_id as string
+  const userId = String(invite.user_id ?? "")
+  const organizationId =
+    typeof invite.organization_id === "string" && invite.organization_id.trim()
+      ? invite.organization_id
+      : null
 
   // Set password + confirm the user via admin API
   const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
@@ -99,18 +123,12 @@ export async function POST(req: Request) {
   await supabaseAdmin
     .from("seeded_invites")
     .update({ claimed_at: new Date().toISOString() })
-    .eq("id", invite.id)
+    .eq("id", String(invite.id ?? ""))
 
-  // Sign in the user so they land in the dashboard already authenticated
-  const { data: session, error: signInErr } = await supabaseAdmin.auth.admin.generateLink({
-    type: "magiclink",
-    email: invite.target_email as string,
+  return NextResponse.json({
+    ok: true,
+    redirect: "/dashboard",
+    email: String(invite.target_email ?? ""),
+    organizationId,
   })
-
-  if (signInErr || !session?.properties?.action_link) {
-    // Fallback: tell client to redirect to /login — they have a password now
-    return NextResponse.json({ ok: true, redirect: "/login?claimed=1" })
-  }
-
-  return NextResponse.json({ ok: true, redirect: "/dashboard" , magicLink: session.properties.action_link })
 }

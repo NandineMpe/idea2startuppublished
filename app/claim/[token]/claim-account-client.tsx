@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Loader2, Sparkles, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { createClient } from "@/lib/supabase/client"
 
 type Preview = {
   email: string
@@ -20,6 +21,7 @@ type Preview = {
 export function ClaimAccountClient({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
   const router = useRouter()
+  const [supabase] = useState(() => createClient())
 
   const [preview, setPreview]       = useState<Preview | null>(null)
   const [loadError, setLoadError]   = useState<string | null>(null)
@@ -32,6 +34,8 @@ export function ClaimAccountClient({ params }: { params: Promise<{ token: string
   useEffect(() => {
     let cancelled = false
     async function load() {
+      // Prevent session confusion if admin/founder claim links are opened while already signed in.
+      await supabase.auth.signOut().catch(() => undefined)
       const res = await fetch(`/api/claim?token=${encodeURIComponent(token)}`)
       const data = await res.json() as { error?: string } & Partial<Preview>
       if (cancelled) return
@@ -45,7 +49,7 @@ export function ClaimAccountClient({ params }: { params: Promise<{ token: string
     }
     load()
     return () => { cancelled = true }
-  }, [token])
+  }, [token, supabase])
 
   const claim = useCallback(async () => {
     if (password.length < 8) { setClaimError("Password must be at least 8 characters"); return }
@@ -57,7 +61,13 @@ export function ClaimAccountClient({ params }: { params: Promise<{ token: string
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, password }),
     })
-    const data = await res.json() as { ok?: boolean; redirect?: string; magicLink?: string; error?: string }
+    const data = await res.json() as {
+      ok?: boolean
+      redirect?: string
+      email?: string
+      organizationId?: string | null
+      error?: string
+    }
 
     if (!res.ok) {
       setClaimError(data.error || "Something went wrong. Try again.")
@@ -65,14 +75,32 @@ export function ClaimAccountClient({ params }: { params: Promise<{ token: string
       return
     }
 
-    // If we got a magic link, use it to sign in directly then redirect
-    if (data.magicLink) {
-      window.location.href = data.magicLink
+    const email = data.email ?? preview?.email
+    if (!email) {
+      setClaimError("Account activated, but we could not determine the login email.")
+      setClaiming(false)
       return
     }
 
-    router.push(data.redirect ?? "/dashboard")
-  }, [token, password, router])
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    if (signInError) {
+      setClaimError("Account activated, but automatic sign-in failed. Please sign in manually.")
+      setClaiming(false)
+      return
+    }
+
+    if (data.organizationId) {
+      await fetch("/api/organizations/active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ organizationId: data.organizationId }),
+      }).catch(() => undefined)
+    }
+
+    router.replace(data.redirect ?? "/dashboard")
+    router.refresh()
+  }, [token, password, router, preview?.email, supabase])
 
   // ── loading ────────────────────────────────────────────────────────────────
 

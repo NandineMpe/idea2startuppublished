@@ -46,7 +46,10 @@ interface FounderPreview {
 
 interface SeedResult {
   claimUrl: string
+  previewUrl?: string | null
   emailSent: boolean
+  organizationSlug?: string
+  organizationName?: string
   profile: {
     company: string
     stage: string
@@ -58,6 +61,7 @@ interface SeedResult {
 
 interface SeededInvite {
   id: string
+  organization_id?: string | null
   target_email: string
   target_name: string
   target_company: string
@@ -65,6 +69,32 @@ interface SeededInvite {
   email_sent_at: string | null
   claimed_at: string | null
   token: string | null
+}
+
+function normalizeDomain(value: string): string {
+  const raw = value.trim().toLowerCase()
+  if (!raw) return ""
+
+  const withoutProtocol = raw.replace(/^https?:\/\//, "")
+  const hostOnly = withoutProtocol.split("/")[0]?.trim() ?? ""
+  const cleaned = hostOnly.replace(/^www\./, "").replace(/:\d+$/, "")
+  if (!cleaned) return ""
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(cleaned)) return ""
+  return cleaned
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+}
+
+function slugLooksValid(value: string): boolean {
+  return value.length >= 3 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -203,8 +233,26 @@ function PreviewCard({ preview }: { preview: FounderPreview }) {
 function SeedForm() {
   const [form, setForm] = useState({
     targetEmail: "", founderName: "", companyName: "",
-    companyUrl: "", linkedinUrl: "", sendEmail: true,
+    companyUrl: "", companyDomain: "", organizationSlug: "",
+    linkedinUrl: "", sendEmail: true, confirmStandalone: false, autoOpenPreview: true,
   })
+  const [domainTouched, setDomainTouched] = useState(false)
+  const [slugTouched, setSlugTouched] = useState(false)
+
+  useEffect(() => {
+    if (domainTouched) return
+    const inferred = normalizeDomain(form.companyUrl)
+    if (!inferred) return
+    setForm((prev) => (prev.companyDomain === inferred ? prev : { ...prev, companyDomain: inferred }))
+  }, [form.companyUrl, form.companyDomain, domainTouched])
+
+  useEffect(() => {
+    if (slugTouched) return
+    const base = form.companyName || form.companyDomain
+    const inferred = slugify(base)
+    if (!inferred) return
+    setForm((prev) => (prev.organizationSlug === inferred ? prev : { ...prev, organizationSlug: inferred }))
+  }, [form.companyName, form.companyDomain, form.organizationSlug, slugTouched])
 
   // Context doc upload (skips Exa research when provided)
   const fileInputRef                          = useRef<HTMLInputElement>(null)
@@ -240,8 +288,28 @@ function SeedForm() {
   const [seedResult, setSeedResult]       = useState<SeedResult | null>(null)
   const [seedError, setSeedError]         = useState<string | null>(null)
 
-  const canPreview = form.founderName && form.companyName && form.companyUrl
-  const canSeed    = preview && form.targetEmail && seedStatus !== "running"
+  const normalizedDomain = normalizeDomain(form.companyDomain)
+  const normalizedSlug = slugify(form.organizationSlug)
+  const slugError =
+    normalizedSlug && !slugLooksValid(normalizedSlug)
+      ? "Slug must be 3-48 chars: lowercase letters, numbers, single hyphens."
+      : null
+  const domainValidationActive = domainTouched || Boolean(form.companyDomain) || Boolean(form.companyUrl)
+  const domainError =
+    domainValidationActive && !normalizedDomain
+      ? "Enter a valid startup domain (e.g. basis.com)."
+      : null
+
+  const canPreview = Boolean(form.founderName && form.companyName && form.companyUrl && normalizedDomain)
+  const canSeed = Boolean(
+    preview &&
+    form.targetEmail &&
+    normalizedDomain &&
+    normalizedSlug &&
+    !slugError &&
+    form.confirmStandalone &&
+    seedStatus !== "running",
+  )
 
   // ── step 1: preview ────────────────────────────────────────────────────────
   const runPreview = useCallback(async () => {
@@ -260,6 +328,7 @@ function SeedForm() {
           founderName:      form.founderName,
           companyName:      form.companyName,
           companyUrl:       form.companyUrl,
+          companyDomain:    normalizedDomain,
           linkedinUrl:      form.linkedinUrl || undefined,
           ...(knowledgeBaseMd ? { knowledgeBaseMd } : {}),
         }),
@@ -272,7 +341,7 @@ function SeedForm() {
       setPreviewStatus("error")
       setPreviewError(e instanceof Error ? e.message : "Network error")
     }
-  }, [form])
+  }, [form, knowledgeBaseMd, normalizedDomain])
 
   // ── step 2: seed ───────────────────────────────────────────────────────────
   const runSeed = useCallback(async () => {
@@ -280,22 +349,51 @@ function SeedForm() {
     setSeedResult(null)
     setSeedError(null)
 
+    const previewTab = form.autoOpenPreview ? window.open("about:blank", "_blank", "noopener,noreferrer") : null
+
     try {
       const res = await fetch("/api/admin/seed-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ ...form, ...(knowledgeBaseMd ? { knowledgeBaseMd } : {}) }),
+        body: JSON.stringify({
+          ...form,
+          companyDomain: normalizedDomain,
+          organizationSlug: normalizedSlug,
+          confirmStandalone: form.confirmStandalone,
+          ...(knowledgeBaseMd ? { knowledgeBaseMd } : {}),
+        }),
       })
       const data = await res.json() as { ok?: boolean; error?: string } & Partial<SeedResult>
-      if (!res.ok) { setSeedStatus("error"); setSeedError(data.error ?? "Seed failed"); return }
-      setSeedResult({ claimUrl: data.claimUrl!, emailSent: data.emailSent ?? false, profile: data.profile! })
+      if (!res.ok) {
+        if (previewTab) previewTab.close()
+        setSeedStatus("error")
+        setSeedError(data.error ?? "Seed failed")
+        return
+      }
+      const nextResult: SeedResult = {
+        claimUrl: data.claimUrl!,
+        previewUrl: data.previewUrl ?? null,
+        emailSent: data.emailSent ?? false,
+        organizationSlug: data.organizationSlug ?? normalizedSlug,
+        organizationName: data.organizationName ?? form.companyName,
+        profile: data.profile!,
+      }
+      if (previewTab && nextResult.previewUrl) {
+        previewTab.location.href = nextResult.previewUrl
+      } else if (previewTab) {
+        previewTab.close()
+      } else if (form.autoOpenPreview && nextResult.previewUrl) {
+        window.open(nextResult.previewUrl, "_blank", "noopener,noreferrer")
+      }
+      setSeedResult(nextResult)
       setSeedStatus("done")
     } catch (e: unknown) {
+      if (previewTab) previewTab.close()
       setSeedStatus("error")
       setSeedError(e instanceof Error ? e.message : "Network error")
     }
-  }, [form])
+  }, [form, knowledgeBaseMd, normalizedDomain, normalizedSlug])
 
   return (
     <div className="space-y-6">
@@ -305,8 +403,35 @@ function SeedForm() {
         <Field label="Founder name"    value={form.founderName}  onChange={(v) => setForm(f => ({...f, founderName: v}))}  placeholder="Sarah Chen" disabled={previewStatus === "running"} />
         <Field label="Company"         value={form.companyName}  onChange={(v) => setForm(f => ({...f, companyName: v}))}  placeholder="Basis" disabled={previewStatus === "running"} />
         <Field label="Website"         value={form.companyUrl}   onChange={(v) => setForm(f => ({...f, companyUrl: v}))}   placeholder="https://basis.com" type="url" disabled={previewStatus === "running"} />
+        <Field
+          label="Target startup domain"
+          value={form.companyDomain}
+          onChange={(v) => {
+            setDomainTouched(true)
+            setForm((f) => ({ ...f, companyDomain: v }))
+          }}
+          placeholder="basis.com"
+          disabled={previewStatus === "running"}
+        />
+        <Field
+          label="Account slug"
+          value={form.organizationSlug}
+          onChange={(v) => {
+            setSlugTouched(true)
+            setForm((f) => ({ ...f, organizationSlug: v }))
+          }}
+          placeholder="basis"
+          disabled={previewStatus === "running"}
+        />
         <Field label="LinkedIn (optional)" value={form.linkedinUrl} onChange={(v) => setForm(f => ({...f, linkedinUrl: v}))} placeholder="https://linkedin.com/in/..." type="url" disabled={previewStatus === "running"} />
       </div>
+
+      {(domainError || slugError) && (
+        <div className="space-y-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {domainError && <p>{domainError}</p>}
+          {slugError && <p>{slugError}</p>}
+        </div>
+      )}
 
       {/* Context doc upload — skips Exa research entirely */}
       <div className="space-y-2">
@@ -379,6 +504,18 @@ function SeedForm() {
               disabled={seedStatus === "running"}
             />
 
+            <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Standalone tenant plan</p>
+              <p className="text-sm text-foreground/90">
+                Create isolated account <span className="font-mono">{normalizedSlug || "startup-slug"}</span> for{" "}
+                <span className="font-medium">{form.companyName || "target startup"}</span>, scoped to{" "}
+                <span className="font-mono">{normalizedDomain || "domain.com"}</span>.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This creates a separate founder tenant and claim link, not attached to your current company context.
+              </p>
+            </div>
+
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -391,6 +528,34 @@ function SeedForm() {
                 <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${form.sendEmail ? "translate-x-4" : "translate-x-0"}`} />
               </button>
               <span className="text-sm text-muted-foreground">Send "If I was your agent" email via AgentMail</span>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-md border border-border bg-background/70 px-3 py-2">
+              <input
+                id="confirm-standalone"
+                type="checkbox"
+                checked={form.confirmStandalone}
+                onChange={(e) => setForm((f) => ({ ...f, confirmStandalone: e.target.checked }))}
+                className="mt-1 h-4 w-4 rounded border-border bg-transparent"
+                disabled={seedStatus === "running"}
+              />
+              <label htmlFor="confirm-standalone" className="text-sm text-foreground/90 leading-relaxed">
+                I confirm this should create a standalone startup tenant with isolated data/context.
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.autoOpenPreview}
+                onClick={() => setForm((f) => ({ ...f, autoOpenPreview: !f.autoOpenPreview }))}
+                disabled={seedStatus === "running"}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${form.autoOpenPreview ? "bg-primary" : "bg-muted"}`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${form.autoOpenPreview ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+              <span className="text-sm text-muted-foreground">Auto-open seeded dashboard preview after successful seed</span>
             </div>
 
             <Button
@@ -415,6 +580,11 @@ function SeedForm() {
                   <CheckCircle2 className="h-4 w-4" />
                   Account seeded — {seedResult.emailSent ? "email sent via AgentMail" : "no email sent"}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Tenant:{" "}
+                  <span className="font-mono text-foreground">{seedResult.organizationSlug || normalizedSlug}</span>
+                  {seedResult.organizationName ? ` · ${seedResult.organizationName}` : ""}
+                </p>
                 <div className="flex items-center gap-3 text-sm">
                   <a href={seedResult.claimUrl} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-primary underline underline-offset-4 hover:text-primary/80">
@@ -425,6 +595,25 @@ function SeedForm() {
                     Copy
                   </button>
                 </div>
+                {seedResult.previewUrl && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <a
+                      href={seedResult.previewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-primary underline underline-offset-4 hover:text-primary/80"
+                    >
+                      Open seeded dashboard preview <ExternalLink className="h-3 w-3" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(seedResult.previewUrl ?? "")}
+                      className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
