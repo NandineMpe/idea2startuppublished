@@ -112,7 +112,7 @@ Produce a thorough research brief for this task.`
       model: qwenModel(),
       system: mergeSystemWithWritingRules(system),
       prompt,
-      maxTokens: 3000,
+      maxOutputTokens: 3000,
       temperature: 0.3,
     })
 
@@ -185,7 +185,7 @@ export const todoResearch = inngest.createFunction(
       ? [
           context.profile.name ? `Company: ${context.profile.name}` : "",
           context.profile.problem ? `Problem: ${context.profile.problem}` : "",
-          context.profile.targetCustomer ? `ICP: ${context.profile.targetCustomer}` : "",
+          context.extracted?.keywords?.length ? `Keywords: ${context.extracted.keywords.slice(0, 8).join(", ")}` : "",
         ]
           .filter(Boolean)
           .join("\n")
