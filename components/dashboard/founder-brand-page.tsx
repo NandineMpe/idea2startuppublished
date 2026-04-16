@@ -1176,44 +1176,23 @@ export function FounderBrandPageContent() {
   }
 
   return (
-    <div className="space-y-8 max-w-[1100px] mx-auto">
+    <div className="space-y-6 max-w-[1100px] mx-auto">
       {/* Header */}
       <div className="flex flex-col gap-1">
         <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Founder brand</p>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pitch deck</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Founder brand</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Your investor and customer pitch in editorial format. Edit each slide directly, or generate all slides from your saved company context.
+          Daily AI strategic review, plus your pitch deck, public presence workflow, and brand notes.
         </p>
       </div>
 
-      {generateError && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          {generateError}
-        </div>
-      )}
-
-      {/* Pitch deck */}
-      <div className="space-y-4">
-        {deckLoaded ? (
-          <PitchDeckCarousel
-            deck={deck}
-            onUpdateSlide={updateSlide}
-            onUpdateHeader={updateHeader}
-            onGenerateFromContext={generateFromContext}
-            generating={generating}
-          />
-        ) : (
-          <Skeleton className="h-[min(72vh,760px)] w-full rounded-[2rem]" />
-        )}
-      </div>
-
-      {/* All original tabs */}
-      <div className="border-t border-border pt-8">
-        <Tabs defaultValue="strategicReview">
-          <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
+      <Tabs defaultValue="strategicReview">
+        <TabsList className="mb-1 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
             <TabsTrigger value="strategicReview" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
               Strategic Review
+            </TabsTrigger>
+            <TabsTrigger value="pitchDeck" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Pitch Deck
             </TabsTrigger>
             <TabsTrigger value="pitchNotes" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
               Pitch Notes
@@ -1234,6 +1213,31 @@ export function FounderBrandPageContent() {
               Design Docs
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="pitchDeck" className="mt-4 focus-visible:outline-none">
+            <div className="space-y-4">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Your investor and customer pitch in editorial format. Edit each slide directly, or generate all slides from your saved company context.
+              </p>
+              {generateError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {generateError}
+                </div>
+              )}
+              {deckLoaded ? (
+                <PitchDeckCarousel
+                  deck={deck}
+                  onUpdateSlide={updateSlide}
+                  onUpdateHeader={updateHeader}
+                  onGenerateFromContext={generateFromContext}
+                  generating={generating}
+                />
+              ) : (
+                <Skeleton className="h-[min(72vh,760px)] w-full rounded-[2rem]" />
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="strategicReview" className="mt-4 focus-visible:outline-none">
             <div className="max-w-[900px]">
@@ -1318,8 +1322,7 @@ export function FounderBrandPageContent() {
             </div>
           </TabsContent>
 
-        </Tabs>
-      </div>
+      </Tabs>
     </div>
   )
 }
