@@ -10,7 +10,6 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  Palette,
   Sparkles,
   Upload,
   Share2,
@@ -37,12 +36,9 @@ import {
   type TemplateVars,
 } from "@/lib/distribution"
 import { useToast } from "@/hooks/use-toast"
-import { BrandingPage } from "@/components/dashboard/branding-page"
 import { ContentCalendarPage } from "@/components/dashboard/content-calendar-page"
 import { GtmMotionPanel } from "@/components/dashboard/gtm-motion-panel"
 import { ReadersDigestPanel } from "@/components/dashboard/readers-digest-panel"
-import { GtmChannelsPanel } from "@/components/dashboard/gtm-channels-panel"
-import { GtmPricingPanel } from "@/components/dashboard/gtm-pricing-panel"
 import { authClient } from "@/lib/better-auth-client"
 import { loadGtmHubState, saveGtmHubState, type GtmHubState } from "@/lib/gtm-hub"
 
@@ -103,8 +99,8 @@ export function DistributionPage() {
   })
 
   const formHydrated = useRef(false)
-  /** Top-level GTM facet (lookalike, motion, reader's digest, channels, pricing, branding, content calendar). */
-  const [facetTab, setFacetTab] = useState("lookalike")
+  /** Top-level GTM facet (motion, reader's digest, content calendar). Lookalike hidden until LinkedIn is connected. */
+  const [facetTab, setFacetTab] = useState("motion")
   const [mainTab, setMainTab] = useState("profile")
   const [gtmHub, setGtmHub] = useState<GtmHubState | null>(null)
 
@@ -166,7 +162,7 @@ export function DistributionPage() {
         title: "Apollo import merged",
         description: `${detail.length} contacts with personalized outreach — review them on Matches.`,
       })
-      setFacetTab("lookalike")
+      setFacetTab("motion")
       setMainTab("matches")
     }
     window.addEventListener("junoDistributionApolloMatches", onApollo)
@@ -431,12 +427,6 @@ export function DistributionPage() {
       <Tabs value={facetTab} onValueChange={setFacetTab} className="w-full">
         <TabsList className="mb-2 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
           <TabsTrigger
-            value="lookalike"
-            className="rounded-md px-4 py-2 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            Lookalike engine
-          </TabsTrigger>
-          <TabsTrigger
             value="motion"
             className="rounded-md px-4 py-2 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm"
           >
@@ -449,27 +439,6 @@ export function DistributionPage() {
             <span className="inline-flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5 opacity-70" />
               Reader's Digest
-            </span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="channels"
-            className="rounded-md px-4 py-2 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            GTM channels
-          </TabsTrigger>
-          <TabsTrigger
-            value="pricing-model"
-            className="rounded-md px-4 py-2 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            Pricing model
-          </TabsTrigger>
-          <TabsTrigger
-            value="branding"
-            className="rounded-md px-4 py-2 text-[13px] data-[state=active]:bg-background data-[state=active]:shadow-sm"
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Palette className="h-3.5 w-3.5 opacity-70" />
-              Branding
             </span>
           </TabsTrigger>
           <TabsTrigger
@@ -489,26 +458,6 @@ export function DistributionPage() {
 
         <TabsContent value="readers-digest" className="mt-4 focus-visible:outline-none">
           <ReadersDigestPanel />
-        </TabsContent>
-
-        <TabsContent value="channels" className="mt-4 focus-visible:outline-none">
-          <GtmChannelsPanel
-            channelMix={gtmHub.channelMix}
-            motionStrategy={gtmHub.motionStrategy}
-            onChannelMixChange={(channelMix) => setGtmHub((h) => ({ ...h, channelMix }))}
-            onMotionStrategyChange={(motionStrategy) => setGtmHub((h) => ({ ...h, motionStrategy }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="pricing-model" className="mt-4 focus-visible:outline-none">
-          <GtmPricingPanel
-            pricing={gtmHub.pricing}
-            onChange={(pricing) => setGtmHub((h) => ({ ...h, pricing }))}
-          />
-        </TabsContent>
-
-        <TabsContent value="branding" className="mt-4 focus-visible:outline-none">
-          <BrandingPage embedded />
         </TabsContent>
 
         <TabsContent value="content-calendar" className="mt-4 focus-visible:outline-none">

@@ -70,7 +70,7 @@ ${context.promptBlock}
 ITEMS TO ANALYSE:
 ${JSON.stringify(itemSummaries, null, 2)}
 
-Return ONLY a JSON array. Each object MUST include \`index\` (number, matching the item's index in ITEMS TO ANALYSE) plus:
+Return ONLY a JSON array. Each object MUST include \`index\` (number, matching the item's index in ITEMS TO ANALYSE) and \`title\` (string, copied exactly from the item's title field) plus:
 
 1. relevanceScore (0-10): How much does this SPECIFICALLY affect this founder?
    - 9-10: Directly about a named competitor, threatens/validates our thesis, or changes our market
@@ -163,6 +163,7 @@ CRITICAL RULES:
 
     const scored: Array<{
       index: number
+      title?: string
       relevanceScore: number
       urgency: string
       category: string
@@ -172,9 +173,20 @@ CRITICAL RULES:
       connectionToRoadmap?: string | null
     }> = JSON.parse(jsonMatch[0])
 
+    // Build a title-keyed lookup so a wrong `index` from the LLM can be
+    // recovered by matching on title (which the LLM also echoes back).
+    const byTitle = new Map<string, RawItem>()
+    for (const item of items) {
+      byTitle.set(item.title.trim().toLowerCase(), item)
+    }
+
     return scored
       .map((s) => {
-        const original = items[s.index]
+        let original = items[s.index]
+        // If the LLM returned a bad index, fall back to title matching.
+        if (!original && typeof s.title === "string") {
+          original = byTitle.get(s.title.trim().toLowerCase()) ?? (undefined as unknown as RawItem)
+        }
         if (!original) return null
         const urgency = VALID_URGENCY.has(s.urgency as ScoredItem["urgency"])
           ? (s.urgency as ScoredItem["urgency"])
