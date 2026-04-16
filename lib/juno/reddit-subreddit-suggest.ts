@@ -697,7 +697,7 @@ Prefer communities where real buyers discuss workflow pain, vendor comparisons, 
         "Reply with one JSON array only. No prose before or after. Keep reasons practical.",
       ),
       messages: [{ role: "user", content: user }],
-      maxOutputTokens: 1500,
+      maxOutputTokens: 2500,
       abortSignal: AbortSignal.timeout(90_000),
     })
 
@@ -715,7 +715,7 @@ Prefer communities where real buyers discuss workflow pain, vendor comparisons, 
       out.push({
         name: name.toLowerCase(),
         reason: reason || "Suggested from company context.",
-        score: 65,
+        score: 75,
         source: "llm",
       })
     }
