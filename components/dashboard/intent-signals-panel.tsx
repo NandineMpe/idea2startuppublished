@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns"
-import { Bookmark, Check, Copy, ExternalLink, Flame, Loader2, MessageCircle, Play, X } from "lucide-react"
+import { Bookmark, Check, Copy, ExternalLink, Flame, Loader2, MessageCircle, Play, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -386,6 +386,18 @@ export function IntentSignalsPanel() {
     await updateSignal(id, { status: "irrelevant" })
   }
 
+  async function deleteSignal(id: string) {
+    setActionId(id)
+    try {
+      const res = await fetch(`/api/intelligence/intent-signals/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setRows((prev) => prev.filter((r) => r.id !== id))
+      }
+    } finally {
+      setActionId(null)
+    }
+  }
+
   async function setScoreFeedback(id: string, value: "too_high" | "ok" | "too_low" | null) {
     await updateSignal(id, { score_feedback: value })
   }
@@ -766,6 +778,18 @@ export function IntentSignalsPanel() {
                     Not relevant
                   </Button>
                 )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto text-muted-foreground hover:text-destructive"
+                  disabled={actionId === row.id}
+                  title="Permanently delete this thread"
+                  onClick={() => void deleteSignal(row.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </article>
           )

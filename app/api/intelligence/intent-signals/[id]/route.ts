@@ -105,3 +105,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { error } = await supabase
+      .from("intent_signals")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id)
+
+    if (error) {
+      return jsonApiError(500, error, "intent-signals DELETE")
+    }
+
+    return NextResponse.json({ deleted: true })
+  } catch (e) {
+    console.error("intent-signals DELETE:", e)
+    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+  }
+}
