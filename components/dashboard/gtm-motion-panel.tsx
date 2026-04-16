@@ -367,10 +367,6 @@ export function GtmMotionPanel() {
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Outreach queue
           </p>
-          <p className="text-sm text-muted-foreground">
-            {"Jack & Jill"} leads (7+ ICP) → TheOrg org chart + AI drafts. Copy and send from your inbox; in-app
-            sending uses the configured provider.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
