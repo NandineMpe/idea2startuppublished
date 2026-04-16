@@ -15,7 +15,10 @@ import {
   Target,
   TrendingUp,
   Clock,
+  FileText,
+  Coffee,
 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -1015,6 +1018,94 @@ function CeoReviewPanel() {
   )
 }
 
+// ─── Design Docs panel ───────────────────────────────────────────
+
+type DesignDocSummary = {
+  id: string
+  mode: string
+  title: string
+  doc_data: { theAssignment?: string; recommendedApproach?: string }
+  status: string
+  created_at: string
+}
+
+function DesignDocsPanel() {
+  const [docs, setDocs] = useState<DesignDocSummary[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/office-hours/design-doc?all=true")
+      .then((r) => r.json())
+      .then((data: { docs?: DesignDocSummary[] }) => setDocs(data.docs ?? []))
+      .catch(() => setDocs([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
+      </div>
+    )
+  }
+
+  if (docs.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-12 text-center">
+        <Coffee className="h-6 w-6 text-muted-foreground" />
+        <div>
+          <p className="font-medium text-foreground">No design docs yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">Complete an Office Hours session to generate your first.</p>
+        </div>
+        <Link href="/dashboard/office-hours">
+          <Button variant="outline" size="sm">
+            <FileText className="mr-2 h-3.5 w-3.5" />
+            Start Office Hours →
+          </Button>
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {docs.map((doc) => (
+        <Card key={doc.id} className="border-border">
+          <CardContent className="py-4">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-[13px] font-medium text-foreground">{doc.title}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    doc.mode === "builder"
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                  }`}>
+                    {doc.mode === "builder" ? "🛠 Builder" : "🔬 Startup"}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {new Date(doc.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <Link href="/dashboard/office-hours">
+                <Button variant="ghost" size="sm" className="h-7 text-[12px]">View →</Button>
+              </Link>
+            </div>
+            {doc.doc_data.theAssignment && (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/40 dark:bg-amber-900/10">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Assignment</p>
+                <p className="mt-0.5 text-[12px] text-foreground">{doc.doc_data.theAssignment}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────
 
 export function FounderBrandPageContent() {
@@ -1117,74 +1208,116 @@ export function FounderBrandPageContent() {
         )}
       </div>
 
-      {/* Secondary tabs */}
+      {/* All original tabs */}
       <div className="border-t border-border pt-8">
         <Tabs defaultValue="strategicReview">
           <TabsList className="mb-4 flex h-auto w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/40 p-1">
-            <TabsTrigger value="strategicReview" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="strategicReview" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
               Strategic Review
             </TabsTrigger>
-            <TabsTrigger value="publicPresence" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="pitchNotes" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Pitch Notes
+            </TabsTrigger>
+            <TabsTrigger value="brandStrategy" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Brand Strategy
+            </TabsTrigger>
+            <TabsTrigger value="publicPresence" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
               Public Presence
             </TabsTrigger>
-            <TabsTrigger value="brandNotes" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              Brand Notes
+            <TabsTrigger value="credibility" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Credibility & Proof
+            </TabsTrigger>
+            <TabsTrigger value="location" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Founder Location
+            </TabsTrigger>
+            <TabsTrigger value="designDocs" className="rounded-md px-3 py-2 text-[12px] data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-[13px]">
+              Design Docs
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="strategicReview" className="focus-visible:outline-none">
+          <TabsContent value="strategicReview" className="mt-4 focus-visible:outline-none">
             <div className="max-w-[900px]">
               <CeoReviewPanel />
             </div>
           </TabsContent>
 
-          <TabsContent value="publicPresence" className="focus-visible:outline-none">
+          <TabsContent value="pitchNotes" className="mt-4 focus-visible:outline-none">
+            <div className="max-w-[900px] space-y-3">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Your own pitch notes — elevator pitch, one-liners, investor and customer versions. These feed into the deck above.
+              </p>
+              <Textarea
+                value={founderState.pitchArticulation ?? ""}
+                onChange={(e) => setFounderState((prev) => ({ ...prev, pitchArticulation: e.target.value }))}
+                placeholder={"30-second version…\n\nOne sentence you want repeated…\n\nHow you differ from the obvious alternative…"}
+                rows={14}
+                className="min-h-[280px] resize-y text-[13px] leading-relaxed"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="brandStrategy" className="mt-4 focus-visible:outline-none">
+            <div className="max-w-[900px] space-y-3">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                How you will build and reinforce your founder brand over time — themes, campaigns, partnerships, and what you will not do.
+              </p>
+              <Textarea
+                value={founderState.brandStrategies ?? ""}
+                onChange={(e) => setFounderState((prev) => ({ ...prev, brandStrategies: e.target.value }))}
+                placeholder={"North-star theme for the next 6–12 months…\n\nContent pillars or narratives…\n\nRisks to avoid (tone, topics, over-promising)…"}
+                rows={14}
+                className="min-h-[280px] resize-y text-[13px] leading-relaxed"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="publicPresence" className="mt-4 focus-visible:outline-none">
             <div className="max-w-[900px]">
               <FounderPublicPresencePanel
-                hint="Intelligence feed, your scheduled topics, then other channels: LinkedIn, talks, newsletter, podcast."
-                placeholder="Primary channels and rough cadence…"
+                hint="Intelligence feed, your scheduled topics (with links and media), then other channels: LinkedIn, talks, newsletter, podcast."
+                placeholder="Primary channels and rough cadence (e.g. LinkedIn 2×/week)…"
                 data={founderState}
                 setData={setFounderState}
               />
             </div>
           </TabsContent>
 
-          <TabsContent value="brandNotes" className="focus-visible:outline-none">
-            <div className="max-w-[900px] space-y-6">
-              {(["pitchArticulation", "brandStrategies", "credibilityProof"] as const).map((key) => {
-                const labels: Record<string, string> = {
-                  pitchArticulation: "Pitch notes",
-                  brandStrategies: "Brand strategy",
-                  credibilityProof: "Credibility & proof",
-                }
-                const hints: Record<string, string> = {
-                  pitchArticulation: "Your raw pitch notes — elevator pitch, one-liners, investor and customer versions.",
-                  brandStrategies: "How you will build and reinforce your founder brand over time.",
-                  credibilityProof: "Why people should listen — background, wins, logos, metrics, third-party validation.",
-                }
-                const placeholders: Record<string, string> = {
-                  pitchArticulation: "30-second version…\n\nOne sentence you want repeated…\n\nHow you differ…",
-                  brandStrategies: "North-star theme for the next 6–12 months…\n\nContent pillars…",
-                  credibilityProof: "2–3 proof points you want front and center…\n\nBio line for profiles and decks…",
-                }
-                return (
-                  <div key={key} className="space-y-2">
-                    <div>
-                      <p className="text-[13px] font-medium text-foreground">{labels[key]}</p>
-                      <p className="text-[12px] text-muted-foreground mt-0.5">{hints[key]}</p>
-                    </div>
-                    <Textarea
-                      value={founderState[key] ?? ""}
-                      onChange={(e) => setFounderState((prev) => ({ ...prev, [key]: e.target.value }))}
-                      placeholder={placeholders[key]}
-                      rows={6}
-                      className="resize-y text-[13px] leading-relaxed"
-                    />
-                  </div>
-                )
-              })}
+          <TabsContent value="credibility" className="mt-4 focus-visible:outline-none">
+            <div className="max-w-[900px] space-y-3">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Why people should listen — background, wins, logos, metrics, and third-party validation. Short beats CV-length.
+              </p>
+              <Textarea
+                value={founderState.credibilityProof ?? ""}
+                onChange={(e) => setFounderState((prev) => ({ ...prev, credibilityProof: e.target.value }))}
+                placeholder={"2–3 proof points you want front and center…\n\nBio line for profiles and decks…\n\nSocial proof (customers, press, investors) you can name…"}
+                rows={14}
+                className="min-h-[280px] resize-y text-[13px] leading-relaxed"
+              />
             </div>
           </TabsContent>
+
+          <TabsContent value="location" className="mt-4 focus-visible:outline-none">
+            <div className="max-w-[900px] space-y-3">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                Where you are based, time zones you work in, and markets you care about — useful for scheduling, travel, and local credibility.
+              </p>
+              <Textarea
+                value={founderState.founderLocation ?? ""}
+                onChange={(e) => setFounderState((prev) => ({ ...prev, founderLocation: e.target.value }))}
+                placeholder={"City / region / country…\n\nTime zone(s) and typical working hours…\n\nMarkets you sell into or visit regularly…"}
+                rows={14}
+                className="min-h-[280px] resize-y text-[13px] leading-relaxed"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="designDocs" className="mt-4 focus-visible:outline-none">
+            <div className="max-w-[900px]">
+              <DesignDocsPanel />
+            </div>
+          </TabsContent>
+
         </Tabs>
       </div>
     </div>
