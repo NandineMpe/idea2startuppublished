@@ -237,7 +237,7 @@ export function IntentSignalsPanel() {
       (b.relevance_score ?? 0) - (a.relevance_score ?? 0)
 
     if (statusFilter === "new") {
-      return [...rows.filter((row) => row.status === "new")].sort(byRelevanceDesc)
+      return [...rows.filter((row) => row.status === "new" && (row.relevance_score ?? 0) >= 5)].sort(byRelevanceDesc)
     }
     if (statusFilter === "hot") {
       return [...rows.filter((row) => row.status === "new" && (row.relevance_score ?? 0) >= 8)].sort(byRelevanceDesc)
