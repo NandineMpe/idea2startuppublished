@@ -5,11 +5,20 @@ import { insertContentCalendarRow } from "@/lib/content-calendar"
 import { saveContentToDB } from "@/lib/juno/delivery"
 import {
   dedupeByUrl,
-  filterToLast24Hours,
   scrapeArxiv,
   scrapeCTOSources,
   scrapeHackerNews,
 } from "@/lib/juno/scrapers"
+import type { RawItem } from "@/lib/juno/scrapers"
+
+const MS_72H = 72 * 60 * 60 * 1000
+function filterToLast72Hours(items: RawItem[]): RawItem[] {
+  const min = Date.now() - MS_72H
+  return items.filter((item) => {
+    const t = Date.parse(item.publishedAt)
+    return !Number.isNaN(t) && t >= min
+  })
+}
 import type { RawItem } from "@/lib/juno/types"
 
 function toTechItems(items: RawItem[]): Array<{ title: string; source: string; description: string }> {
@@ -59,7 +68,10 @@ export const techRadar = inngest.createFunction(
         step.run(`hn-${i}`, () => scrapeHackerNews([...baseKw, "AI", "LLM", "typescript", "nextjs"])),
       ])
 
-      const allTech = filterToLast24Hours(dedupeByUrl([...ctoItems, ...arxiv, ...hn]))
+      const deduped = dedupeByUrl([...ctoItems, ...arxiv, ...hn])
+      const filtered72h = filterToLast72Hours(deduped)
+      // Fall back to the most recent scraped items if nothing passes the date filter
+      const allTech = filtered72h.length > 0 ? filtered72h : deduped.slice(0, 20)
       if (allTech.length === 0) continue
 
       const analysis = await step.run(`analyze-${i}`, () =>
