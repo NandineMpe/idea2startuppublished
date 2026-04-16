@@ -3,12 +3,12 @@ import { jsonApiError, logApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { inngest } from "@/lib/inngest/client"
 import { resolveOrganizationSelection } from "@/lib/organizations"
-import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 const PIPELINE_EVENTS: Record<string, string> = {
   cbs: "juno/brief.requested",
   cro: "juno/jobs.scan.requested",
   intent: "juno/intent.scan.requested",
+  cto: "juno/tech.radar.requested",
 }
 
 export async function POST(req: Request) {
@@ -21,19 +21,10 @@ export async function POST(req: Request) {
     }
 
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const workspace = await resolveWorkspaceSelection(user.id, { useCookieWorkspace: true })
-    if (workspace) {
-      return NextResponse.json(
-        {
-          error:
-            "A client workspace is active. To avoid contaminating your owner/company history, switch to your company scope before running this pipeline.",
-        },
-        { status: 409 },
-      )
-    }
 
     const body = (await req.json().catch(() => ({}))) as { pipeline?: string }
     const pipeline = typeof body.pipeline === "string" ? body.pipeline : ""
@@ -56,25 +47,8 @@ export async function POST(req: Request) {
       )
     }
 
-    // Check company profile exists — brief will be skipped if not
-    if (pipeline === "cbs") {
-      const { data: profile } = organization
-        ? await supabase
-            .from("company_profile")
-            .select("company_name")
-            .eq("organization_id", organization.id)
-            .maybeSingle()
-        : { data: null }
-
-      if (!profile?.company_name) {
-        return NextResponse.json(
-          { error: "No company profile found. Fill in My Context → Company & Founder first." },
-          { status: 422 },
-        )
-      }
-    }
-
-    if (pipeline === "intent") {
+    // Check company profile exists so manual runs have usable context.
+    if (pipeline === "cbs" || pipeline === "intent" || pipeline === "cto") {
       const { data: profile } = organization
         ? await supabase
             .from("company_profile")
@@ -84,10 +58,14 @@ export async function POST(req: Request) {
         : { data: null }
 
       if (!profile?.company_name?.trim()) {
-        return NextResponse.json(
-          { error: "Add your company profile under Context before running this scan." },
-          { status: 422 },
-        )
+        const message =
+          pipeline === "intent"
+            ? "Add your company profile under Context before running this scan."
+            : pipeline === "cto"
+              ? "Add your company profile under Context before running Tech radar."
+              : "No company profile found. Fill in My Context -> Company & Founder first."
+
+        return NextResponse.json({ error: message }, { status: 422 })
       }
     }
 
@@ -96,7 +74,8 @@ export async function POST(req: Request) {
         name: eventName as
           | "juno/brief.requested"
           | "juno/jobs.scan.requested"
-          | "juno/intent.scan.requested",
+          | "juno/intent.scan.requested"
+          | "juno/tech.radar.requested",
         data: { userId: user.id },
       })
     } catch (sendErr) {
@@ -104,7 +83,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Could not queue the job with Inngest. Confirm INNGEST_EVENT_KEY in Vercel matches Inngest Cloud → Keys (Production).",
+            "Could not queue the job with Inngest. Confirm INNGEST_EVENT_KEY in Vercel matches Inngest Cloud -> Keys (Production).",
         },
         { status: 502 },
       )

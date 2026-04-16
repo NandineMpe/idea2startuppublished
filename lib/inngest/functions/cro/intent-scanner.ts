@@ -31,12 +31,13 @@ function toRedditReconSignals(signals: ScoredIntent[]): RedditReconSignal[] {
 
 async function saveBehavioralUpdatesArtifact(params: {
   userId: string
+  organizationId: string | null
   companyName: string
   signals: RedditReconSignal[]
   summary: Awaited<ReturnType<typeof summarizeRedditRecon>>
   scanOutcome?: "no_candidates" | "ok"
 }) {
-  const { userId, companyName, signals, summary, scanOutcome } = params
+  const { userId, organizationId, companyName, signals, summary, scanOutcome } = params
   const dateStr = new Date().toISOString().slice(0, 10)
   const uniqueSubreddits = [...new Set(signals.map((signal) => signal.subreddit).filter(Boolean) as string[])]
   const latestSignalAt =
@@ -46,6 +47,7 @@ async function saveBehavioralUpdatesArtifact(params: {
 
   const { error } = await supabaseAdmin.from("ai_outputs").insert({
     user_id: userId,
+    ...(organizationId ? { organization_id: organizationId } : {}),
     tool: "behavioral_updates",
     title: `Behavioral updates - ${companyName || "Customer research"} - ${dateStr}`.slice(0, 500),
     output: summary.overview,
@@ -139,6 +141,7 @@ export const intentScanner = inngest.createFunction(
       await step.run("persist-behavioral-updates-empty", () =>
         saveBehavioralUpdatesArtifact({
           userId,
+          organizationId: context.organizationId ?? null,
           companyName: context.profile.name.trim(),
           signals: [],
           summary,
@@ -179,6 +182,7 @@ export const intentScanner = inngest.createFunction(
       for (const s of toSave) {
         const { error } = await supabaseAdmin.from("intent_signals").insert({
           user_id: userId,
+          ...(context.organizationId ? { organization_id: context.organizationId } : {}),
           platform: s.platform,
           signal_type: s.type,
           title: s.title,
@@ -212,6 +216,7 @@ export const intentScanner = inngest.createFunction(
     await step.run("persist-behavioral-updates", () =>
       saveBehavioralUpdatesArtifact({
         userId,
+        organizationId: context.organizationId ?? null,
         companyName: context.profile.name.trim(),
         signals: researchSignals,
         summary,

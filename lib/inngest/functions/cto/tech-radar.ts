@@ -27,10 +27,18 @@ export const techRadar = inngest.createFunction(
     id: "cto-tech-radar",
     name: "CTO: Tech Radar",
     retries: 2,
-    triggers: [{ cron: "0 6 * * *" }],
+    triggers: [{ cron: "0 6 * * *" }, { event: "juno/tech.radar.requested" }],
   },
-  async ({ step }) => {
-    const userIds = await step.run("load-users", getActiveUserIds)
+  async ({ step, event }) => {
+    const requestedUserId =
+      event?.name === "juno/tech.radar.requested" &&
+      typeof (event.data as { userId?: unknown } | undefined)?.userId === "string"
+        ? ((event.data as { userId: string }).userId || "").trim()
+        : ""
+    const userIds =
+      requestedUserId.length > 0
+        ? [requestedUserId]
+        : await step.run("load-users", getActiveUserIds)
 
     for (const [i, userId] of userIds.entries()) {
       const context = await step.run(`context-${i}`, () =>

@@ -4,36 +4,48 @@ import { isProduction } from "@/lib/api-error-response"
 import { generateText } from "ai"
 import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
-import { fetchAllAuditAiItems, type AuditRawItem } from "@/lib/content-intelligence/audit-ai-sources"
+import { getCompanyContext } from "@/lib/company-context"
+import { fetchContextualNewsItems, type AuditRawItem } from "@/lib/content-intelligence/audit-ai-sources"
 
-const AUDIT_DIGEST_SYSTEM = `You are an investigative journalist writing a magazine feature on how AI is reshaping audit and assurance. Your reader is a founder selling AI-powered audit technology to mid-market and Big Four firms.
+function buildDigestSystemPrompt(params: {
+  companyName: string
+  industry: string
+  vertical: string
+  icp: string
+}): string {
+  const { companyName, industry, vertical, icp } = params
+  return `You are an investigative journalist writing a magazine feature on how AI is reshaping ${industry || vertical || "the technology industry"}. Your reader is a founder at ${companyName || "a startup"} selling to ${icp || "B2B buyers"}.
 
-You will receive a batch of raw signals (tweets, articles, news) from the last 45 days about AI in audit.
+You will receive a batch of raw signals (news, articles) from the last 45 days relevant to this market.
 
 Produce a single JSON object with these fields:
 
-headline (string): Magazine cover headline. Punchy, factual, names firms.
+headline (string): Magazine cover headline. Punchy, factual, names real companies and figures.
 subhead (string): One sentence expanding on headline.
-executiveSummary (string): 3-4 paragraph magazine lede. Tell the full arc: who moved, what happened, why it matters for audit practice. Name KPMG, Deloitte, EY, PwC, BDO, Grant Thornton, PCAOB, AICPA where they appear.
-timeline (array of objects): Chronological events, each with date (ISO string or "recent"), actor (firm/regulator name), event (what happened, under 200 chars), significance (why it matters, under 300 chars), sourceUrl (string or null).
-firmProfiles (array of objects): Per-firm breakdown with name, stance (string, their position on AI audit), moves (string, specific actions taken), quote (verbatim quote if available, else null), assessment (your analyst judgment on where they stand).
-regulatoryLandscape (string): 2-3 paragraphs on PCAOB, AICPA, SEC, EU positions.
-marketImplications (string): What this means for buyers, builders, and sellers of audit tech.
-whatToWatch (array of strings): 5-8 specific things to monitor in the next 90 days.
+executiveSummary (string): 3-4 paragraph magazine lede. Tell the full arc: who moved, what happened, why it matters for this market. Name specific companies, regulators, or investors where they appear.
+timeline (array of objects): Chronological events, each with date (ISO string or "recent"), actor (company/org name), event (what happened, under 200 chars), significance (why it matters for ${companyName || "this startup"}, under 300 chars), sourceUrl (string or null).
+firmProfiles (array of objects): Per-company breakdown with name, stance (their position on AI), moves (specific actions taken), quote (verbatim quote if available, else null), assessment (analyst judgment on where they stand).
+marketImplications (string): What this means for buyers, builders, and sellers of ${industry || vertical || "technology"} products.
+whatToWatch (array of strings): 5-8 specific things to monitor in the next 90 days that directly affect ${companyName || "this company"}'s market.
 rawSourceCount (number): How many raw items you were given.
 
-Be direct. Use names, numbers, dates. Skip filler. This is an in-depth feature, not a summary.`
+Be direct. Use names, numbers, dates. Skip filler. Tailor every insight to a founder in the ${industry || vertical || "technology"} space.`
+}
 
 export async function GET() {
   const supabase = await createClient()
   const { data: auth } = await supabase.auth.getUser()
   if (!auth.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const context = await getCompanyContext(auth.user.id, { useCookieOrganization: true })
+  const orgId = context?.organizationId ?? auth.user.id
+  const cacheKey = `market-digest:${orgId}`
+
   const { data: cached } = await supabase
     .from("content_briefings")
     .select("id, summary, generated_at")
     .eq("user_id", auth.user.id)
-    .like("id", "audit-digest:%")
+    .like("id", `market-digest:${orgId}%`)
     .order("generated_at", { ascending: false })
     .limit(1)
 
@@ -42,9 +54,15 @@ export async function GET() {
     if (age < 6 * 60 * 60 * 1000) {
       try {
         const parsed = JSON.parse(cached[0].summary)
-        return NextResponse.json({ digest: parsed, cached: true, generatedAt: cached[0].generated_at })
+        return NextResponse.json({
+          digest: parsed,
+          cached: true,
+          generatedAt: cached[0].generated_at,
+          companyName: context?.profile.name ?? "",
+          industry: context?.profile.industry ?? "",
+        })
       } catch {
-        // stale or corrupt, regenerate
+        // stale or corrupt, fall through to regenerate
       }
     }
   }
@@ -52,7 +70,9 @@ export async function GET() {
   return NextResponse.json({
     digest: null,
     cached: false,
-    message: "Use POST to generate a fresh audit digest.",
+    message: "Use POST to generate a fresh digest.",
+    companyName: context?.profile.name ?? "",
+    industry: context?.profile.industry ?? "",
   })
 }
 
@@ -65,25 +85,41 @@ export async function POST() {
     return NextResponse.json({ error: "LLM not configured" }, { status: 500 })
   }
 
-  const items = await fetchAllAuditAiItems()
+  const context = await getCompanyContext(auth.user.id, { useCookieOrganization: true })
+  const companyName = context?.profile.name?.trim() || "My Company"
+  const industry = context?.profile.industry?.trim() || context?.extracted.vertical?.trim() || "technology"
+  const vertical = context?.extracted.vertical?.trim() || industry
+  const icp = [...(context?.profile.icp ?? []), ...(context?.extracted.icp ?? [])]
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(", ")
+  const keywords = context?.extracted.keywords ?? []
+  const competitors = context?.extracted.competitors ?? []
+
+  const items = await fetchContextualNewsItems({
+    companyName,
+    industry,
+    vertical,
+    keywords,
+    competitors,
+  })
 
   if (items.length === 0) {
     return NextResponse.json({
       digest: null,
-      error:
-        "No audit AI items matched in the last 45 days. RSS feeds may be slow or filters may be tight. Try again later.",
+      error: `No market signals found for ${companyName} in the last 45 days. Try again later.`,
     })
   }
 
-  /** Keep prompts within model context limits and reduce timeouts (AI SDK 6 uses maxOutputTokens, not maxTokens). */
   const LLM_ITEM_CAP = 72
-  const itemsForLlm = items.length > LLM_ITEM_CAP ? items.slice(0, LLM_ITEM_CAP) : items
-  const userPayload = buildUserPayload(itemsForLlm, items.length)
+  const itemsForLlm = items.slice(0, LLM_ITEM_CAP)
+  const systemPrompt = buildDigestSystemPrompt({ companyName, industry, vertical, icp })
+  const userPayload = buildUserPayload(itemsForLlm, items.length, companyName)
 
   try {
     const { text } = await generateText({
       model: qwenModel(),
-      system: mergeSystemWithWritingRules(AUDIT_DIGEST_SYSTEM),
+      system: mergeSystemWithWritingRules(systemPrompt),
       prompt: userPayload,
       maxOutputTokens: 8000,
       temperature: 0.3,
@@ -101,15 +137,16 @@ export async function POST() {
 
     digest.rawSourceCount = items.length
 
-    const briefingId = `audit-digest:${auth.user.id}:${Date.now()}`
+    const orgId = context?.organizationId ?? auth.user.id
+    const briefingId = `market-digest:${orgId}:${Date.now()}`
     const { error: persistError } = await supabase.from("content_briefings").upsert(
       {
         id: briefingId,
         user_id: auth.user.id,
         generated_at: new Date().toISOString(),
-        angle: "AI in audit - 45 day compilation",
+        angle: `45 days of AI in ${industry} — ${companyName}`,
         summary: JSON.stringify(digest),
-        top_hook: digest.headline ?? "AI in Audit",
+        top_hook: digest.headline ?? `AI in ${industry}`,
         connections: [],
         story_count: items.length,
         breaking_count: 0,
@@ -117,7 +154,7 @@ export async function POST() {
       { onConflict: "id" },
     )
     if (persistError) {
-      console.error("[audit-digest] content_briefings upsert:", persistError.message)
+      console.error("[market-digest] content_briefings upsert:", persistError.message)
     }
 
     return NextResponse.json({
@@ -125,9 +162,11 @@ export async function POST() {
       cached: false,
       generatedAt: new Date().toISOString(),
       sourceCount: items.length,
+      companyName,
+      industry,
     })
   } catch (e) {
-    console.error("[audit-digest] Generation failed:", e)
+    console.error("[market-digest] Generation failed:", e)
     const message = e instanceof Error ? e.message : String(e)
     const isTimeout = /abort|timeout|timed out/i.test(message)
     const userMsg = isTimeout
@@ -141,39 +180,42 @@ export async function POST() {
 
 const SNIPPET_MAX = 420
 
-function buildUserPayload(items: AuditRawItem[], totalFetched: number): string {
+function buildUserPayload(items: AuditRawItem[], totalFetched: number, companyName: string): string {
   const sorted = [...items].sort(
     (a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime(),
   )
 
   const lines = sorted.map((item, i) => {
     const date = new Date(item.publishedAt).toISOString().slice(0, 10)
-    const snippet = item.snippet.length > SNIPPET_MAX ? `${item.snippet.slice(0, SNIPPET_MAX)}…` : item.snippet
+    const snippet =
+      item.snippet.length > SNIPPET_MAX ? `${item.snippet.slice(0, SNIPPET_MAX)}…` : item.snippet
     return `[${i}] date: ${date}\ntitle: ${item.title}\nsource: ${item.source}\nurl: ${item.url}\nauthor: ${item.author ?? "unknown"}\nsnippet: ${snippet}`
   })
 
-  const capNote = items.length < totalFetched ? ` (showing ${items.length} of ${totalFetched} fetched, newest first)` : ""
+  const capNote =
+    items.length < totalFetched
+      ? ` (showing ${items.length} of ${totalFetched} fetched)`
+      : ""
 
-  return `Below are ${items.length} raw signals about AI in audit from the last 45 days${capNote}. Synthesize them into the magazine feature format described in your instructions.\n\n${lines.join("\n\n")}`
+  return `Below are ${items.length} raw market signals from the last 45 days relevant to ${companyName}${capNote}. Synthesize them into the magazine feature format.\n\n${lines.join("\n\n")}`
 }
 
 function extractJson(text: string): Record<string, unknown> | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
   const candidate = fenced ? fenced[1].trim() : text.trim()
 
-  const starts = [candidate.indexOf("{")]
-  for (const start of starts) {
-    if (start === -1) continue
-    let depth = 0
-    for (let i = start; i < candidate.length; i++) {
-      if (candidate[i] === "{") depth++
-      if (candidate[i] === "}") depth--
-      if (depth === 0) {
-        try {
-          return JSON.parse(candidate.slice(start, i + 1)) as Record<string, unknown>
-        } catch {
-          break
-        }
+  const start = candidate.indexOf("{")
+  if (start === -1) return null
+
+  let depth = 0
+  for (let i = start; i < candidate.length; i++) {
+    if (candidate[i] === "{") depth++
+    if (candidate[i] === "}") depth--
+    if (depth === 0) {
+      try {
+        return JSON.parse(candidate.slice(start, i + 1)) as Record<string, unknown>
+      } catch {
+        break
       }
     }
   }

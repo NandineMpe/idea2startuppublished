@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { getCompanyContext } from "@/lib/company-context"
-import { REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
-import { suggestSubredditsFromContext } from "@/lib/juno/reddit-subreddit-suggest"
+import {
+  defaultSubredditsFromContext,
+  suggestSubredditsFromContext,
+} from "@/lib/juno/reddit-subreddit-suggest"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -14,9 +16,8 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const context = await getCompanyContext(user.id, {
-      queryHint: "reddit customer pain product gaps audit compliance finance accounting software ICP",
+      queryHint: "reddit customer pain points product gaps ICP buying signals",
       refreshVault: "if_stale",
-      
     })
 
     if (!context) {
@@ -28,7 +29,7 @@ export async function GET() {
 
     return NextResponse.json({
       saved: context.profile.reddit_intent_subreddits,
-      defaults: REDDIT_SUBREDDITS.map((s) => s.toLowerCase()),
+      defaults: defaultSubredditsFromContext(context),
     })
   } catch (error) {
     return jsonApiError(500, error, "reddit-subreddits GET")
@@ -44,9 +45,8 @@ export async function POST() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const context = await getCompanyContext(user.id, {
-      queryHint: "reddit customer pain product gaps audit compliance finance accounting software ICP",
+      queryHint: "reddit customer pain points product gaps ICP buying signals",
       refreshVault: "if_stale",
-      
     })
 
     if (!context) {
@@ -57,7 +57,8 @@ export async function POST() {
     }
 
     const suggestions = await suggestSubredditsFromContext(context)
-    return NextResponse.json({ suggestions })
+    const defaults = defaultSubredditsFromContext(context)
+    return NextResponse.json({ suggestions, defaults })
   } catch (error) {
     return jsonApiError(500, error, "reddit-subreddits POST")
   }

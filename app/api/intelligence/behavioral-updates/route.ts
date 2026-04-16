@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { getCompanyContext } from "@/lib/company-context"
-import { REDDIT_SUBREDDITS } from "@/lib/juno/intent-keywords"
 import {
   coerceBehavioralSummary,
   summarizeRedditRecon,
   type RedditBehavioralSummary,
   type RedditReconSignal,
 } from "@/lib/juno/reddit-recon"
+import { defaultSubredditsFromContext } from "@/lib/juno/reddit-subreddit-suggest"
 import { createClient } from "@/lib/supabase/server"
 
 type BehavioralUpdatesThread = RedditReconSignal & {
@@ -76,7 +76,6 @@ export async function GET(req: Request) {
     const context = await getCompanyContext(user.id, {
       queryHint: "reddit customer frustrations buying process workarounds discovery and product gaps",
       refreshVault: "if_stale",
-      
     })
 
     if (!context) {
@@ -119,6 +118,8 @@ export async function GET(req: Request) {
       })
     }
 
+    const orgId = context.organizationId
+
     let threadsQuery = supabase
       .from("intent_signals")
       .select(
@@ -139,9 +140,36 @@ export async function GET(req: Request) {
       .order("discovered_at", { ascending: false })
       .limit(24)
 
+    // Always scope to org to prevent data bleed between organizations.
+    if (orgId) {
+      threadsQuery = threadsQuery.eq("organization_id", orgId)
+      summarySignalsQuery = summarySignalsQuery.eq("organization_id", orgId)
+    }
+
     if (selectedSubreddit) {
       threadsQuery = threadsQuery.eq("subreddit", selectedSubreddit)
       summarySignalsQuery = summarySignalsQuery.eq("subreddit", selectedSubreddit)
+    }
+
+    const subredditListQuery = supabase
+      .from("intent_signals")
+      .select("subreddit, discovered_at")
+      .eq("user_id", user.id)
+      .eq("platform", "reddit")
+      .order("discovered_at", { ascending: false })
+      .limit(80)
+
+    const aiOutputsQuery = supabase
+      .from("ai_outputs")
+      .select("inputs, created_at, metadata")
+      .eq("user_id", user.id)
+      .eq("tool", "behavioral_updates")
+      .order("created_at", { ascending: false })
+      .limit(1)
+
+    if (orgId) {
+      subredditListQuery.eq("organization_id", orgId)
+      aiOutputsQuery.eq("organization_id", orgId)
     }
 
     const [
@@ -152,20 +180,8 @@ export async function GET(req: Request) {
     ] = await Promise.all([
       threadsQuery,
       summarySignalsQuery,
-      supabase
-        .from("intent_signals")
-        .select("subreddit, discovered_at")
-        .eq("user_id", user.id)
-        .eq("platform", "reddit")
-        .order("discovered_at", { ascending: false })
-        .limit(80),
-      supabase
-        .from("ai_outputs")
-        .select("inputs, created_at, metadata")
-        .eq("user_id", user.id)
-        .eq("tool", "behavioral_updates")
-        .order("created_at", { ascending: false })
-        .limit(1),
+      subredditListQuery,
+      aiOutputsQuery,
     ])
 
     if (threadsError) return jsonApiError(500, threadsError, "behavioral-updates GET threads")
@@ -181,7 +197,8 @@ export async function GET(req: Request) {
       .map((row) => (typeof row.subreddit === "string" ? row.subreddit.trim().toLowerCase() : ""))
       .filter(Boolean)
     const saved = context.profile.reddit_intent_subreddits ?? []
-    const defaults = REDDIT_SUBREDDITS.map((s) => s.toLowerCase())
+    const defaults = defaultSubredditsFromContext(context)
+    // Only show subreddits derived from this startup context + saved list + scanned signals.
     const subreddits = [...new Set([...saved, ...fromSignals, ...defaults])].sort((a, b) =>
       a.localeCompare(b),
     )

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 
 type Story = {
@@ -29,6 +30,13 @@ type Briefing = {
   top_hook: string
 }
 
+type ContentIntelligenceFeedProps = {
+  talkingPoints?: string
+  talkingPointsGeneratedAt?: string | null
+  onTalkingPointsChange?: (value: string) => void
+  onTalkingPointsGeneratedAtChange?: (value: string | null) => void
+}
+
 function storyMatchesQuery(story: Story, q: string): boolean {
   const needle = q.trim().toLowerCase()
   if (!needle) return true
@@ -45,17 +53,44 @@ function isCollabStory(story: Story): boolean {
   )
 }
 
-export function ContentIntelligenceFeed() {
+export function ContentIntelligenceFeed({
+  talkingPoints,
+  talkingPointsGeneratedAt,
+  onTalkingPointsChange,
+  onTalkingPointsGeneratedAtChange,
+}: ContentIntelligenceFeedProps) {
   const { toast } = useToast()
   const [briefing, setBriefing] = useState<Briefing | null>(null)
   const [stories, setStories] = useState<Story[]>([])
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
+  const [runningTalkingPoints, setRunningTalkingPoints] = useState(false)
   const [pillar, setPillar] = useState("all")
   const [status, setStatus] = useState("all")
   const [minScore, setMinScore] = useState("4")
   const [angle, setAngle] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [localTalkingPoints, setLocalTalkingPoints] = useState("")
+  const [localTalkingPointsGeneratedAt, setLocalTalkingPointsGeneratedAt] = useState<string | null>(null)
+
+  const resolvedTalkingPoints = talkingPoints ?? localTalkingPoints
+  const resolvedTalkingPointsGeneratedAt = talkingPointsGeneratedAt ?? localTalkingPointsGeneratedAt
+
+  function setTalkingPointsValue(value: string) {
+    if (onTalkingPointsChange) {
+      onTalkingPointsChange(value)
+      return
+    }
+    setLocalTalkingPoints(value)
+  }
+
+  function setTalkingPointsGeneratedAtValue(value: string | null) {
+    if (onTalkingPointsGeneratedAtChange) {
+      onTalkingPointsGeneratedAtChange(value)
+      return
+    }
+    setLocalTalkingPointsGeneratedAt(value)
+  }
 
   async function load() {
     setLoading(true)
@@ -114,6 +149,37 @@ export function ContentIntelligenceFeed() {
     }
   }
 
+  async function generateTalkingPoints() {
+    setRunningTalkingPoints(true)
+    try {
+      const res = await fetch("/api/founder/tiktok-digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ focus: angle }),
+      })
+      const json = (await res.json()) as { digest?: string; error?: string; generatedAt?: string }
+      if (!res.ok) throw new Error(json.error || "Failed to generate talking points")
+
+      const digest = json.digest ?? ""
+      const generatedAt = json.generatedAt ?? new Date().toISOString()
+      setTalkingPointsValue(digest)
+      setTalkingPointsGeneratedAtValue(generatedAt)
+
+      toast({
+        title: "Talking points ready",
+        description: "Generated from AI + work trends. Edit before filming.",
+      })
+    } catch (error) {
+      toast({
+        title: "Could not generate talking points",
+        description: error instanceof Error ? error.message : "Try again shortly.",
+        variant: "destructive",
+      })
+    } finally {
+      setRunningTalkingPoints(false)
+    }
+  }
+
   async function updateStatus(id: string, next: Story["status"]) {
     const res = await fetch("/api/content-feed/stories", {
       method: "PATCH",
@@ -138,9 +204,14 @@ export function ContentIntelligenceFeed() {
             Signals come from RSS (major tech and AI outlets).
           </p>
         </div>
-        <Button size="sm" onClick={() => void runDigestNow()} disabled={running}>
-          {running ? "Triggering..." : "Run digest now"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => void runDigestNow()} disabled={running}>
+            {running ? "Triggering..." : "Run digest now"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void generateTalkingPoints()} disabled={runningTalkingPoints}>
+            {runningTalkingPoints ? "Generating..." : "Generate talking points"}
+          </Button>
+        </div>
       </div>
 
       <div className="relative mt-3">
@@ -194,6 +265,27 @@ export function ContentIntelligenceFeed() {
           onChange={(e) => setAngle(e.target.value)}
           className="h-8 rounded-md border border-input bg-background px-2 text-[12px]"
           placeholder="Optional angle (manual run)"
+        />
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Label htmlFor="content-feed-talking-points" className="text-[12px] font-semibold">
+            AI + work talking points
+          </Label>
+          {resolvedTalkingPointsGeneratedAt ? (
+            <span className="text-[11px] text-muted-foreground">
+              Last generated: {new Date(resolvedTalkingPointsGeneratedAt).toLocaleString()}
+            </span>
+          ) : null}
+        </div>
+        <Textarea
+          id="content-feed-talking-points"
+          value={resolvedTalkingPoints}
+          onChange={(e) => setTalkingPointsValue(e.target.value)}
+          placeholder="Generate talking points to get a short-form snapshot you can react to this week."
+          rows={8}
+          className="min-h-[170px] resize-y font-mono text-[12px] leading-relaxed"
         />
       </div>
 

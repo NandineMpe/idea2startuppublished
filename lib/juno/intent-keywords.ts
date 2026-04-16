@@ -1,45 +1,42 @@
 /** Primary intent phrases — direct product-seeking + problem + recommendations */
 export const INTENT_KEYWORDS_PRIMARY: string[] = [
-  "audit management software",
-  "audit prep tool",
-  "audit readiness",
-  "compliance automation",
-  "compliance software",
-  "SOX compliance",
-  "GAAP",
-  "audit evidence",
-  "continuous compliance",
-  "audit AI",
-  "audit prep is",
-  "preparing for audit",
-  "first audit",
-  "audit findings",
-  "control gaps",
-  "compliance burden",
-  "manual audit",
-  "audit documentation",
-  "recommend audit",
-  "best audit software",
-  "looking for audit",
-  "what do you use for audit",
-  "how do you handle audit",
+  "insurance software",
+  "insurtech",
+  "insurance platform",
+  "insurance automation",
+  "policy management software",
+  "insurance AI",
+  "claims automation",
+  "insurance tech stack",
+  "best insurance software",
+  "looking for insurance tool",
+  "insurance startup",
+  "embedded insurance",
+  "insurance API",
+  "insurance underwriting software",
+  "digital insurance",
+  "insurance claims software",
+  "what do you use for insurance",
+  "how do you handle claims",
+  "insurance compliance",
+  "insurance data",
 ]
 
-/** Use with finance/audit context in prompts (narrower search) */
+/** Broader market signals — buyer pain, switching, evaluation */
 export const INTENT_KEYWORDS_SECONDARY: string[] = [
-  "scaling compliance",
-  "automate financial reporting",
-  "SEC reporting",
-  "internal controls",
-  "revenue recognition",
-  "ASC 606",
-  "lease accounting",
-  "IFRS compliance",
-  "financial close automation",
-  "audit trail",
+  "switching insurance provider",
+  "insurance broker software",
+  "insurance CRM",
+  "policy administration",
+  "loss ratio",
+  "actuarial software",
+  "insurance distribution",
+  "MGA software",
+  "reinsurance",
+  "insurance regulation",
 ]
 
-/** GTM and buyer-behavior phrases (search fallback and matched keyword metadata) */
+/** GTM and buyer-behavior phrases */
 export const INTENT_KEYWORDS_OUTREACH: string[] = [
   "B2B sales",
   "cold email",
@@ -51,53 +48,68 @@ export const INTENT_KEYWORDS_OUTREACH: string[] = [
 ]
 
 export const COMPETITOR_KEYWORDS: string[] = [
-  "FloQast",
-  "AuditBoard",
-  "Trullion",
-  "Leapfin",
-  "Workiva",
-  "Trintech",
-  "BlackLine",
+  "Lemonade",
+  "Root Insurance",
+  "Hippo",
+  "Next Insurance",
+  "Openly",
+  "Cowbell",
+  "Coalition",
+  "At-Bay",
+  "Slice Labs",
 ]
 
 /**
  * Default pool for Reddit intent scans (no r/ prefix). Deduped lowercase at merge time.
- * Mix finance/compliance buyers with B2B sales and operator communities (outreach, demos, GTM).
+ * Insurtech / insurance / founder communities.
  */
 export const REDDIT_SUBREDDITS: string[] = [
-  "accounting",
-  "bookkeeping",
-  "cpa",
-  "tax",
-  "auditing",
+  // Insurance & insurtech core
+  "Insurance",
+  "insurtech",
+  "InsuranceAgent",
+  "InsuranceProfessional",
+  "HealthInsurance",
+  "CarInsurance",
+  "HomeInsurance",
+  "LifeInsurance",
+  "BusinessInsurance",
+  "WorkersComp",
+  // Fintech adjacent
   "fintech",
+  "financialindependence",
+  "personalfinance",
+  // Startup & founder communities
   "startups",
-  "saas",
   "entrepreneur",
-  "smallbusiness",
-  "CFOs",
-  "sales",
-  "revops",
-]
-
-/** Always merged first when not using a user-pinned list — keeps GTM and buyer voice in the 12-sub cap. */
-export const REDDIT_SUBREDDIT_SCAN_PRIORITY: string[] = [
-  "cfos",
-  "sales",
   "saas",
-  "startups",
-  "accounting",
-  "fintech",
+  "smallbusiness",
+  "Entrepreneur",
+  // Risk & compliance
+  "riskmanagement",
+  "LegalAdvice",
+  "legaladviceofftopic",
 ]
 
-/** Short high-recall tokens — paired with longer phrases so searches still return rows */
+/** Highest-signal subs scanned first in the 12-sub cap. */
+export const REDDIT_SUBREDDIT_SCAN_PRIORITY: string[] = [
+  "insurance",
+  "insurtech",
+  "startups",
+  "fintech",
+  "InsuranceAgent",
+  "saas",
+]
+
+/** Short high-recall tokens */
 export const INTENT_SHORT_TOKENS: string[] = [
-  "audit",
-  "compliance",
-  "SOX",
-  "audit prep",
-  "internal controls",
-  "controller",
+  "insurance",
+  "insurtech",
+  "underwriting",
+  "claims",
+  "policy",
+  "coverage",
+  "broker",
   "outreach",
   "demo",
 ]

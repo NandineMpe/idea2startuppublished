@@ -3,7 +3,7 @@ import { jsonApiError } from "@/lib/api-error-response"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { saveVaultKnowledgeEntry } from "@/lib/vault-knowledge"
-import { resolveOrganizationSelection } from "@/lib/organizations"
+import { resolveOrganizationSelection, ensurePersonalOrganization } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 async function extractTextFromBuffer(buffer: Buffer, mimetype: string): Promise<string> {
@@ -83,13 +83,14 @@ export async function POST(request: Request) {
     }
 
     const workspace = await resolveWorkspaceSelection(user.id)
-    const organization =
+    let organization =
       workspace === null
         ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
         : null
 
     if (!workspace && !organization) {
-      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+      // New user with no org yet — provision their personal org automatically.
+      organization = await ensurePersonalOrganization(user.id)
     }
 
     const formData = await request.formData()
@@ -101,8 +102,19 @@ export async function POST(request: Request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const mimetype = file.type || "application/octet-stream"
     const filename = file.name || "document"
+    const ext = filename.split(".").pop()?.toLowerCase() ?? ""
+    const extMime: Record<string, string> = {
+      md: "text/markdown",
+      txt: "text/plain",
+      html: "text/html",
+      htm: "text/html",
+      csv: "text/csv",
+      pdf: "application/pdf",
+    }
+    const mimetype = file.type && file.type !== "application/octet-stream"
+      ? file.type
+      : extMime[ext] ?? file.type ?? "application/octet-stream"
 
     const content = await extractTextFromBuffer(buffer, mimetype)
 
@@ -151,6 +163,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No active organization" }, { status: 400 })
     }
 
+    // Vault sync is best-effort — don't block upload if vault isn't configured.
     const vaultWrite = await saveVaultKnowledgeEntry({
       content,
       title: filename,
@@ -159,13 +172,6 @@ export async function POST(request: Request) {
       folder: isPitchDeck ? "sources/pitch-decks" : "sources/documents",
       noteType: isPitchDeck ? "pitch_deck" : "source_document",
     })
-
-    if (!vaultWrite.success) {
-      return NextResponse.json(
-        { error: vaultWrite.error ?? "Obsidian vault sync failed. Connect the vault before uploading documents." },
-        { status: 500 },
-      )
-    }
 
     if (isPitchDeck) {
       await supabase

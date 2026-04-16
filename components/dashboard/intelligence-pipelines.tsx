@@ -89,8 +89,7 @@ const PIPELINES: Pipeline[] = [
     accent: "text-violet-600 bg-violet-500/10 border-violet-500/20",
     statusKey: "cto",
     windowHours: 26,
-    triggerable: false,
-    triggerNote: "Scheduled only - runs ~06:00",
+    triggerable: true,
   },
 ]
 
@@ -152,6 +151,14 @@ const LOG_LINES: Record<string, string[]> = {
     "Synthesizing customer behavior and switching forces...",
     "Saving behavioral updates and thread evidence...",
     "Finished. Open Reddit intent signals below.",
+  ],
+  cto: [
+    "Fetching company context...",
+    "Scraping CTO feeds, arXiv, and Hacker News...",
+    "Filtering and deduplicating recent technical signals...",
+    "Analyzing trends and platform implications...",
+    "Saving tech radar output and writing vault notes...",
+    "Finished. Tech radar card is refreshed.",
   ],
 }
 
@@ -330,7 +337,7 @@ function PipelineLatestOutput({
     if (!radar || radar.type !== "tech_radar") {
       return (
         <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
-          No tech radar run yet. It runs on the daily schedule.
+          No tech radar run yet. Use Run now or wait for the daily schedule.
         </p>
       )
     }
@@ -467,6 +474,8 @@ export function IntelligencePipelines() {
               ? "Brief run finished. Signal feed and this card are updated."
               : pipeline === "intent"
                 ? "Behavioral updates refreshed. Reddit customer research and thread evidence are updated below."
+                : pipeline === "cto"
+                  ? "Tech radar refreshed. Latest trends and technical suggestions are updated."
                 : "Run finished and the card has been updated."
 
           setTriggerResult({ id: pipeline, msg: successMessage, ok: true })

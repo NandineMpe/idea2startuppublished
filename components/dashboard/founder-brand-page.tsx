@@ -1342,11 +1342,31 @@ function DesignDocsPanel() {
 // ─── Page ─────────────────────────────────────────────────────────
 
 export function FounderBrandPageContent() {
-  const [data, setData] = useState<FounderBrandState>(() => loadFounderBrandState())
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [data, setData] = useState<FounderBrandState>(() => loadFounderBrandState(null))
+
+  // Resolve org ID from the active session, then reload state scoped to that org.
+  useEffect(() => {
+    async function resolveOrg() {
+      try {
+        const res = await fetch("/api/company/profile")
+        if (!res.ok) return
+        const json = await res.json()
+        const id: string | null =
+          json?.organization?.id ?? json?.workspace?.id ?? null
+        if (!id) return
+        setOrgId(id)
+        setData(loadFounderBrandState(id))
+      } catch {
+        // Non-fatal — fall back to unscoped state
+      }
+    }
+    void resolveOrg()
+  }, [])
 
   useEffect(() => {
-    saveFounderBrandState(data)
-  }, [data])
+    saveFounderBrandState(data, orgId)
+  }, [data, orgId])
 
   function patch(key: BrandNotesTabKey, value: string) {
     setData((prev) => ({ ...prev, [key]: value }))

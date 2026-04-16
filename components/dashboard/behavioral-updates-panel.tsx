@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowUpRight,
   Brain,
+  ChevronDown,
   Filter,
   Loader2,
   MessageCircle,
@@ -121,6 +122,23 @@ function formatRelative(iso: string | null | undefined) {
   return formatDistanceToNow(parsed, { addSuffix: true })
 }
 
+function normalizeSubredditSuggestions(input: SubredditSuggestion[]): SubredditSuggestion[] {
+  const map = new Map<string, SubredditSuggestion>()
+  for (const row of input) {
+    const name = String(row.name ?? "")
+      .toLowerCase()
+      .trim()
+      .replace(/^r\//i, "")
+    if (!/^[a-z0-9_]{2,32}$/.test(name)) continue
+    if (map.has(name)) continue
+    map.set(name, {
+      name,
+      reason: String(row.reason ?? "").trim() || "Relevant customer discussion for this startup context.",
+    })
+  }
+  return [...map.values()].slice(0, MAX_SCAN_SUBREDDITS)
+}
+
 function ResearchListCard({
   title,
   description,
@@ -182,8 +200,11 @@ export function BehavioralUpdatesPanel() {
   const [pinnedSubreddits, setPinnedSubreddits] = useState<string[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [suggestions, setSuggestions] = useState<SubredditSuggestion[]>([])
+  const [latestSuggestionsOpen, setLatestSuggestionsOpen] = useState(true)
   const [saveTargetsLoading, setSaveTargetsLoading] = useState(false)
   const [targetsHint, setTargetsHint] = useState<string | null>(null)
+  const [showSubredditSetup, setShowSubredditSetup] = useState(false)
+  const setupSuggestAutoLoaded = useRef(false)
   const pollRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   // Question / ask-the-data state
@@ -223,11 +244,18 @@ export function BehavioralUpdatesPanel() {
         setData(json.data)
         const saved = json.data.redditIntentSaved
         if (saved === null || saved === undefined) {
-          setUseAutoSubreddits(true)
+          setUseAutoSubreddits(false)
           setPinnedSubreddits([])
+          setSuggestions([])
+          setTargetsHint(null)
+          setupSuggestAutoLoaded.current = false
+          setShowSubredditSetup(true)
         } else {
           setUseAutoSubreddits(false)
           setPinnedSubreddits(saved)
+          setSuggestions([])
+          setTargetsHint(null)
+          setShowSubredditSetup(false)
         }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Could not load behavioral updates.")
@@ -256,7 +284,9 @@ export function BehavioralUpdatesPanel() {
     return ["all", ...values.filter((value) => value && value.toLowerCase() !== "all")]
   }, [data?.subreddits])
 
-  async function runSuggestSubreddits() {
+  const requiresSubredditSetup = Boolean(data) && data.redditIntentSaved == null
+
+  const runSuggestSubreddits = useCallback(async () => {
     setSuggestLoading(true)
     setTargetsHint(null)
     setSuggestions([])
@@ -267,21 +297,38 @@ export function BehavioralUpdatesPanel() {
       })
       const json = (await res.json().catch(() => ({}))) as {
         suggestions?: SubredditSuggestion[]
+        defaults?: string[]
         error?: string
       }
       if (!res.ok) {
         throw new Error(typeof json.error === "string" ? json.error : "Could not suggest subreddits.")
       }
-      setSuggestions(json.suggestions ?? [])
-      if ((json.suggestions ?? []).length === 0) {
-        setTargetsHint("No suggestions returned. Check LLM configuration or try again after adding more context.")
+      const defaultsAsSuggestions = (json.defaults ?? []).map((name) => ({
+        name,
+        reason: "Context-derived baseline for this startup.",
+      }))
+      const normalized = normalizeSubredditSuggestions([
+        ...(json.suggestions ?? []),
+        ...defaultsAsSuggestions,
+      ])
+      setSuggestions(normalized)
+      if (normalized.length === 0) {
+        setTargetsHint("No relevant communities were found yet. Add more startup context and try again.")
       }
     } catch (e) {
       setTargetsHint(e instanceof Error ? e.message : "Suggestion failed.")
     } finally {
       setSuggestLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!showSubredditSetup || loading || suggestLoading || suggestions.length > 0) return
+    if (setupSuggestAutoLoaded.current) return
+    setupSuggestAutoLoaded.current = true
+    setUseAutoSubreddits(false)
+    void runSuggestSubreddits()
+  }, [loading, runSuggestSubreddits, showSubredditSetup, suggestLoading, suggestions.length])
 
   function togglePinnedSub(name: string) {
     const n = name.toLowerCase().trim().replace(/^r\//i, "")
@@ -325,7 +372,7 @@ export function BehavioralUpdatesPanel() {
       }
       setTargetsHint(
         useAutoSubreddits || pinnedSubreddits.length === 0
-          ? "Scanner will pick subreddits from your context each run (merged with built-in defaults)."
+          ? "Scanner will pick subreddit targets from this startup context each run."
           : `Saved ${pinnedSubreddits.length} subreddit targets for scans.`,
       )
       void loadData(selectedSubreddit, true)
@@ -337,6 +384,12 @@ export function BehavioralUpdatesPanel() {
   }
 
   async function triggerScan() {
+    if (requiresSubredditSetup) {
+      setError("Select and save subreddit targets for this startup before running a Reddit scan.")
+      setShowSubredditSetup(true)
+      return
+    }
+
     setScanning(true)
     setScanHint(null)
     setError(null)
@@ -449,7 +502,8 @@ export function BehavioralUpdatesPanel() {
               type="button"
               size="sm"
               onClick={() => void triggerScan()}
-              disabled={refreshing || scanning}
+              disabled={refreshing || scanning || requiresSubredditSetup}
+              title={requiresSubredditSetup ? "Save subreddit targets first" : undefined}
               className="gap-2"
             >
               {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
@@ -486,8 +540,8 @@ export function BehavioralUpdatesPanel() {
               <div className="min-w-0 space-y-2">
                 <p className="text-[12px] font-medium text-foreground">Subreddits for scans</p>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Choose automatic picks from your company context each run, or pin a list. Pinned lists cap at{" "}
-                  {MAX_SCAN_SUBREDDITS} communities.
+                  Choose automatic picks from your company context each run, or pin a list specific to this startup.
+                  Pinned lists cap at {MAX_SCAN_SUBREDDITS} communities.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -541,7 +595,9 @@ export function BehavioralUpdatesPanel() {
 
             {!useAutoSubreddits ? (
               <div className="mt-3 space-y-2">
-                <p className="text-[11px] text-muted-foreground">Tap to toggle. Pool includes defaults, signals, and saved picks.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Tap to toggle. Pool includes startup-specific context matches, scanned signals, and your saved picks.
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {(data?.subreddits ?? []).map((sub) => {
                     const active = pinnedSubreddits.includes(sub.toLowerCase())
@@ -564,25 +620,38 @@ export function BehavioralUpdatesPanel() {
                 {suggestions.length > 0 ? (
                   <div className="rounded-lg border border-border/60 bg-background/60 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-[11px] font-medium text-foreground">Latest suggestions</p>
+                      <button
+                        type="button"
+                        onClick={() => setLatestSuggestionsOpen((open) => !open)}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground hover:text-primary"
+                        aria-expanded={latestSuggestionsOpen}
+                        aria-controls="latest-subreddit-suggestions"
+                      >
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 transition-transform ${latestSuggestionsOpen ? "rotate-180" : ""}`}
+                        />
+                        Latest suggestions
+                      </button>
                       <Button type="button" variant="outline" size="sm" className="h-7 text-[10px]" onClick={mergeSuggestionsIntoPins}>
                         Add all to pins
                       </Button>
                     </div>
-                    <ul className="mt-2 space-y-2">
-                      {suggestions.map((s) => (
-                        <li key={s.name} className="text-[11px] leading-relaxed">
-                          <button
-                            type="button"
-                            className="font-medium text-primary hover:underline"
-                            onClick={() => togglePinnedSub(s.name)}
-                          >
-                            r/{s.name}
-                          </button>
-                          <span className="text-muted-foreground"> — {s.reason}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {latestSuggestionsOpen ? (
+                      <ul id="latest-subreddit-suggestions" className="mt-2 space-y-2">
+                        {suggestions.map((s) => (
+                          <li key={s.name} className="text-[11px] leading-relaxed">
+                            <button
+                              type="button"
+                              className="font-medium text-primary hover:underline"
+                              onClick={() => togglePinnedSub(s.name)}
+                            >
+                              r/{s.name}
+                            </button>
+                            <span className="text-muted-foreground"> - {s.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -659,6 +728,119 @@ export function BehavioralUpdatesPanel() {
             Loading Reddit customer research...
           </div>
         ) : null}
+
+        {/* ── Subreddit setup step ──────────────────────────────── */}
+        {showSubredditSetup && !loading && (
+          <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Setup required before scan</p>
+                <h3 className="mt-1 text-base font-semibold text-foreground">Choose your Reddit scan communities</h3>
+                <p className="mt-1 text-[13px] text-muted-foreground leading-relaxed">
+                  Juno loads startup-specific subreddit matches from your context. Tick what is relevant, save it, then run the scan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSubredditSetup(false)}
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:text-foreground"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Suggest button */}
+            {suggestions.length === 0 && (
+              <Button
+                type="button"
+                onClick={async () => {
+                  setSuggestLoading(true)
+                  setUseAutoSubreddits(false)
+                  await runSuggestSubreddits()
+                }}
+                disabled={suggestLoading}
+                className="gap-2"
+              >
+                {suggestLoading
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading context-matched communities...</>
+                  : <><Sparkles className="h-4 w-4" /> Load subreddit suggestions</>
+                }
+              </Button>
+            )}
+
+            {/* Suggestions checklist */}
+            {suggestions.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[12px] font-medium text-foreground">
+                  Tick the communities relevant to your market ({pinnedSubreddits.length}/{MAX_SCAN_SUBREDDITS} selected)
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {suggestions.map((s) => {
+                    const name = s.name.toLowerCase()
+                    const checked = pinnedSubreddits.includes(name)
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => togglePinnedSub(name)}
+                        className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                          checked
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-background/80 text-muted-foreground hover:border-primary/40"
+                        }`}
+                      >
+                        <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
+                          checked ? "border-primary bg-primary text-white" : "border-muted-foreground/40"
+                        }`}>
+                          {checked ? "✓" : ""}
+                        </span>
+                        <span>
+                          <span className="block text-[12px] font-medium text-foreground">r/{s.name}</span>
+                          <span className="block text-[11px] leading-relaxed">{s.reason}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    type="button"
+                    disabled={pinnedSubreddits.length === 0 || saveTargetsLoading}
+                    onClick={async () => {
+                      await saveSubredditTargets()
+                      setShowSubredditSetup(false)
+                    }}
+                    className="gap-2"
+                  >
+                    {saveTargetsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                    Save {pinnedSubreddits.length > 0 ? `${pinnedSubreddits.length} communities` : "selection"} & start scanning
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      setSuggestLoading(true)
+                      setSuggestions([])
+                      setPinnedSubreddits([])
+                      await runSuggestSubreddits()
+                    }}
+                    disabled={suggestLoading}
+                    className="text-[12px]"
+                  >
+                    Regenerate suggestions
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {targetsHint && (
+              <p className="text-[12px] text-muted-foreground">{targetsHint}</p>
+            )}
+          </div>
+        )}
 
         {data ? (
           <>

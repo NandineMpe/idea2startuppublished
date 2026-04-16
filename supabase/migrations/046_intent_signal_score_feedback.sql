@@ -1,20 +1,19 @@
--- Explicit relevance score feedback (closes loop into future LLM scoring prompts)
+-- Optional subreddit targets for Reddit intent scanning (no r/ prefix). Null = derive per scan from context + defaults.
+ALTER TABLE company_profile
+ADD COLUMN IF NOT EXISTS reddit_intent_subreddits JSONB DEFAULT NULL;
 
-ALTER TABLE intent_signals
-  ADD COLUMN IF NOT EXISTS score_feedback TEXT,
-  ADD COLUMN IF NOT EXISTS score_feedback_at TIMESTAMPTZ;
+COMMENT ON COLUMN company_profile.reddit_intent_subreddits IS 'JSON array of subreddit name strings for intent scanning; null uses AI suggestion merged with defaults each run';
 
-ALTER TABLE intent_signals DROP CONSTRAINT IF EXISTS intent_signals_score_feedback_check;
-
-ALTER TABLE intent_signals
-  ADD CONSTRAINT intent_signals_score_feedback_check
-  CHECK (
-    score_feedback IS NULL
-    OR score_feedback IN ('too_high', 'ok', 'too_low')
-  );
-
-CREATE INDEX IF NOT EXISTS idx_intent_user_score_feedback_at
-  ON intent_signals(user_id, score_feedback_at DESC)
-  WHERE score_feedback IS NOT NULL;
-
-COMMENT ON COLUMN intent_signals.score_feedback IS 'User says model relevance_score was too_high, ok, or too_low';
+-- Workspace profiles table exists only after multitenancy migration (038). Skip if not deployed.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'client_workspace_profiles'
+  ) THEN
+    EXECUTE 'ALTER TABLE client_workspace_profiles ADD COLUMN IF NOT EXISTS reddit_intent_subreddits JSONB DEFAULT NULL';
+    EXECUTE 'COMMENT ON COLUMN client_workspace_profiles.reddit_intent_subreddits IS ''JSON array of subreddit name strings for intent scanning; null uses AI suggestion merged with defaults each run''';
+  END IF;
+END $$;

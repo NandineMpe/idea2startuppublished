@@ -50,6 +50,8 @@ export function AuditAiDigest() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [sourceCount, setSourceCount] = useState(0)
   const [loaded, setLoaded] = useState(false)
+  const [companyName, setCompanyName] = useState("")
+  const [industry, setIndustry] = useState("")
 
   const loadCached = useCallback(async () => {
     setLoading(true)
@@ -61,6 +63,8 @@ export function AuditAiDigest() {
         return
       }
       const data = await res.json()
+      if (data.companyName) setCompanyName(data.companyName)
+      if (data.industry) setIndustry(data.industry)
       if (data.digest) {
         setDigest(data.digest as AuditDigest)
         setGeneratedAt(data.generatedAt ?? null)
@@ -85,6 +89,8 @@ export function AuditAiDigest() {
         error?: string
         generatedAt?: string
         sourceCount?: number
+        companyName?: string
+        industry?: string
       } = {}
       try {
         data = raw ? (JSON.parse(raw) as typeof data) : {}
@@ -100,6 +106,8 @@ export function AuditAiDigest() {
         setError(data.error || `Request failed (HTTP ${res.status}).`)
         return
       }
+      if (data.companyName) setCompanyName(data.companyName)
+      if (data.industry) setIndustry(data.industry)
       if (data.digest) {
         setDigest(data.digest as AuditDigest)
         setGeneratedAt(data.generatedAt ?? null)
@@ -124,9 +132,11 @@ export function AuditAiDigest() {
         <div className="flex items-center gap-3">
           <BookOpen className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <h2 className="text-lg font-semibold text-foreground">45 Days of AI in Audit</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              45 Days of AI in {industry || companyName || "Your Market"}
+            </h2>
             <p className="text-[13px] text-muted-foreground mt-0.5">
-              Deep compilation: KPMG, Deloitte, EY, PwC, BDO, Grant Thornton, PCAOB, AICPA.
+              {companyName ? `Market intelligence for ${companyName}.` : "Compile signals from your market."}
               {generatedAt ? ` Last compiled: ${new Date(generatedAt).toLocaleDateString()}.` : ""}
               {sourceCount > 0 ? ` ${sourceCount} sources analyzed.` : ""}
             </p>
@@ -175,7 +185,7 @@ export function AuditAiDigest() {
           <div className="py-12 text-center">
             <p className="text-[13px] text-destructive">{error}</p>
             <p className="text-[12px] text-muted-foreground mt-1">
-              Hit "Compile digest" to pull 45 days of AI-in-audit signals from RSS (including Google News search feeds), then synthesize via Qwen.
+              Hit &quot;Compile digest&quot; to pull 45 days of market signals for your company and synthesize via Qwen.
             </p>
           </div>
         ) : !digest ? (
@@ -183,8 +193,8 @@ export function AuditAiDigest() {
             <BookOpen className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-[14px] text-foreground font-medium">No digest compiled yet</p>
             <p className="text-[12px] text-muted-foreground mt-1 max-w-md mx-auto">
-              This compiles 45 days of AI-in-audit signals from RSS feeds into an in-depth magazine feature.
-              KPMG, Deloitte, EY, PwC, regulators, the full picture.
+              Compiles 45 days of market signals from Google News into an in-depth feature — tailored to{" "}
+              {companyName || "your company"}&apos;s industry, ICP, and competitive landscape.
             </p>
           </div>
         ) : (

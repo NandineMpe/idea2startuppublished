@@ -2,7 +2,16 @@
  * Founder brand workspace — client localStorage.
  */
 
-export const FOUNDER_BRAND_STORAGE_KEY = "juno-founder-brand-v1"
+const FOUNDER_BRAND_STORAGE_KEY_BASE = "juno-founder-brand-v1"
+
+/** Returns a storage key scoped to the org/user so different accounts don't share localStorage. */
+export function founderBrandStorageKey(orgId: string | null | undefined): string {
+  if (!orgId) return FOUNDER_BRAND_STORAGE_KEY_BASE
+  return `${FOUNDER_BRAND_STORAGE_KEY_BASE}:${orgId}`
+}
+
+/** @deprecated Use founderBrandStorageKey(orgId) instead */
+export const FOUNDER_BRAND_STORAGE_KEY = FOUNDER_BRAND_STORAGE_KEY_BASE
 
 /** Planned conversations / content — your own schedule, not auto-generated. */
 export type UpcomingConversationTopic = {
@@ -118,10 +127,11 @@ export function hydrateFounderBrand(partial: Partial<FounderBrandState> | null):
   }
 }
 
-export function loadFounderBrandState(): FounderBrandState {
+export function loadFounderBrandState(orgId?: string | null): FounderBrandState {
   if (typeof window === "undefined") return { ...DEFAULT_FOUNDER_BRAND }
   try {
-    const raw = localStorage.getItem(FOUNDER_BRAND_STORAGE_KEY)
+    const key = founderBrandStorageKey(orgId)
+    const raw = localStorage.getItem(key)
     if (!raw) return { ...DEFAULT_FOUNDER_BRAND }
     return hydrateFounderBrand(JSON.parse(raw) as Partial<FounderBrandState>)
   } catch {
@@ -129,7 +139,8 @@ export function loadFounderBrandState(): FounderBrandState {
   }
 }
 
-export function saveFounderBrandState(state: FounderBrandState) {
+export function saveFounderBrandState(state: FounderBrandState, orgId?: string | null) {
   if (typeof window === "undefined") return
-  localStorage.setItem(FOUNDER_BRAND_STORAGE_KEY, JSON.stringify(state))
+  const key = founderBrandStorageKey(orgId)
+  localStorage.setItem(key, JSON.stringify(state))
 }
