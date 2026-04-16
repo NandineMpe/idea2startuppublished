@@ -30,6 +30,7 @@ const FALLBACK_SUBREDDITS = [
 ]
 
 const SUBREDDIT_CATALOG: CatalogEntry[] = [
+  // ── Founders & Operators ──────────────────────────────────────────────────
   {
     name: "startups",
     reason: "Founders discuss early GTM, positioning, and painful workflow gaps.",
@@ -49,11 +50,24 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["small business", "smb", "owner operator", "local business"],
   },
   {
-    name: "saas",
-    reason: "SaaS buyers and builders compare product, onboarding, and retention choices.",
-    priority: 9,
-    signals: ["saas", "subscription", "churn", "onboarding", "retention"],
+    name: "Entrepreneur_Ride_Along",
+    reason: "Bootstrapped founders share unfiltered build-in-public updates and product decisions.",
+    priority: 8,
+    signals: ["bootstrapped", "indie hacker", "solo founder", "build in public", "side project"],
   },
+  {
+    name: "indiehackers",
+    reason: "Indie builders discuss monetization, tool choices, and early traction experiments.",
+    priority: 8,
+    signals: ["indie hacker", "bootstrapped", "mrr", "solo founder", "side project", "niche product"],
+  },
+  {
+    name: "sideproject",
+    reason: "Builders share early-stage products and get candid feedback on value propositions.",
+    priority: 7,
+    signals: ["side project", "side hustle", "launch", "mvp", "personal project"],
+  },
+  // ── Revenue & Sales ───────────────────────────────────────────────────────
   {
     name: "sales",
     reason: "Revenue teams post candidly about outbound friction, demos, and vendor claims.",
@@ -67,10 +81,35 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["b2b", "enterprise sales", "deal cycle", "procurement", "buying committee"],
   },
   {
+    name: "salestechniques",
+    reason: "Practitioners debate closing tactics, discovery questions, and tool effectiveness.",
+    priority: 7,
+    signals: ["sales technique", "closing", "discovery", "objection handling", "cold call"],
+  },
+  {
+    name: "RevOps",
+    reason: "Revenue Operations teams discuss CRM hygiene, attribution, and stack consolidation.",
+    priority: 8,
+    signals: ["revops", "revenue operations", "crm", "attribution", "stack", "hubspot", "salesforce"],
+  },
+  // ── Product & Growth ──────────────────────────────────────────────────────
+  {
+    name: "saas",
+    reason: "SaaS buyers and builders compare product, onboarding, and retention choices.",
+    priority: 9,
+    signals: ["saas", "subscription", "churn", "onboarding", "retention"],
+  },
+  {
     name: "productmanagement",
     reason: "Product teams map customer jobs, prioritization, and switching constraints.",
     priority: 8,
     signals: ["product manager", "product management", "roadmap", "feature request", "workflow"],
+  },
+  {
+    name: "ProductLed",
+    reason: "PLG practitioners discuss activation, freemium conversion, and self-serve onboarding.",
+    priority: 8,
+    signals: ["product led growth", "plg", "self-serve", "freemium", "activation", "free trial"],
   },
   {
     name: "marketing",
@@ -79,10 +118,28 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["marketing", "demand gen", "positioning", "lead generation", "go to market"],
   },
   {
+    name: "digital_marketing",
+    reason: "Digital marketers debate channel mix, performance, and martech tooling.",
+    priority: 7,
+    signals: ["digital marketing", "paid ads", "ppc", "seo", "social media marketing", "email marketing"],
+  },
+  {
     name: "growthhacking",
     reason: "Practitioners share experiments, conversion issues, and acquisition lessons.",
     priority: 7,
     signals: ["growth", "acquisition", "conversion", "activation", "funnel"],
+  },
+  {
+    name: "SEO",
+    reason: "SEO practitioners discuss rankings, content strategy, and organic channel performance.",
+    priority: 7,
+    signals: ["seo", "search engine", "organic traffic", "content strategy", "backlinks", "serp"],
+  },
+  {
+    name: "content_marketing",
+    reason: "Content teams discuss editorial calendars, distribution, and buyer education.",
+    priority: 6,
+    signals: ["content marketing", "content strategy", "editorial", "thought leadership", "blog"],
   },
   {
     name: "CustomerSuccess",
@@ -90,6 +147,7 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     priority: 7,
     signals: ["customer success", "renewal", "expansion", "onboarding", "adoption"],
   },
+  // ── Finance & Accounting ──────────────────────────────────────────────────
   {
     name: "CFO",
     reason: "Finance leaders discuss budgeting, risk, and software ROI criteria.",
@@ -109,11 +167,49 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["fintech", "payments", "banking", "lending", "financial services"],
   },
   {
-    name: "ecommerce",
-    reason: "Commerce operators discuss tooling gaps, margins, and operational throughput.",
-    priority: 7,
-    signals: ["ecommerce", "shopify", "merchant", "fulfillment", "store operations"],
+    name: "personalfinance",
+    reason: "Consumers and self-employed discuss financial tooling, budgeting apps, and advisor pain.",
+    priority: 6,
+    signals: ["personal finance", "budgeting", "financial planning", "wealth management", "consumer finance"],
   },
+  {
+    name: "investing",
+    reason: "Retail and professional investors discuss platforms, research tools, and portfolio pain.",
+    priority: 6,
+    signals: ["investing", "portfolio", "equity", "asset management", "investment platform"],
+  },
+  // ── HR, People & Recruiting ───────────────────────────────────────────────
+  {
+    name: "humanresources",
+    reason: "HR generalists and leaders discuss compliance, tooling, and workforce pain.",
+    priority: 9,
+    signals: ["hr", "human resources", "people ops", "hris", "employee", "workforce", "talent"],
+  },
+  {
+    name: "recruiting",
+    reason: "Recruiters debate sourcing, ATS pain, and candidate experience gaps.",
+    priority: 9,
+    signals: ["recruiting", "recruiter", "ats", "sourcing", "talent acquisition", "hiring"],
+  },
+  {
+    name: "PeopleManagement",
+    reason: "Managers discuss performance, engagement, and operational people decisions.",
+    priority: 7,
+    signals: ["people management", "manager", "team lead", "performance review", "1on1", "engagement"],
+  },
+  {
+    name: "hrtech",
+    reason: "HR tech buyers and practitioners compare vendors, integrations, and ROI claims.",
+    priority: 8,
+    signals: ["hrtech", "hr software", "payroll software", "hcm", "workforce management"],
+  },
+  {
+    name: "payroll",
+    reason: "Payroll and comp operators discuss compliance edge cases and system pain.",
+    priority: 7,
+    signals: ["payroll", "payroll processing", "payroll software", "compensation", "benefits administration"],
+  },
+  // ── Technology & Engineering ──────────────────────────────────────────────
   {
     name: "devops",
     reason: "Technical operators share delivery, reliability, and toolchain pain points.",
@@ -133,17 +229,54 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["security", "cybersecurity", "compliance", "threat", "vulnerability"],
   },
   {
-    name: "legaladvice",
-    reason: "Legal and regulatory pain points appear here, often with concrete edge cases.",
-    priority: 5,
-    signals: ["legal", "regulation", "compliance", "contract", "policy"],
+    name: "softwarearchitecture",
+    reason: "Engineers debate system design tradeoffs and tooling choices at scale.",
+    priority: 6,
+    signals: ["software architecture", "system design", "api", "microservices", "scalability"],
   },
   {
-    name: "riskmanagement",
-    reason: "Risk professionals discuss controls, exposure, and decision tradeoffs.",
+    name: "webdev",
+    reason: "Web developers discuss tooling, frameworks, and build pipeline decisions.",
     priority: 6,
-    signals: ["risk", "risk management", "governance", "controls", "insurance"],
+    signals: ["web development", "frontend", "backend", "api", "web app", "developer tools"],
   },
+  {
+    name: "nocode",
+    reason: "No-code builders share tooling choices, automation pain, and platform comparisons.",
+    priority: 7,
+    signals: ["no code", "nocode", "low code", "automation", "zapier", "make", "airtable"],
+  },
+  {
+    name: "dataengineering",
+    reason: "Data engineers discuss pipeline reliability, tooling, and warehouse decisions.",
+    priority: 7,
+    signals: ["data engineering", "data pipeline", "etl", "data warehouse", "dbt", "airflow"],
+  },
+  {
+    name: "BusinessIntelligence",
+    reason: "BI teams discuss dashboards, reporting pain, and tool sprawl.",
+    priority: 7,
+    signals: ["business intelligence", "bi", "analytics", "dashboard", "reporting", "tableau", "power bi"],
+  },
+  {
+    name: "MachineLearning",
+    reason: "ML practitioners discuss model deployment, tooling, and production pain.",
+    priority: 6,
+    signals: ["machine learning", "ml", "model", "ai model", "nlp", "llm", "inference"],
+  },
+  {
+    name: "artificial",
+    reason: "AI practitioners and buyers discuss adoption, tooling, and workflow integration.",
+    priority: 7,
+    signals: ["artificial intelligence", "ai tool", "ai software", "generative ai", "ai adoption"],
+  },
+  {
+    name: "LocalLLaMA",
+    reason: "AI-native builders debate model choices, API cost, and on-premise alternatives.",
+    priority: 6,
+    signals: ["llm", "language model", "ai api", "openai", "anthropic", "fine tuning", "embeddings"],
+  },
+  // ── Insurance & Risk ──────────────────────────────────────────────────────
   {
     name: "Insurance",
     reason: "Insurance buyers and operators discuss claims, policy operations, and broker experience.",
@@ -155,6 +288,178 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     reason: "Insurtech builders discuss modernization gaps and adoption blockers.",
     priority: 7,
     signals: ["insurtech", "insurance software", "underwriting tech", "claims automation"],
+  },
+  {
+    name: "riskmanagement",
+    reason: "Risk professionals discuss controls, exposure, and decision tradeoffs.",
+    priority: 6,
+    signals: ["risk", "risk management", "governance", "controls", "insurance"],
+  },
+  // ── Legal & Compliance ────────────────────────────────────────────────────
+  {
+    name: "legaladvice",
+    reason: "Legal and regulatory pain points appear here, often with concrete edge cases.",
+    priority: 5,
+    signals: ["legal", "regulation", "compliance", "contract", "policy"],
+  },
+  {
+    name: "legaltech",
+    reason: "Legal tech buyers compare document management, e-discovery, and contract automation.",
+    priority: 7,
+    signals: ["legaltech", "legal software", "contract management", "e-discovery", "legal operations", "clm"],
+  },
+  {
+    name: "law",
+    reason: "Attorneys and legal ops discuss workflow, billing, and practice management pain.",
+    priority: 6,
+    signals: ["law", "attorney", "lawyer", "legal practice", "law firm", "legal operations"],
+  },
+  // ── Healthcare & Life Sciences ────────────────────────────────────────────
+  {
+    name: "healthcareit",
+    reason: "Healthcare IT buyers discuss EHR pain, interoperability, and vendor lock-in.",
+    priority: 9,
+    signals: ["healthcare it", "ehr", "emr", "health informatics", "interoperability", "hipaa", "clinical workflow"],
+  },
+  {
+    name: "medicine",
+    reason: "Clinicians discuss operational pain, tooling gaps, and workflow inefficiencies.",
+    priority: 7,
+    signals: ["healthcare", "clinical", "physician", "hospital", "medical", "patient care", "health system"],
+  },
+  {
+    name: "nursing",
+    reason: "Nurses surface frontline care delivery friction and documentation pain.",
+    priority: 6,
+    signals: ["nursing", "nurse", "clinical staff", "bedside", "care coordination"],
+  },
+  {
+    name: "medicaldevices",
+    reason: "MedTech professionals discuss regulatory, procurement, and integration challenges.",
+    priority: 7,
+    signals: ["medical device", "medtech", "fda", "regulatory", "clinical trial", "diagnostic"],
+  },
+  {
+    name: "digitalhealth",
+    reason: "Digital health builders and buyers discuss adoption, reimbursement, and interoperability.",
+    priority: 8,
+    signals: ["digital health", "telehealth", "remote patient monitoring", "health app", "wearable", "patient engagement"],
+  },
+  // ── Real Estate & PropTech ────────────────────────────────────────────────
+  {
+    name: "realestateinvesting",
+    reason: "Real estate investors discuss deal analysis, tooling, and portfolio operations.",
+    priority: 7,
+    signals: ["real estate", "property management", "landlord", "investment property", "cap rate", "deal flow"],
+  },
+  {
+    name: "CommercialRealEstate",
+    reason: "CRE professionals discuss leasing, asset management, and market intelligence.",
+    priority: 7,
+    signals: ["commercial real estate", "cre", "office", "retail space", "industrial", "leasing"],
+  },
+  {
+    name: "proptech",
+    reason: "PropTech builders and buyers discuss workflow gaps and platform comparisons.",
+    priority: 8,
+    signals: ["proptech", "real estate software", "property tech", "real estate crm", "property management software"],
+  },
+  // ── Logistics, Supply Chain & Operations ─────────────────────────────────
+  {
+    name: "supplychain",
+    reason: "Supply chain professionals discuss visibility gaps, vendor pain, and planning tools.",
+    priority: 8,
+    signals: ["supply chain", "procurement", "sourcing", "vendor management", "inventory", "logistics"],
+  },
+  {
+    name: "logistics",
+    reason: "Logistics operators discuss routing, last-mile, and TMS platform tradeoffs.",
+    priority: 7,
+    signals: ["logistics", "freight", "shipping", "last mile", "fulfillment", "3pl", "carrier"],
+  },
+  {
+    name: "manufacturing",
+    reason: "Manufacturing operators discuss MES, ERP gaps, and operational throughput.",
+    priority: 7,
+    signals: ["manufacturing", "factory", "production", "industrial", "erp", "mes", "quality control"],
+  },
+  {
+    name: "ecommerce",
+    reason: "Commerce operators discuss tooling gaps, margins, and operational throughput.",
+    priority: 7,
+    signals: ["ecommerce", "shopify", "merchant", "fulfillment", "store operations"],
+  },
+  // ── Education & EdTech ────────────────────────────────────────────────────
+  {
+    name: "edtech",
+    reason: "EdTech builders and buyers discuss LMS gaps, learner engagement, and procurement.",
+    priority: 8,
+    signals: ["edtech", "education technology", "lms", "e-learning", "online learning", "training platform"],
+  },
+  {
+    name: "Teachers",
+    reason: "Educators surface instructional tooling pain and curriculum workflow frustrations.",
+    priority: 6,
+    signals: ["education", "teacher", "classroom", "curriculum", "school", "k12", "higher education"],
+  },
+  {
+    name: "highereducation",
+    reason: "University administrators discuss admissions, student systems, and institutional software.",
+    priority: 6,
+    signals: ["higher education", "university", "college", "admissions", "student information system", "campus"],
+  },
+  // ── Professional Services & Agency ────────────────────────────────────────
+  {
+    name: "consulting",
+    reason: "Consultants and agency owners discuss project delivery, tooling, and client operations.",
+    priority: 7,
+    signals: ["consulting", "consultant", "professional services", "advisory", "management consulting"],
+  },
+  {
+    name: "agency",
+    reason: "Agency operators discuss workflow, client management, and service delivery tools.",
+    priority: 7,
+    signals: ["agency", "marketing agency", "digital agency", "creative agency", "client work"],
+  },
+  {
+    name: "freelance",
+    reason: "Freelancers discuss client management, invoicing, and productivity tooling.",
+    priority: 6,
+    signals: ["freelance", "freelancer", "independent contractor", "solopreneur", "gig work"],
+  },
+  // ── Non-profit & Social Impact ────────────────────────────────────────────
+  {
+    name: "nonprofit",
+    reason: "Non-profit operators discuss donor management, grant tooling, and operational constraints.",
+    priority: 6,
+    signals: ["nonprofit", "non-profit", "charity", "foundation", "social impact", "donor management"],
+  },
+  // ── Hospitality & Food Service ────────────────────────────────────────────
+  {
+    name: "restaurantowners",
+    reason: "Restaurant operators discuss POS pain, staffing, and operational tooling decisions.",
+    priority: 7,
+    signals: ["restaurant", "food service", "hospitality", "pos system", "table management", "qsr"],
+  },
+  // ── Construction & Trades ─────────────────────────────────────────────────
+  {
+    name: "Construction",
+    reason: "Construction operators discuss project management, estimating, and subcontractor tools.",
+    priority: 7,
+    signals: ["construction", "general contractor", "subcontractor", "project management", "estimating", "jobsite"],
+  },
+  // ── Project Management & Productivity ─────────────────────────────────────
+  {
+    name: "projectmanagement",
+    reason: "PMs discuss tooling choices, workflow pain, and cross-team coordination gaps.",
+    priority: 7,
+    signals: ["project management", "project manager", "pm tool", "gantt", "agile", "jira", "notion"],
+  },
+  {
+    name: "productivity",
+    reason: "Knowledge workers discuss workflow optimization, tool stacks, and automation.",
+    priority: 6,
+    signals: ["productivity", "workflow", "automation", "tool stack", "efficiency", "time management"],
   },
 ]
 
@@ -358,7 +663,7 @@ async function llmSuggestionsFromContext(
   const { profile, promptBlock, extracted } = context
   const icp = [...(profile.icp ?? []), ...(extracted.icp ?? [])].filter(Boolean).slice(0, 10)
 
-  const user = `You are helping a founder choose Reddit communities for customer research.
+  const user = `You are helping a founder discover Reddit communities for customer research and buyer intent monitoring.
 
 Company: ${profile.name || "Unknown"}
 Industry: ${profile.industry || extracted.vertical || "unknown"}
@@ -367,13 +672,23 @@ ICP: ${icp.join(", ").slice(0, 600)}
 Context (compressed):
 ${promptBlock.slice(0, 7000)}
 
-Deterministic starter list (already context-matched):
-${heuristic.map((s, idx) => `${idx + 1}. ${s.name} - ${s.reason}`).join("\n")}
+Starter list already identified (DO NOT repeat these):
+${heuristic.map((s) => s.name).join(", ")}
+
+Your job: find ADDITIONAL subreddits the starter list missed.
+
+Think across these discovery angles:
+1. Role/persona communities — where does the ICP spend time? (e.g. r/humanresources, r/recruiting, r/CFO, r/nursing)
+2. Industry verticals — niche industry forums the ICP would be in (e.g. r/healthcareit, r/legaltech, r/supplychain)
+3. Problem/pain communities — forums organized around the problem being solved (e.g. r/payroll, r/nocode, r/dataengineering)
+4. Tool/platform communities — subreddits for tools the ICP currently uses or evaluates (e.g. r/salesforce, r/hubspot, r/notion)
+5. Competitor communities — where users complain about or compare alternatives
+6. Adjacent buyer communities — colleagues or influencers who affect the buying decision
 
 Return a JSON array only, no markdown.
-Each item must be: {"name":"subreddit_slug","reason":"one sentence"}.
-Use 8 to 12 items, no r/ prefix, letters/numbers/underscore only.
-Prefer communities where buyers/operators discuss procurement, workflow pain, vendor comparisons, or switching decisions.`
+Each item must be: {"name":"subreddit_slug","reason":"one sentence explaining why buyers here are relevant"}.
+Return 15 to 20 items, no r/ prefix, letters/numbers/underscore only, each subreddit must actually exist on Reddit.
+Prefer communities where real buyers discuss workflow pain, vendor comparisons, procurement decisions, or switching costs.`
 
   try {
     const { text } = await generateText({
