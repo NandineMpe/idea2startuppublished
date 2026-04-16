@@ -290,6 +290,36 @@ const SUBREDDIT_CATALOG: CatalogEntry[] = [
     signals: ["insurtech", "insurance software", "underwriting tech", "claims automation"],
   },
   {
+    name: "InsuranceAgent",
+    reason: "Agents and brokers surface day-to-day workflow pain, carrier comparison, and commission frustrations.",
+    priority: 8,
+    signals: ["insurance agent", "broker", "p&c", "carrier", "commission", "agency management"],
+  },
+  {
+    name: "HealthInsurance",
+    reason: "Health insurance buyers and administrators discuss plan selection, billing, and coverage gaps.",
+    priority: 7,
+    signals: ["health insurance", "benefits", "group health", "self-insured", "stop-loss", "payer"],
+  },
+  {
+    name: "CommercialInsurance",
+    reason: "Commercial lines professionals discuss complex risk placement and client operations.",
+    priority: 8,
+    signals: ["commercial insurance", "commercial lines", "gl", "e&o", "d&o", "cyber insurance", "excess surplus"],
+  },
+  {
+    name: "actuaries",
+    reason: "Actuaries discuss pricing models, reserving, and data quality challenges in insurance.",
+    priority: 7,
+    signals: ["actuarial", "actuary", "reserving", "pricing model", "loss ratio", "mortality", "life insurance"],
+  },
+  {
+    name: "Compliance",
+    reason: "Compliance officers discuss regulatory requirements, audit readiness, and control frameworks.",
+    priority: 7,
+    signals: ["compliance", "regulatory", "audit", "controls", "insurance regulation", "state filing"],
+  },
+  {
     name: "riskmanagement",
     reason: "Risk professionals discuss controls, exposure, and decision tradeoffs.",
     priority: 6,
