@@ -70,7 +70,7 @@ const PIPELINES: Pipeline[] = [
   {
     id: "intent",
     title: "Behavioral updates",
-    subtitle: "Reddit customer research across target subreddits: pains, workarounds, buying behavior, and switching forces.",
+    subtitle: "Customer research across target communities: pains, workarounds, buying behavior, and switching forces.",
     schedule: "Scheduled - every 4h",
     href: "/dashboard#reddit-intent-signals",
     icon: FlaskConical,
@@ -82,7 +82,7 @@ const PIPELINES: Pipeline[] = [
   {
     id: "cto",
     title: "Tech radar",
-    subtitle: "arXiv + HN to trends and technical post suggestions.",
+    subtitle: "Emerging trends and technical post suggestions tailored to your stack.",
     schedule: "Scheduled - ~06:00 daily",
     href: "/dashboard/team",
     icon: Cpu,
@@ -265,7 +265,7 @@ function PipelineLatestOutput({
       return (
         <div className="space-y-2">
           <p className="rounded-md border border-dashed border-border bg-muted/20 px-2 py-1.5 text-[11px] italic text-muted-foreground/80">
-            No behavioral snapshot saved yet. Run the Reddit scan and the latest customer research will appear here.
+            No behavioral snapshot saved yet. Run the customer research scan and the latest insights will appear here.
           </p>
           {feed.hotIntentCount > 0 ? (
             <PipelineTitleLink
@@ -473,7 +473,7 @@ export function IntelligencePipelines() {
             pipeline === "cbs"
               ? "Brief run finished. Signal feed and this card are updated."
               : pipeline === "intent"
-                ? "Behavioral updates refreshed. Reddit customer research and thread evidence are updated below."
+                ? "Behavioral updates refreshed. Customer research and thread evidence are updated below."
                 : pipeline === "cto"
                   ? "Tech radar refreshed. Latest trends and technical suggestions are updated."
                 : "Run finished and the card has been updated."

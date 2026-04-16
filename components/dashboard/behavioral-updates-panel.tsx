@@ -461,7 +461,7 @@ export function BehavioralUpdatesPanel() {
             </p>
             <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-foreground">
               <Brain className="h-5 w-5 shrink-0 text-orange-500" />
-              Reddit customer research
+              Customer research
             </h2>
             <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-muted-foreground">
               Secondary customer research from live subreddit discussions. This is where we map what people want,
@@ -725,7 +725,7 @@ export function BehavioralUpdatesPanel() {
         {loading && !data ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/15 px-4 py-5 text-[13px] text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading Reddit customer research...
+            Loading customer research...
           </div>
         ) : null}
 
@@ -921,7 +921,7 @@ export function BehavioralUpdatesPanel() {
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") void askQuestion() }}
-                  placeholder="e.g. At what stage are companies buying audit services?"
+                  placeholder={`e.g. What problems are ${data?.companyName ? `${data.companyName}'s` : "your"} target customers struggling with most?`}
                   className="h-9 text-[13px]"
                   disabled={querying}
                 />
