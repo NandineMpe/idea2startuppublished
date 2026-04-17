@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { normalizeReferralCodeParam } from '@/lib/referral-code'
+import {
+    PREVIEW_MODE_COOKIE,
+    isMutatingMethod,
+    isPreviewApiAllowed,
+} from '@/lib/preview-mode'
 
 function applyReferralCaptureCookie(response: NextResponse, ref: string | null) {
     if (!ref) return
@@ -15,6 +20,19 @@ function applyReferralCaptureCookie(response: NextResponse, ref: string | null) 
 
 export async function updateSession(request: NextRequest) {
     const refFromQuery = normalizeReferralCodeParam(request.nextUrl.searchParams.get('ref'))
+
+    const previewSlug = request.cookies.get(PREVIEW_MODE_COOKIE)?.value?.trim() || null
+    if (
+        previewSlug &&
+        request.nextUrl.pathname.startsWith('/api/') &&
+        !isPreviewApiAllowed(request.nextUrl.pathname) &&
+        isMutatingMethod(request.method)
+    ) {
+        return NextResponse.json(
+            { error: 'Read-only preview. Sign in to make changes.' },
+            { status: 403 },
+        )
+    }
 
     let supabaseResponse = NextResponse.next({
         request,
