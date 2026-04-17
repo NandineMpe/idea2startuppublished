@@ -8,7 +8,6 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAppUrl } from "@/lib/app-url"
 import { PREVIEW_LABEL_COOKIE, PREVIEW_MODE_COOKIE } from "@/lib/preview-mode"
 
 export const dynamic = "force-dynamic"
@@ -26,9 +25,9 @@ async function clearPreview() {
   cookieStore.delete(PREVIEW_LABEL_COOKIE)
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await clearPreview()
-  return NextResponse.redirect(new URL("/login", resolveAppUrl()))
+  return NextResponse.redirect(new URL("/login", request.url))
 }
 
 export async function POST() {

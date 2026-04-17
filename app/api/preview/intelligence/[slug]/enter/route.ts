@@ -14,30 +14,29 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
-import { resolveAppUrl } from "@/lib/app-url"
 import { getIntelligencePreviewShareBySlug } from "@/lib/intelligence-preview"
 import { PREVIEW_LABEL_COOKIE, PREVIEW_MODE_COOKIE } from "@/lib/preview-mode"
 
 export const dynamic = "force-dynamic"
 
-function backToLanding(reason: string, slug: string) {
-  const url = new URL(`/preview/intelligence/${encodeURIComponent(slug)}`, resolveAppUrl())
+function backToLanding(request: Request, reason: string, slug: string) {
+  const url = new URL(`/preview/intelligence/${encodeURIComponent(slug)}`, request.url)
   url.searchParams.set("error", reason)
   return NextResponse.redirect(url)
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await context.params
   const share = await getIntelligencePreviewShareBySlug(slug)
-  if (!share) return backToLanding("not_found", slug)
+  if (!share) return backToLanding(request, "not_found", slug)
 
   const { data: userRes, error: userErr } = await supabaseAdmin.auth.admin.getUserById(share.userId)
   if (userErr || !userRes?.user?.email) {
     console.error("[preview/enter] getUserById failed:", userErr?.message)
-    return backToLanding("user_missing", slug)
+    return backToLanding(request, "user_missing", slug)
   }
   const email = userRes.user.email
 
@@ -47,12 +46,12 @@ export async function GET(
   })
   if (linkErr) {
     console.error("[preview/enter] generateLink failed:", linkErr.message)
-    return backToLanding("link_failed", slug)
+    return backToLanding(request, "link_failed", slug)
   }
   const tokenHash = linkData?.properties?.hashed_token
   if (!tokenHash) {
     console.error("[preview/enter] missing hashed_token in generateLink response")
-    return backToLanding("link_failed", slug)
+    return backToLanding(request, "link_failed", slug)
   }
 
   const supabase = await createClient()
@@ -62,7 +61,7 @@ export async function GET(
   })
   if (verifyErr) {
     console.error("[preview/enter] verifyOtp failed:", verifyErr.message)
-    return backToLanding("verify_failed", slug)
+    return backToLanding(request, "verify_failed", slug)
   }
 
   const cookieStore = await cookies()
@@ -76,5 +75,5 @@ export async function GET(
   cookieStore.set(PREVIEW_MODE_COOKIE, share.slug, cookieOptions)
   cookieStore.set(PREVIEW_LABEL_COOKIE, share.label, cookieOptions)
 
-  return NextResponse.redirect(new URL("/dashboard", resolveAppUrl()))
+  return NextResponse.redirect(new URL("/dashboard", request.url))
 }
