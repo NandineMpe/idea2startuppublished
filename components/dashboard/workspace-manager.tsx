@@ -110,6 +110,14 @@ export function WorkspaceManager() {
     toast({ title: "Intake link copied" })
   }
 
+  async function handleCopyPreview(intakePath: string) {
+    // intakePath is /intake/{token} — reuse same token for /preview/{token}
+    const token = intakePath.replace("/intake/", "")
+    const url = `${window.location.origin}/preview/${token}`
+    await navigator.clipboard.writeText(url)
+    toast({ title: "Preview link copied", description: "Anyone with this link can view the workspace — no login needed." })
+  }
+
   return (
     <div className="space-y-6">
       <Card className="glass-card border-border">
@@ -238,10 +246,18 @@ export function WorkspaceManager() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => void handleCopyPreview(workspace.intakePath)}
+                        >
+                          <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                          Share preview
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => void handleCopy(workspace.intakePath)}
                         >
                           <Copy className="mr-2 h-3.5 w-3.5" />
-                          Copy link
+                          Copy intake link
                         </Button>
                         <Button
                           variant="outline"

@@ -14,6 +14,7 @@ import {
   Lock,
   Plug,
   RefreshCw,
+  Search,
   ShieldCheck,
   Unlock,
   Link2,
@@ -25,6 +26,10 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import type { PipedreamAccountPublic } from "@/lib/pipedream-serialize-account"
 import { latestPipedreamActivityIso } from "@/lib/pipedream-serialize-account"
+import { Input } from "@/components/ui/input"
+
+/** Unique categories extracted from the APPS catalog (computed once at module level below) */
+let ALL_CATEGORIES: string[] = []
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +53,27 @@ type AppDefinition = {
 }
 
 // ─── App logos (inline SVG) ───────────────────────────────────────────────────
+
+/** Generic fallback: colored circle with 1-2 letter abbreviation */
+function SimpleAppLogo({ letters, bg, fg = "#fff" }: { letters: string; bg: string; fg?: string }) {
+  return (
+    <svg viewBox="0 0 28 28" className="h-7 w-7">
+      <rect width="28" height="28" rx="7" fill={bg} />
+      <text
+        x="14"
+        y="14"
+        dominantBaseline="central"
+        textAnchor="middle"
+        fontSize={letters.length === 1 ? "14" : "11"}
+        fontWeight="700"
+        fontFamily="system-ui,sans-serif"
+        fill={fg}
+      >
+        {letters}
+      </text>
+    </svg>
+  )
+}
 
 function GithubLogo() {
   return (
@@ -187,16 +213,470 @@ function ZohoMailLogo() {
   )
 }
 
+function SalesforceLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#00A1E0">
+      <path d="M10.034 5.678c.67-.696 1.604-1.13 2.64-1.13 1.347 0 2.527.705 3.198 1.764a4.437 4.437 0 0 1 1.81-.385c2.458 0 4.452 2.003 4.452 4.474 0 2.47-1.994 4.474-4.453 4.474a4.42 4.42 0 0 1-.89-.09 3.36 3.36 0 0 1-3.028 1.911 3.344 3.344 0 0 1-1.375-.297 3.998 3.998 0 0 1-3.797 2.723c-1.741 0-3.22-1.105-3.778-2.659a3.196 3.196 0 0 1-.632.063C2.44 16.526 1 15.077 1 13.285c0-1.138.58-2.139 1.455-2.716a3.805 3.805 0 0 1-.17-1.132C2.285 7.432 3.997 5.71 6.111 5.71c1.468 0 2.75.826 3.423 2.047.111-.697.345-1.388.5-2.079z"/>
+    </svg>
+  )
+}
+
+function MailchimpLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#FFE01B">
+      <rect width="24" height="24" rx="5" fill="#FFE01B"/>
+      <path d="M19.5 11.5c-.3-.4-.8-.5-1.3-.3-.1-1.6-1.5-2.9-3.2-2.9-1.3 0-2.4.7-3 1.8-.3-.1-.7-.1-1 0C10.3 9.4 9.5 8.5 8.5 8.5c-1.1 0-2 .9-2 2 0 .3.1.7.2 1-.5.5-.7 1.1-.7 1.8 0 1.7 1.4 3 3.1 3 .5 0 1-.1 1.4-.4.4.3.9.4 1.5.4.5 0 .9-.1 1.3-.3.6.5 1.4.8 2.2.8 1.9 0 3.5-1.6 3.5-3.5 0-.5-.1-1-.5-1.8z" fill="#241C15"/>
+    </svg>
+  )
+}
+
+function TwilioLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#F22F46">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 20.8a8.8 8.8 0 1 1 0-17.6 8.8 8.8 0 0 1 0 17.6zm-2.4-9.6a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zm4.8 0a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zm-4.8 4.8a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zm4.8 0a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z"/>
+    </svg>
+  )
+}
+
+function SendGridLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <rect width="24" height="24" rx="4" fill="#1A82E2"/>
+      <path d="M4 8h6v6H4zM10 8h6v6h-6zM16 8h4v6h-4zM4 14h6v4H4zM10 14h6v4h-6z" fill="#fff" fillOpacity="0.9"/>
+    </svg>
+  )
+}
+
+function TelegramLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#26A5E4">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  )
+}
+
+function OpenAILogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.032.067L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.843-3.372L15.115 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+    </svg>
+  )
+}
+
+function JiraLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M11.975 0C8.775 5.4 9.975 9 12.375 11.4L17.775 6c-3-3-3.6-4.8-5.8-6z" fill="#2684FF"/>
+      <path d="M11.975 0C8.775 5.4 9.975 9 12.375 11.4L17.775 6c-3-3-3.6-4.8-5.8-6z" fill="url(#a)"/>
+      <path d="M12.375 11.4c-3.6 3-5.4 7.2-2.4 12 2.4-2.4 5.4-4.8 8.4-7.2L12.375 11.4z" fill="#2684FF"/>
+      <path d="M12.375 11.4c-3.6 3-5.4 7.2-2.4 12 2.4-2.4 5.4-4.8 8.4-7.2L12.375 11.4z" fill="url(#b)"/>
+      <defs>
+        <linearGradient id="a" x1="17.5" y1="6.3" x2="12" y2="0" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#0052CC"/>
+          <stop offset="1" stopColor="#2684FF"/>
+        </linearGradient>
+        <linearGradient id="b" x1="9.8" y1="23" x2="18" y2="16" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#0052CC"/>
+          <stop offset="1" stopColor="#2684FF"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+function TrelloLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#0052CC">
+      <path d="M21 0H3C1.343 0 0 1.343 0 3v18c0 1.657 1.343 3 3 3h18c1.657 0 3-1.343 3-3V3c0-1.657-1.343-3-3-3zM10.44 18.18c0 .795-.645 1.44-1.44 1.44H4.56c-.795 0-1.44-.645-1.44-1.44V4.56c0-.795.645-1.44 1.44-1.44H9c.795 0 1.44.645 1.44 1.44v13.62zm10.44-6c0 .795-.645 1.44-1.44 1.44H15c-.795 0-1.44-.645-1.44-1.44V4.56c0-.795.645-1.44 1.44-1.44h4.44c.795 0 1.44.645 1.44 1.44v7.62z"/>
+    </svg>
+  )
+}
+
+function AsanaLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <circle cx="12" cy="5.5" r="4" fill="#FC636B"/>
+      <circle cx="5.5" cy="16" r="4" fill="#FC636B"/>
+      <circle cx="18.5" cy="16" r="4" fill="#FC636B"/>
+    </svg>
+  )
+}
+
+function TypeformLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#262627">
+      <rect width="24" height="24" rx="6" fill="#262627"/>
+      <path d="M7 8h10M12 8v8" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function CalendlyLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <rect width="24" height="24" rx="6" fill="#006BFF"/>
+      <rect x="5" y="7" width="14" height="13" rx="2" stroke="#fff" strokeWidth="1.5" fill="none"/>
+      <path d="M8 5v4M16 5v4M5 12h14" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function GitLabLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z" fill="#FC6D26"/>
+    </svg>
+  )
+}
+
+function WebflowLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#4353FF">
+      <path d="M17.682 7.282c-1.646 4.407-2.53 6.6-3.282 9.065C13.594 13.37 12.7 10.76 12 8.6c-1.53 4.05-2.377 6.315-3.146 8.695C7.706 14.028 6.775 11.4 6 9H2.5l5 10.5L11 9l1 3.5 4 7.5L21.5 9l-.5-1.718z"/>
+    </svg>
+  )
+}
+
+function LinearLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <rect width="24" height="24" rx="6" fill="#5E6AD2"/>
+      <path d="M5 14.5L9.5 19M5 10l9 9M7 5l12 12M13 5l6 6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function SupabaseLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M11.9 2.1L3 15h10l-1 6.9 9-12.9H12l-.1-6.9z" fill="#3ECF8E"/>
+    </svg>
+  )
+}
+
+function CloudflareLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#F48120">
+      <path d="M16.5 14.3c.1-.3.1-.6 0-.9l.9-.5c.1 0 .1-.1.1-.2l-.9-1.5c0-.1-.2-.1-.3-.1l-1 .4c-.2-.2-.5-.3-.8-.4l-.2-1c0-.1-.1-.2-.2-.2h-1.7c-.1 0-.2.1-.2.2l-.2 1c-.3.1-.5.3-.8.4l-1-.4c-.1 0-.2 0-.3.1l-.9 1.5c0 .1 0 .2.1.2l.9.5c-.1.3-.1.6 0 .9l-.9.5c-.1 0-.1.1-.1.2l.9 1.5c0 .1.2.1.3.1l1-.4c.2.2.5.3.8.4l.2 1c0 .1.1.2.2.2h1.7c.1 0 .2-.1.2-.2l.2-1c.3-.1.5-.3.8-.4l1 .4c.1 0 .2 0 .3-.1l.9-1.5c0-.1 0-.2-.1-.2l-.9-.5zM12 15.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4z"/>
+      <path d="M20.7 9.2l-.5-.3c0-.2 0-.4-.1-.5l.5-.3c.1 0 .1-.1 0-.2l-.5-.8c0-.1-.1-.1-.2 0l-.5.2-.4-.2-.1-.6c0-.1 0-.1-.1-.1h-.9c-.1 0-.1 0-.1.1l-.1.6-.4.2-.5-.2c-.1 0-.2 0-.2 0l-.5.8c0 .1 0 .2.1.2l.5.3c0 .2 0 .4.1.5l-.5.3c-.1 0-.1.1 0 .2l.5.8c0 .1.1.1.2 0l.5-.2.4.2.1.6c0 .1 0 .1.1.1h.9c.1 0 .1 0 .1-.1l.1-.6.4-.2.5.2c.1 0 .2 0 .2 0l.5-.8c.1-.1.1-.2 0-.2zm-2.3 1a.9.9 0 1 1 0-1.8.9.9 0 0 1 0 1.8z"/>
+    </svg>
+  )
+}
+
+function SentryLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#362D59">
+      <path d="M14.007 0a1.95 1.95 0 0 0-1.682.968L.205 21.688a1.906 1.906 0 0 0 1.682 2.844H6.25a1.903 1.903 0 0 0 0-.633 12.41 12.41 0 0 1-1.04-2.207H2.536l9.773-16.934 5.814 10.076a12.23 12.23 0 0 0-3.637 1.852l-1.12-1.94a8.52 8.52 0 0 0-4.54 7.509 8.56 8.56 0 0 0 .086 1.277H5.087A10.282 10.282 0 0 1 5 21.293a10.528 10.528 0 0 1 5.557-9.258l-1.307-2.265A12.78 12.78 0 0 0 2.63 21.293a12.618 12.618 0 0 0 .125 1.806.64.64 0 0 0 .633.533h4.124a8.507 8.507 0 0 1-.129-1.473 8.526 8.526 0 0 1 8.526-8.526 8.59 8.59 0 0 1 .925.05l1.22 2.114a6.218 6.218 0 0 0-2.145-.375 6.244 6.244 0 0 0-6.244 6.244 6.245 6.245 0 0 0 .153 1.366H16.5a1.9 1.9 0 0 0 1.64-.952l5.656-9.799a1.946 1.946 0 0 0-1.674-2.938h-.516l-5.917 10.251a4.007 4.007 0 0 1-.302-1.562 4.027 4.027 0 0 1 4.027-4.027 4.027 4.027 0 0 1 .91.104l2.13-3.691h.516a4.2 4.2 0 0 0-.147-8.397z" fill="#362D59"/>
+    </svg>
+  )
+}
+
+function GoogleDriveLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M16.01 8.5L12 1.5 7.99 8.5h8.02z" fill="#FBBC04"/>
+      <path d="M1.5 20.5l4-6.93L9.49 8.5H.51L1.5 20.5z" fill="#4285F4"/>
+      <path d="M22.5 20.5l-1-12-8.49.05 4 6.93 5.49-1z" fill="#34A853"/>
+      <path d="M7.99 8.5l-4 6.93L1.5 20.5h21l-2.5-5.07L16 8.5H7.99z" fill="#EA4335" fillOpacity="0.2"/>
+      <path d="M1.5 20.5h21l-4-6.93H5.5L1.5 20.5z" fill="#EA4335"/>
+    </svg>
+  )
+}
+
+function GoogleDocLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M14.727 0H3.272A1.09 1.09 0 0 0 2.182 1.09v21.82A1.09 1.09 0 0 0 3.273 24h17.454a1.09 1.09 0 0 0 1.091-1.09V7.09L14.727 0z" fill="#4285F4"/>
+      <path d="M14.727 0v7.09h7.091L14.727 0z" fill="#3367D6"/>
+      <path d="M6.545 11.455h10.91v1.363H6.545zm0 2.727h10.91v1.363H6.545zm0 2.727h7.273v1.363H6.545z" fill="#fff"/>
+    </svg>
+  )
+}
+
+function DropboxLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#0061FF">
+      <path d="M6 1.5L0 5.25l6 3.75 6-3.75L6 1.5zm12 0l-6 3.75 6 3.75 6-3.75L18 1.5zM0 12.75l6 3.75 6-3.75-6-3.75-6 3.75zm18-3.75l-6 3.75 6 3.75 6-3.75-6-3.75zM6 17.625l6 3.75 6-3.75-6-3.75-6 3.75z"/>
+    </svg>
+  )
+}
+
+function MicrosoftTeamsLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M19.5 8.25a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5z" fill="#7B83EB"/>
+      <path d="M23.25 9.75h-7.5v5.25a4.5 4.5 0 0 0 4.5 4.5h.75a2.25 2.25 0 0 0 2.25-2.25V12a2.25 2.25 0 0 0-2.25-2.25h1.25z" fill="#7B83EB"/>
+      <path d="M9.75 3a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5z" fill="#7B83EB"/>
+      <path d="M14.25 11.25H3A2.25 2.25 0 0 0 .75 13.5v6.75A5.25 5.25 0 0 0 6 25.5h7.5a2.25 2.25 0 0 0 2.25-2.25V13.5a2.25 2.25 0 0 0-1.5-2.25z" fill="#7B83EB"/>
+    </svg>
+  )
+}
+
+function PipedriveLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#1A73E8">
+      <rect width="24" height="24" rx="6" fill="#1A73E8"/>
+      <path d="M12 5.5a6.5 6.5 0 0 0-3.5 12v2.5h7v-2.5A6.5 6.5 0 0 0 12 5.5z" fill="#fff"/>
+      <circle cx="12" cy="11" r="2.5" fill="#1A73E8"/>
+    </svg>
+  )
+}
+
+function ZendeskLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#03363D">
+      <path d="M11 7.5c0-3.04-2.46-5.5-5.5-5.5S0 4.46 0 7.5V18h11V7.5zm13 9c0 3.04-2.46 5.5-5.5 5.5S13 19.54 13 16.5V6h11v10.5zM13 5l11-3v3H13zM11 19L0 22v-3h11z"/>
+    </svg>
+  )
+}
+
+function IntercomLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#1F8DED">
+      <path d="M22 0H2C.9 0 0 .9 0 2v20c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V2c0-1.1-.9-2-2-2zm-4.6 16.7c-1.8 1.3-4 2-6.4 2s-4.6-.7-6.4-2c-.3-.2-.4-.7-.1-1 .2-.3.7-.4 1-.1 1.5 1.1 3.4 1.7 5.5 1.7s4-.6 5.5-1.7c.3-.2.8-.2 1 .1.2.3.2.8-.1 1zM6 11a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3-3a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3 1a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3-1a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3 3a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
+    </svg>
+  )
+}
+
+function FreshdeskLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#25C16F">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5 13h-4v4a1 1 0 0 1-2 0v-4H7a1 1 0 0 1 0-2h4V7a1 1 0 0 1 2 0v4h4a1 1 0 0 1 0 2z"/>
+    </svg>
+  )
+}
+
+function MondayLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <circle cx="4.5" cy="16.5" r="3.5" fill="#FF3D57"/>
+      <circle cx="12" cy="16.5" r="3.5" fill="#FFCB00"/>
+      <circle cx="19.5" cy="16.5" r="3.5" fill="#00CA72"/>
+    </svg>
+  )
+}
+
+function ClickUpLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M2 16.5l4-6 4 4.5 4-6 4 4.5 4-6" stroke="#7B68EE" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function ActiveCampaignLogo() {
+  return <SimpleAppLogo letters="AC" bg="#356AE6" />
+}
+
+function KlaviyoLogo() {
+  return <SimpleAppLogo letters="K" bg="#1D1D1D" />
+}
+
+function InstagramLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="url(#ig-grad)">
+      <defs>
+        <linearGradient id="ig-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#FFC107"/>
+          <stop offset="50%" stopColor="#E91E63"/>
+          <stop offset="100%" stopColor="#9C27B0"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+    </svg>
+  )
+}
+
+function YouTubeLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#FF0000">
+      <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/>
+    </svg>
+  )
+}
+
+function FacebookLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#1877F2">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    </svg>
+  )
+}
+
+function TikTokLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+    </svg>
+  )
+}
+
+function RedditLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#FF4500">
+      <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+    </svg>
+  )
+}
+
+function WordPressLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#21759B">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zM2.177 12a9.823 9.823 0 0 1 1.485-5.227l4.177 11.44A9.83 9.83 0 0 1 2.177 12zm9.823 9.823a9.83 9.83 0 0 1-2.765-.398l2.937-8.535 3.008 8.232c.019.048.042.092.066.135a9.831 9.831 0 0 1-3.246.566zm1.288-13.306c.562-.03 1.069-.089 1.069-.089.503-.059.445-.798-.058-.769 0 0-1.513.119-2.49.119-.919 0-2.462-.119-2.462-.119-.503-.029-.562.739-.059.769 0 0 .478.059.981.089l1.457 3.992-2.047 6.137-3.404-9.129c.562-.03 1.069-.089 1.069-.089.504-.059.445-.798-.058-.769 0 0-1.512.119-2.49.119a14.09 14.09 0 0 1-.576-.012 9.831 9.831 0 0 1 14.845-2.12c-.033-.003-.064-.007-.098-.007-.919 0-1.572.799-1.572 1.659 0 .769.444 1.42.919 2.189.356.622.771 1.42.771 2.572 0 .799-.307 1.725-.711 3.015l-.933 3.115-3.373-10.032zm6.018 11.93l2.975-8.59c.556-1.39.742-2.503.742-3.496 0-.359-.024-.692-.067-1.006A9.825 9.825 0 0 1 21.824 12a9.823 9.823 0 0 1-2.518 6.447z"/>
+    </svg>
+  )
+}
+
+function PayPalLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.59 3.025-2.566 6.082-8.558 6.082H9.828c-.524 0-.968.382-1.05.9l-1.42 8.99-.398 2.52a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788l.038-.199.735-4.653.047-.258c.073-.454.462-.788.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.764-4.47z" fill="#003087"/>
+    </svg>
+  )
+}
+
+function SquareLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#28B446">
+      <path d="M19.5 0h-15C2.015 0 0 2.015 0 4.5v15C0 21.985 2.015 24 4.5 24h15c2.485 0 4.5-2.015 4.5-4.5v-15C24 2.015 21.985 0 19.5 0zM16 16a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v7z"/>
+    </svg>
+  )
+}
+
+function XeroLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#13B5EA">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-1.024 15.823L8.2 13.043l-2.803 2.78a.734.734 0 1 1-1.034-1.04l2.8-2.777-2.8-2.778a.733.733 0 1 1 1.034-1.038l2.796 2.773 2.79-2.773a.733.733 0 1 1 1.034 1.038l-2.793 2.778 2.793 2.777a.734.734 0 0 1-1.034 1.04zM17.4 16a.733.733 0 0 1-.7-.521l-1.976-6.547-1.023 2.284a.733.733 0 0 1-1.336-.6l1.601-3.574a.733.733 0 0 1 1.36.1l2.776 9.193A.734.734 0 0 1 17.4 16z"/>
+    </svg>
+  )
+}
+
+function GoogleAnalyticsLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <rect x="1" y="11" width="5" height="12" rx="2" fill="#F9AB00"/>
+      <rect x="9.5" y="5" width="5" height="18" rx="2" fill="#E37400"/>
+      <rect x="18" y="1" width="5" height="22" rx="2" fill="#E37400"/>
+    </svg>
+  )
+}
+
+function MixpanelLogo() {
+  return <SimpleAppLogo letters="M" bg="#7856FF" />
+}
+
+function SegmentLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#52BD94">
+      <path d="M14.578 2.094a10.015 10.015 0 0 0-9.15 3.67A10.013 10.013 0 0 0 2.1 14.576a.75.75 0 0 0 .738.624h4.526a.75.75 0 0 0 .746-.668 4.504 4.504 0 0 1 4.452-4.032h9a.75.75 0 0 0 .75-.75V5.224a.75.75 0 0 0-.624-.738 10.08 10.08 0 0 0-7.11-2.392zm-.328 13.656h-4.5a.75.75 0 0 0-.75.75v4.5a.75.75 0 0 0 .624.74 10.013 10.013 0 0 0 8.61-2.654 10.013 10.013 0 0 0 2.652-8.61.75.75 0 0 0-.738-.624h-4.524a.75.75 0 0 0-.746.668 4.504 4.504 0 0 1-4.452 4.032H2.85a.75.75 0 0 0-.75.75v4.5a.75.75 0 0 0 .75.75h9a.75.75 0 0 0 .738-.624 4.503 4.503 0 0 1 4.452-4.032h.468z"/>
+    </svg>
+  )
+}
+
+function SnowflakeLogo() {
+  return <SimpleAppLogo letters="SF" bg="#29B5E8" />
+}
+
+function AmplitudeLogo() {
+  return <SimpleAppLogo letters="A" bg="#1DA462" />
+}
+
+function PinterestLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#BD081C">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.084 3.163 9.426 7.627 11.174-.105-.949-.2-2.405.042-3.441.218-.937 1.407-5.965 1.407-5.965s-.359-.719-.359-1.782c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 0 1 .083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.632-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/>
+    </svg>
+  )
+}
+
+function WooCommerceLogo() {
+  return <SimpleAppLogo letters="WC" bg="#7F54B3" />
+}
+
+function BigCommerceLogo() {
+  return <SimpleAppLogo letters="BC" bg="#34313F" />
+}
+
+function QuickBooksLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#2CA01C">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-2.4 16.8A4.8 4.8 0 1 1 9.6 7.2v1.92a2.88 2.88 0 1 0 0 5.76H12V16.8H9.6zm7.2-2.4h-2.4v-1.92A2.88 2.88 0 1 0 14.4 7.2H12V4.8h2.4a4.8 4.8 0 1 1 0 9.6z"/>
+    </svg>
+  )
+}
+
+function DatadogLogo() {
+  return <SimpleAppLogo letters="DD" bg="#632CA6" />
+}
+
+function PagerDutyLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#06AC38">
+      <path d="M16.003 2.333c-1.3-.717-2.9-1.006-5.276-.979H2.666v9.836h8.027c2.086.026 3.93-.169 5.26-.981 1.49-.906 2.38-2.434 2.38-3.942-.001-1.49-.878-3.018-2.33-3.934zm-1.576 6.127c-.784.507-1.936.627-3.803.627H5.516V4.21h5.083c1.866 0 3.037.132 3.828.666.726.483 1.14 1.241 1.14 1.77.001.535-.426 1.326-1.14 1.814zM5.516 21.646H2.666v-7.354h2.85v7.354zm5.696-7.354H5.516v7.354h5.696c2.376.026 3.977-.263 5.276-.98 1.452-.916 2.33-2.444 2.33-3.934 0-1.508-.89-3.037-2.38-3.942-1.33-.813-3.175-1.008-5.226-.498z"/>
+    </svg>
+  )
+}
+
+function MongoDBLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#47A248">
+      <path d="M17.193 9.555c-1.264-5.58-4.252-7.414-4.573-8.115-.28-.394-.53-.954-.735-1.44-.036.495-.055.685-.523 1.184-.723.566-4.438 3.682-4.74 10.02-.282 5.912 4.27 9.435 4.888 9.884l.07.05A73.49 73.49 0 0 1 11.91 24h.481c.114-1.032.284-2.056.51-3.07.417-.296 8.079-6.084 4.292-11.375zm-2.161 3.201c-.129 0-.247-.05-.335-.14l-1.378-1.396-1.389 1.395a.463.463 0 0 1-.651-.657l1.561-1.567V7.816a.462.462 0 1 1 .924 0v2.54l1.603 1.626a.463.463 0 0 1-.335.774z"/>
+    </svg>
+  )
+}
+
+function VercelLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor">
+      <path d="M24 22.525H0l12-21.05 12 21.05z"/>
+    </svg>
+  )
+}
+
+function CloudinaryLogo() {
+  return <SimpleAppLogo letters="CL" bg="#3448C5" />
+}
+
+function ToDoistLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#DB4035">
+      <path d="M21.333 0H2.667C1.194 0 0 1.194 0 2.667v18.666C0 22.806 1.194 24 2.667 24h18.666C22.806 24 24 22.806 24 21.333V2.667C24 1.194 22.806 0 21.333 0zM7.46 17.067l-3.127-3.04 1.094-1.107 2.02 1.96 5.34-5.44 1.107 1.094-6.434 6.533z"/>
+    </svg>
+  )
+}
+
+function BoxLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#0061D5">
+      <path d="M9 6.5a5 5 0 1 0 0 10A5 5 0 0 0 9 6.5zm0 8a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm12-3.5a3.5 3.5 0 0 0-5.43-2.91A6.97 6.97 0 0 0 9 5.5a7 7 0 0 0-7 7 7 7 0 0 0 7 7c1.88 0 3.59-.74 4.85-1.95A3.5 3.5 0 1 0 21 11z"/>
+    </svg>
+  )
+}
+
+function SurveyMonkeyLogo() {
+  return <SimpleAppLogo letters="SM" bg="#00BF6F" />
+}
+
+function ConfluenceLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none">
+      <path d="M.975 17.662c-.319.527-.677 1.144-.944 1.578a.916.916 0 0 0 .318 1.26l3.813 2.376a.93.93 0 0 0 1.27-.33c.243-.41.573-1.002.927-1.617 2.485-4.23 4.99-3.722 9.502-1.456l3.785 1.901a.926.926 0 0 0 1.24-.434l1.785-3.967a.924.924 0 0 0-.434-1.225c-1.208-.587-3.602-1.8-5.794-2.906-7.05-3.573-13.042-2.979-17.468 4.82zM23.025 6.338c.319-.527.677-1.144.944-1.578a.917.917 0 0 0-.318-1.26L19.838 1.124a.93.93 0 0 0-1.27.33c-.243.41-.573 1.002-.927 1.617-2.485 4.23-4.99 3.722-9.502 1.456L4.354 2.626a.926.926 0 0 0-1.24.434L1.329 7.027a.924.924 0 0 0 .434 1.225c1.208.587 3.602 1.8 5.794 2.906 7.063 3.58 13.055 2.986 17.468-4.82z" fill="#2684FF"/>
+    </svg>
+  )
+}
+
+function BitbucketLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="#2684FF">
+      <path d="M.778 1.213a.768.768 0 0 0-.768.892l3.263 19.81c.084.5.515.873 1.022.873h15.464a.772.772 0 0 0 .77-.646l3.263-20.03a.768.768 0 0 0-.768-.891L.778 1.213zM14.54 15.53H9.46L8.022 8.471h7.949l-1.43 7.058z"/>
+    </svg>
+  )
+}
+
 // ─── App catalog ──────────────────────────────────────────────────────────────
 
 const APPS: AppDefinition[] = [
-  {
-    slug: "github",
-    name: "GitHub",
-    description: "Access repos, trigger workflows, and let Juno act on your codebase.",
-    logo: <GithubLogo />,
-    category: "Developer",
-  },
+  // ── Communication ─────────────────────────────────────────────────────────
   {
     slug: "slack",
     name: "Slack",
@@ -205,12 +685,77 @@ const APPS: AppDefinition[] = [
     category: "Communication",
   },
   {
+    slug: "discord",
+    name: "Discord",
+    description: "Send messages, manage channels, and automate community interactions.",
+    logo: <DiscordLogo />,
+    category: "Communication",
+  },
+  {
+    slug: "telegram_bot_api",
+    name: "Telegram",
+    description: "Send and receive messages via Telegram bots and automate chat workflows.",
+    logo: <TelegramLogo />,
+    category: "Communication",
+  },
+  {
+    slug: "microsoft_teams",
+    name: "Microsoft Teams",
+    description: "Post messages, create meetings, and automate team collaboration workflows.",
+    logo: <MicrosoftTeamsLogo />,
+    category: "Communication",
+  },
+  {
+    slug: "twilio",
+    name: "Twilio",
+    description: "Send SMS, make calls, and automate phone and messaging workflows.",
+    logo: <TwilioLogo />,
+    category: "Communication",
+  },
+  // ── Email ─────────────────────────────────────────────────────────────────
+  {
     slug: "gmail",
     name: "Gmail",
     description: "Send and read emails, manage labels, and automate inbox workflows.",
     logo: <GmailLogo />,
     category: "Email",
   },
+  {
+    slug: "sendgrid",
+    name: "SendGrid",
+    description: "Send transactional and marketing emails at scale with full delivery tracking.",
+    logo: <SendGridLogo />,
+    category: "Email",
+  },
+  {
+    slug: "mailchimp",
+    name: "Mailchimp",
+    description: "Manage campaigns, sync audience lists, and automate email marketing.",
+    logo: <MailchimpLogo />,
+    category: "Email",
+  },
+  {
+    slug: "microsoft_outlook",
+    name: "Microsoft Outlook",
+    description: "Send emails, manage calendar events, and automate inbox workflows.",
+    logo: <SimpleAppLogo letters="OL" bg="#0078D4" />,
+    category: "Email",
+  },
+  {
+    slug: "zoho_mail",
+    name: "Zoho Mail",
+    description: "Send and read emails, manage folders, and automate inbox workflows.",
+    logo: <ZohoMailLogo />,
+    category: "Email",
+  },
+  {
+    slug: "mailgun",
+    name: "Mailgun",
+    description: "Send transactional emails and monitor delivery via Mailgun's API.",
+    logo: <SimpleAppLogo letters="MG" bg="#F06B66" />,
+    category: "Email",
+  },
+  // ── Productivity ─────────────────────────────────────────────────────────
   {
     slug: "google_calendar",
     name: "Google Calendar",
@@ -226,6 +771,207 @@ const APPS: AppDefinition[] = [
     category: "Productivity",
   },
   {
+    slug: "google_docs",
+    name: "Google Docs",
+    description: "Create and edit documents, append content, and automate doc workflows.",
+    logo: <GoogleDocLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "google_drive",
+    name: "Google Drive",
+    description: "Upload, organise, and share files. Trigger workflows on file changes.",
+    logo: <GoogleDriveLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "dropbox",
+    name: "Dropbox",
+    description: "Sync files, trigger automations on uploads, and manage shared folders.",
+    logo: <DropboxLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "box",
+    name: "Box",
+    description: "Manage cloud files, trigger automations on uploads, and collaborate securely.",
+    logo: <BoxLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "todoist",
+    name: "Todoist",
+    description: "Create tasks, manage projects, and sync your to-do list automatically.",
+    logo: <ToDoistLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "calendly",
+    name: "Calendly",
+    description: "Trigger workflows on new bookings and manage scheduling automations.",
+    logo: <CalendlyLogo />,
+    category: "Productivity",
+  },
+  {
+    slug: "onedrive",
+    name: "Microsoft OneDrive",
+    description: "Sync files, manage folders, and automate cloud storage workflows.",
+    logo: <SimpleAppLogo letters="OD" bg="#0078D4" />,
+    category: "Productivity",
+  },
+  // ── Project Management ────────────────────────────────────────────────────
+  {
+    slug: "jira",
+    name: "Jira",
+    description: "Create issues, update sprints, and automate engineering project workflows.",
+    logo: <JiraLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "trello",
+    name: "Trello",
+    description: "Create cards, move lists, and automate board-based project workflows.",
+    logo: <TrelloLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "asana",
+    name: "Asana",
+    description: "Create tasks, update projects, and sync work across your team.",
+    logo: <AsanaLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "monday",
+    name: "Monday.com",
+    description: "Update boards, create items, and automate team project workflows.",
+    logo: <MondayLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "clickup",
+    name: "ClickUp",
+    description: "Create tasks, manage docs, and automate across all your ClickUp projects.",
+    logo: <ClickUpLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "linear",
+    name: "Linear",
+    description: "Create and update issues, manage cycles, and automate engineering workflows.",
+    logo: <LinearLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "confluence",
+    name: "Confluence",
+    description: "Create and update pages, manage spaces, and automate documentation workflows.",
+    logo: <ConfluenceLogo />,
+    category: "Project Management",
+  },
+  {
+    slug: "basecamp",
+    name: "Basecamp",
+    description: "Create to-dos, post messages, and automate project collaboration.",
+    logo: <SimpleAppLogo letters="BC" bg="#1D2D35" />,
+    category: "Project Management",
+  },
+  // ── CRM ──────────────────────────────────────────────────────────────────
+  {
+    slug: "hubspot",
+    name: "HubSpot",
+    description: "Sync contacts, track deals, and automate CRM workflows.",
+    logo: <HubSpotLogo />,
+    category: "CRM",
+  },
+  {
+    slug: "salesforce",
+    name: "Salesforce",
+    description: "Sync leads, update records, and automate CRM and sales workflows.",
+    logo: <SalesforceLogo />,
+    category: "CRM",
+  },
+  {
+    slug: "zoho_crm",
+    name: "Zoho CRM",
+    description: "Sync leads, contacts, and deals. Automate CRM workflows and track your pipeline.",
+    logo: <ZohoCRMLogo />,
+    category: "CRM",
+  },
+  {
+    slug: "pipedrive",
+    name: "Pipedrive",
+    description: "Manage deals, contacts, and automate your sales pipeline.",
+    logo: <PipedriveLogo />,
+    category: "CRM",
+  },
+  {
+    slug: "intercom",
+    name: "Intercom",
+    description: "Manage conversations, contacts, and automate customer messaging workflows.",
+    logo: <IntercomLogo />,
+    category: "CRM",
+  },
+  {
+    slug: "close",
+    name: "Close",
+    description: "Manage leads, log calls, and automate your sales outreach.",
+    logo: <SimpleAppLogo letters="CL" bg="#5D2DBF" />,
+    category: "CRM",
+  },
+  // ── Marketing ─────────────────────────────────────────────────────────────
+  {
+    slug: "activecampaign",
+    name: "ActiveCampaign",
+    description: "Automate email sequences, manage contacts, and track campaign performance.",
+    logo: <ActiveCampaignLogo />,
+    category: "Marketing",
+  },
+  {
+    slug: "klaviyo",
+    name: "Klaviyo",
+    description: "Manage email/SMS flows, sync audience segments, and trigger campaigns.",
+    logo: <KlaviyoLogo />,
+    category: "Marketing",
+  },
+  {
+    slug: "typeform",
+    name: "Typeform",
+    description: "Trigger workflows on form submissions and sync responses to your tools.",
+    logo: <TypeformLogo />,
+    category: "Marketing",
+  },
+  {
+    slug: "surveymonkey",
+    name: "SurveyMonkey",
+    description: "Collect responses, trigger workflows on submissions, and analyse survey data.",
+    logo: <SurveyMonkeyLogo />,
+    category: "Marketing",
+  },
+  {
+    slug: "jotform",
+    name: "JotForm",
+    description: "Trigger automations on new form submissions and sync responses downstream.",
+    logo: <SimpleAppLogo letters="JF" bg="#FF6100" />,
+    category: "Marketing",
+  },
+  // ── Customer Support ──────────────────────────────────────────────────────
+  {
+    slug: "zendesk",
+    name: "Zendesk",
+    description: "Create and update tickets, manage agents, and automate support workflows.",
+    logo: <ZendeskLogo />,
+    category: "Support",
+  },
+  {
+    slug: "freshdesk",
+    name: "Freshdesk",
+    description: "Create tickets, update contacts, and automate customer support pipelines.",
+    logo: <FreshdeskLogo />,
+    category: "Support",
+  },
+  // ── Social Media ──────────────────────────────────────────────────────────
+  {
     slug: "twitter",
     name: "X (Twitter)",
     description: "Post tweets, monitor mentions, and engage with your audience.",
@@ -240,11 +986,54 @@ const APPS: AppDefinition[] = [
     category: "Social",
   },
   {
-    slug: "hubspot",
-    name: "HubSpot",
-    description: "Sync contacts, track deals, and automate CRM workflows.",
-    logo: <HubSpotLogo />,
-    category: "CRM",
+    slug: "instagram_for_business",
+    name: "Instagram",
+    description: "Publish content, manage comments, and track engagement on Instagram.",
+    logo: <InstagramLogo />,
+    category: "Social",
+  },
+  {
+    slug: "facebook_pages",
+    name: "Facebook Pages",
+    description: "Post updates, manage comments, and automate Facebook Page workflows.",
+    logo: <FacebookLogo />,
+    category: "Social",
+  },
+  {
+    slug: "youtube",
+    name: "YouTube",
+    description: "Upload videos, manage playlists, and trigger workflows on new content.",
+    logo: <YouTubeLogo />,
+    category: "Social",
+  },
+  {
+    slug: "tiktok",
+    name: "TikTok",
+    description: "Publish videos and automate TikTok content workflows.",
+    logo: <TikTokLogo />,
+    category: "Social",
+  },
+  {
+    slug: "reddit",
+    name: "Reddit",
+    description: "Monitor posts, submit links, and automate Reddit community interactions.",
+    logo: <RedditLogo />,
+    category: "Social",
+  },
+  {
+    slug: "pinterest",
+    name: "Pinterest",
+    description: "Create pins, manage boards, and automate Pinterest publishing workflows.",
+    logo: <PinterestLogo />,
+    category: "Social",
+  },
+  // ── Data & Spreadsheets ───────────────────────────────────────────────────
+  {
+    slug: "google_sheets",
+    name: "Google Sheets",
+    description: "Read rows, append data, and automate spreadsheet workflows.",
+    logo: <GoogleSheetsLogo />,
+    category: "Data",
   },
   {
     slug: "airtable",
@@ -254,12 +1043,70 @@ const APPS: AppDefinition[] = [
     category: "Data",
   },
   {
-    slug: "google_sheets",
-    name: "Google Sheets",
-    description: "Read rows, append data, and automate spreadsheet workflows.",
-    logo: <GoogleSheetsLogo />,
+    slug: "snowflake",
+    name: "Snowflake",
+    description: "Run queries, load data, and automate cloud data warehouse workflows.",
+    logo: <SnowflakeLogo />,
     category: "Data",
   },
+  {
+    slug: "mongodb",
+    name: "MongoDB",
+    description: "Read and write documents, trigger workflows on database changes.",
+    logo: <MongoDBLogo />,
+    category: "Data",
+  },
+  {
+    slug: "postgresql",
+    name: "PostgreSQL",
+    description: "Run queries, insert rows, and automate relational database workflows.",
+    logo: <SimpleAppLogo letters="PG" bg="#336791" />,
+    category: "Data",
+  },
+  {
+    slug: "mysql",
+    name: "MySQL",
+    description: "Execute queries, sync tables, and automate database-driven workflows.",
+    logo: <SimpleAppLogo letters="MY" bg="#4479A1" />,
+    category: "Data",
+  },
+  {
+    slug: "google_bigquery",
+    name: "BigQuery",
+    description: "Run SQL queries and automate analytics pipelines on Google BigQuery.",
+    logo: <SimpleAppLogo letters="BQ" bg="#4285F4" />,
+    category: "Data",
+  },
+  // ── Analytics ─────────────────────────────────────────────────────────────
+  {
+    slug: "google_analytics",
+    name: "Google Analytics",
+    description: "Pull reports, track events, and automate analytics data workflows.",
+    logo: <GoogleAnalyticsLogo />,
+    category: "Analytics",
+  },
+  {
+    slug: "mixpanel",
+    name: "Mixpanel",
+    description: "Track user events, manage cohorts, and automate product analytics.",
+    logo: <MixpanelLogo />,
+    category: "Analytics",
+  },
+  {
+    slug: "amplitude",
+    name: "Amplitude",
+    description: "Sync product events, manage dashboards, and automate analytics workflows.",
+    logo: <AmplitudeLogo />,
+    category: "Analytics",
+  },
+  {
+    slug: "segment",
+    name: "Segment",
+    description: "Route customer data between tools and automate CDP workflows.",
+    logo: <SegmentLogo />,
+    category: "Analytics",
+  },
+  // ── Finance ───────────────────────────────────────────────────────────────
   {
     slug: "stripe",
     name: "Stripe",
@@ -268,6 +1115,35 @@ const APPS: AppDefinition[] = [
     category: "Finance",
   },
   {
+    slug: "paypal",
+    name: "PayPal",
+    description: "Track payments, manage transactions, and automate PayPal workflows.",
+    logo: <PayPalLogo />,
+    category: "Finance",
+  },
+  {
+    slug: "square",
+    name: "Square",
+    description: "Sync payments, manage inventory, and automate Square point-of-sale workflows.",
+    logo: <SquareLogo />,
+    category: "Finance",
+  },
+  {
+    slug: "quickbooks",
+    name: "QuickBooks",
+    description: "Sync invoices, expenses, and customers with QuickBooks Online.",
+    logo: <QuickBooksLogo />,
+    category: "Finance",
+  },
+  {
+    slug: "xero",
+    name: "Xero",
+    description: "Create invoices, sync contacts, and automate accounting workflows.",
+    logo: <XeroLogo />,
+    category: "Finance",
+  },
+  // ── E-commerce ────────────────────────────────────────────────────────────
+  {
     slug: "shopify",
     name: "Shopify",
     description: "Sync orders, manage products, and automate your store.",
@@ -275,27 +1151,152 @@ const APPS: AppDefinition[] = [
     category: "E-commerce",
   },
   {
-    slug: "discord",
-    name: "Discord",
-    description: "Send messages, manage channels, and automate community interactions.",
-    logo: <DiscordLogo />,
-    category: "Communication",
+    slug: "woocommerce",
+    name: "WooCommerce",
+    description: "Sync orders, products, and customers from your WooCommerce store.",
+    logo: <WooCommerceLogo />,
+    category: "E-commerce",
   },
   {
-    slug: "zoho_crm",
-    name: "Zoho CRM",
-    description: "Sync leads, contacts, and deals. Automate CRM workflows and track your pipeline.",
-    logo: <ZohoCRMLogo />,
-    category: "CRM",
+    slug: "bigcommerce",
+    name: "BigCommerce",
+    description: "Manage products, orders, and automate your BigCommerce store.",
+    logo: <BigCommerceLogo />,
+    category: "E-commerce",
+  },
+  // ── Developer / DevOps ────────────────────────────────────────────────────
+  {
+    slug: "github",
+    name: "GitHub",
+    description: "Access repos, trigger workflows, and let Juno act on your codebase.",
+    logo: <GithubLogo />,
+    category: "Developer",
   },
   {
-    slug: "zoho_mail",
-    name: "Zoho Mail",
-    description: "Send and read emails, manage folders, and automate inbox workflows.",
-    logo: <ZohoMailLogo />,
-    category: "Email",
+    slug: "gitlab",
+    name: "GitLab",
+    description: "Trigger workflows on merge requests, issues, and CI/CD pipeline events.",
+    logo: <GitLabLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "bitbucket",
+    name: "Bitbucket",
+    description: "Trigger workflows on pushes, pull requests, and pipeline events.",
+    logo: <BitbucketLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "vercel",
+    name: "Vercel",
+    description: "Trigger deployments, manage projects, and automate Vercel workflows.",
+    logo: <VercelLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "sentry",
+    name: "Sentry",
+    description: "Trigger automations on new errors, manage issues, and track releases.",
+    logo: <SentryLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "pagerduty",
+    name: "PagerDuty",
+    description: "Create incidents, manage on-call schedules, and automate alerting.",
+    logo: <PagerDutyLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "datadog",
+    name: "Datadog",
+    description: "Trigger automations on monitors, manage incidents, and sync metrics.",
+    logo: <DatadogLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "cloudflare",
+    name: "Cloudflare",
+    description: "Manage DNS, Workers, and automate Cloudflare network workflows.",
+    logo: <CloudflareLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "supabase",
+    name: "Supabase",
+    description: "Trigger workflows on database events and manage your Supabase project.",
+    logo: <SupabaseLogo />,
+    category: "Developer",
+  },
+  {
+    slug: "heroku",
+    name: "Heroku",
+    description: "Deploy apps, manage dynos, and automate Heroku platform workflows.",
+    logo: <SimpleAppLogo letters="H" bg="#430098" />,
+    category: "Developer",
+  },
+  {
+    slug: "aws",
+    name: "AWS",
+    description: "Interact with S3, Lambda, SQS and other AWS services via automation.",
+    logo: <SimpleAppLogo letters="AWS" bg="#FF9900" fg="#232F3E" />,
+    category: "Developer",
+  },
+  // ── AI / ML ───────────────────────────────────────────────────────────────
+  {
+    slug: "openai",
+    name: "OpenAI",
+    description: "Call GPT models, generate embeddings, and automate AI-powered workflows.",
+    logo: <OpenAILogo />,
+    category: "AI",
+  },
+  {
+    slug: "anthropic",
+    name: "Anthropic",
+    description: "Call Claude models for reasoning, summarisation, and AI-powered automations.",
+    logo: <SimpleAppLogo letters="A" bg="#CC785C" />,
+    category: "AI",
+  },
+  {
+    slug: "pinecone",
+    name: "Pinecone",
+    description: "Upsert and query vector embeddings for AI-powered search and retrieval.",
+    logo: <SimpleAppLogo letters="PC" bg="#000000" fg="#fff" />,
+    category: "AI",
+  },
+  // ── Design / Content ──────────────────────────────────────────────────────
+  {
+    slug: "webflow",
+    name: "Webflow",
+    description: "Manage CMS items, trigger publish events, and automate Webflow workflows.",
+    logo: <WebflowLogo />,
+    category: "Design",
+  },
+  {
+    slug: "wordpress",
+    name: "WordPress",
+    description: "Create posts, manage pages, and automate content publishing workflows.",
+    logo: <WordPressLogo />,
+    category: "Design",
+  },
+  {
+    slug: "cloudinary",
+    name: "Cloudinary",
+    description: "Upload, transform, and deliver images and video via Cloudinary.",
+    logo: <CloudinaryLogo />,
+    category: "Design",
+  },
+  {
+    slug: "figma",
+    name: "Figma",
+    description: "Trigger workflows on file changes, comments, and design system updates.",
+    logo: <SimpleAppLogo letters="F" bg="#F24E1E" />,
+    category: "Design",
   },
 ]
+
+// Pre-compute unique ordered categories
+ALL_CATEGORIES = Array.from(new Set(APPS.map((a) => a.category)))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -379,7 +1380,15 @@ async function syncAccountsAfterConnect(
 
 // ─── Generic App Connect Card ─────────────────────────────────────────────────
 
-function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition }) {
+function AppConnectCard({
+  userId,
+  app,
+  onStatusChange,
+}: {
+  userId: string
+  app: AppDefinition
+  onStatusChange?: (slug: string, connected: boolean) => void
+}) {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const client = useFrontendClient()
@@ -408,6 +1417,12 @@ function AppConnectCard({ userId, app }: { userId: string; app: AppDefinition })
   const hasUnhealthy = accounts.some((a) => a.dead || a.healthy === false)
   const allDead = accounts.length > 0 && accounts.every((a) => a.dead)
   const pipedreamLastActivity = latestPipedreamActivityIso(accounts)
+
+  // Report connection status to parent grid for sorting
+  const isActivelyConnected = connected && !allDead
+  React.useEffect(() => {
+    onStatusChange?.(app.slug, isActivelyConnected)
+  }, [app.slug, isActivelyConnected, onStatusChange])
 
   const { primary: primaryAccount } = useMemo(() => {
     if (accounts.length === 0) return { primary: null as PdAccount | null, duplicateRows: 0 }
@@ -989,6 +2004,147 @@ function GithubPipedreamCard({ userId }: { userId: string }) {
   )
 }
 
+// ─── Filterable integrations grid ─────────────────────────────────────────────
+
+type StatusMap = Map<string, boolean>
+
+function IntegrationsGrid({ userId }: { userId: string }) {
+  const [search, setSearch] = useState("")
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [statusMap, setStatusMap] = useState<StatusMap>(() => new Map())
+
+  const onStatusChange = useCallback((slug: string, connected: boolean) => {
+    setStatusMap((prev) => {
+      if (prev.get(slug) === connected) return prev
+      const next = new Map(prev)
+      next.set(slug, connected)
+      return next
+    })
+  }, [])
+
+  const connectedCount = useMemo(() => {
+    let n = 0
+    for (const v of statusMap.values()) if (v) n++
+    return n
+  }, [statusMap])
+
+  const filteredApps = useMemo(() => {
+    let list = APPS
+    // Category filter
+    if (activeCategory) {
+      list = list.filter((a) => a.category === activeCategory)
+    }
+    // Search filter
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.slug.toLowerCase().includes(q) ||
+          a.description.toLowerCase().includes(q) ||
+          a.category.toLowerCase().includes(q),
+      )
+    }
+    // Sort connected apps first
+    list = [...list].sort((a, b) => {
+      const aConn = statusMap.get(a.slug) ? 0 : 1
+      const bConn = statusMap.get(b.slug) ? 0 : 1
+      return aConn - bConn
+    })
+    return list
+  }, [search, activeCategory, statusMap])
+
+  return (
+    <section className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Connect more apps
+          </h2>
+          {connectedCount > 0 && (
+            <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 text-[10px]">
+              {connectedCount} connected
+            </Badge>
+          )}
+        </div>
+        {/* Search */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search integrations…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm glass-input border-border focus-visible:ring-primary/30"
+          />
+        </div>
+      </div>
+
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          onClick={() => setActiveCategory(null)}
+          className={cn(
+            "px-3 py-1 rounded-full text-xs font-medium transition-all",
+            !activeCategory
+              ? "bg-primary/15 text-primary border border-primary/30"
+              : "bg-muted/30 text-muted-foreground border border-transparent hover:bg-muted/50 hover:text-foreground",
+          )}
+        >
+          All ({APPS.length})
+        </button>
+        {ALL_CATEGORIES.map((cat) => {
+          const count = APPS.filter((a) => a.category === cat).length
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-medium transition-all",
+                activeCategory === cat
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "bg-muted/30 text-muted-foreground border border-transparent hover:bg-muted/50 hover:text-foreground",
+              )}
+            >
+              {cat} ({count})
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Grid */}
+      {filteredApps.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredApps.map((app) => (
+            <AppConnectCard key={app.slug} userId={userId} app={app} onStatusChange={onStatusChange} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-16 text-center space-y-2">
+          <Search className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            No integrations match &ldquo;{search}&rdquo;
+            {activeCategory ? ` in ${activeCategory}` : ""}.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("")
+              setActiveCategory(null)
+            }}
+            className="text-xs text-primary hover:underline underline-offset-4"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ─── Provider wrapper ─────────────────────────────────────────────────────────
 
 export function IntegrationsPageClient({
@@ -1057,18 +2213,8 @@ export function IntegrationsPageClient({
               <GithubPipedreamCard userId={userId} />
             </section>
 
-            {/* All other apps */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Connect more apps</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {APPS.map((app) => (
-                  <AppConnectCard key={app.slug} userId={userId} app={app} />
-                ))}
-              </div>
-            </section>
+            {/* All other apps — filterable grid */}
+            <IntegrationsGrid userId={userId} />
           </FrontendClientProvider>
         </QueryClientProvider>
       ) : (
