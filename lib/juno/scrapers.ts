@@ -101,7 +101,7 @@ export async function scrapeArxiv(
     sortBy: "submittedDate",
     sortOrder: "descending",
   })
-  const url = `http://export.arxiv.org/api/query?${params.toString()}`
+  const url = `https://export.arxiv.org/api/query?${params.toString()}`
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(25_000) })
@@ -172,7 +172,7 @@ export async function fetchArxivSearchLive(searchQuery: string, maxResults = 15)
     sortBy: "relevance",
     sortOrder: "descending",
   })
-  const url = `http://export.arxiv.org/api/query?${params.toString()}`
+  const url = `https://export.arxiv.org/api/query?${params.toString()}`
 
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(25_000) })

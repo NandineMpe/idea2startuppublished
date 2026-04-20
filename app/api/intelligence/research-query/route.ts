@@ -10,6 +10,7 @@ import {
   type ResearchEvidenceSnippet,
 } from "@/lib/juno/research-evidence"
 import { fetchLiveArxivSnippets, fetchLiveWebResearchSnippets } from "@/lib/juno/research-live-fetch"
+import { tryParseJsonObject } from "@/lib/parse-llm-json"
 
 export const maxDuration = 120
 export const dynamic = "force-dynamic"
@@ -23,11 +24,37 @@ type CitedSource = {
 
 const MAX_BRIEF_ROWS = 28
 const MERGE_LIMITS = { corpus: 40, arxivLive: 14, webLive: 6 } as const
+const MAX_CONTEXT_CHARS = 14_000
+/** Rows sent to the LLM (prioritize live retrieval, then scored brief items). */
+const MAX_EVIDENCE_FOR_LLM = 34
+const MAX_SUMMARY_CHARS = 380
 
 function evidenceOrigin(s: ResearchEvidenceSnippet): "stored_brief" | "live_arxiv" | "live_web" {
   if (s.briefRunAt.startsWith("live_arxiv:")) return "live_arxiv"
   if (s.briefRunAt.startsWith("live_web:")) return "live_web"
   return "stored_brief"
+}
+
+function originRank(s: ResearchEvidenceSnippet): number {
+  const o = evidenceOrigin(s)
+  if (o === "live_arxiv") return 0
+  if (o === "live_web") return 1
+  return 2
+}
+
+function evidenceRowsForModel(merged: ResearchEvidenceSnippet[]): ResearchEvidenceSnippet[] {
+  return [...merged]
+    .sort((a, b) => {
+      const dr = originRank(a) - originRank(b)
+      if (dr !== 0) return dr
+      return (b.relevanceScore ?? -1) - (a.relevanceScore ?? -1)
+    })
+    .slice(0, MAX_EVIDENCE_FOR_LLM)
+}
+
+function trimContextBlock(block: string): string {
+  if (block.length <= MAX_CONTEXT_CHARS) return block
+  return `${block.slice(0, MAX_CONTEXT_CHARS)}\n\n…(company context truncated for this request)`
 }
 
 /**
@@ -70,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const boostKeywords = context?.extracted.keywords ?? []
 
-    const [{ data: briefRows }, arxivLive, webLive] = await Promise.all([
+    const [briefRes, arxivLive, webLive] = await Promise.all([
       supabase
         .from("ai_outputs")
         .select("created_at, inputs")
@@ -78,11 +105,21 @@ export async function POST(req: NextRequest) {
         .eq("tool", "daily_brief")
         .order("created_at", { ascending: false })
         .limit(MAX_BRIEF_ROWS),
-      fetchLiveArxivSnippets(question, boostKeywords, 14),
-      fetchLiveWebResearchSnippets(question, 6),
+      fetchLiveArxivSnippets(question, boostKeywords, 14).catch((e) => {
+        console.error("[research-query] live arXiv:", e)
+        return [] as ResearchEvidenceSnippet[]
+      }),
+      fetchLiveWebResearchSnippets(question, 6).catch((e) => {
+        console.error("[research-query] live web:", e)
+        return [] as ResearchEvidenceSnippet[]
+      }),
     ])
 
-    const corpus = snippetsFromBriefRows(briefRows ?? [], 80)
+    if (briefRes.error) {
+      console.error("[research-query] ai_outputs:", briefRes.error.message)
+    }
+
+    const corpus = snippetsFromBriefRows(briefRes.data ?? [], 80)
 
     const merged = mergeResearchSnippets(corpus, arxivLive, webLive, {
       corpus: MERGE_LIMITS.corpus,
@@ -107,30 +144,34 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const contextBlock = context?.promptBlock ? `OUR COMPANY / CONTEXT:\n${context.promptBlock}\n\n` : ""
+    const forModel = evidenceRowsForModel(merged)
+
+    const contextBlock = context?.promptBlock
+      ? `OUR COMPANY / CONTEXT:\n${trimContextBlock(context.promptBlock)}\n\n`
+      : ""
 
     const prompt = `You are a research analyst answering a question using mixed evidence: items from the founder's saved daily briefs, freshly retrieved arXiv results for this question, and optional open-web snippets.
 
 ${contextBlock}QUESTION:
 "${question}"
 
-EVIDENCE (${merged.length} items). Each row includes evidenceOrigin:
+EVIDENCE (${forModel.length} of ${merged.length} gathered items; highest priority first). Each row includes evidenceOrigin:
 - stored_brief: scored when a past daily brief ran
 - live_arxiv: retrieved just now from arXiv for this question
 - live_web: retrieved just now from the web (when available)
 
 ${JSON.stringify(
-  merged.map((s: ResearchEvidenceSnippet) => ({
+  forModel.map((s: ResearchEvidenceSnippet) => ({
     evidenceOrigin: evidenceOrigin(s),
     url: s.url,
     title: s.title,
     source: s.source,
-    abstractOrSummary: s.description,
+    abstractOrSummary: s.description.slice(0, MAX_SUMMARY_CHARS),
     publishedAt: s.publishedAt,
     relevanceScore: s.relevanceScore,
     category: s.category,
-    whyItMatters: s.whyItMatters,
-    strategicImplication: s.strategicImplication,
+    whyItMatters: s.whyItMatters.slice(0, 240),
+    strategicImplication: s.strategicImplication.slice(0, 240),
     briefRunAt: s.briefRunAt,
   })),
   null,
@@ -155,19 +196,53 @@ citedUrls must be URLs from EVIDENCE you relied on.
 
 Return ONLY valid JSON, no markdown fences.`
 
-    const { text } = await generateText({
-      model: qwenModel(),
-      maxOutputTokens: 2200,
-      messages: [{ role: "user", content: appendWritingRules(prompt) }],
-    })
+    let text: string
+    try {
+      const out = await generateText({
+        model: qwenModel(),
+        maxOutputTokens: 2200,
+        messages: [{ role: "user", content: appendWritingRules(prompt) }],
+      })
+      text = out.text
+    } catch (llmErr) {
+      const msg = llmErr instanceof Error ? llmErr.message : String(llmErr)
+      console.error("[research-query] LLM:", llmErr)
+      return NextResponse.json(
+        {
+          error:
+            msg.length > 0 && msg.length < 400
+              ? msg
+              : "The language model request failed. Check API keys and quotas, then try again.",
+        },
+        { status: 502 },
+      )
+    }
 
-    const parsed = JSON.parse(text?.match(/\{[\s\S]*\}/)?.[0] || "{}") as {
+    const parsed = tryParseJsonObject<{
       answer?: string
       keyFindings?: string[]
       citedUrls?: string[]
+    }>(text)
+
+    let answer = typeof parsed?.answer === "string" ? parsed.answer.trim() : ""
+    let keyFindings = Array.isArray(parsed?.keyFindings)
+      ? parsed.keyFindings.filter((x): x is string => typeof x === "string")
+      : []
+
+    if (!answer) {
+      const fallback = text?.trim().slice(0, 2500) ?? ""
+      answer =
+        fallback.length > 80
+          ? `Model output was not valid JSON. Raw reply (trimmed):\n\n${fallback}`
+          : "The model returned an empty or unreadable reply. Try again with a shorter question."
+      keyFindings = []
     }
 
-    const citedUrls = new Set((parsed.citedUrls ?? []).map((u) => u.trim()))
+    const citedUrls = new Set(
+      (Array.isArray(parsed?.citedUrls) ? parsed.citedUrls : [])
+        .filter((u): u is string => typeof u === "string")
+        .map((u) => u.trim()),
+    )
     const citedSources: CitedSource[] = merged
       .filter((s) => citedUrls.has(s.url))
       .map((s) => ({
@@ -178,8 +253,8 @@ Return ONLY valid JSON, no markdown fences.`
       }))
 
     return NextResponse.json({
-      answer: parsed.answer ?? "",
-      keyFindings: parsed.keyFindings ?? [],
+      answer,
+      keyFindings,
       sources: citedSources,
       evidenceCount: merged.length,
       storedBriefCount,
@@ -187,7 +262,16 @@ Return ONLY valid JSON, no markdown fences.`
       liveWebCount,
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error("[research-query] error:", err)
-    return NextResponse.json({ error: "Query failed — try again." }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          message && message.length < 500
+            ? message
+            : "Query failed — try again.",
+      },
+      { status: 500 },
+    )
   }
 }
