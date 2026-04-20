@@ -71,7 +71,14 @@ export async function POST(req: Request) {
 
     const organization = await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
     if (!organization) {
-      return NextResponse.json({ session: null, error: "No active organization" }, { status: 400 })
+      return NextResponse.json(
+        {
+          session: null,
+          error:
+            "No workspace organization found. Open the dashboard to finish setup, then try again.",
+        },
+        { status: 400 },
+      )
     }
 
     const { data: session, error } = await supabase
