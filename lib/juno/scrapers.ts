@@ -157,6 +157,34 @@ function parseArxivXml(xml: string): RawItem[] {
   return entries
 }
 
+/**
+ * Ad-hoc arXiv search without the 24h window used by scheduled briefs.
+ * `sortBy=relevance` matches natural-language questions better than latest-only.
+ */
+export async function fetchArxivSearchLive(searchQuery: string, maxResults = 15): Promise<RawItem[]> {
+  const q = searchQuery.trim()
+  if (!q) return []
+
+  const params = new URLSearchParams({
+    search_query: q,
+    start: "0",
+    max_results: String(maxResults),
+    sortBy: "relevance",
+    sortOrder: "descending",
+  })
+  const url = `http://export.arxiv.org/api/query?${params.toString()}`
+
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(25_000) })
+    if (!response.ok) return []
+    const xml = await response.text()
+    return parseArxivXml(xml)
+  } catch (e) {
+    console.error("[arxiv-live] fetch failed:", e)
+    return []
+  }
+}
+
 function extractTag(xml: string, tag: string): string | undefined {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i")
   const m = regex.exec(xml)

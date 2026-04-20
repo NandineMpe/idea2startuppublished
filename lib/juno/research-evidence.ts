@@ -1,4 +1,4 @@
-import type { ScoredItem } from "@/lib/juno/types"
+import type { RawItem, ScoredItem } from "@/lib/juno/types"
 
 /** Normalized row passed to the research Q&A prompt. */
 export type ResearchEvidenceSnippet = {
@@ -129,4 +129,70 @@ export function snippetsFromBriefRows(
   }
 
   return [...byUrl.values()]
+}
+
+/** Map a freshly fetched `RawItem` (arXiv API or web) into the shared Q&A snippet shape. */
+export function snippetFromRawItem(
+  item: RawItem,
+  sourceLabel: string,
+  briefRunAtLabel: string,
+): ResearchEvidenceSnippet | null {
+  const url = item.url?.trim()
+  const title = item.title?.trim()
+  if (!url || !title) return null
+  return {
+    title,
+    url,
+    source: sourceLabel,
+    description: (item.description ?? "").slice(0, 600),
+    publishedAt: item.publishedAt ?? "",
+    relevanceScore: null,
+    category: "research",
+    whyItMatters: "",
+    strategicImplication: "",
+    briefRunAt: briefRunAtLabel,
+  }
+}
+
+export type MergedEvidenceLimits = {
+  corpus: number
+  arxivLive: number
+  webLive: number
+}
+
+/** Dedupe by URL: corpus first, then arXiv live, then web. */
+export function mergeResearchSnippets(
+  corpus: ResearchEvidenceSnippet[],
+  arxivLive: ResearchEvidenceSnippet[],
+  webLive: ResearchEvidenceSnippet[],
+  limits: MergedEvidenceLimits,
+): ResearchEvidenceSnippet[] {
+  const seen = new Set<string>()
+  const out: ResearchEvidenceSnippet[] = []
+
+  for (const s of corpus) {
+    if (out.length >= limits.corpus) break
+    const u = s.url.trim()
+    if (!u || seen.has(u)) continue
+    seen.add(u)
+    out.push(s)
+  }
+
+  for (const s of arxivLive) {
+    if (out.length >= limits.corpus + limits.arxivLive) break
+    const u = s.url.trim()
+    if (!u || seen.has(u)) continue
+    seen.add(u)
+    out.push(s)
+  }
+
+  for (const s of webLive) {
+    if (out.length >= limits.corpus + limits.arxivLive + limits.webLive) break
+    const u = s.url.trim()
+    if (!u || seen.has(u)) continue
+    seen.add(u)
+    out.push(s)
+  }
+
+  return out
 }

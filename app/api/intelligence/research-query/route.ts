@@ -4,9 +4,14 @@ import { getCompanyContext } from "@/lib/company-context"
 import { isLlmConfigured, qwenModel } from "@/lib/llm-provider"
 import { appendWritingRules } from "@/lib/copy-writing-rules"
 import { generateText } from "ai"
-import { snippetsFromBriefRows, type ResearchEvidenceSnippet } from "@/lib/juno/research-evidence"
+import {
+  mergeResearchSnippets,
+  snippetsFromBriefRows,
+  type ResearchEvidenceSnippet,
+} from "@/lib/juno/research-evidence"
+import { fetchLiveArxivSnippets, fetchLiveWebResearchSnippets } from "@/lib/juno/research-live-fetch"
 
-export const maxDuration = 60
+export const maxDuration = 120
 export const dynamic = "force-dynamic"
 
 type CitedSource = {
@@ -17,11 +22,17 @@ type CitedSource = {
 }
 
 const MAX_BRIEF_ROWS = 28
-const MAX_EVIDENCE = 72
+const MERGE_LIMITS = { corpus: 40, arxivLive: 14, webLive: 6 } as const
+
+function evidenceOrigin(s: ResearchEvidenceSnippet): "stored_brief" | "live_arxiv" | "live_web" {
+  if (s.briefRunAt.startsWith("live_arxiv:")) return "live_arxiv"
+  if (s.briefRunAt.startsWith("live_web:")) return "live_web"
+  return "stored_brief"
+}
 
 /**
  * POST /api/intelligence/research-query
- * Answers questions using research-class items from recent daily briefs (arXiv, papers, etc.).
+ * Answers from stored daily-brief research items plus live arXiv search and optional Exa web hits.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -51,39 +62,66 @@ export async function POST(req: NextRequest) {
         keyFindings: [],
         sources: [],
         evidenceCount: 0,
+        storedBriefCount: 0,
+        liveArxivCount: 0,
+        liveWebCount: 0,
       })
     }
 
-    const { data: briefRows } = await supabase
-      .from("ai_outputs")
-      .select("created_at, inputs")
-      .eq("user_id", user.id)
-      .eq("tool", "daily_brief")
-      .order("created_at", { ascending: false })
-      .limit(MAX_BRIEF_ROWS)
+    const boostKeywords = context?.extracted.keywords ?? []
 
-    const evidence = snippetsFromBriefRows(briefRows ?? [], MAX_EVIDENCE)
+    const [{ data: briefRows }, arxivLive, webLive] = await Promise.all([
+      supabase
+        .from("ai_outputs")
+        .select("created_at, inputs")
+        .eq("user_id", user.id)
+        .eq("tool", "daily_brief")
+        .order("created_at", { ascending: false })
+        .limit(MAX_BRIEF_ROWS),
+      fetchLiveArxivSnippets(question, boostKeywords, 14),
+      fetchLiveWebResearchSnippets(question, 6),
+    ])
 
-    if (evidence.length === 0) {
+    const corpus = snippetsFromBriefRows(briefRows ?? [], 80)
+
+    const merged = mergeResearchSnippets(corpus, arxivLive, webLive, {
+      corpus: MERGE_LIMITS.corpus,
+      arxivLive: MERGE_LIMITS.arxivLive,
+      webLive: MERGE_LIMITS.webLive,
+    })
+
+    const storedBriefCount = merged.filter((s) => evidenceOrigin(s) === "stored_brief").length
+    const liveArxivCount = merged.filter((s) => evidenceOrigin(s) === "live_arxiv").length
+    const liveWebCount = merged.filter((s) => evidenceOrigin(s) === "live_web").length
+
+    if (merged.length === 0) {
       return NextResponse.json({
         answer:
-          "No research items are stored in your recent daily briefs yet. Once the CBS brief runs (scheduled around 05:00) with your company profile and keywords set, Juno ingests arXiv and similar sources and scores them into the Research section of your Signal feed — then you can ask over that corpus.",
+          "No research evidence is available yet. Save company keywords on your profile, let at least one daily brief run, and try again. Live arXiv search also returned no hits for this phrasing (try shorter nouns or acronyms).",
         keyFindings: [],
         sources: [],
         evidenceCount: 0,
+        storedBriefCount: 0,
+        liveArxivCount: 0,
+        liveWebCount: 0,
       })
     }
 
     const contextBlock = context?.promptBlock ? `OUR COMPANY / CONTEXT:\n${context.promptBlock}\n\n` : ""
 
-    const prompt = `You are a research analyst answering a question using evidence from curated research signals (papers, preprints, and technical summaries) collected for this founder.
+    const prompt = `You are a research analyst answering a question using mixed evidence: items from the founder's saved daily briefs, freshly retrieved arXiv results for this question, and optional open-web snippets.
 
 ${contextBlock}QUESTION:
 "${question}"
 
-RESEARCH SIGNALS (${evidence.length} items — titles, sources, and why they mattered when scored):
+EVIDENCE (${merged.length} items). Each row includes evidenceOrigin:
+- stored_brief: scored when a past daily brief ran
+- live_arxiv: retrieved just now from arXiv for this question
+- live_web: retrieved just now from the web (when available)
+
 ${JSON.stringify(
-  evidence.map((s: ResearchEvidenceSnippet) => ({
+  merged.map((s: ResearchEvidenceSnippet) => ({
+    evidenceOrigin: evidenceOrigin(s),
     url: s.url,
     title: s.title,
     source: s.source,
@@ -93,31 +131,33 @@ ${JSON.stringify(
     category: s.category,
     whyItMatters: s.whyItMatters,
     strategicImplication: s.strategicImplication,
-    collectedFromBriefRun: s.briefRunAt,
+    briefRunAt: s.briefRunAt,
   })),
   null,
   2,
 )}
 
 TASK:
-Answer the question directly. Ground every substantive claim in the items above. If the evidence does not contain enough detail to answer (for example the question is highly specific and no item discusses it), say so clearly and still report what the corpus does support.
+Answer the question directly. Ground specific claims in the URLs above. Prefer live_arxiv or live_web when they directly address the question; use stored_brief for founder-specific scoring context when relevant.
 
-Use careful academic-style language: distinguish established definitions from speculation. If items conflict, note the disagreement.
+If nothing in the set answers the core question, say that plainly and summarize the closest related points.
+
+Distinguish established definitions from opinion. Note disagreements when sources conflict.
 
 Return JSON with this exact shape:
 {
-  "answer": "4-8 sentences",
+  "answer": "4-10 sentences",
   "keyFindings": ["bullet 1", "bullet 2", "bullet 3"],
   "citedUrls": ["url1", "url2"]
 }
 
-citedUrls must be a subset of the urls in RESEARCH SIGNALS that you relied on most.
+citedUrls must be URLs from EVIDENCE you relied on.
 
 Return ONLY valid JSON, no markdown fences.`
 
     const { text } = await generateText({
       model: qwenModel(),
-      maxOutputTokens: 1800,
+      maxOutputTokens: 2200,
       messages: [{ role: "user", content: appendWritingRules(prompt) }],
     })
 
@@ -128,7 +168,7 @@ Return ONLY valid JSON, no markdown fences.`
     }
 
     const citedUrls = new Set((parsed.citedUrls ?? []).map((u) => u.trim()))
-    const citedSources: CitedSource[] = evidence
+    const citedSources: CitedSource[] = merged
       .filter((s) => citedUrls.has(s.url))
       .map((s) => ({
         title: s.title,
@@ -141,7 +181,10 @@ Return ONLY valid JSON, no markdown fences.`
       answer: parsed.answer ?? "",
       keyFindings: parsed.keyFindings ?? [],
       sources: citedSources,
-      evidenceCount: evidence.length,
+      evidenceCount: merged.length,
+      storedBriefCount,
+      liveArxivCount,
+      liveWebCount,
     })
   } catch (err) {
     console.error("[research-query] error:", err)

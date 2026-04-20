@@ -248,6 +248,9 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
     keyFindings: string[]
     sources: { title: string; url: string; source: string | null; relevance_score: number | null }[]
     evidenceCount: number
+    storedBriefCount: number
+    liveArxivCount: number
+    liveWebCount: number
   } | null>(null)
 
   useEffect(() => {
@@ -328,6 +331,9 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
         keyFindings?: string[]
         sources?: { title: string; url: string; source: string | null; relevance_score: number | null }[]
         evidenceCount?: number
+        storedBriefCount?: number
+        liveArxivCount?: number
+        liveWebCount?: number
         error?: string
       } = {}
       try {
@@ -341,6 +347,9 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
         keyFindings: json.keyFindings ?? [],
         sources: json.sources ?? [],
         evidenceCount: json.evidenceCount ?? 0,
+        storedBriefCount: json.storedBriefCount ?? 0,
+        liveArxivCount: json.liveArxivCount ?? 0,
+        liveWebCount: json.liveWebCount ?? 0,
       })
     } catch (e) {
       setResearchQueryError(e instanceof Error ? e.message : "Query failed")
@@ -462,7 +471,7 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
               </div>
               <p className="text-[12px] font-medium text-foreground leading-snug">Query your research corpus</p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Answers use papers and technical items from recent daily briefs (for example arXiv), plus your saved company context and vault grounding when connected.
+                Each question runs a live arXiv search, merges in your recent brief research items, and adds optional web hits when Exa is configured. Company context and vault grounding apply when connected.
               </p>
               <div className="flex gap-2 pt-0.5">
                 <Input
@@ -509,9 +518,13 @@ export function FounderDailyFeed({ className, title, subtitle }: FounderDailyFee
                       ))}
                     </ul>
                   ) : null}
-                  <p className="text-[10px] text-muted-foreground">
-                    Grounded in {researchQueryResult.evidenceCount} research item
-                    {researchQueryResult.evidenceCount === 1 ? "" : "s"} from recent briefs
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Evidence mix: {researchQueryResult.evidenceCount} total (
+                    {researchQueryResult.storedBriefCount} from briefs, {researchQueryResult.liveArxivCount} live arXiv
+                    {researchQueryResult.liveWebCount > 0
+                      ? `, ${researchQueryResult.liveWebCount} web`
+                      : ""}
+                    ).
                   </p>
                   {researchQueryResult.sources.length > 0 ? (
                     <div className="space-y-1">
