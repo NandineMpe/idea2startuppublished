@@ -28,6 +28,12 @@ function trimContext(block: string): string {
   return `${block.slice(0, MAX_CONTEXT_CHARS)}\n\n…(truncated)`
 }
 
+function strField(v: unknown): string {
+  if (typeof v === "string") return v.trim()
+  if (v === null || v === undefined) return ""
+  return String(v).trim()
+}
+
 function normalizeReplies(
   raw: Array<{ role?: string; reply?: string }> | undefined,
 ): Array<{ role: AgentRole; label: string; reply: string }> {
@@ -72,17 +78,47 @@ export async function POST(req: NextRequest) {
       }, { status: 403 })
     }
 
-    const body = (await req.json()) as {
-      meetingId?: string
-      question?: string
-      founderNotes?: string
+    let body: Record<string, unknown>
+    try {
+      const raw = await req.text()
+      if (!raw.trim()) {
+        return NextResponse.json({ error: "Request body is empty." }, { status: 400 })
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json({ error: "Expected a JSON object in the body." }, { status: 400 })
+      }
+      body = parsed as Record<string, unknown>
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 })
     }
-    const meetingId = body.meetingId?.trim()
-    const question = body.question?.trim()
-    const founderNotes = body.founderNotes?.trim() ?? ""
 
-    if (!meetingId) return NextResponse.json({ error: "meetingId is required" }, { status: 400 })
-    if (!question) return NextResponse.json({ error: "question is required" }, { status: 400 })
+    let meetingId = strField(body.meetingId ?? body.meeting_id)
+    const question = strField(body.question)
+    const founderNotes = strField(body.founderNotes ?? body.founder_notes)
+
+    if (!question) {
+      return NextResponse.json({ error: "question is required" }, { status: 400 })
+    }
+
+    if (!meetingId) {
+      const { data: latest } = await supabase
+        .from("ai_outputs")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("tool", "staff_meeting")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      meetingId = typeof latest?.id === "string" ? latest.id.trim() : ""
+    }
+
+    if (!meetingId) {
+      return NextResponse.json(
+        { error: "meetingId is required, or save at least one staff meeting first." },
+        { status: 400 },
+      )
+    }
 
     const { data: row, error: rowError } = await supabase
       .from("ai_outputs")

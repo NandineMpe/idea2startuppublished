@@ -281,7 +281,17 @@ export function JunoStaffMeetingPanel() {
   }, [activeMeetingRow?.id, founderNotes])
 
   const askStaffMeeting = useCallback(async () => {
-    if (!activeMeetingRow?.id || !meetingQuestion.trim() || meetingAskLoading) return
+    const meetingId =
+      typeof activeMeetingRow?.id === "string"
+        ? activeMeetingRow.id.trim()
+        : String(activeMeetingRow?.id ?? "").trim()
+    const q = meetingQuestion.trim()
+    if (!meetingId || !q || meetingAskLoading) {
+      if (!meetingId) {
+        setMeetingAskError("This meeting has no id. Refresh the page or pick another meeting tab.")
+      }
+      return
+    }
     setMeetingAskLoading(true)
     setMeetingAskError(null)
     setMeetingAskResult(null)
@@ -289,10 +299,11 @@ export function JunoStaffMeetingPanel() {
       const res = await fetch("/api/staff-meetings/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
-          meetingId: activeMeetingRow.id,
-          question: meetingQuestion.trim(),
-          founderNotes: founderNotes.trim() || undefined,
+          meetingId,
+          question: q,
+          ...(founderNotes.trim() ? { founderNotes: founderNotes.trim() } : {}),
         }),
       })
       let json: {
