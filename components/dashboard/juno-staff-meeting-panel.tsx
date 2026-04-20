@@ -1,7 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react"
-import { Calendar, Loader2 } from "lucide-react"
+import { Calendar, Loader2, SendHorizonal } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   buildCollaborationViewModel,
@@ -184,6 +187,15 @@ export function JunoStaffMeetingPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [founderNotes, setFounderNotes] = useState("")
+  const [meetingQuestion, setMeetingQuestion] = useState("")
+  const [meetingAskLoading, setMeetingAskLoading] = useState(false)
+  const [meetingAskError, setMeetingAskError] = useState<string | null>(null)
+  const [meetingAskResult, setMeetingAskResult] = useState<{
+    executiveSummary: string
+    agentReplies: Array<{ role: string; label: string; reply: string }>
+  } | null>(null)
+
   useEffect(() => {
     setSelectedMeetingId(null)
   }, [dateFilter])
@@ -244,6 +256,68 @@ export function JunoStaffMeetingPanel() {
     }
     return filteredMeetings[0]
   }, [filteredMeetings, selectedMeetingId, feed, dateFilter])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!activeMeetingRow?.id) {
+      setFounderNotes("")
+      setMeetingAskResult(null)
+      setMeetingAskError(null)
+      return
+    }
+    const key = `juno.staff-meeting.founder-notes.${activeMeetingRow.id}`
+    const raw = window.sessionStorage.getItem(key)
+    setFounderNotes(typeof raw === "string" ? raw : "")
+    setMeetingAskResult(null)
+    setMeetingAskError(null)
+  }, [activeMeetingRow?.id])
+
+  const persistFounderNotesToSession = useCallback(() => {
+    if (typeof window === "undefined" || !activeMeetingRow?.id) return
+    window.sessionStorage.setItem(
+      `juno.staff-meeting.founder-notes.${activeMeetingRow.id}`,
+      founderNotes,
+    )
+  }, [activeMeetingRow?.id, founderNotes])
+
+  const askStaffMeeting = useCallback(async () => {
+    if (!activeMeetingRow?.id || !meetingQuestion.trim() || meetingAskLoading) return
+    setMeetingAskLoading(true)
+    setMeetingAskError(null)
+    setMeetingAskResult(null)
+    try {
+      const res = await fetch("/api/staff-meetings/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          meetingId: activeMeetingRow.id,
+          question: meetingQuestion.trim(),
+          founderNotes: founderNotes.trim() || undefined,
+        }),
+      })
+      let json: {
+        executiveSummary?: string
+        agentReplies?: Array<{ role: string; label: string; reply: string }>
+        error?: string
+      } = {}
+      try {
+        json = await res.json()
+      } catch {
+        /* non-JSON */
+      }
+      if (!res.ok) {
+        throw new Error(typeof json.error === "string" ? json.error : "Question could not be answered")
+      }
+      setMeetingAskResult({
+        executiveSummary: json.executiveSummary ?? "",
+        agentReplies: Array.isArray(json.agentReplies) ? json.agentReplies : [],
+      })
+    } catch (e) {
+      setMeetingAskError(e instanceof Error ? e.message : "Question could not be answered")
+    } finally {
+      setMeetingAskLoading(false)
+    }
+  }, [activeMeetingRow?.id, founderNotes, meetingAskLoading, meetingQuestion])
 
   const d = useMemo(() => {
     if (!feed) return null
@@ -782,6 +856,92 @@ export function JunoStaffMeetingPanel() {
           )}
         </Section>
       )}
+
+      <div className="mt-10 pt-8 border-t border-border">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
+          Ask the meeting
+        </p>
+        <p className="text-[13px] text-muted-foreground mb-4 max-w-2xl leading-relaxed">
+          Put your own context in writing, then ask a follow-up. CBS, CRO, CMO, and CTO each reply from the lens of
+          this saved staff meeting synthesis (plus your company profile when available).
+        </p>
+
+        {!activeMeetingRow?.id ? (
+          <EmptyHint>Select a staff meeting above once one exists, then you can ask questions about it.</EmptyHint>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="text-[12px] font-medium text-foreground block mb-1.5">
+                Your contribution (optional)
+              </label>
+              <Textarea
+                value={founderNotes}
+                onChange={(e) => setFounderNotes(e.target.value)}
+                onBlur={() => persistFounderNotesToSession()}
+                placeholder="Decisions you are leaning toward, constraints, what you disagree with, or what you need from each agent…"
+                className="min-h-[88px] text-[13px] resize-y"
+                disabled={meetingAskLoading}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Saved in this browser per meeting when you leave the field.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                value={meetingQuestion}
+                onChange={(e) => setMeetingQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void askStaffMeeting()
+                }}
+                placeholder="e.g. Given my notes, should we postpone the LinkedIn push until security findings are closed?"
+                className="h-10 text-[13px]"
+                disabled={meetingAskLoading}
+              />
+              <Button
+                type="button"
+                onClick={() => void askStaffMeeting()}
+                disabled={meetingAskLoading || !meetingQuestion.trim()}
+                className="shrink-0 gap-2 h-10"
+              >
+                {meetingAskLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SendHorizonal className="h-4 w-4" />
+                )}
+                {meetingAskLoading ? "Asking…" : "Ask all agents"}
+              </Button>
+            </div>
+
+            {meetingAskError ? (
+              <p className="text-[13px] text-destructive border border-destructive/20 bg-destructive/5 rounded-lg px-3 py-2">
+                {meetingAskError}
+              </p>
+            ) : null}
+
+            {meetingAskResult ? (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/10 p-4">
+                <div>
+                  <p className="text-[12px] font-medium text-foreground mb-1">Together</p>
+                  <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                    {meetingAskResult.executiveSummary}
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {meetingAskResult.agentReplies.map((a) => (
+                    <Card key={a.role} style={{ padding: "12px 14px" }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge text={a.role.toUpperCase()} variant="default" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug mb-2">{a.label}</p>
+                      <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{a.reply}</p>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
