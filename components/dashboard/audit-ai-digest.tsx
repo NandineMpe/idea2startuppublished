@@ -185,7 +185,7 @@ export function AuditAiDigest() {
           <div className="py-12 text-center">
             <p className="text-[13px] text-destructive">{error}</p>
             <p className="text-[12px] text-muted-foreground mt-1">
-              Hit &quot;Compile digest&quot; to pull 45 days of market signals for your company and synthesize via Qwen.
+              Hit &quot;Compile digest&quot; to pull 45 days of market signals for your company and synthesize via OpenRouter.
             </p>
           </div>
         ) : !digest ? (

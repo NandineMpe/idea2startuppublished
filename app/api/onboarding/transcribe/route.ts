@@ -3,8 +3,7 @@ import { getLlmApiKey, getLlmBaseUrl } from "@/lib/llm-provider"
 
 /**
  * Audio transcription via the OpenAI-compatible /audio/transcriptions endpoint.
- * Works with OpenRouter (openai/whisper-1), DashScope (paraformer-realtime-v2),
- * or any other provider that exposes the endpoint.
+ * Primary: OpenRouter (`openai/whisper-1`). Optional: DashScope STT or any compatible host.
  */
 function getTranscribeConfig(): { url: string; apiKey: string; model: string } {
   const apiKey = getLlmApiKey()
@@ -32,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "No LLM API key configured. Set LLM_API_KEY, OPENROUTER_API_KEY, or DASHSCOPE_API_KEY." },
+      { error: "No LLM API key configured. Set OPENROUTER_API_KEY (or LLM_API_KEY); DashScope optional for STT." },
       { status: 503 },
     )
   }

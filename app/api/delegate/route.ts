@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const companyContext = await getCompanyContextPrompt(user?.id, {})
     const startupContext = context?.trim() || companyContext || "Not provided"
 
-    // ── Step 1: Use Qwen to plan the delegation ─────────────────────────────
+    // ── Step 1: Use OpenRouter LLM to plan the delegation ─────────────────────
     const userPrompt = `STRATEGIC GOAL: ${goal}\n\nSTARTUP CONTEXT:\n${startupContext}`
 
     const { text: planText } = await generateText({

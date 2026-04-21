@@ -1,6 +1,7 @@
 /**
  * One-shot LLM credential check (same routing as lib/llm-provider.ts).
- * Run: node --env-file=.env --env-file=.env.local scripts/check-llm-health.mjs
+ * Production expects OPENROUTER_API_KEY (Vercel). Run:
+ *   node --env-file=.env --env-file=.env.local scripts/check-llm-health.mjs
  * Does not print API keys.
  */
 const DASHSCOPE_BASE_INTL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
@@ -55,7 +56,7 @@ function getLlmApiKey() {
 
 function getDefaultModelId() {
   const baseUrl = getLlmBaseUrl()
-  const configured = process.env.QWEN_MODEL?.trim()
+  const configured = process.env.LLM_MODEL?.trim() || process.env.QWEN_MODEL?.trim()
   if (configured) {
     const t = configured
     if (isDashScopeBaseUrl(baseUrl)) {

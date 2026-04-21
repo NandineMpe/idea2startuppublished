@@ -27,7 +27,7 @@ export const DISMISS_SELECT_OPTIONS = DISMISS_PRESET_IDS.map((id) => ({
   label: DISMISS_PRESET_LABELS[id],
 }))
 
-/** Build the single line we store and show to the LLM (Qwen). */
+/** Build the single line we store and show to the LLM (OpenRouter). */
 export function buildDismissalReasonText(
   reasonPreset: string | undefined | null,
   reasonDetail: string | undefined | null,

@@ -30,7 +30,7 @@ export interface CompanyContext {
   vaultFiles: Array<{ path: string; content: string }>
   /** Deprecated live vault search hits; preserved as an empty array for compatibility. */
   knowledgeHits: string[]
-  /** Pre-formatted block for LLM system prompts (Qwen in production) */
+  /** Pre-formatted block for LLM system prompts (OpenRouter in production) */
   promptBlock: string
   extracted: {
     competitors: string[]

@@ -603,7 +603,7 @@ export function ContextBrainPage() {
             To replace old text: use <span className="font-medium text-foreground/90">Erase saved document</span>, then paste and <span className="font-medium text-foreground/90">Save</span>. Or edit and Save over it.
           </p>
           <p className="text-[13px] text-muted-foreground leading-relaxed">
-            Ask any AI (ChatGPT, Qwen, Gemini) for a company overview in markdown, then paste or upload it here.
+            Ask any AI (ChatGPT, OpenRouter, Gemini, etc.) for a company overview in markdown, then paste or upload it here.
           </p>
           <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground font-mono leading-relaxed">
             &quot;Generate everything you know about my company [name] as a detailed markdown document covering our product, market, traction, team, and strategy.&quot;

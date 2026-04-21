@@ -1,7 +1,8 @@
 /**
- * Default app LLM: OpenAI-compatible API (OpenRouter, DashScope, or custom LLM_BASE_URL).
- * OpenRouter default: Nemotron 3 Super (free). DashScope default: qwen-plus.
- * Use `qwenModel()` with the Vercel AI SDK (`generateText`, `streamText`, etc.).
+ * Production LLM path: **OpenRouter** (`OPENROUTER_API_KEY` in Vercel), OpenAI-compatible API.
+ * Default model: Nemotron 3 Super (free). Override with `LLM_MODEL` or legacy `QWEN_MODEL`.
+ * Optional legacy hosts: Alibaba DashScope, or any `LLM_BASE_URL`.
+ * Use `llmModel()` / `qwenModel()` with the Vercel AI SDK (`generateText`, `streamText`, etc.).
  */
 import { createOpenAI } from "@ai-sdk/openai"
 
@@ -12,7 +13,7 @@ const DASHSCOPE_BASE_HK = "https://cn-hongkong.dashscope.aliyuncs.com/compatible
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 /** DashScope stable alias (Qwen-Plus tier; not tied to removed qwen3.6-plus SKUs). */
 const DEFAULT_DASHSCOPE_QWEN_MODEL = "qwen-plus"
-/** OpenRouter: NVIDIA Nemotron 3 Super (free tier). Override with QWEN_MODEL. */
+/** OpenRouter: NVIDIA Nemotron 3 Super (free tier). */
 const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 const KNOWN_UNSUPPORTED_DASHSCOPE_MODELS = new Set(["qwen3-235b-a22b"])
 
@@ -115,13 +116,13 @@ export function isLlmConfigured(): boolean {
 
 /**
  * Model id for the provider.
- * DashScope default: qwen-plus.
  * OpenRouter default: nvidia/nemotron-3-super-120b-a12b:free.
- * Override with QWEN_MODEL env var.
+ * DashScope legacy default: qwen-plus.
+ * Override with `LLM_MODEL` or legacy `QWEN_MODEL`.
  */
 export function getDefaultModelId(): string {
   const baseUrl = getLlmBaseUrl()
-  const configured = process.env.QWEN_MODEL?.trim()
+  const configured = process.env.LLM_MODEL?.trim() || process.env.QWEN_MODEL?.trim()
 
   if (configured) {
     return isDashScopeBaseUrl(baseUrl)
@@ -142,12 +143,15 @@ const openaiCompatible = createOpenAI({
 
 /**
  * Language model for the Vercel AI SDK (generateText, streamText, etc.).
- * Uses OpenRouter Nemotron (free) or DashScope qwen-plus depending on base URL / env.
+ * Production: OpenRouter via `OPENROUTER_API_KEY` (and optional `LLM_MODEL`).
  */
 export function qwenModel() {
   return openaiCompatible(getDefaultModelId())
 }
 
+/** Preferred alias — same implementation as `qwenModel()`. */
+export const llmModel = qwenModel
+
 /** User-facing error when routes guard on a missing LLM key. */
 export const LLM_API_KEY_MISSING_MESSAGE =
-  "Set LLM_API_KEY, DASHSCOPE_API_KEY (Alibaba Model Studio), or OPENROUTER_API_KEY"
+  "Set OPENROUTER_API_KEY in your deployment (e.g. Vercel). You can also use LLM_API_KEY, or legacy DASHSCOPE_API_KEY for Alibaba only."

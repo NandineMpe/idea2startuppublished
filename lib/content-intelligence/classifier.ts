@@ -182,7 +182,7 @@ ${items
     const rows = sanitizeParsed(parsed, items)
     return rows.length > 0 ? rows : buildFallback(items)
   } catch (e) {
-    console.warn("[content-intelligence] Qwen classify failed:", e)
+    console.warn("[content-intelligence] OpenRouter classify failed:", e)
     return buildFallback(items)
   }
 }
