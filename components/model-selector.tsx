@@ -9,8 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 const models = [
   {
-    value: "qwen-plus",
-    label: "Qwen Plus",
+    value: "nvidia/nemotron-3-super-120b-a12b:free",
+    label: "Nemotron 3 Super (OpenRouter)",
     apiRoute: "/api/chat",
   },
   {

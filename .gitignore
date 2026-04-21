@@ -35,3 +35,5 @@ next-env.d.ts
 /paperclip/
 
 aardvark-gilded-rich_-_CLI_Quickstart-oauth-credentials.txt
+
+.env*.local

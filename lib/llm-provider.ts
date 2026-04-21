@@ -1,5 +1,6 @@
 /**
- * Default app LLM: Qwen via an OpenAI-compatible API (DashScope, OpenRouter, or custom LLM_BASE_URL).
+ * Default app LLM: OpenAI-compatible API (OpenRouter, DashScope, or custom LLM_BASE_URL).
+ * OpenRouter default: Nemotron 3 Super (free). DashScope default: qwen-plus.
  * Use `qwenModel()` with the Vercel AI SDK (`generateText`, `streamText`, etc.).
  */
 import { createOpenAI } from "@ai-sdk/openai"
@@ -11,8 +12,8 @@ const DASHSCOPE_BASE_HK = "https://cn-hongkong.dashscope.aliyuncs.com/compatible
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 /** DashScope stable alias (Qwen-Plus tier; not tied to removed qwen3.6-plus SKUs). */
 const DEFAULT_DASHSCOPE_QWEN_MODEL = "qwen-plus"
-/** OpenRouter: Qwen 3.5 tier (avoid qwen3.6 if your account no longer offers it). */
-const DEFAULT_OPENROUTER_QWEN_MODEL = "qwen/qwen3.5-plus"
+/** OpenRouter: NVIDIA Nemotron 3 Super (free tier). Override with QWEN_MODEL. */
+const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 const KNOWN_UNSUPPORTED_DASHSCOPE_MODELS = new Set(["qwen3-235b-a22b"])
 
 function dashscopeBaseFromEnv(): string | null {
@@ -38,9 +39,10 @@ function normalizeDashScopeModelId(modelId: string): string {
 /** DashScope-only names that OpenRouter and other hosts reject (see server_error Unsupported model). */
 function normalizeNonDashScopeModelId(modelId: string): string {
   const trimmed = modelId.trim()
-  if (trimmed === "qwen3-235b-a22b") return DEFAULT_OPENROUTER_QWEN_MODEL
-  if (trimmed === "qwen/qwen3.6-plus" || trimmed === "qwen3.6-plus") return DEFAULT_OPENROUTER_QWEN_MODEL
-  if (KNOWN_UNSUPPORTED_DASHSCOPE_MODELS.has(trimmed)) return DEFAULT_OPENROUTER_QWEN_MODEL
+  if (trimmed === "qwen3-235b-a22b") return DEFAULT_OPENROUTER_MODEL
+  if (trimmed === "qwen/qwen3.6-plus" || trimmed === "qwen3.6-plus") return DEFAULT_OPENROUTER_MODEL
+  if (trimmed === "qwen/qwen3.5-plus" || trimmed === "qwen3.5-plus") return DEFAULT_OPENROUTER_MODEL
+  if (KNOWN_UNSUPPORTED_DASHSCOPE_MODELS.has(trimmed)) return DEFAULT_OPENROUTER_MODEL
   return trimmed
 }
 
@@ -48,7 +50,7 @@ function normalizeNonDashScopeModelId(modelId: string): string {
  * OpenAI-compatible base URL.
  * - Set LLM_BASE_URL to override.
  * - If a DashScope key is present, prefer DashScope unless you explicitly point elsewhere.
- * - Otherwise default to OpenRouter.
+ * - Otherwise default to OpenRouter. For OpenRouter-only, remove DASHSCOPE_API_KEY so routing does not hit Alibaba.
  */
 export function getLlmBaseUrl(): string {
   const explicit =
@@ -85,7 +87,7 @@ export function isLlmConfigured(): boolean {
 /**
  * Model id for the provider.
  * DashScope default: qwen-plus.
- * OpenRouter default: qwen/qwen3.5-plus.
+ * OpenRouter default: nvidia/nemotron-3-super-120b-a12b:free.
  * Override with QWEN_MODEL env var.
  */
 export function getDefaultModelId(): string {
@@ -98,7 +100,7 @@ export function getDefaultModelId(): string {
       : normalizeNonDashScopeModelId(configured)
   }
 
-  return isDashScopeBaseUrl(baseUrl) ? DEFAULT_DASHSCOPE_QWEN_MODEL : DEFAULT_OPENROUTER_QWEN_MODEL
+  return isDashScopeBaseUrl(baseUrl) ? DEFAULT_DASHSCOPE_QWEN_MODEL : DEFAULT_OPENROUTER_MODEL
 }
 
 const openaiCompatible = createOpenAI({
@@ -114,7 +116,7 @@ const openaiCompatible = createOpenAI({
 
 /**
  * Language model for the Vercel AI SDK (generateText, streamText, etc.).
- * Default: Qwen via an OpenAI-compatible API.
+ * Uses OpenRouter Nemotron (free) or DashScope qwen-plus depending on base URL / env.
  */
 export function qwenModel() {
   return openaiCompatible(getDefaultModelId())
