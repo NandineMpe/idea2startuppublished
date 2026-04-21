@@ -27,20 +27,28 @@ function getLlmBaseUrl() {
     process.env.DASHSCOPE_BASE_URL?.trim() ||
     process.env.OPENROUTER_BASE_URL?.trim()
   if (explicit) return explicit
-  if (process.env.DASHSCOPE_API_KEY?.trim()) {
-    return dashscopeBaseFromEnv() ?? DASHSCOPE_BASE_INTL
-  }
   if (process.env.OPENROUTER_API_KEY?.trim()) {
     return OPENROUTER_BASE_URL
+  }
+  if (process.env.DASHSCOPE_API_KEY?.trim()) {
+    return dashscopeBaseFromEnv() ?? DASHSCOPE_BASE_INTL
   }
   return OPENROUTER_BASE_URL
 }
 
 function getLlmApiKey() {
+  const generic = process.env.LLM_API_KEY?.trim()
+  if (generic) return generic
+  const base = getLlmBaseUrl()
+  if (isDashScopeBaseUrl(base)) {
+    return process.env.DASHSCOPE_API_KEY?.trim() || ""
+  }
+  if (/openrouter\.ai/i.test(base)) {
+    return process.env.OPENROUTER_API_KEY?.trim() || ""
+  }
   return (
-    process.env.LLM_API_KEY?.trim() ||
-    process.env.DASHSCOPE_API_KEY?.trim() ||
     process.env.OPENROUTER_API_KEY?.trim() ||
+    process.env.DASHSCOPE_API_KEY?.trim() ||
     ""
   )
 }
@@ -67,13 +75,14 @@ const apiKey = getLlmApiKey()
 const baseUrl = getLlmBaseUrl()
 const model = getDefaultModelId()
 
-const keySource = process.env.LLM_API_KEY?.trim()
-  ? "LLM_API_KEY"
-  : process.env.DASHSCOPE_API_KEY?.trim()
-    ? "DASHSCOPE_API_KEY"
-    : process.env.OPENROUTER_API_KEY?.trim()
-      ? "OPENROUTER_API_KEY"
-      : "(none)"
+let keySource = "(none)"
+if (process.env.LLM_API_KEY?.trim()) keySource = "LLM_API_KEY"
+else if (/openrouter\.ai/i.test(baseUrl) && process.env.OPENROUTER_API_KEY?.trim())
+  keySource = "OPENROUTER_API_KEY"
+else if (isDashScopeBaseUrl(baseUrl) && process.env.DASHSCOPE_API_KEY?.trim())
+  keySource = "DASHSCOPE_API_KEY"
+else if (process.env.OPENROUTER_API_KEY?.trim()) keySource = "OPENROUTER_API_KEY"
+else if (process.env.DASHSCOPE_API_KEY?.trim()) keySource = "DASHSCOPE_API_KEY"
 
 console.log("--- LLM health check ---")
 console.log("Key source:", keySource)
@@ -91,11 +100,13 @@ const headers = {
   Authorization: `Bearer ${apiKey}`,
   "Content-Type": "application/json",
 }
-if (process.env.OPENROUTER_HTTP_REFERER) {
-  headers["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER
-}
-if (process.env.OPENROUTER_APP_TITLE) {
-  headers["X-Title"] = process.env.OPENROUTER_APP_TITLE
+if (/openrouter\.ai/i.test(baseUrl)) {
+  headers["HTTP-Referer"] =
+    process.env.OPENROUTER_HTTP_REFERER?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    (process.env.VERCEL_URL?.trim() ? `https://${process.env.VERCEL_URL.trim()}` : "") ||
+    "https://usejuno-ai.com"
+  headers["X-Title"] = process.env.OPENROUTER_APP_TITLE?.trim() || "Juno"
 }
 
 const body = JSON.stringify({

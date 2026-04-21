@@ -48,9 +48,10 @@ function normalizeNonDashScopeModelId(modelId: string): string {
 
 /**
  * OpenAI-compatible base URL.
- * - Set LLM_BASE_URL to override.
- * - If a DashScope key is present, prefer DashScope unless you explicitly point elsewhere.
- * - Otherwise default to OpenRouter. For OpenRouter-only, remove DASHSCOPE_API_KEY so routing does not hit Alibaba.
+ * - Set LLM_BASE_URL (or *_BASE_URL) to override.
+ * - Implicit routing when no base URL is set: **OpenRouter wins over DashScope** if both API keys exist,
+ *   so a leftover DASHSCOPE_API_KEY does not block OpenRouter after you add OPENROUTER_API_KEY.
+ * - With no keys, defaults to OpenRouter URL (calls fail until a key is set).
  */
 export function getLlmBaseUrl(): string {
   const explicit =
@@ -59,25 +60,53 @@ export function getLlmBaseUrl(): string {
     process.env.OPENROUTER_BASE_URL?.trim()
   if (explicit) return explicit
 
-  if (process.env.DASHSCOPE_API_KEY?.trim()) {
-    return dashscopeBaseFromEnv() ?? DASHSCOPE_BASE_INTL
-  }
-
   if (process.env.OPENROUTER_API_KEY?.trim()) {
     return OPENROUTER_BASE_URL
+  }
+
+  if (process.env.DASHSCOPE_API_KEY?.trim()) {
+    return dashscopeBaseFromEnv() ?? DASHSCOPE_BASE_INTL
   }
 
   return OPENROUTER_BASE_URL
 }
 
-/** API key for the OpenAI-compatible endpoint (DashScope key from Alibaba Model Studio works here). */
+/**
+ * API key for the resolved base URL.
+ * LLM_API_KEY overrides; otherwise the key must match the host (OpenRouter vs DashScope).
+ */
 export function getLlmApiKey(): string {
+  const generic = process.env.LLM_API_KEY?.trim()
+  if (generic) return generic
+
+  const base = getLlmBaseUrl()
+  if (isDashScopeBaseUrl(base)) {
+    return process.env.DASHSCOPE_API_KEY?.trim() || ""
+  }
+  if (isOpenRouterBaseUrl(base)) {
+    return process.env.OPENROUTER_API_KEY?.trim() || ""
+  }
+  // Custom LLM_BASE_URL: prefer OpenRouter key, then DashScope (legacy).
   return (
-    process.env.LLM_API_KEY?.trim() ||
-    process.env.DASHSCOPE_API_KEY?.trim() ||
     process.env.OPENROUTER_API_KEY?.trim() ||
+    process.env.DASHSCOPE_API_KEY?.trim() ||
     ""
   )
+}
+
+function isOpenRouterBaseUrl(baseUrl: string): boolean {
+  return /openrouter\.ai/i.test(baseUrl)
+}
+
+/** OpenRouter recommends HTTP-Referer; some requests fail without it. */
+function openRouterHeaderDefaults(): Record<string, string> {
+  const referer =
+    process.env.OPENROUTER_HTTP_REFERER?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    (process.env.VERCEL_URL?.trim() ? `https://${process.env.VERCEL_URL.trim()}` : "") ||
+    "https://usejuno-ai.com"
+  const title = process.env.OPENROUTER_APP_TITLE?.trim() || "Juno"
+  return { "HTTP-Referer": referer, "X-Title": title }
 }
 
 export function isLlmConfigured(): boolean {
@@ -107,10 +136,7 @@ const openaiCompatible = createOpenAI({
   apiKey: getLlmApiKey() || "",
   baseURL: getLlmBaseUrl(),
   headers: {
-    ...(process.env.OPENROUTER_HTTP_REFERER
-      ? { "HTTP-Referer": process.env.OPENROUTER_HTTP_REFERER }
-      : {}),
-    ...(process.env.OPENROUTER_APP_TITLE ? { "X-Title": process.env.OPENROUTER_APP_TITLE } : {}),
+    ...(isOpenRouterBaseUrl(getLlmBaseUrl()) ? openRouterHeaderDefaults() : {}),
   },
 })
 
