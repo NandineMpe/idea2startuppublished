@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Augentik Reports</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f4efe3;
+      --paper-2: #ebe2cf;
+      --ink: #130f0a;
+      --muted: #70675d;
+      --rule: #241c14;
+      --hairline: rgba(36, 28, 20, 0.18);
+      --accent: #7b160d;
+      --accent-soft: rgba(123, 22, 13, 0.12);
+      --ok: #176044;
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-sans: "Inter", Arial, sans-serif;
+      --font-mono: "JetBrains Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #fafafa;
+      color: var(--ink);
+      font-family: var(--font-sans);
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 296px minmax(0, 1fr);
+    }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 32px;
+      border-right: 1px solid var(--rule);
+      background: #f7f5f0;
+    }
+
+    .brand {
+      font-family: var(--font-serif);
+      font-size: 43px;
+      line-height: 0.9;
+      letter-spacing: 0;
+    }
+
+    .brand span { color: var(--accent); }
+
+    .tagline {
+      margin: 12px 0 18px;
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 16px;
+    }
+
+    .issue {
+      display: flex;
+      justify-content: space-between;
+      padding: 18px 0 28px;
+      border-bottom: 3px double var(--rule);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .nav-group {
+      margin-top: 32px;
+    }
+
+    .nav-title {
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px dotted var(--hairline);
+      color: #4f4841;
+      font-family: var(--font-serif);
+      font-size: 21px;
+      text-decoration: none;
+    }
+
+    .nav-item.active {
+      color: var(--accent);
+    }
+
+    .nav-item small {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .user-card {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      bottom: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--hairline);
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 16px;
+      font-style: italic;
+    }
+
+    main {
+      padding: 24px clamp(24px, 6vw, 96px) 64px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 auto 26px;
+      max-width: 1350px;
+    }
+
+    .lede {
+      max-width: 800px;
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: clamp(20px, 2vw, 25px);
+      font-style: italic;
+      line-height: 1.18;
+    }
+
+    .source-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: #5f554d;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .pill {
+      padding: 8px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .pill.muted {
+      border-color: rgba(36, 28, 20, 0.26);
+      color: #9a9188;
+    }
+
+    input[type="date"] {
+      height: 38px;
+      border: 1px solid rgba(36, 28, 20, 0.22);
+      background: #efe8da;
+      padding: 0 12px;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 13px;
+    }
+
+    .book-rule {
+      max-width: 1350px;
+      margin: 0 auto 28px;
+      border-top: 4px double var(--rule);
+    }
+
+    .tabs {
+      max-width: 1350px;
+      margin: 0 auto;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+
+    .tab {
+      min-height: 46px;
+      padding: 0 24px;
+      border: 0;
+      border-top: 1px solid var(--rule);
+      background: transparent;
+      color: #6e5248;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      border: 1px solid var(--rule);
+      border-bottom-color: var(--paper);
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    .report {
+      max-width: 1350px;
+      margin: 0 auto;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      min-height: 720px;
+      padding: clamp(24px, 3vw, 42px);
+    }
+
+    .report-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      padding-bottom: 26px;
+      border-bottom: 4px double var(--rule);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: clamp(30px, 3vw, 40px);
+      line-height: 1;
+      font-weight: 400;
+    }
+
+    .period {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 17px;
+      font-style: italic;
+    }
+
+    .meta {
+      color: #6c625a;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      text-align: right;
+    }
+
+    .flag {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    .note {
+      padding: 16px 0;
+      border-bottom: 1px dotted var(--hairline);
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 17px;
+      font-style: italic;
+    }
+
+    .statement {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      table-layout: fixed;
+    }
+
+    .statement th {
+      padding: 14px 8px;
+      border-bottom: 1px solid var(--rule);
+      color: #705f55;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+    }
+
+    .statement th.amount,
+    .statement td.amount {
+      width: 210px;
+      text-align: right;
+    }
+
+    .statement th.tie,
+    .statement td.tie {
+      width: 150px;
+      text-align: right;
+    }
+
+    .section-row td {
+      padding: 28px 8px 10px;
+      color: var(--ink);
+      font-family: var(--font-serif);
+      font-size: 25px;
+      font-style: italic;
+    }
+
+    .line-row {
+      border-bottom: 1px dotted rgba(36, 28, 20, 0.18);
+      cursor: pointer;
+    }
+
+    .line-row:hover,
+    .line-row.active {
+      background: var(--paper-2);
+    }
+
+    .line-row td {
+      padding: 15px 8px;
+      vertical-align: top;
+      font-size: 15px;
+    }
+
+    .account-name {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .account-number {
+      color: #7d746d;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .account-title {
+      font-family: var(--font-serif);
+      font-size: 21px;
+      color: #130f0a;
+    }
+
+    .account-subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 12px;
+    }
+
+    .amount {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      white-space: nowrap;
+    }
+
+    .tie {
+      color: var(--ok);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .subtotal td,
+    .total td {
+      border-top: 1px solid var(--rule);
+      font-family: var(--font-serif);
+      font-size: 21px;
+      font-style: italic;
+    }
+
+    .total td {
+      border-top: 4px double var(--rule);
+      border-bottom: 4px double var(--rule);
+      font-weight: 600;
+    }
+
+    .drilldown {
+      margin-top: 0;
+      border-left: 4px solid var(--accent);
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      background: #ede4d1;
+      padding: 30px;
+      display: none;
+    }
+
+    .drilldown.open { display: block; }
+
+    .drill-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 24px;
+      align-items: start;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--hairline);
+    }
+
+    .drill-account {
+      color: #695f56;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .drill-title {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 31px;
+      font-weight: 400;
+    }
+
+    .drill-amount {
+      font-family: var(--font-mono);
+      font-size: clamp(24px, 3vw, 32px);
+      white-space: nowrap;
+    }
+
+    .close {
+      min-width: 108px;
+      height: 44px;
+      border: 0;
+      background: #f5efe3;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+
+    .summary-cell {
+      border-top: 1px solid var(--rule);
+      padding: 12px 8px 8px 0;
+    }
+
+    .summary-label {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+    }
+
+    .summary-value {
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 16px;
+    }
+
+    .drill-section-title {
+      margin: 24px 0 10px;
+      color: #574d45;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .detail-table th {
+      padding: 12px 8px;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      background: rgba(36, 28, 20, 0.05);
+      color: #6b5f56;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .detail-table td {
+      padding: 13px 8px;
+      border-bottom: 1px dotted var(--hairline);
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    .detail-table .mono {
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .detail-table .right {
+      text-align: right;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+
+    .source-link {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      text-decoration: underline dotted;
+      text-underline-offset: 4px;
+      white-space: nowrap;
+    }
+
+    .reconcile {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 4px double var(--rule);
+      display: flex;
+      justify-content: flex-end;
+      gap: 30px;
+      align-items: baseline;
+      font-family: var(--font-serif);
+      font-size: 21px;
+      font-style: italic;
+    }
+
+    .reconcile strong {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-style: normal;
+    }
+
+    .actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .action {
+      min-height: 42px;
+      border: 1px solid var(--rule);
+      background: transparent;
+      padding: 0 18px;
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .rail {
+        position: relative;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--rule);
+      }
+      .user-card { position: static; margin-top: 24px; }
+      .topbar,
+      .report-head,
+      .drill-head {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+      .source-controls,
+      .meta {
+        text-align: left;
+        justify-content: flex-start;
+      }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .statement th.tie,
+      .statement td.tie { display: none; }
+    }
+
+    @media (max-width: 700px) {
+      main { padding-inline: 14px; }
+      .report { padding: 18px 14px; }
+      .statement th.amount,
+      .statement td.amount { width: 138px; }
+      .account-name {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .amount { font-size: 14px; }
+      .drilldown { padding: 20px 14px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .detail-table th:nth-child(4),
+      .detail-table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="rail" aria-label="Augentik navigation">
+      <div class="brand">Augentik<span>.</span></div>
+      <p class="tagline">The books, kept in good hands.</p>
+      <div class="issue"><span>Vol. XII</span><span>No. 47</span></div>
+
+      <nav>
+        <div class="nav-group">
+          <div class="nav-title">The desk</div>
+          <a class="nav-item" href="#"><span>Front page</span><small>12</small></a>
+          <a class="nav-item" href="#"><span>Workflows</span><small>&bull;</small></a>
+          <a class="nav-item" href="#"><span>Audit trail</span><small>312</small></a>
+          <a class="nav-item" href="#"><span>Close checklist</span><small>47</small></a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">The books</div>
+          <a class="nav-item" href="#"><span>Single source of truth</span><small>**</small></a>
+          <a class="nav-item" href="#"><span>Transactions</span><small>5,278</small></a>
+          <a class="nav-item" href="#"><span>Ledger</span><small>16</small></a>
+          <a class="nav-item active" href="#"><span>Reports</span><small>$</small></a>
+          <a class="nav-item" href="#"><span>Journal entries</span><small>244</small></a>
+        </div>
+      </nav>
+
+      <div class="user-card">Signed in as<br><strong>E. Thornton</strong><br>Controller, Northwind Materials</div>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <p class="lede">Draft management reports - every figure traces back to the adjusted trial balance. Click any account number to inspect the ledger detail and account-specific adjustments.</p>
+        <div class="source-controls">
+          <span class="pill">Augentik Ledger</span>
+          <span class="pill muted">QuickBooks</span>
+          <label for="as-of">As of</label>
+          <input id="as-of" type="date" value="2026-04-26">
+        </div>
+      </div>
+
+      <div class="book-rule"></div>
+
+      <div class="tabs" role="tablist" aria-label="Financial statements">
+        <button class="tab" type="button" data-statement="income">Income Statement</button>
+        <button class="tab active" type="button" data-statement="balance">Balance Sheet</button>
+        <button class="tab" type="button" data-statement="cashflow">Cash Flow Statement</button>
+        <button class="tab" type="button" data-statement="equity">Shareholders' Equity</button>
+      </div>
+
+      <section class="report" aria-live="polite">
+        <div class="report-head">
+          <div>
+            <h1 id="statement-title">Balance Sheet - Northwind Materials, Inc.</h1>
+            <p class="period" id="statement-period">As of March 31, 2026</p>
+          </div>
+          <div class="meta">
+            <div>134 posted entries</div>
+            <div>Adjusted TB hash a4f8...ff01</div>
+            <div class="flag">2 accounts flagged</div>
+          </div>
+        </div>
+
+        <div class="note">Account rows tie directly to the adjusted trial balance; subtotals are calculated from those account-level balances.</div>
+
+        <table class="statement">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th class="tie">ATB tie-out</th>
+              <th class="amount" id="period-label">Mar 2026</th>
+            </tr>
+          </thead>
+          <tbody id="statement-body"></tbody>
+        </table>
+
+        <div id="drilldown" class="drilldown" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const currency = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2
+    });
+
+    const reports = {
+      balance: {
+        title: "Balance Sheet - Northwind Materials, Inc.",
+        period: "As of March 31, 2026",
+        periodLabel: "Mar 2026",
+        sections: [
+          {
+            label: "Current Assets",
+            rows: [
+              {
+                id: "1010",
+                account: "1010",
+                name: "Cash - Chase Operating",
+                source: "Chase operating account ending 1842",
+                atb: 1186240.52,
+                ledgerOpening: 892410.18,
+                adjustmentTotal: -18500,
+                ledger: [
+                  ["BNK-2026-03-004", "Mar 03", "Customer receipts batch", 418204.70, "ch_3Okj...x8f2"],
+                  ["BNK-2026-03-018", "Mar 18", "Vendor payment run", -126374.36, "qb_billpay_4811"],
+                  ["BNK-2026-03-031", "Mar 31", "Stripe sweep to operating", 203000.00, "stripe_po_2094"],
+                  ["BNK-2026-03-032", "Mar 31", "Payroll funding transfer", -182500.00, "mercury_wire_882"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-012", "Mar 31", "Book outstanding bank fees", -8500.00, "bank_stmt_1842"],
+                  ["AJE-2026-03-019", "Mar 31", "Reclass held customer deposit", -10000.00, "rev_review_03"]
+                ]
+              },
+              {
+                id: "1020",
+                account: "1020",
+                name: "Cash - Mercury Payroll",
+                source: "Mercury payroll account ending 7209",
+                atb: 326880.40,
+                ledgerOpening: 301120.40,
+                adjustmentTotal: 0,
+                ledger: [
+                  ["BNK-2026-03-010", "Mar 14", "Payroll funding from Chase operating", 182500.00, "chase_wire_882"],
+                  ["PAY-2026-03-015", "Mar 15", "Semi-monthly payroll", -78620.00, "gusto_pr_9081"],
+                  ["PAY-2026-03-031", "Mar 31", "Semi-monthly payroll", -78020.00, "gusto_pr_9155"]
+                ],
+                adjustments: []
+              },
+              {
+                id: "1200",
+                account: "1200",
+                name: "Accounts Receivable",
+                source: "Open invoice subledger",
+                atb: 874220.00,
+                ledgerOpening: 742000.00,
+                adjustmentTotal: -42000.00,
+                ledger: [
+                  ["INV-2026-03-0812", "Mar 25", "Acme MSA milestone billing", 84000.00, "INV-2026-0812"],
+                  ["INV-2026-03-0868", "Mar 30", "Quarterly platform invoices", 90220.00, "invoice_batch_q1"],
+                  ["RCPT-2026-03-028", "Mar 31", "Customer receipt applied", -65000.00, "stripe_po_2094"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-021", "Mar 31", "Bad debt reserve true-up", -42000.00, "ar_aging_03"]
+                ]
+              },
+              {
+                id: "1300",
+                account: "1300",
+                name: "Prepaid Expenses",
+                source: "Prepaids roll-forward",
+                atb: 116420.00,
+                ledgerOpening: 94420.00,
+                adjustmentTotal: -12000.00,
+                ledger: [
+                  ["AP-2026-03-144", "Mar 04", "Annual D&O insurance", 36000.00, "bill_7144"],
+                  ["AP-2026-03-188", "Mar 21", "Software renewals", 10000.00, "bill_7188"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-009", "Mar 31", "March prepaid amortization", -12000.00, "prepaid_sched_03"]
+                ]
+              }
+            ]
+          },
+          {
+            label: "Current Liabilities",
+            rows: [
+              {
+                id: "2000",
+                account: "2000",
+                name: "Accounts Payable",
+                source: "AP aging",
+                atb: -392840.33,
+                ledgerOpening: -351120.33,
+                adjustmentTotal: -64000.00,
+                ledger: [
+                  ["AP-2026-03-144", "Mar 04", "D&O insurance bill", -36000.00, "bill_7144"],
+                  ["AP-2026-03-221", "Mar 26", "Cloud infrastructure invoice", -69720.00, "aws_03"],
+                  ["PMT-2026-03-227", "Mar 28", "Vendor payments released", 64000.00, "qb_billpay_4811"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-017", "Mar 31", "Accrue legal fees", -44000.00, "legal_est_03"],
+                  ["AJE-2026-03-018", "Mar 31", "Accrue contractor services", -20000.00, "contractor_cutoff"]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      income: {
+        title: "Income Statement - Northwind Materials, Inc.",
+        period: "For the month ended March 31, 2026",
+        periodLabel: "Mar 2026",
+        sections: [
+          {
+            label: "Revenue",
+            rows: [
+              {
+                id: "4000",
+                account: "4000",
+                name: "Revenue - Product",
+                source: "Stripe and invoice revenue detail",
+                atb: 4281904.00,
+                ledgerOpening: 0,
+                adjustmentTotal: 84000.00,
+                ledger: [
+                  ["JE-2026-03-041", "Mar 28", "Stripe settlements batch", 4197904.00, "ch_30kj...x8f2"]
+                ],
+                adjustments: [
+                  ["JE-2026-03-038", "Mar 25", "Revenue reclass - Acme MSA milestone", 84000.00, "INV-2026-0812"]
+                ]
+              },
+              {
+                id: "4100",
+                account: "4100",
+                name: "Revenue - Services",
+                source: "Professional services invoices",
+                atb: 486000.00,
+                ledgerOpening: 0,
+                adjustmentTotal: 0,
+                ledger: [
+                  ["INV-2026-03-0798", "Mar 20", "Implementation services batch", 486000.00, "invoice_batch_ps"]
+                ],
+                adjustments: []
+              }
+            ]
+          },
+          {
+            label: "Operating Expenses",
+            rows: [
+              {
+                id: "6100",
+                account: "6100",
+                name: "Payroll Expense",
+                source: "Gusto payroll register",
+                atb: -614280.00,
+                ledgerOpening: 0,
+                adjustmentTotal: -28440.00,
+                ledger: [
+                  ["PAY-2026-03-015", "Mar 15", "Semi-monthly payroll", -292920.00, "gusto_pr_9081"],
+                  ["PAY-2026-03-031", "Mar 31", "Semi-monthly payroll", -292920.00, "gusto_pr_9155"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-026", "Mar 31", "Accrued payroll taxes", -28440.00, "payroll_accrual"]
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      cashflow: {
+        title: "Cash Flow Statement - Northwind Materials, Inc.",
+        period: "For the month ended March 31, 2026",
+        periodLabel: "Mar 2026",
+        sections: [
+          {
+            label: "Cash Accounts",
+            rows: [
+              {
+                id: "1010",
+                account: "1010",
+                name: "Cash - Chase Operating",
+                source: "Chase operating account ending 1842",
+                atb: 1186240.52,
+                ledgerOpening: 892410.18,
+                adjustmentTotal: -18500,
+                ledger: [
+                  ["BNK-2026-03-004", "Mar 03", "Customer receipts batch", 418204.70, "ch_3Okj...x8f2"],
+                  ["BNK-2026-03-018", "Mar 18", "Vendor payment run", -126374.36, "qb_billpay_4811"],
+                  ["BNK-2026-03-031", "Mar 31", "Stripe sweep to operating", 203000.00, "stripe_po_2094"],
+                  ["BNK-2026-03-032", "Mar 31", "Payroll funding transfer", -182500.00, "mercury_wire_882"]
+                ],
+                adjustments: [
+                  ["AJE-2026-03-012", "Mar 31", "Book outstanding bank fees", -8500.00, "bank_stmt_1842"],
+                  ["AJE-2026-03-019", "Mar 31", "Reclass held customer deposit", -10000.00, "rev_review_03"]
+                ]
+              },
+              {
+                id: "1020",
+                account: "1020",
+                name: "Cash - Mercury Payroll",
+                source: "Mercury payroll account ending 7209",
+                atb: 326880.40,
+                ledgerOpening: 301120.40,
+                adjustmentTotal: 0,
+                ledger: [
+                  ["BNK-2026-03-010", "Mar 14", "Payroll funding from Chase operating", 182500.00, "chase_wire_882"],
+                  ["PAY-2026-03-015", "Mar 15", "Semi-monthly payroll", -78620.00, "gusto_pr_9081"],
+                  ["PAY-2026-03-031", "Mar 31", "Semi-monthly payroll", -78020.00, "gusto_pr_9155"]
+                ],
+                adjustments: []
+              }
+            ]
+          }
+        ]
+      },
+      equity: {
+        title: "Shareholders' Equity - Northwind Materials, Inc.",
+        period: "For the month ended March 31, 2026",
+        periodLabel: "Mar 2026",
+        sections: [
+          {
+            label: "Equity Accounts",
+            rows: [
+              {
+                id: "3000",
+                account: "3000",
+                name: "Common Stock",
+                source: "Cap table ledger",
+                atb: -250000.00,
+                ledgerOpening: -250000.00,
+                adjustmentTotal: 0,
+                ledger: [["EQ-2025-11-001", "Nov 18", "Initial issuance", -250000.00, "board_approval"]],
+                adjustments: []
+              },
+              {
+                id: "3100",
+                account: "3100",
+                name: "Retained Earnings",
+                source: "Prior close roll-forward",
+                atb: -1298640.00,
+                ledgerOpening: -1298640.00,
+                adjustmentTotal: 0,
+                ledger: [["CLS-2026-02", "Feb 28", "Prior month close balance", -1298640.00, "close_pkg_feb"]],
+                adjustments: []
+              }
+            ]
+          }
+        ]
+      }
+    };
+
+    const body = document.getElementById("statement-body");
+    const drilldown = document.getElementById("drilldown");
+    const title = document.getElementById("statement-title");
+    const period = document.getElementById("statement-period");
+    const periodLabel = document.getElementById("period-label");
+    let activeStatement = "balance";
+    let activeAccount = null;
+
+    function sumRows(rows) {
+      return rows.reduce((total, row) => total + row.atb, 0);
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function renderStatement(statementKey) {
+      activeStatement = statementKey;
+      activeAccount = null;
+      const report = reports[statementKey];
+      title.textContent = report.title;
+      period.textContent = report.period;
+      periodLabel.textContent = report.periodLabel;
+      drilldown.classList.remove("open");
+      drilldown.innerHTML = "";
+
+      body.innerHTML = report.sections.map((section) => {
+        const rows = section.rows.map((row) => `
+          <tr class="line-row" data-account-id="${row.id}" tabindex="0">
+            <td>
+              <div class="account-name">
+                <span class="account-number">${escapeHtml(row.account)}</span>
+                <span>
+                  <span class="account-title">${escapeHtml(row.name)}</span>
+                  <div class="account-subtitle">${escapeHtml(row.source)}</div>
+                </span>
+              </div>
+            </td>
+            <td class="tie">Ties</td>
+            <td class="amount">${currency.format(row.atb)}</td>
+          </tr>
+        `).join("");
+
+        return `
+          <tr class="section-row"><td colspan="3">${escapeHtml(section.label)}</td></tr>
+          ${rows}
+          <tr class="subtotal">
+            <td>${escapeHtml(section.label)} subtotal</td>
+            <td class="tie">Calculated</td>
+            <td class="amount">${currency.format(sumRows(section.rows))}</td>
+          </tr>
+        `;
+      }).join("") + `
+        <tr class="total">
+          <td>Total per adjusted trial balance</td>
+          <td class="tie">Locked</td>
+          <td class="amount">${currency.format(report.sections.reduce((total, section) => total + sumRows(section.rows), 0))}</td>
+        </tr>
+      `;
+
+      body.querySelectorAll(".line-row").forEach((rowEl) => {
+        rowEl.addEventListener("click", () => openAccount(rowEl.dataset.accountId));
+        rowEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openAccount(rowEl.dataset.accountId);
+          }
+        });
+      });
+    }
+
+    function findAccount(accountId) {
+      for (const section of reports[activeStatement].sections) {
+        const account = section.rows.find((row) => row.id === accountId);
+        if (account) return account;
+      }
+      return null;
+    }
+
+    function total(entries) {
+      return entries.reduce((sum, entry) => sum + entry[3], 0);
+    }
+
+    function renderEntries(entries, emptyText) {
+      if (!entries.length) {
+        return `<p class="period">${emptyText}</p>`;
+      }
+
+      return `
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th style="width: 190px;">Reference</th>
+              <th style="width: 100px;">Date</th>
+              <th>Memo</th>
+              <th style="width: 170px;">Source doc</th>
+              <th style="width: 160px; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${entries.map((entry) => `
+              <tr>
+                <td class="mono">${escapeHtml(entry[0])}</td>
+                <td>${escapeHtml(entry[1])}</td>
+                <td>${escapeHtml(entry[2])}</td>
+                <td><span class="source-link">${escapeHtml(entry[4])}</span></td>
+                <td class="right">${currency.format(entry[3])}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function openAccount(accountId) {
+      const account = findAccount(accountId);
+      if (!account) return;
+      activeAccount = accountId;
+
+      document.querySelectorAll(".line-row").forEach((rowEl) => {
+        rowEl.classList.toggle("active", rowEl.dataset.accountId === accountId);
+      });
+
+      const ledgerTotal = total(account.ledger);
+      const adjustmentTotal = total(account.adjustments);
+      const computedAtb = account.ledgerOpening + ledgerTotal + adjustmentTotal;
+
+      drilldown.innerHTML = `
+        <div class="drill-head">
+          <div>
+            <div class="drill-account">${escapeHtml(account.account)}</div>
+            <h2 class="drill-title">${escapeHtml(account.name)}</h2>
+          </div>
+          <div class="drill-amount">${currency.format(account.atb)}</div>
+          <button class="close" type="button">Close x</button>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-cell">
+            <div class="summary-label">Beginning balance</div>
+            <div class="summary-value">${currency.format(account.ledgerOpening)}</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Posted ledger activity</div>
+            <div class="summary-value">${currency.format(ledgerTotal)}</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Adjusting entries</div>
+            <div class="summary-value">${currency.format(adjustmentTotal)}</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Adjusted TB amount</div>
+            <div class="summary-value">${currency.format(account.atb)}</div>
+          </div>
+        </div>
+
+        <div class="drill-section-title">Posted ledger detail</div>
+        ${renderEntries(account.ledger, "No posted ledger entries for this account in the selected period.")}
+
+        <div class="drill-section-title">Account-specific adjusting entries</div>
+        ${renderEntries(account.adjustments, "No adjusting entries were posted to this account.")}
+
+        <div class="reconcile">
+          <span>Reconciled total</span>
+          <strong>${currency.format(computedAtb)}</strong>
+        </div>
+        <div class="actions">
+          <button class="action" type="button">Open in ledger</button>
+          <button class="action" type="button">Open in transactions</button>
+          <button class="action" type="button">View adjusted trial balance</button>
+        </div>
+      `;
+
+      drilldown.classList.add("open");
+      drilldown.querySelector(".close").addEventListener("click", closeDrilldown);
+      drilldown.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function closeDrilldown() {
+      activeAccount = null;
+      drilldown.classList.remove("open");
+      document.querySelectorAll(".line-row").forEach((rowEl) => rowEl.classList.remove("active"));
+    }
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((node) => node.classList.remove("active"));
+        tab.classList.add("active");
+        renderStatement(tab.dataset.statement);
+      });
+    });
+
+    renderStatement(activeStatement);
+  </script>
+</body>
+</html>
