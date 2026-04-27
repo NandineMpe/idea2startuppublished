@@ -30,15 +30,74 @@ type FirmProfile = {
   assessment: string
 }
 
+type MustKnowHeadline = {
+  date: string
+  title: string
+  source: string
+  whyItMatters: string
+  companyRelevance: string
+  sourceUrl?: string | null
+}
+
+type RiskOpportunity = {
+  theme: string
+  risk: string
+  opportunity: string
+  whoShouldCare: string
+}
+
+type SourceRegisterItem = {
+  date: string
+  title: string
+  source: string
+  sourceUrl?: string | null
+  relevanceTier: "critical" | "important" | "watch"
+  reason: string
+}
+
+type StateOfPlayItem = {
+  theme: string
+  whatChanged: string
+  whyItMatters: string
+  whoIsAffected: string
+  sourceUrls?: string[]
+}
+
+type ChangeLogItem = {
+  date: string
+  category: string
+  actor: string
+  change: string
+  impact: string
+  sourceUrl?: string | null
+}
+
+type StakeholderBriefing = {
+  stakeholderType: string
+  nowTrue: string
+  implication: string
+  action: string
+}
+
 type AuditDigest = {
   headline: string
   subhead: string
   executiveSummary: string
+  industryAlignmentMemo?: string
+  stateOfPlay?: StateOfPlayItem[]
+  changeLog?: ChangeLogItem[]
+  mustKnowHeadlines?: MustKnowHeadline[]
   timeline: TimelineEvent[]
   firmProfiles: FirmProfile[]
   regulatoryLandscape: string
+  technologyLandscape?: string
+  educationAndWorkforceLandscape?: string
   marketImplications: string
+  riskAndOpportunityMap?: RiskOpportunity[]
+  stakeholderBriefings?: StakeholderBriefing[]
   whatToWatch: string[]
+  sourceRegister?: SourceRegisterItem[]
+  coverageNotes?: string
   rawSourceCount: number
 }
 
@@ -133,7 +192,7 @@ export function AuditAiDigest() {
           <BookOpen className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              45 Days of AI in {industry || companyName || "Your Market"}
+              45 Days of Accounting & Audit Intelligence
             </h2>
             <p className="text-[13px] text-muted-foreground mt-0.5">
               {companyName ? `Market intelligence for ${companyName}.` : "Compile signals from your market."}
@@ -185,7 +244,7 @@ export function AuditAiDigest() {
           <div className="py-12 text-center">
             <p className="text-[13px] text-destructive">{error}</p>
             <p className="text-[12px] text-muted-foreground mt-1">
-              Hit &quot;Compile digest&quot; to pull 45 days of market signals for your company and synthesize via OpenRouter.
+              Hit &quot;Compile digest&quot; to pull 45 days of accounting and audit signals for your company.
             </p>
           </div>
         ) : !digest ? (
@@ -193,8 +252,8 @@ export function AuditAiDigest() {
             <BookOpen className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-[14px] text-foreground font-medium">No digest compiled yet</p>
             <p className="text-[12px] text-muted-foreground mt-1 max-w-md mx-auto">
-              Compiles 45 days of market signals from Google News into an in-depth feature — tailored to{" "}
-              {companyName || "your company"}&apos;s industry, ICP, and competitive landscape.
+              Compiles 45 days of accounting, auditing, reporting, regulatory, and AI-in-audit signals into an in-depth brief tailored to{" "}
+              {companyName || "your company"}&apos;s context, ICP, and competitive landscape.
             </p>
           </div>
         ) : (
@@ -221,6 +280,110 @@ function DigestContent({ digest }: { digest: AuditDigest }) {
           {digest.executiveSummary.split("\n").filter(Boolean).map((p, i) => (
             <p key={i} className="text-[13px] text-foreground/90 leading-relaxed">{p}</p>
           ))}
+        </div>
+      )}
+
+      {/* Industry alignment memo */}
+      {digest.industryAlignmentMemo && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/60 dark:bg-amber-950/15">
+          <SectionHeading icon={BookOpen} label="Industry alignment memo" />
+          <div className="mt-3 prose prose-sm dark:prose-invert max-w-none">
+            {digest.industryAlignmentMemo.split("\n").filter(Boolean).map((p, i) => (
+              <p key={i} className="text-[13px] text-foreground/90 leading-relaxed">{p}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* State of play */}
+      {Array.isArray(digest.stateOfPlay) && digest.stateOfPlay.length > 0 && (
+        <div>
+          <SectionHeading icon={TrendingUp} label="State of play" count={digest.stateOfPlay.length} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {digest.stateOfPlay.map((item, i) => (
+              <div key={`${item.theme}-${i}`} className="rounded-lg border border-border p-4 bg-muted/20">
+                <p className="text-[13px] font-semibold text-foreground">{item.theme}</p>
+                <p className="mt-2 text-[12px] text-foreground/85 leading-relaxed">
+                  <span className="font-medium text-foreground">Changed: </span>
+                  {item.whatChanged}
+                </p>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Why it matters: </span>
+                  {item.whyItMatters}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">{item.whoIsAffected}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Must-know headlines */}
+      {Array.isArray(digest.mustKnowHeadlines) && digest.mustKnowHeadlines.length > 0 && (
+        <div>
+          <SectionHeading icon={BookOpen} label="Must-know headlines" count={digest.mustKnowHeadlines.length} />
+          <div className="mt-3 space-y-2">
+            {digest.mustKnowHeadlines.map((item, i) => (
+              <div key={`${item.sourceUrl ?? item.title}-${i}`} className="rounded-lg border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-foreground">{item.title}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {formatShortDate(item.date)} - {item.source}
+                    </p>
+                  </div>
+                  {item.sourceUrl ? (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      Source <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-[12px] text-foreground/85 leading-relaxed">{item.whyItMatters}</p>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Company relevance: </span>
+                  {item.companyRelevance}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Change log */}
+      {Array.isArray(digest.changeLog) && digest.changeLog.length > 0 && (
+        <div>
+          <SectionHeading icon={Calendar} label="Material change log" count={digest.changeLog.length} />
+          <div className="mt-3 divide-y divide-border rounded-lg border border-border">
+            {digest.changeLog.map((item, i) => (
+              <div key={`${item.actor}-${item.change}-${i}`} className="p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-[12px] font-semibold text-foreground">
+                      {formatShortDate(item.date)} - {item.actor}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.category}</p>
+                  </div>
+                  {item.sourceUrl ? (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      Source <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-[12px] text-foreground/85 leading-relaxed">{item.change}</p>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">{item.impact}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -294,6 +457,30 @@ function DigestContent({ digest }: { digest: AuditDigest }) {
         </div>
       )}
 
+      {/* Technology */}
+      {digest.technologyLandscape && (
+        <div>
+          <SectionHeading icon={TrendingUp} label="Technology landscape" />
+          <div className="mt-2 prose prose-sm dark:prose-invert max-w-none">
+            {digest.technologyLandscape.split("\n").filter(Boolean).map((p, i) => (
+              <p key={i} className="text-[13px] text-foreground/90 leading-relaxed">{p}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Education and workforce */}
+      {digest.educationAndWorkforceLandscape && (
+        <div>
+          <SectionHeading icon={Building2} label="Education and workforce" />
+          <div className="mt-2 prose prose-sm dark:prose-invert max-w-none">
+            {digest.educationAndWorkforceLandscape.split("\n").filter(Boolean).map((p, i) => (
+              <p key={i} className="text-[13px] text-foreground/90 leading-relaxed">{p}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Market implications */}
       {digest.marketImplications && (
         <div>
@@ -301,6 +488,57 @@ function DigestContent({ digest }: { digest: AuditDigest }) {
           <div className="mt-2 prose prose-sm dark:prose-invert max-w-none">
             {digest.marketImplications.split("\n").filter(Boolean).map((p, i) => (
               <p key={i} className="text-[13px] text-foreground/90 leading-relaxed">{p}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stakeholder briefings */}
+      {Array.isArray(digest.stakeholderBriefings) && digest.stakeholderBriefings.length > 0 && (
+        <div>
+          <SectionHeading icon={Eye} label="Stakeholder briefings" count={digest.stakeholderBriefings.length} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {digest.stakeholderBriefings.map((item, i) => (
+              <div key={`${item.stakeholderType}-${i}`} className="rounded-lg border border-border p-4">
+                <p className="text-[13px] font-semibold text-foreground">
+                  {item.stakeholderType.replace(/_/g, " ")}
+                </p>
+                <p className="mt-2 text-[12px] text-foreground/85 leading-relaxed">
+                  <span className="font-medium text-foreground">Now true: </span>
+                  {item.nowTrue}
+                </p>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Implication: </span>
+                  {item.implication}
+                </p>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Action: </span>
+                  {item.action}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Risk and opportunity */}
+      {Array.isArray(digest.riskAndOpportunityMap) && digest.riskAndOpportunityMap.length > 0 && (
+        <div>
+          <SectionHeading icon={Scale} label="Risk and opportunity map" count={digest.riskAndOpportunityMap.length} />
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {digest.riskAndOpportunityMap.map((item, i) => (
+              <div key={`${item.theme}-${i}`} className="rounded-lg border border-border p-4 bg-muted/20">
+                <p className="text-[13px] font-semibold text-foreground">{item.theme}</p>
+                <p className="mt-2 text-[12px] text-foreground/85 leading-relaxed">
+                  <span className="font-medium text-destructive">Risk: </span>
+                  {item.risk}
+                </p>
+                <p className="mt-1 text-[12px] text-foreground/85 leading-relaxed">
+                  <span className="font-medium text-emerald-700 dark:text-emerald-400">Opportunity: </span>
+                  {item.opportunity}
+                </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">{item.whoShouldCare}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -318,6 +556,45 @@ function DigestContent({ digest }: { digest: AuditDigest }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Source register */}
+      {Array.isArray(digest.sourceRegister) && digest.sourceRegister.length > 0 && (
+        <div>
+          <SectionHeading icon={ExternalLink} label="Source register" count={digest.sourceRegister.length} />
+          <div className="mt-3 divide-y divide-border rounded-lg border border-border">
+            {digest.sourceRegister.map((item, i) => (
+              <div key={`${item.sourceUrl ?? item.title}-${i}`} className="p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-medium text-foreground">{item.title}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {formatShortDate(item.date)} - {item.source} - {item.relevanceTier}
+                    </p>
+                  </div>
+                  {item.sourceUrl ? (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 text-[11px] text-primary hover:underline"
+                    >
+                      Open <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-[12px] text-muted-foreground leading-relaxed">{item.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {digest.coverageNotes && (
+        <div className="rounded-lg border border-border bg-muted/20 p-4">
+          <SectionHeading icon={Eye} label="Coverage notes" />
+          <p className="mt-2 text-[12px] text-muted-foreground leading-relaxed">{digest.coverageNotes}</p>
         </div>
       )}
     </div>
