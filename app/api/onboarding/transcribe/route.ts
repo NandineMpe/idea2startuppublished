@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getLlmApiKey, getLlmBaseUrl } from "@/lib/llm-provider"
 
-/**
- * Audio transcription via the OpenAI-compatible /audio/transcriptions endpoint.
- * Primary: OpenRouter (`openai/whisper-1`). Optional: DashScope STT or any compatible host.
- */
+/** OpenAI-compatible `/audio/transcriptions`. DashScope: `DASHSCOPE_STT_MODEL` or paraformer default; other hosts: `STT_MODEL` or whisper-1. */
 function getTranscribeConfig(): { url: string; apiKey: string; model: string } {
   const apiKey = getLlmApiKey()
   const base = getLlmBaseUrl().replace(/\/+$/, "")
 
-  // OpenRouter uses whisper via openai/whisper-1
-  const isOpenRouter = base.includes("openrouter.ai")
   const isDashScope = base.includes("dashscope") || base.includes("aliyuncs.com")
 
-  let model: string
-  if (isOpenRouter) {
-    model = "openai/whisper-1"
-  } else if (isDashScope) {
-    model = process.env.DASHSCOPE_STT_MODEL?.trim() || "paraformer-realtime-v2"
-  } else {
-    // Generic OpenAI-compatible — assume whisper-1
-    model = process.env.STT_MODEL?.trim() || "whisper-1"
-  }
+  const model = isDashScope
+    ? process.env.DASHSCOPE_STT_MODEL?.trim() || "paraformer-realtime-v2"
+    : process.env.STT_MODEL?.trim() || "whisper-1"
 
   return { url: `${base}/audio/transcriptions`, apiKey, model }
 }
@@ -31,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "No LLM API key configured. Set OPENROUTER_API_KEY (or LLM_API_KEY); DashScope optional for STT." },
+      { error: "No API key. Set DASHSCOPE_API_KEY or LLM_API_KEY (and DASHSCOPE_STT_MODEL if needed)." },
       { status: 503 },
     )
   }

@@ -127,7 +127,6 @@ function matchedOrSearchTerm(
   if (m.length > 0) return m
   const st = searchTerm.trim()
   if (st.length > 1 && combined.toLowerCase().includes(st.toLowerCase())) return [st]
-  if (st.length > 1) return [st]
   return []
 }
 
@@ -205,7 +204,7 @@ async function crawlSubredditPosts(
     }
     const data = await res.json()
     for (const post of parseRedditListing(data)) {
-      pushRedditPost(signals, post, keywords, "", cutoff, subreddit, false)
+      pushRedditPost(signals, post, keywords, "", cutoff, subreddit, true)
     }
   } catch (e) {
     console.warn(`[intent-monitor] crawl r/${subreddit}:`, e)

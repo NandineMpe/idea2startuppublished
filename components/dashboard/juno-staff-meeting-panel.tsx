@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react"
-import { Calendar, Loader2, SendHorizonal } from "lucide-react"
+import { Calendar, Loader2, SendHorizonal, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
@@ -329,6 +329,30 @@ export function JunoStaffMeetingPanel() {
       setMeetingAskLoading(false)
     }
   }, [activeMeetingRow?.id, founderNotes, meetingAskLoading, meetingQuestion])
+
+  const clearAllMeetingResponses = useCallback(() => {
+    setMeetingAskResult(null)
+    setMeetingAskError(null)
+  }, [])
+
+  const removeAgentReply = useCallback((role: string) => {
+    setMeetingAskResult((prev) => {
+      if (!prev) return null
+      const agentReplies = prev.agentReplies.filter((a) => a.role !== role)
+      const hasSummary = prev.executiveSummary.trim().length > 0
+      if (agentReplies.length === 0 && !hasSummary) return null
+      return { ...prev, agentReplies }
+    })
+  }, [])
+
+  const clearExecutiveSummaryOnly = useCallback(() => {
+    setMeetingAskResult((prev) => {
+      if (!prev) return null
+      const agentReplies = prev.agentReplies
+      if (agentReplies.length === 0) return null
+      return { executiveSummary: "", agentReplies }
+    })
+  }, [])
 
   const d = useMemo(() => {
     if (!feed) return null
@@ -929,25 +953,73 @@ export function JunoStaffMeetingPanel() {
               </p>
             ) : null}
 
-            {meetingAskResult ? (
+            {meetingAskResult &&
+            (meetingAskResult.executiveSummary.trim().length > 0 ||
+              meetingAskResult.agentReplies.length > 0) ? (
               <div className="space-y-4 rounded-xl border border-border bg-muted/10 p-4">
-                <div>
-                  <p className="text-[12px] font-medium text-foreground mb-1">Together</p>
-                  <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                    {meetingAskResult.executiveSummary}
-                  </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <p className="text-[12px] font-medium text-foreground">Together</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 gap-1.5 text-[12px]"
+                    onClick={clearAllMeetingResponses}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear all responses
+                  </Button>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {meetingAskResult.agentReplies.map((a) => (
-                    <Card key={a.role} style={{ padding: "12px 14px" }}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge text={a.role.toUpperCase()} variant="default" />
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug mb-2">{a.label}</p>
-                      <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{a.reply}</p>
-                    </Card>
-                  ))}
-                </div>
+
+                {meetingAskResult.executiveSummary.trim() ? (
+                  <div className="rounded-lg border border-border/60 bg-card/50 p-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                        Executive summary
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={clearExecutiveSummaryOnly}
+                      >
+                        Clear summary
+                      </Button>
+                    </div>
+                    <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                      {meetingAskResult.executiveSummary}
+                    </p>
+                  </div>
+                ) : null}
+
+                {meetingAskResult.agentReplies.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {meetingAskResult.agentReplies.map((a) => (
+                      <Card
+                        key={a.role}
+                        style={{ padding: "12px 14px", position: "relative", paddingRight: 36 }}
+                      >
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1.5 right-1.5 h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeAgentReply(a.role)}
+                          title={`Remove ${a.role.toUpperCase()} response`}
+                          aria-label={`Remove ${a.role.toUpperCase()} response`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                        <div className="flex items-center gap-2 mb-2 pr-6">
+                          <Badge text={a.role.toUpperCase()} variant="default" />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug mb-2">{a.label}</p>
+                        <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{a.reply}</p>
+                      </Card>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

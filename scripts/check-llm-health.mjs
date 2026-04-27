@@ -1,13 +1,11 @@
 /**
- * One-shot LLM credential check (same routing as lib/llm-provider.ts).
- * Production expects OPENROUTER_API_KEY (Vercel). Run:
+ * One-shot LLM credential check (same routing as lib/llm-provider.ts). Run:
  *   node --env-file=.env --env-file=.env.local scripts/check-llm-health.mjs
  * Does not print API keys.
  */
 const DASHSCOPE_BASE_INTL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
-const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-const DEFAULT_DASHSCOPE_QWEN_MODEL = "qwen-plus"
-const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+const DEFAULT_DASHSCOPE_QWEN_MODEL = "qwen3-max-preview"
+const LEGACY_REMAP = "qwen3-max-preview"
 
 function dashscopeBaseFromEnv() {
   const region = process.env.DASHSCOPE_REGION?.trim().toLowerCase()
@@ -23,18 +21,12 @@ function isDashScopeBaseUrl(baseUrl) {
 }
 
 function getLlmBaseUrl() {
-  const explicit =
-    process.env.LLM_BASE_URL?.trim() ||
-    process.env.DASHSCOPE_BASE_URL?.trim() ||
-    process.env.OPENROUTER_BASE_URL?.trim()
+  const explicit = process.env.LLM_BASE_URL?.trim() || process.env.DASHSCOPE_BASE_URL?.trim()
   if (explicit) return explicit
-  if (process.env.OPENROUTER_API_KEY?.trim()) {
-    return OPENROUTER_BASE_URL
-  }
   if (process.env.DASHSCOPE_API_KEY?.trim()) {
     return dashscopeBaseFromEnv() ?? DASHSCOPE_BASE_INTL
   }
-  return OPENROUTER_BASE_URL
+  return DASHSCOPE_BASE_INTL
 }
 
 function getLlmApiKey() {
@@ -47,11 +39,7 @@ function getLlmApiKey() {
   if (/openrouter\.ai/i.test(base)) {
     return process.env.OPENROUTER_API_KEY?.trim() || ""
   }
-  return (
-    process.env.OPENROUTER_API_KEY?.trim() ||
-    process.env.DASHSCOPE_API_KEY?.trim() ||
-    ""
-  )
+  return process.env.DASHSCOPE_API_KEY?.trim() || ""
 }
 
 function getDefaultModelId() {
@@ -60,16 +48,17 @@ function getDefaultModelId() {
   if (configured) {
     const t = configured
     if (isDashScopeBaseUrl(baseUrl)) {
+      if (t === "qwen3.6-max-preview" || t === "qwen/qwen3.6-max-preview") return DEFAULT_DASHSCOPE_QWEN_MODEL
       if (t === "qwen/qwen3.6-plus" || t === "qwen3.6-plus") return DEFAULT_DASHSCOPE_QWEN_MODEL
       if (t === "qwen3-235b-a22b") return DEFAULT_DASHSCOPE_QWEN_MODEL
       return t
     }
-    if (t === "qwen3-235b-a22b") return DEFAULT_OPENROUTER_MODEL
-    if (t === "qwen/qwen3.6-plus" || t === "qwen3.6-plus") return DEFAULT_OPENROUTER_MODEL
-    if (t === "qwen/qwen3.5-plus" || t === "qwen3.5-plus") return DEFAULT_OPENROUTER_MODEL
+    if (t === "qwen3-235b-a22b") return LEGACY_REMAP
+    if (t === "qwen/qwen3.6-plus" || t === "qwen3.6-plus") return LEGACY_REMAP
+    if (t === "qwen/qwen3.5-plus" || t === "qwen3.5-plus") return LEGACY_REMAP
     return t
   }
-  return isDashScopeBaseUrl(baseUrl) ? DEFAULT_DASHSCOPE_QWEN_MODEL : DEFAULT_OPENROUTER_MODEL
+  return DEFAULT_DASHSCOPE_QWEN_MODEL
 }
 
 const apiKey = getLlmApiKey()
@@ -78,11 +67,9 @@ const model = getDefaultModelId()
 
 let keySource = "(none)"
 if (process.env.LLM_API_KEY?.trim()) keySource = "LLM_API_KEY"
+else if (isDashScopeBaseUrl(baseUrl) && process.env.DASHSCOPE_API_KEY?.trim()) keySource = "DASHSCOPE_API_KEY"
 else if (/openrouter\.ai/i.test(baseUrl) && process.env.OPENROUTER_API_KEY?.trim())
   keySource = "OPENROUTER_API_KEY"
-else if (isDashScopeBaseUrl(baseUrl) && process.env.DASHSCOPE_API_KEY?.trim())
-  keySource = "DASHSCOPE_API_KEY"
-else if (process.env.OPENROUTER_API_KEY?.trim()) keySource = "OPENROUTER_API_KEY"
 else if (process.env.DASHSCOPE_API_KEY?.trim()) keySource = "DASHSCOPE_API_KEY"
 
 console.log("--- LLM health check ---")

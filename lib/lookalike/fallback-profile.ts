@@ -24,7 +24,7 @@ export function fallbackPlaybook(params: {
   const p = emptyPlaybook()
   p.bestChannel = params.channel
   p.averageResponseTime = params.responseTime
-  p.rationale = "Set LLM_API_KEY or OPENROUTER_API_KEY to generate a full lookalike profile and playbook."
+  p.rationale = "Set DASHSCOPE_API_KEY or LLM_API_KEY to generate a full lookalike profile and playbook."
   p.bestAngle = "Manual review"
   p.messageTemplate.linkedin = `Hi {name},\n\nI noticed you're {function} at {company} — thought this might resonate.\n\n— {sender_name}`
   p.messageTemplate.email = `Subject: Quick note for {company}\n\nHi {name},\n\nReaching out because of your role as {function} at {company}.\n\nBest,\n{sender_name}`

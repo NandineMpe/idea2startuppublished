@@ -140,7 +140,16 @@ export async function POST(req: Request) {
       })
       text = out.text
     } catch (e) {
-      console.error("[chat POST] generateText failed:", e)
+      const body =
+        e && typeof e === "object" && "responseBody" in e
+          ? String((e as { responseBody?: string }).responseBody)
+          : ""
+      console.error(
+        "[chat POST] generateText failed:",
+        e instanceof Error ? e.message : String(e),
+        body || undefined,
+        e,
+      )
       return NextResponse.json(
         { error: "The AI service failed to respond. Try again in a moment." },
         { status: 502 },

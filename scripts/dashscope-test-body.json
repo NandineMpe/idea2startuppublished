@@ -1,5 +1,5 @@
 {
-  "model": "qwen-plus",
+  "model": "qwen3-max-preview",
   "messages": [{ "role": "user", "content": "hello" }],
   "max_tokens": 10
 }

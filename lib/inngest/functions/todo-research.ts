@@ -66,7 +66,7 @@ async function researchTodo(
 ): Promise<ResearchOutput> {
   if (!isLlmConfigured()) {
     return {
-      summary: "LLM not configured — set OPENROUTER_API_KEY (or LLM_API_KEY) to enable research.",
+      summary: "LLM not configured — set DASHSCOPE_API_KEY or LLM_API_KEY.",
       keyFindings: [],
       actionItems: [],
       sources: [],

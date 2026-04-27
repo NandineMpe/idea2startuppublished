@@ -21,7 +21,7 @@ export async function generateLinkedInPost(params: {
   dismissalFeedbackBlock?: string
 }): Promise<{ post: string; angle: string }> {
   if (!isLlmConfigured()) {
-    return { post: "", angle: "Set LLM_API_KEY or OPENROUTER_API_KEY" }
+    return { post: "", angle: "Set DASHSCOPE_API_KEY or LLM_API_KEY" }
   }
 
   const feedback = params.dismissalFeedbackBlock?.trim()

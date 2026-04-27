@@ -23,7 +23,7 @@ function heuristicUrgency(item: RawItem): ContentUrgency {
 
 function heuristicScore(item: RawItem): number {
   const t = `${item.title} ${item.snippet}`
-  let score = 5
+  let score = 3
   if (/a16z speedrun/i.test(item.source)) score += 1
   if (/\d/.test(t)) score += 1
   if (/(openai|anthropic|google|meta|microsoft|amazon|nvidia|stanford|mit)/i.test(t)) score += 2
@@ -33,6 +33,13 @@ function heuristicScore(item: RawItem): number {
   if (/(CFO|chief financial|VP sales|sales director|enterprise.*sales|loath|hate|email.*demo|demo.*email|cold.*email|spam|reply rate)/i.test(t)) score += 2
   if (/(what.*(work|working)|how.*close|best.*outreach|mistake|lesson|playbook|script|cadence)/i.test(t)) score += 1
   return Math.max(1, Math.min(10, score))
+}
+
+function hasFounderRelevantSignal(item: RawItem, angle?: string): boolean {
+  const t = `${item.source} ${item.title} ${item.snippet} ${angle ?? ""}`.toLowerCase()
+  return /(\bai\b|artificial intelligence|llm|model|agent|automation|workflow|workplace|enterprise|b2b|saas|founder|startup|gtm|sales|cold email|outreach|demo|pipeline|cfo|finance|vendor|security|privacy|trust|governance|risk|research|benchmark|openai|anthropic|google|deepmind|microsoft|meta|nvidia)/i.test(
+    t,
+  )
 }
 
 function isTwitterSource(item: RawItem): boolean {
@@ -152,16 +159,19 @@ Analysis rules:
 - If an item reveals what buyers hate, fear, or find valuable in the sales process, include "buyer_insight" in connectedTopics. If it reveals what outreach tactics work or fail, include "outreach_signal".
 - If it contains CFO or finance-team perspectives on vendor selection, include "cfo_signal" in connectedTopics.
 - If an item looks like a creator/sponsorship/collaboration lead, include "collab_opportunity" in connectedTopics.
-- Score higher when the item has names, numbers, or a clear news hook. Score B2B Reddit discussions higher when they reveal candid buyer opinions or counter-intuitive sales findings.`
+- Score higher when the item has names, numbers, or a clear news hook. Score B2B Reddit discussions higher when they reveal candid buyer opinions or counter-intuitive sales findings.
+- Score 1-3 for generic tech/startup news that does not connect to AI, workplace tech, B2B sales/GTM, finance buyers, trust/safety, or the founder's optional angle.
+- Reserve 7+ for items a founder could actually react to, use in positioning, or learn from this week.`
 
 export async function classifyAndScore(items: RawItem[], angle?: string): Promise<ClassifiedItem[]> {
-  if (!isLlmConfigured() || items.length === 0) return buildFallback(items)
+  const relevantItems = items.filter((item) => hasFounderRelevantSignal(item, angle))
+  if (!isLlmConfigured() || relevantItems.length === 0) return buildFallback(relevantItems)
 
   const userPayload = `Audience: smart professionals who are not all engineers. Optional angle from the founder: ${angle ?? "none"}
 
 For each item below, produce one array entry in the same order.
 
-${items
+${relevantItems
   .map(
     (item, i) =>
       `[${i}] title: ${item.title}\nsource: ${item.source}\nurl: ${item.url}\nsnippet: ${item.snippet}`,
@@ -173,17 +183,17 @@ ${items
       model: qwenModel(),
       system: mergeSystemWithWritingRules(CLASSIFIER_SYSTEM),
       prompt: userPayload,
-      maxTokens: 6000,
+      maxOutputTokens: 6000,
       temperature: 0.25,
     })
 
     const parsed = extractJsonArray(text)
-    if (!parsed) return buildFallback(items)
-    const rows = sanitizeParsed(parsed, items)
-    return rows.length > 0 ? rows : buildFallback(items)
+    if (!parsed) return buildFallback(relevantItems)
+    const rows = sanitizeParsed(parsed, relevantItems)
+    return rows.length > 0 ? rows : buildFallback(relevantItems)
   } catch (e) {
     console.warn("[content-intelligence] OpenRouter classify failed:", e)
-    return buildFallback(items)
+    return buildFallback(relevantItems)
   }
 }
 

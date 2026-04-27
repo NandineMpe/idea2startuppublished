@@ -41,8 +41,8 @@ export async function scoreIntentSignals(
   if (!isLlmConfigured()) {
     return signals.map((signal) => ({
       ...signal,
-      relevanceScore: 5,
-      whyRelevant: "LLM API key missing — manual review.",
+      relevanceScore: 1,
+      whyRelevant: "LLM API key missing - not surfaced until scored.",
       suggestedResponse: "",
       responsePlatform: defaultResponsePlatform(signal.platform),
       urgency: "monitor" as const,
@@ -60,7 +60,7 @@ export async function scoreIntentSignals(
         ? `\n${options.calibrationBlock.trim()}\n\n`
         : ""
 
-    const prompt = `You are a product strategy and customer research analyst monitoring Reddit conversations for people who may need a product like ours.
+    const prompt = `You are a strict product strategy and customer research analyst monitoring Reddit conversations for people who may need a product like ours.
 
 OUR COMPANY:
 ${context.promptBlock}
@@ -95,9 +95,12 @@ Scoring guide:
 - 9-10: Actively looking for what we build or exact pain we solve.
 - 7-8: Strong problem-signal we can help with.
 - 6-8: Buyers or finance leaders describing how they evaluate vendors, what they ignore (cold email, demo asks), or how they want to be reached. Count this when it informs ICP or outreach, not only product features.
-- 5-6: Related; could add value carefully.
-- 4: Tangential but worth a glance; we may still save for review.
-- Below 4: skip (we will filter).
+- 5-6: Clearly related to our ICP, workflow, market, or GTM motion; could add value carefully.
+- 4: Weak but concrete fit; only use when you can name the exact connection to our company context.
+- 1-3: Generic industry chatter, broad subreddit discussion, career advice, news without a company-specific implication, or anything where the connection is mostly keyword overlap.
+
+Do not inflate scores. If whyRelevant cannot cite a specific ICP, workflow, pain, competitor, roadmap item, or GTM learning from OUR COMPANY context, score 3 or lower.
+Only score 7+ when the thread is actionable or strategically important for this specific company.
 
 Return ONLY a valid JSON array, no markdown fences.`
 
@@ -155,8 +158,8 @@ Return ONLY a valid JSON array, no markdown fences.`
       for (const signal of chunk) {
         out.push({
           ...signal,
-          relevanceScore: 5,
-          whyRelevant: "Scoring failed - review manually.",
+          relevanceScore: 1,
+          whyRelevant: "Scoring failed - not surfaced until scored.",
           suggestedResponse: "",
           responsePlatform: defaultResponsePlatform(signal.platform),
           urgency: "monitor",

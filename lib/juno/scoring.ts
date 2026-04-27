@@ -27,10 +27,10 @@ export async function scoreItems(items: RawItem[], context: CompanyContext): Pro
   if (!isLlmConfigured()) {
     return items.map((item) => ({
       ...item,
-      relevanceScore: 5,
+      relevanceScore: 1,
       urgency: "today" as const,
       category: "opportunity" as const,
-      whyItMatters: "Unscored — set LLM_API_KEY or OPENROUTER_API_KEY",
+      whyItMatters: "Unscored - set DASHSCOPE_API_KEY or LLM_API_KEY before surfacing.",
       strategicImplication: "—",
       suggestedAction: "No immediate action — file as context",
       connectionToRoadmap: null,
@@ -171,6 +171,7 @@ CRITICAL RULES:
       strategicImplication?: string
       suggestedAction?: string
       connectionToRoadmap?: string | null
+      competitorEvent?: unknown
     }> = JSON.parse(jsonMatch[0])
 
     // Build a title-keyed lookup so a wrong `index` from the LLM can be
@@ -181,11 +182,11 @@ CRITICAL RULES:
     }
 
     return scored
-      .map((s) => {
-        let original = items[s.index]
+      .map((s): ScoredItem | null => {
+        let original: RawItem | undefined = items[s.index]
         // If the LLM returned a bad index, fall back to title matching.
         if (!original && typeof s.title === "string") {
-          original = byTitle.get(s.title.trim().toLowerCase()) ?? (undefined as unknown as RawItem)
+          original = byTitle.get(s.title.trim().toLowerCase())
         }
         if (!original) return null
         const urgency = VALID_URGENCY.has(s.urgency as ScoredItem["urgency"])
@@ -200,7 +201,10 @@ CRITICAL RULES:
             : String(s.connectionToRoadmap)
         return {
           ...original,
-          relevanceScore: typeof s.relevanceScore === "number" ? s.relevanceScore : 5,
+          relevanceScore:
+            typeof s.relevanceScore === "number"
+              ? Math.max(0, Math.min(10, Math.round(s.relevanceScore)))
+              : 1,
           urgency,
           category,
           whyItMatters: s.whyItMatters || "—",
@@ -215,10 +219,10 @@ CRITICAL RULES:
     console.error("Scoring failed:", e)
     return items.map((item) => ({
       ...item,
-      relevanceScore: 5,
+      relevanceScore: 1,
       urgency: "today" as const,
       category: "opportunity" as const,
-      whyItMatters: "Scoring failed — review manually.",
+      whyItMatters: "Scoring failed - not surfaced until scored.",
       strategicImplication: "—",
       suggestedAction: "No immediate action — file as context",
       connectionToRoadmap: null,
