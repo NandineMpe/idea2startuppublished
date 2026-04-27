@@ -23,6 +23,16 @@ export async function storeBriefing(userId: string, briefing: ContentBriefing) {
   if (error) throw error
 }
 
+/** Drops rows from prior digest runs so the feed does not accumulate stale headlines. */
+export async function pruneStoriesOutsideBriefing(userId: string, keepBriefingId: string) {
+  const { error } = await supabaseAdmin
+    .from("content_stories")
+    .delete()
+    .eq("user_id", userId)
+    .or(`briefing_id.is.null,briefing_id.neq.${keepBriefingId}`)
+  if (error) throw error
+}
+
 export async function storeStories(userId: string, briefingId: string, items: ClassifiedItem[]) {
   if (items.length === 0) return
   const rows = items.map((item) => ({

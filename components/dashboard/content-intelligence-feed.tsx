@@ -131,19 +131,49 @@ export function ContentIntelligenceFeed({
 
   async function runDigestNow() {
     setRunning(true)
+    const beforeTs = briefing?.generated_at ?? null
     try {
       const res = await fetch("/api/content-feed/briefing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ angle }),
       })
-      if (!res.ok) throw new Error("Failed to trigger digest")
-      toast({ title: "Digest requested", description: "Inngest is running. Pulling fresh feed in a few seconds." })
-      setTimeout(() => {
-        void load()
-      }, 5000)
-    } catch {
-      toast({ title: "Could not trigger digest", description: "Check Inngest connection.", variant: "destructive" })
+      const json = (await res.json()) as { ok?: boolean; error?: string; eventIds?: string[] }
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to trigger digest")
+      }
+      toast({ title: "Digest requested", description: "Pulling fresh AI headlines. This can take up to a minute." })
+
+      const deadline = Date.now() + 90_000
+      const poll = async () => {
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 4000))
+          try {
+            const bRes = await fetch("/api/content-feed/briefing")
+            const bJson = (await bRes.json()) as { briefing: Briefing | null }
+            const nextTs = bJson.briefing?.generated_at ?? null
+            if (nextTs && nextTs !== beforeTs) {
+              await load()
+              toast({ title: "Digest updated", description: "Stories match the latest run." })
+              return
+            }
+          } catch {
+            /* keep polling */
+          }
+        }
+        await load()
+        toast({
+          title: "Still waiting?",
+          description: "If the timestamp did not change, check Inngest and INNGEST_EVENT_KEY on the server.",
+        })
+      }
+      void poll()
+    } catch (e) {
+      toast({
+        title: "Could not trigger digest",
+        description: e instanceof Error ? e.message : "Check Inngest connection.",
+        variant: "destructive",
+      })
     } finally {
       setRunning(false)
     }

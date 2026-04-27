@@ -16,13 +16,35 @@ export async function GET(req: Request) {
   const minScore = Number(url.searchParams.get("minScore") || "0")
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || "40")))
 
+  const { data: latestBriefing, error: briefingLookupError } = await supabase
+    .from("content_briefings")
+    .select("id")
+    .eq("user_id", auth.user.id)
+    .not("id", "like", "audit-digest:%")
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (briefingLookupError) {
+    const msg = (briefingLookupError.message ?? "").toLowerCase()
+    if (!msg.includes("does not exist") && !msg.includes("schema cache") && !msg.includes("could not find")) {
+      return jsonApiError(500, briefingLookupError, "content-feed stories GET briefing lookup")
+    }
+  }
+
+  if (!latestBriefing?.id) {
+    return NextResponse.json({ stories: [] })
+  }
+
   let query = supabase
     .from("content_stories")
     .select(
       "id, briefing_id, title, url, source, tier, published_at, pillar, urgency, content_score, hook, key_quote, why_it_matters, status, connected_topics, named_people, named_companies, named_numbers",
     )
     .eq("user_id", auth.user.id)
+    .eq("briefing_id", latestBriefing.id)
     .gte("content_score", Number.isFinite(minScore) ? minScore : 0)
+    .order("published_at", { ascending: false })
     .order("content_score", { ascending: false })
     .limit(limit)
 

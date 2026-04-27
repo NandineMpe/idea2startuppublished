@@ -1,7 +1,7 @@
 import { inngest } from "@/lib/inngest/client"
 import { classifyAndScore, buildBriefing } from "@/lib/content-intelligence/classifier"
 import { fetchTier1Sources } from "@/lib/content-intelligence/sources"
-import { storeBriefing, storeStories } from "@/lib/content-intelligence/store"
+import { pruneStoriesOutsideBriefing, storeBriefing, storeStories } from "@/lib/content-intelligence/store"
 import { CONTENT_FEED_MANUAL_DIGEST_REQUESTED } from "@/lib/inngest/event-names"
 
 async function runForUser(userId: string, angle?: string) {
@@ -14,7 +14,7 @@ async function runForUser(userId: string, angle?: string) {
     bySource.get(item.source)!.push(item)
   }
   const diverseRaw: typeof raw = []
-  const maxPerSource = 4
+  const maxPerSource = 6
   for (const items of bySource.values()) {
     items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
   }
@@ -23,10 +23,11 @@ async function runForUser(userId: string, angle?: string) {
       if (items[i]) diverseRaw.push(items[i])
     }
   }
-  const classified = await classifyAndScore(diverseRaw.slice(0, 40), angle)
+  const classified = await classifyAndScore(diverseRaw.slice(0, 120), angle)
   const briefing = buildBriefing(classified, angle)
   await storeBriefing(userId, briefing)
   await storeStories(userId, briefing.id, classified)
+  await pruneStoriesOutsideBriefing(userId, briefing.id)
   return { userId, status: "ok" as const, processed: classified.length, briefingId: briefing.id }
 }
 

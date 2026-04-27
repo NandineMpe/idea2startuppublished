@@ -5,7 +5,7 @@ import type { ClassifiedItem, ContentBriefing, ContentPillar, ContentUrgency, Ra
 
 function heuristicPillar(item: RawItem): ContentPillar {
   const t = `${item.title} ${item.snippet}`.toLowerCase()
-  if (/(safety|policy|trust|governance|risk|privacy)/.test(t)) return "safety_trust"
+  if (/(safety|policy|regulation|minister|government|law|lawsuit|copyright|trust|governance|risk|privacy|deepfake|misinformation|fake citation|hallucinated citation)/.test(t)) return "safety_trust"
   if (/(b2b|cfo|outreach|cold email|demo|pipeline|quota|rev(enue|ops)|SDR|AE|account exec|discovery call|closing deal|sales cycle|ICP|ideal customer)/.test(t)) return "workplace"
   if (/(work|hiring|job|consulting|legal|accounting|enterprise|productivity)/.test(t)) return "workplace"
   if (/(how to|tutorial|prompt|tool|workflow|tips|hack)/.test(t)) return "hacks"
@@ -28,6 +28,8 @@ function heuristicScore(item: RawItem): number {
   if (/\d/.test(t)) score += 1
   if (/(openai|anthropic|google|meta|microsoft|amazon|nvidia|stanford|mit)/i.test(t)) score += 2
   if (/(launch|release|index|lawsuit|ban|leak|layoff|funding|acquisition)/i.test(t)) score += 2
+  if (/(policy|regulation|government|minister|election|copyright|lawsuit|deepfake|misinformation|hallucinat|fake citation|scandal|withdrew|withdrawn|national ai)/i.test(t)) score += 3
+  if (/(south africa|africa|eu|uk|china|india|us|white house|parliament|commission|regulator)/i.test(t)) score += 1
   // Boost B2B sales discussions — these are high-signal for outreach strategy
   if (/r\/(sales|b2bsales|CFO|saas)/i.test(item.source)) score += 1
   if (/(CFO|chief financial|VP sales|sales director|enterprise.*sales|loath|hate|email.*demo|demo.*email|cold.*email|spam|reply rate)/i.test(t)) score += 2
@@ -36,10 +38,26 @@ function heuristicScore(item: RawItem): number {
 }
 
 function hasFounderRelevantSignal(item: RawItem, angle?: string): boolean {
-  const t = `${item.source} ${item.title} ${item.snippet} ${angle ?? ""}`.toLowerCase()
-  return /(\bai\b|artificial intelligence|llm|model|agent|automation|workflow|workplace|enterprise|b2b|saas|founder|startup|gtm|sales|cold email|outreach|demo|pipeline|cfo|finance|vendor|security|privacy|trust|governance|risk|research|benchmark|openai|anthropic|google|deepmind|microsoft|meta|nvidia)/i.test(
-    t,
-  )
+  const blob = `${item.source} ${item.title} ${item.snippet} ${angle ?? ""}`
+  const t = blob.toLowerCase()
+
+  const strongAi =
+    /\b(ai|a\.i\.|artificial intelligence|machine learning|\bllms?\b|large language|chatgpt|gpt-[0-9]|openai|anthropic|claude|gemini|deepmind|copilot|generative ai|\bgenai\b|foundation model|multimodal|diffusion|agentic|\bai model\b|\bai tool\b|\bai startup\b|nvidia\b.*\b(h100|blackwell|gpu|chip)\b|open.?weight|hugging\s*face|mistral|xai|grok|llama\b|qwen)\b/i.test(
+      blob,
+    )
+
+  const workPlusAi =
+    /\b(workplace|hiring|jobs?\b|future of work|enterprise|employees?|workflows?|productivity)\b/.test(t) &&
+    /\b(ai|llm|chatgpt|copilot|agent|artificial intelligence)\b/.test(t)
+
+  const policyPlusAi =
+    /\b(policy|regulation|government|minister|lawmakers?|election|copyright|lawsuit)\b/.test(t) &&
+    /\b(ai|artificial intelligence|llm|algorithm|chatgpt|deepfake)\b/.test(t)
+
+  const trustPlusAi =
+    /\b(hallucinat|fake citation|misinformation|trust|governance)\b/.test(t) && /\b(ai|llm|model|chatgpt|algorithm)\b/.test(t)
+
+  return strongAi || workPlusAi || policyPlusAi || trustPlusAi
 }
 
 function isTwitterSource(item: RawItem): boolean {
@@ -139,7 +157,7 @@ function sanitizeParsed(input: unknown, originals: RawItem[]): ClassifiedItem[] 
   })
 }
 
-const CLASSIFIER_SYSTEM = `You classify items for a B2B SaaS founder doing sales, GTM strategy, and content creation about AI and workplace tech.
+const CLASSIFIER_SYSTEM = `You classify items for a founder who makes short-form videos explaining what is happening in AI to a mainstream audience.
 
 Output: a JSON array only. Same length and order as the input list. Each object must have:
 pillar (breaking|workplace|hacks|deep_dive|safety_trust),
@@ -152,22 +170,26 @@ connectedTopics (string array),
 namedEntities (object with people, companies, numbers arrays of strings).
 
 Analysis rules:
+- Only score items that are clearly about AI, major model/lab releases, AI products, or AI-shaped work and policy. Skip generic healthcare, marketing, or creator pieces unless AI, LLMs, or automation are explicit in the headline or snippet.
 - hook: Say what is actually happening (claim, launch, fight, data point). Do not write "just moved this story", "here is the angle most people miss", or filler about the feed itself.
+- Prioritize stories that are TikTok-worthy because they reveal how AI is entering public life: government policy, schools, jobs, creators, elections, courts, copyright, scams, safety, model releases, major labs, viral failures, and AI misuse.
+- A story like a minister or government department withdrawing an AI policy because of hallucinated/fake citations is high priority: it combines public policy, trust, and AI failure.
 - For X/Twitter or social-native items (source mentions Twitter or X): the snippet is usually the post. Name the underlying move or stance. One analyst-style line.
-- For Reddit B2B/sales items (source starts with r/): extract the core insight or complaint. Name the buyer persona (CFO, VP Sales, AE) and what they said. This is outreach intelligence — the founder needs to know what buyers think and say.
-- whyItMatters: Name who should care (founders, buyers, builders, policy) and why timing matters. For B2B sales items, explain how this changes or validates outreach strategy.
+- For Reddit B2B/sales items (source starts with r/): extract the core insight or complaint only if it is useful for a founder POV or work/AI story.
+- whyItMatters: Name who should care (ordinary people, founders, workers, students, creators, policy makers, builders) and why timing matters.
+- If it is useful for TikTok explainers, include "creator_explainer" in connectedTopics. If it is policy/regulation/government, include "ai_policy". If it is a scandal, hallucination, misuse, or trust failure, include "ai_trust_failure". If it changes jobs/work, include "future_of_work".
 - If an item reveals what buyers hate, fear, or find valuable in the sales process, include "buyer_insight" in connectedTopics. If it reveals what outreach tactics work or fail, include "outreach_signal".
 - If it contains CFO or finance-team perspectives on vendor selection, include "cfo_signal" in connectedTopics.
 - If an item looks like a creator/sponsorship/collaboration lead, include "collab_opportunity" in connectedTopics.
-- Score higher when the item has names, numbers, or a clear news hook. Score B2B Reddit discussions higher when they reveal candid buyer opinions or counter-intuitive sales findings.
-- Score 1-3 for generic tech/startup news that does not connect to AI, workplace tech, B2B sales/GTM, finance buyers, trust/safety, or the founder's optional angle.
-- Reserve 7+ for items a founder could actually react to, use in positioning, or learn from this week.`
+- Score higher when the item has names, numbers, public consequences, controversy, a clear news hook, or a "people need to know this" angle.
+- Score 1-3 for generic product updates with no public implication, weak SEO explainers, or technical-only stories without a mainstream angle.
+- Reserve 7+ for items a founder could film a timely TikTok about today.`
 
 export async function classifyAndScore(items: RawItem[], angle?: string): Promise<ClassifiedItem[]> {
   const relevantItems = items.filter((item) => hasFounderRelevantSignal(item, angle))
   if (!isLlmConfigured() || relevantItems.length === 0) return buildFallback(relevantItems)
 
-  const userPayload = `Audience: smart professionals who are not all engineers. Optional angle from the founder: ${angle ?? "none"}
+  const userPayload = `Audience: people who want a smart, accessible TikTok briefing on AI without reading the entire news cycle. Optional angle from the founder: ${angle ?? "none"}
 
 For each item below, produce one array entry in the same order.
 
