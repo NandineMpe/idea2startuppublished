@@ -12,12 +12,16 @@ export function JunoAuthForm({
   afterAuthPath,
   message,
   messageBannerClassName = "",
+  namePlaceholder = "Founder name",
+  emailPlaceholder = "founder@company.com",
 }: {
-  pagePath: "/" | "/login"
+  pagePath: string
   afterAuthPath: string
   message?: string
   /** Precomputed on the server. Do not pass functions from RSC into this client component. */
   messageBannerClassName?: string
+  namePlaceholder?: string
+  emailPlaceholder?: string
 }) {
   const [, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<"login" | "signup" | null>(null)
@@ -66,7 +70,7 @@ export function JunoAuthForm({
           type="text"
           name="name"
           autoComplete="name"
-          placeholder="Founder name"
+          placeholder={namePlaceholder}
           disabled={busy}
           className="h-14 rounded-[1.2rem] border-slate-200 bg-white px-4 text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#091924] dark:text-white dark:placeholder:text-slate-500"
         />
@@ -81,7 +85,7 @@ export function JunoAuthForm({
           type="email"
           name="email"
           autoComplete="email"
-          placeholder="founder@company.com"
+          placeholder={emailPlaceholder}
           required
           disabled={busy}
           className="h-14 rounded-[1.2rem] border-slate-200 bg-white px-4 text-slate-900 placeholder:text-slate-400 dark:border-white/10 dark:bg-[#091924] dark:text-white dark:placeholder:text-slate-500"

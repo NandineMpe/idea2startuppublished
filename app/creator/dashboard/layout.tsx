@@ -1,16 +1,19 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { OsPortalPage } from "@/components/access/os-portal-page"
 
-export default async function Home() {
+export default async function CreatorDashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (user) {
-    redirect("/dashboard")
+  if (!user) {
+    redirect("/creator")
   }
 
-  return <OsPortalPage />
+  return <>{children}</>
 }

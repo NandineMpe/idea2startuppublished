@@ -3,10 +3,10 @@
 import { redirect } from "next/navigation"
 import { signInWithBetterAuthBridge, signUpWithBetterAuthBridge } from "@/lib/auth-bridge"
 
-type PagePath = "/" | "/login"
+const VALID_PAGE_PATHS = ["/", "/login", "/creator", "/career"] as const
 
-function safePagePath(value: string): PagePath {
-  return value === "/login" ? "/login" : "/"
+function safePagePath(value: string): string {
+  return (VALID_PAGE_PATHS as readonly string[]).includes(value) ? value : "/"
 }
 
 function safeAfterAuthPath(value: string) {

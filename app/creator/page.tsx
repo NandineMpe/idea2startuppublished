@@ -1,6 +1,6 @@
 import { OsAuthPage } from "@/components/access/os-auth-page"
 
-export default async function Login({
+export default async function CreatorLogin({
   searchParams,
 }: {
   searchParams: Promise<{ message?: string | string[]; next?: string | string[] }>
@@ -14,6 +14,6 @@ export default async function Login({
       : undefined
 
   return (
-    <OsAuthPage mode="founder" message={message} redirectAfterAuth={redirectAfterAuth} />
+    <OsAuthPage mode="creator" message={message} redirectAfterAuth={redirectAfterAuth} />
   )
 }
