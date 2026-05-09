@@ -8,6 +8,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run inngest:dev\"",
     "build": "next build",
     "deploy": "npx vercel deploy --prod --yes",
+    "careeros:smoke:apis": "node scripts/careeros-module-02-smoke.cjs",
+    "careeros:cache:refresh": "npx tsx scripts/careeros-cache-refresh.ts",
     "billing:setup:juno": "node scripts/setup-lemonsqueezy-billing.cjs",
     "db:apply:024": "node scripts/apply-024-lookalike-migration.cjs",
     "db:migrate": "node scripts/apply-all-supabase-migrations.cjs",

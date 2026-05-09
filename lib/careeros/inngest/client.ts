@@ -5,6 +5,9 @@ type CareerOSEvents = {
   "careeros/system.ping": {
     data: { source: string; timestamp: string }
   }
+  "careeros/cache.refresh": {
+    data: { onetKeywords?: string[] }
+  }
   // Phase 1 events will be added here as modules land:
   // "careeros/profile.extract": { data: { userId: string; documentId: string } };
   // "careeros/profile.onet-map": { data: { userId: string } };
