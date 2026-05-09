@@ -10,7 +10,7 @@ From the repo root (loads `.env.local`, `.env`, then overrides from `.env.vercel
 npm run careeros:smoke:apis
 ```
 
-No secrets are printed — only HTTP status and short error snippets.
+No secrets are printed — only HTTP status and short error snippets. The script probes **O*NET** (v2 `X-API-Key` first, else legacy Basic), **CareerOneStop** (three path segments per Get Occupation Details), **Adzuna**, **BLS**, **JSearch**, **TheirStack**, and optionally **Levels.fyi** when `LEVELSFYI_API_BASE_URL` is set — aligned with the official request shapes linked in the table above.
 
 ## Inngest — market cache refresh (O\*NET, rate-paced)
 
@@ -50,11 +50,13 @@ or add the same variables to Development and then `vercel env pull .env.local`.
 
 | Source | Preferred variables | Notes |
 | --- | --- | --- |
-| O*NET | `ONET_USERNAME`, `ONET_PASSWORD` | Basic auth; alternative: `ONET_API_KEY` with empty password (`curl -u "$ONET_API_KEY:"`). |
-| CareerOneStop | `CAREERONESTOP_USER_ID`, `CAREERONESTOP_API_TOKEN` | Path includes user id; `Authorization: Bearer` token. Not the old single-key path shortcut. |
-| Adzuna | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | Both required. |
-| BLS | `BLS_API_KEY` | Registration key in JSON POST body. |
-| Levels.fyi | `LEVELSFYI_API_KEY` or `LEVELS_API_KEY`, optional `LEVELSFYI_API_BASE_URL` | Official REST host/path comes from Levels onboarding — set base URL for automated HTTP probe. |
+| O*NET | **`ONET_API_KEY`** (recommended) | **Web Services v2:** send key in header `X-API-Key` to `https://api-v2.onetcenter.org/` (e.g. `GET …/online/search?keyword=…`). See [Authentication](https://services.onetcenter.org/reference/start/overview#auth). Optional override: `ONET_API_BASE_URL`. **Legacy v1.9:** `ONET_USERNAME` + `ONET_PASSWORD` (Basic) against `services.onetcenter.org/ws/…` still supported for older projects ([migration](https://services.onetcenter.org/reference/start/migration)). |
+| CareerOneStop | `CAREERONESTOP_USER_ID`, `CAREERONESTOP_API_TOKEN` | `GET /v1/occupation/{userId}/{keyword}/{location}` with `Authorization: Bearer <token>` ([API explorer](https://api.careeronestop.org/api-explorer/)). `keyword` = ONET title or SOC code; `location` = zip, city/state, `US`, etc. |
+| Adzuna | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | Both required as query parameters on every request ([developer docs](https://developer.adzuna.com/)). |
+| BLS | `BLS_API_KEY` | **v2** JSON POST: `registrationkey` in body ([API features](https://www.bls.gov/developers/api_features.htm)). |
+| JSearch | `JSEARCH_API_KEY` | RapidAPI: headers `X-RapidAPI-Key`, `X-RapidAPI-Host: jsearch.p.rapidapi.com` ([module curl](#jsearch-rapidapi)). |
+| TheirStack | `THEIRSTACK_API_KEY` | `Authorization: Bearer` ([API reference](https://theirstack.com/en/docs/api-reference/rate-limit)). |
+| Levels.fyi | `LEVELSFYI_API_KEY` or `LEVELS_API_KEY`, optional `LEVELSFYI_API_BASE_URL` | Contract-specific REST base URL from Levels onboarding — set base URL for smoke probe path. |
 
 ## Last verification run (automated)
 
