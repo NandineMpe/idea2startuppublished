@@ -1,3 +1,9 @@
+/**
+ * Diagnostic: GET `/api/careeros/_verify/sources/onet`
+ *
+ * Implemented under `[verify]/sources/onet` because Next.js treats `_`-prefixed
+ * folders as private (not URL segments); `[verify]` captures `_verify` in the path.
+ */
 import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
