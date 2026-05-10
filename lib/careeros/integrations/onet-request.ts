@@ -27,23 +27,35 @@ export type OnetKeywordProbeResult = {
   authMode?: "v2_api_key" | "v19_basic"
 }
 
-/** Headers for O*NET HTTP requests (v2 API key preferred). */
-export function getOnetAuthHeaders(): Record<string, string> | null {
-  const apiKey = process.env.ONET_API_KEY?.trim()
-  if (apiKey) {
-    return {
-      "X-API-Key": apiKey,
-      Accept: "application/json",
-      "User-Agent": ONET_REQUEST_USER_AGENT,
-    }
-  }
+/** True when trimmed username + password are set (matches `_verify` ping order). */
+export function usingOnetBasicCredentials(): boolean {
+  const u = process.env.ONET_USERNAME?.trim()
+  const p = process.env.ONET_PASSWORD?.trim()
+  return Boolean(u && p)
+}
 
+/** Use v2 host paths only when we are not using Basic (API key is the auth method). */
+export function usingOnetV2KeyForRouting(): boolean {
+  return !usingOnetBasicCredentials() && Boolean(process.env.ONET_API_KEY?.trim())
+}
+
+/** Headers for O*NET HTTP requests — Basic first when username/password exist; else v2 API key. */
+export function getOnetAuthHeaders(): Record<string, string> | null {
   const u = process.env.ONET_USERNAME?.trim()
   const p = process.env.ONET_PASSWORD?.trim()
   if (u && p) {
     const token = Buffer.from(`${u}:${p}`).toString("base64")
     return {
       Authorization: `Basic ${token}`,
+      Accept: "application/json",
+      "User-Agent": ONET_REQUEST_USER_AGENT,
+    }
+  }
+
+  const apiKey = process.env.ONET_API_KEY?.trim()
+  if (apiKey) {
+    return {
+      "X-API-Key": apiKey,
       Accept: "application/json",
       "User-Agent": ONET_REQUEST_USER_AGENT,
     }
@@ -97,13 +109,12 @@ export function extractOccupationSearchArray(parsed: Record<string, unknown>): u
 export async function probeOnetOccupationsKeyword(
   keyword: string,
 ): Promise<OnetKeywordProbeResult> {
-  const apiKey = process.env.ONET_API_KEY?.trim()
   const headers = getOnetAuthHeaders()
   if (!headers) {
     return { ok: false, status: 0, skippedReason: "missing_credentials" }
   }
 
-  const hasV2Key = Boolean(apiKey)
+  const hasV2Key = usingOnetV2KeyForRouting()
   const authMode = hasV2Key ? "v2_api_key" : "v19_basic"
   const url = buildOnetKeywordSearchUrl(keyword, hasV2Key)
 
@@ -194,12 +205,11 @@ export function parseOccupationSearchHits(bodyText: string): OnetOccupationHit[]
 export async function onetSearchFirstOccupation(
   keyword: string,
 ): Promise<{ hit: OnetOccupationHit | null; status: number; authMode?: "v2_api_key" | "v19_basic" }> {
-  const apiKey = process.env.ONET_API_KEY?.trim()
   const headers = getOnetAuthHeaders()
   if (!headers) {
     return { hit: null, status: 0 }
   }
-  const hasV2Key = Boolean(apiKey)
+  const hasV2Key = usingOnetV2KeyForRouting()
   const authMode = hasV2Key ? "v2_api_key" : "v19_basic"
   const url = buildOnetKeywordSearchUrl(keyword.trim(), hasV2Key)
   const response = await fetch(url, { headers })
@@ -240,9 +250,8 @@ export function flattenOnetCareerSkillElements(payload: unknown): Array<{ id: st
 /**
  * Skills for an occupation (Content Model element IDs + labels).
  *
- * - With **`ONET_API_KEY`**: tries v2 first (`api-v2.onetcenter.org`), then legacy WS.
- * - **Without an API key** (username/password only): tries legacy **`services.onetcenter.org/ws/...`**
- *   first (same family as keyword search), then v2 as a last resort.
+ * - **Basic** (`ONET_USERNAME` + `ONET_PASSWORD`): tries legacy `services.onetcenter.org/ws/...` first.
+ * - **API key only** (`ONET_API_KEY`, no Basic): tries v2 (`api-v2.onetcenter.org`) first, then legacy.
  */
 export async function fetchOnetCareerSkillsFlat(socCode: string): Promise<{
   ok: boolean
@@ -255,7 +264,7 @@ export async function fetchOnetCareerSkillsFlat(socCode: string): Promise<{
   }
 
   const socEnc = encodeURIComponent(socCode.trim())
-  const hasV2Key = Boolean(process.env.ONET_API_KEY?.trim())
+  const hasV2Key = usingOnetV2KeyForRouting()
   const v2Url = `${onetV2BaseUrl()}/mnm/careers/${socEnc}/skills`
   const legacyUrl = `https://services.onetcenter.org/ws/mnm/careers/${socEnc}/skills`
 
