@@ -13,6 +13,7 @@
     "billing:setup:juno": "node scripts/setup-lemonsqueezy-billing.cjs",
     "db:apply:024": "node scripts/apply-024-lookalike-migration.cjs",
     "db:migrate": "node scripts/apply-all-supabase-migrations.cjs",
+    "db:migrate:file": "node scripts/run-single-migration.cjs",
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky"
