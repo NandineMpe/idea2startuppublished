@@ -6,14 +6,9 @@ type SourcePingResult = {
 }
 
 export async function pingCsoIreland(): Promise<SourcePingResult> {
-  const url = "https://ws.cso.ie/public/api.restful/PxStat.Data.Cube_API.ReadDataset/LMO09/JSON-stat/2.0/en"
-  const body = {
-    query: [
-      { code: "Statistic", selection: { filter: "item", values: ["LMO09C01"] } },
-      { code: "TLIST(M1)", selection: { filter: "last", values: ["1"] } },
-    ],
-    response: { format: "json-stat2" },
-  }
+  // HPM06 responds reliably on the public CSO PxStat endpoint.
+  const url = "https://ws.cso.ie/public/api.restful/PxStat.Data.Cube_API.ReadDataset/HPM06/JSON-stat/2.0/en"
+  const body = { query: [], response: { format: "json-stat2" } }
 
   const res = await fetch(url, {
     method: "POST",
