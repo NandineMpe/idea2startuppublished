@@ -70,18 +70,19 @@ async function main() {
 
   const levelsKey = LEVELSFYI_API_KEY || LEVELS_API_KEY
 
-  // --- O*NET v2 (preferred): X-API-Key @ api-v2.onetcenter.org/online/search
+  // --- O*NET v2 (preferred): X-API-Key @ api-v2.onetcenter.org/mnm/search
   const onetKey = ONET_API_KEY?.trim()
   const onetBase =
     (ONET_API_BASE_URL && ONET_API_BASE_URL.trim().replace(/\/$/, "")) ||
     "https://api-v2.onetcenter.org"
 
   if (onetKey) {
-    const url = `${onetBase}/online/search?keyword=${encodeURIComponent("software")}`
+    const url = `${onetBase}/mnm/search?keyword=${encodeURIComponent("software")}`
     const r = await fetch(url, {
       headers: {
         "X-API-Key": onetKey,
         Accept: "application/json",
+        "User-Agent": "CareerOS-module-smoke/1.0",
       },
     })
     const body = await r.text()
@@ -104,8 +105,14 @@ async function main() {
       )
     } else {
       const r = await fetch(
-        "https://services.onetcenter.org/ws/online/occupations?keyword=software",
-        { headers: { Authorization: onetAuthHeader } },
+        "https://services.onetcenter.org/ws/mnm/search?keyword=software",
+        {
+          headers: {
+            Authorization: onetAuthHeader,
+            Accept: "application/json",
+            "User-Agent": "CareerOS-module-smoke/1.0",
+          },
+        },
       )
       ok(
         "ONET",
