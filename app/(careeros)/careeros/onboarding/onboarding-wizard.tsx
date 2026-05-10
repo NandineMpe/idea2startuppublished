@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -13,8 +14,15 @@ import { toast } from "sonner"
 type Step = 1 | 2 | 3 | "building"
 
 export function CareerOsOnboardingWizard() {
+  const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [busy, setBusy] = useState(false)
+  const [module12Status, setModule12Status] = useState<
+    "idle" | "running" | "completed" | "failed"
+  >("idle")
+  const [module12Message, setModule12Message] = useState("Preparing extraction…")
+  const [module12SkillsCount, setModule12SkillsCount] = useState<number | null>(null)
+  const startedModule12Ref = useRef(false)
 
   const [resumeText, setResumeText] = useState("")
   const [linkedinText, setLinkedinText] = useState("")
@@ -124,6 +132,91 @@ export function CareerOsOnboardingWizard() {
     }
   }
 
+  useEffect(() => {
+    if (step !== "building") return
+    let active = true
+    const pollStatus = async () => {
+      try {
+        const res = await fetch("/api/careeros/onboarding/module-1-2/status", {
+          credentials: "include",
+          cache: "no-store",
+        })
+        if (!res.ok) return
+        const json = (await res.json()) as {
+          module_1_2?: { status?: string; skillsCount?: number; error?: string }
+        }
+        const status = json.module_1_2?.status
+        if (!active || typeof status !== "string") return
+        if (status === "running") {
+          setModule12Status("running")
+          setModule12Message("Extracting skills and role signals from your onboarding documents…")
+        } else if (status === "completed") {
+          setModule12Status("completed")
+          setModule12SkillsCount(
+            typeof json.module_1_2?.skillsCount === "number" ? json.module_1_2.skillsCount : null,
+          )
+          setModule12Message("Career profile ready. Redirecting to CareerOS…")
+          setTimeout(() => router.push("/careeros"), 1200)
+        } else if (status === "failed") {
+          setModule12Status("failed")
+          setModule12Message(
+            typeof json.module_1_2?.error === "string" && json.module_1_2.error
+              ? json.module_1_2.error
+              : "Extraction failed. You can retry now.",
+          )
+        } else {
+          setModule12Status("idle")
+        }
+      } catch {
+        // keep polling; transient network issues are expected
+      }
+    }
+
+    const startExtraction = async () => {
+      if (startedModule12Ref.current) return
+      startedModule12Ref.current = true
+      setModule12Status("running")
+      setModule12Message("Starting Module 1.2 extraction…")
+      try {
+        const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
+          method: "POST",
+          credentials: "include",
+        })
+        const json = (await res.json().catch(() => ({}))) as {
+          error?: string
+          status?: string
+          skillsCount?: number
+        }
+        if (!active) return
+        if (!res.ok) {
+          setModule12Status("failed")
+          setModule12Message(json.error || "Could not start Module 1.2 extraction.")
+          return
+        }
+        if (json.status === "completed") {
+          setModule12Status("completed")
+          setModule12SkillsCount(typeof json.skillsCount === "number" ? json.skillsCount : null)
+          setModule12Message("Career profile ready. Redirecting to CareerOS…")
+          setTimeout(() => router.push("/careeros"), 1200)
+        }
+      } catch {
+        if (!active) return
+        setModule12Status("failed")
+        setModule12Message("Could not start Module 1.2 extraction. Please retry.")
+      }
+    }
+
+    void pollStatus()
+    void startExtraction()
+    const interval = setInterval(() => {
+      void pollStatus()
+    }, 2500)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [router, step])
+
   if (step === "building") {
     return (
       <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-6 py-16">
@@ -131,11 +224,26 @@ export function CareerOsOnboardingWizard() {
           <CardHeader>
             <CardTitle>We&apos;re building your career profile</CardTitle>
             <CardDescription>
-              Module 1.2 will run structured extraction (Qwen) next. For now, your documents and
-              confirmations are stored securely.
+              Module 1.2 is running now. {module12Message}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground">
+              Status:{" "}
+              <span className="font-medium text-foreground capitalize">{module12Status}</span>
+              {module12SkillsCount !== null ? ` • Skills extracted: ${module12SkillsCount}` : ""}
+            </p>
+            {module12Status === "failed" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  startedModule12Ref.current = false
+                  setModule12Status("idle")
+                }}
+              >
+                Retry extraction
+              </Button>
+            ) : null}
             <Button asChild>
               <Link href="/careeros">Continue to CareerOS</Link>
             </Button>
