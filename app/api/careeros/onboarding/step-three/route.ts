@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
+import { randomUUID } from "crypto"
 import { jsonApiError } from "@/lib/api-error-response"
 import { createClient } from "@/lib/supabase/server"
 import { appendCareerOsMarkdownToJunoBrain } from "@/lib/careeros/brain/append-llm-to-brain"
 import { loadLatestLlmMarkdownPlainText } from "@/lib/careeros/documents/load-latest-llm"
+import { sendCareerOSEvent } from "@/lib/careeros/inngest/client"
 import { mergeCareerOsOnboardingState } from "@/lib/careeros/onboarding/user-settings"
 import { supabaseAdmin } from "@/lib/supabase"
 
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
       targetRoleTitle?: unknown
       locationLabel?: unknown
       yearsExperience?: unknown
+      currentSalaryUsd?: unknown
       mergeLlmToBrain?: unknown
     }
 
@@ -42,6 +45,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Years of experience must be between 0 and 80" }, { status: 400 })
       }
       yearsExperience = Math.round(n * 10) / 10
+    }
+
+    let currentSalaryUsd: number | null = null
+    if (body.currentSalaryUsd !== undefined && body.currentSalaryUsd !== null && body.currentSalaryUsd !== "") {
+      const n = Number(body.currentSalaryUsd)
+      if (!Number.isFinite(n) || n < 0 || n > 10_000_000) {
+        return NextResponse.json(
+          { error: "Current salary (USD) must be between 0 and 10,000,000" },
+          { status: 400 },
+        )
+      }
+      currentSalaryUsd = Math.round(n * 100) / 100
     }
 
     if (!currentRoleTitle || !locationLabel) {
@@ -65,6 +80,7 @@ export async function POST(request: Request) {
           target_role_title: targetRoleTitle || null,
           location_label: locationLabel,
           years_experience: yearsExperience,
+          current_salary_usd: currentSalaryUsd,
           updated_at: now,
         },
         { onConflict: "user_id" },
@@ -96,15 +112,30 @@ export async function POST(request: Request) {
     await mergeCareerOsOnboardingState(user.id, {
       step3CompletedAt: now,
       module_1_1_complete: true,
+      module_1_2: {
+        status: "running",
+        startedAt: now,
+      },
+    })
+
+    const onboardingCompletionId = randomUUID()
+    await sendCareerOSEvent({
+      name: "careeros/profile.extract",
+      data: {
+        user_id: user.id,
+        onboarding_completion_id: onboardingCompletionId,
+      },
     })
 
     return NextResponse.json({
       ok: true,
+      module_1_2: { status: "running", onboardingCompletionId },
       profile: {
         currentRoleTitle,
         targetRoleTitle: targetRoleTitle || null,
         locationLabel,
         yearsExperience,
+        currentSalaryUsd,
       },
       ...(mergeLlmToBrain ? { brain } : {}),
     })

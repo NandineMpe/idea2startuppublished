@@ -31,6 +31,7 @@ export function CareerOsOnboardingWizard() {
   const [targetRole, setTargetRole] = useState("")
   const [locationLabel, setLocationLabel] = useState("")
   const [yearsExperience, setYearsExperience] = useState("")
+  const [currentSalaryUsd, setCurrentSalaryUsd] = useState("")
   const [mergeLlmToBrain, setMergeLlmToBrain] = useState(true)
 
   async function submitStepOne(ev: React.FormEvent<HTMLFormElement>) {
@@ -98,6 +99,8 @@ export function CareerOsOnboardingWizard() {
           locationLabel,
           yearsExperience:
             yearsExperience.trim() === "" ? undefined : Number(yearsExperience),
+          currentSalaryUsd:
+            currentSalaryUsd.trim() === "" ? undefined : Number(currentSalaryUsd),
           mergeLlmToBrain,
         }),
       })
@@ -172,42 +175,7 @@ export function CareerOsOnboardingWizard() {
       }
     }
 
-    const startExtraction = async () => {
-      if (startedModule12Ref.current) return
-      startedModule12Ref.current = true
-      setModule12Status("running")
-      setModule12Message("Starting Module 1.2 extraction…")
-      try {
-        const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
-          method: "POST",
-          credentials: "include",
-        })
-        const json = (await res.json().catch(() => ({}))) as {
-          error?: string
-          status?: string
-          skillsCount?: number
-        }
-        if (!active) return
-        if (!res.ok) {
-          setModule12Status("failed")
-          setModule12Message(json.error || "Could not start Module 1.2 extraction.")
-          return
-        }
-        if (json.status === "completed") {
-          setModule12Status("completed")
-          setModule12SkillsCount(typeof json.skillsCount === "number" ? json.skillsCount : null)
-          setModule12Message("Career profile ready. Redirecting to CareerOS…")
-          setTimeout(() => router.push("/careeros"), 1200)
-        }
-      } catch {
-        if (!active) return
-        setModule12Status("failed")
-        setModule12Message("Could not start Module 1.2 extraction. Please retry.")
-      }
-    }
-
     void pollStatus()
-    void startExtraction()
     const interval = setInterval(() => {
       void pollStatus()
     }, 2500)
@@ -236,9 +204,27 @@ export function CareerOsOnboardingWizard() {
             {module12Status === "failed" ? (
               <Button
                 type="button"
-                onClick={() => {
-                  startedModule12Ref.current = false
-                  setModule12Status("idle")
+                onClick={async () => {
+                  if (startedModule12Ref.current) return
+                  startedModule12Ref.current = true
+                  setModule12Status("running")
+                  setModule12Message("Retrying extraction…")
+                  try {
+                    const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
+                      method: "POST",
+                      credentials: "include",
+                    })
+                    const json = (await res.json().catch(() => ({}))) as { error?: string }
+                    if (!res.ok) {
+                      setModule12Status("failed")
+                      setModule12Message(json.error || "Could not queue retry.")
+                    }
+                  } catch {
+                    setModule12Status("failed")
+                    setModule12Message("Could not queue retry.")
+                  } finally {
+                    startedModule12Ref.current = false
+                  }
                 }}
               >
                 Retry extraction
@@ -409,6 +395,19 @@ export function CareerOsOnboardingWizard() {
                   value={yearsExperience}
                   onChange={(e) => setYearsExperience(e.target.value)}
                   placeholder="e.g. 8"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currentSalaryUsd">Current annual salary in USD (optional)</Label>
+                <Input
+                  id="currentSalaryUsd"
+                  type="number"
+                  min={0}
+                  max={10000000}
+                  step={1000}
+                  value={currentSalaryUsd}
+                  onChange={(e) => setCurrentSalaryUsd(e.target.value)}
+                  placeholder="e.g. 145000"
                 />
               </div>
               <div className="flex items-start gap-2 rounded-md border border-border p-3">

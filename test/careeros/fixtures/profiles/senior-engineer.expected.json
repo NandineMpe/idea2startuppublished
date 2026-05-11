@@ -1,0 +1,15 @@
+{
+  "current_role": "Principal Software Engineer",
+  "years_experience": 12,
+  "skills": [
+    { "skill_name": "Python", "canonical_skill_key": "python", "proficiency_band": null, "source_type": "resume", "evidence": "Built Python and TypeScript platform tooling used by 120 engineers." },
+    { "skill_name": "AWS Lambda", "canonical_skill_key": "aws-lambda", "proficiency_band": null, "source_type": "resume", "evidence": "Led migration of 40 services to AWS Lambda and EventBridge." }
+  ],
+  "past_roles": [
+    { "title": "Principal Software Engineer", "company": "Orbit Labs", "start_date": "2021-03", "end_date": "present", "description": "Led migration and platform tooling work.", "is_current": true }
+  ],
+  "education": [
+    { "institution": "University College Dublin", "degree": "BSc Computer Science", "field_of_study": "Computer Science", "graduation_year": 2013 }
+  ],
+  "notable_achievements": ["AWS Certified Solutions Architect Professional"]
+}

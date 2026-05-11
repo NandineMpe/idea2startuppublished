@@ -76,7 +76,7 @@
 | `onet` | `careeros/profile.onet-map` (Phase 1), `careeros/market.refresh-*` (Phase 2+) |
 | `careeronestop` | `careeros/market.refresh-salary` (Phase 2) |
 | `adzuna` | `careeros/market.refresh-demand`, `careeros/market.refresh-salary` (Phase 2) |
-| `jsearch` | `careeros/market.refresh-demand` (Phase 2) |
+| `jsearch` | `careeros/market.refresh-demand`, `careeros/market.refresh-salary` (Phase 2) |
 | `bls` | `careeros/market.refresh-salary` (Phase 2) |
 | `eurostat` | `careeros/market.refresh-salary` (Phase 2) |
 | `cso-ireland` | `careeros/market.refresh-salary` (Phase 2) |
@@ -94,3 +94,72 @@ curl -s "https://<deployment-url>/api/careeros/_verify/sources?token=$VERIFY_TOK
 ```
 
 Expected: `"overall": "PASS"` and all adapters report `"ok": true`.
+
+## Module 2.2 salary composition
+
+- Primary cache table: `careeros.market_salary_bands` (shared cache, not per-user materialisation).
+- Refresh workflow: `careeros/market.refresh-salary`.
+- Source composition rule (`salary-band-v1`):
+  - salary samples from Adzuna + JSearch
+  - blended percentile envelope (p15/p50/p85)
+  - converted into `junior`, `mid`, `senior` ranges via deterministic multipliers
+- Source attribution:
+  - persisted in `source_attribution` JSONB on each salary row
+  - includes source status, sample sizes, partial-data flag, and caveats
+- Caveat:
+  - salary bands are not cost-of-living normalised across countries; interpret with region context.
+
+## Module 2.3 skill-velocity normalisation
+
+### Canonical skill keys
+
+- Shared canonical system across resume extraction (`careeros.user_skills`) and market velocity (`careeros.market_skill_velocity`).
+- Format: lowercase + hyphenated slug (`^[a-z0-9]+(?:-[a-z0-9]+)*$`).
+- Examples:
+  - `Go`, `golang` -> `go`
+  - `JavaScript`, `JS` -> `javascript`
+  - `TypeScript`, `TS` -> `typescript`
+  - `Model Context Protocol`, `MCP` -> `mcp`
+
+### Synonyms table
+
+- Table: `careeros.skill_synonyms`
+- Columns: `synonym_key`, `canonical_skill_key`, `confidence`, `source`, timestamps
+- Purpose: collapse lexical variants into one canonical signal before velocity aggregation.
+
+### Skill granularity examples
+
+| Input mention | Canonical key | Rule |
+|---|---|---|
+| `python-3.12` | `python` | version collapse |
+| `python3` | `python` | variant collapse |
+| `aws lambda` | `aws-lambda` | lexical normalisation |
+| `react server components` | `react-server-components` | keep distinct sub-skill |
+| `ml` | `machine-learning` | acronym expansion |
+| `llm` | `large-language-models` | acronym expansion |
+| `rag` | `retrieval-augmented-generation` | acronym expansion |
+| `mcp servers` | `mcp` | concept collapse |
+| `quick books` | `quickbooks` | typo/spacing normalisation |
+| `k8s` | `kubernetes` | alias normalisation |
+
+### Skill velocity windows
+
+- `M90`, `M180`, `M360`, `M720` (rolling)
+- Velocity formula:
+  - `velocity_score = ((current_mentions - prior_mentions) / prior_mentions) * 100`
+  - If `prior_mentions <= 0`, set `direction = 'new'` and `velocity_score = 0`.
+
+### Noise suppression rules
+
+- minimum mention count in current window: `50`
+- minimum absolute increase for strong-growth surfacing: `100`
+- minimum growth % for strong-growth surfacing: `25%`
+- outlier employer cap: no single employer contributes more than `15%` of mentions for a surfaced skill
+
+### Source composition (Module 2.3)
+
+| Region type | Primary posting sources | Notes |
+|---|---|---|
+| US | TheirStack + Adzuna | TheirStack usually richer for deep skill mention text; Adzuna broadens sample |
+| UK/IE/EU | TheirStack + Adzuna | Region-level mapping uses shared `region_code` mapping from demand/salary modules |
+| GLOBAL | Derived aggregate | computed from region-level rows; not fetched as direct vendor region |

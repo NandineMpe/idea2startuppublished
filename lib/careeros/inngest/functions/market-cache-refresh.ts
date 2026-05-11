@@ -1,5 +1,6 @@
+import { upsertOnetOccupationsFromKeywordProbe } from "@/lib/careeros/market/onet-occupation-cache"
 import { careerosMinIntervalMs } from "@/lib/careeros/integrations/rate-limits"
-import { probeOnetOccupationsKeyword } from "@/lib/careeros/integrations/onet-request"
+import { fetchOnetKeywordSearchDetailed } from "@/lib/careeros/integrations/onet-request"
 import { careerosInngest } from "../client"
 
 /** Default taxonomy keywords for v1 warm probes — extend when ingestion expands. */
@@ -42,19 +43,59 @@ export const marketCacheRefresh = careerosInngest.createFunction(
 
     const paceMs = careerosMinIntervalMs("onet")
 
-    const results: Array<
-      Awaited<ReturnType<typeof probeOnetOccupationsKeyword>> & { keyword: string }
-    > = []
+    const results: Array<{
+      keyword: string
+      ok: boolean
+      status: number
+      skippedReason?: "missing_credentials"
+      authMode?: "v2_api_key" | "v19_basic"
+      occupationCount?: number
+      upserted: number
+      persistError?: string
+    }> = []
 
     for (let i = 0; i < keywords.length; i++) {
       const keyword = keywords[i]!.trim()
       const slug = stepSlug(i, keyword)
 
-      const result = await step.run(`onet-probe-${slug}`, () =>
-        probeOnetOccupationsKeyword(keyword),
-      )
+      const result = await step.run(`onet-cache-${slug}`, async () => {
+        const detailed = await fetchOnetKeywordSearchDetailed(keyword)
+        if (detailed.skippedReason === "missing_credentials") {
+          return {
+            keyword,
+            ok: false as const,
+            status: detailed.status,
+            skippedReason: "missing_credentials" as const,
+            occupationCount: 0,
+            upserted: 0,
+          }
+        }
+        if (!detailed.ok) {
+          return {
+            keyword,
+            ok: false as const,
+            status: detailed.status,
+            authMode: detailed.authMode,
+            occupationCount: detailed.occupationCount,
+            upserted: 0,
+          }
+        }
+        const { upserted, error: persistError } = await upsertOnetOccupationsFromKeywordProbe(
+          keyword,
+          detailed.hits,
+        )
+        return {
+          keyword,
+          ok: true as const,
+          status: detailed.status,
+          authMode: detailed.authMode,
+          occupationCount: detailed.occupationCount,
+          upserted,
+          persistError,
+        }
+      })
 
-      results.push({ keyword, ...result })
+      results.push(result)
 
       const isLast = i === keywords.length - 1
       if (!isLast && paceMs > 0) {

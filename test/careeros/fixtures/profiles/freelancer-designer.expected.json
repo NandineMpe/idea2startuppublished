@@ -1,0 +1,12 @@
+{
+  "current_role": "Freelance Product Designer",
+  "years_experience": 7,
+  "skills": [
+    { "skill_name": "Figma", "canonical_skill_key": "figma", "proficiency_band": null, "source_type": "linkedin", "evidence": "Skills: Figma, usability testing, interaction design, design systems" }
+  ],
+  "past_roles": [
+    { "title": "Freelance Product Designer", "company": "Self-employed", "start_date": "2021-01", "end_date": "present", "description": "UX/UI design for SaaS and ecommerce clients.", "is_current": true }
+  ],
+  "education": [],
+  "notable_achievements": []
+}

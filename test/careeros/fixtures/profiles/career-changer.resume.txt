@@ -1,0 +1,11 @@
+Daniel Brooks
+
+Experience
+Finance Manager, Redcliff Capital (2016-02 to 2024-02)
+- Owned forecasting models and SQL reporting for FP&A.
+
+Analyst, East Harbor Bank (2012-06 to 2016-01)
+- Built Excel and Python automation for portfolio reporting.
+
+Transition
+Completed data science bootcamp in 2025 with projects in pandas and scikit-learn.

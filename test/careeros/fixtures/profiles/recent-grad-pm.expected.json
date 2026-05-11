@@ -1,0 +1,14 @@
+{
+  "current_role": "Product Analyst",
+  "years_experience": 1,
+  "skills": [
+    { "skill_name": "SQL", "canonical_skill_key": "sql", "proficiency_band": null, "source_type": "linkedin", "evidence": "Skills: Product analytics, SQL, A/B testing, stakeholder communication" }
+  ],
+  "past_roles": [
+    { "title": "Product Analyst", "company": "FinchPay", "start_date": "2024-07", "end_date": "present", "description": "Product analytics role.", "is_current": true }
+  ],
+  "education": [
+    { "institution": "Trinity College Dublin", "degree": "BBA", "field_of_study": null, "graduation_year": 2024 }
+  ],
+  "notable_achievements": []
+}

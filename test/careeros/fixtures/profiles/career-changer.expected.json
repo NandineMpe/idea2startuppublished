@@ -1,0 +1,12 @@
+{
+  "current_role": "Finance Manager",
+  "years_experience": 12,
+  "skills": [
+    { "skill_name": "Python", "canonical_skill_key": "python", "proficiency_band": null, "source_type": "linkedin", "evidence": "Skills: SQL, Python, pandas, scikit-learn, financial modeling" }
+  ],
+  "past_roles": [
+    { "title": "Finance Manager", "company": "Redcliff Capital", "start_date": "2016-02", "end_date": "2024-02", "description": "Owned forecasting models and SQL reporting for FP&A.", "is_current": false }
+  ],
+  "education": [],
+  "notable_achievements": ["Completed data science bootcamp in 2025 with projects in pandas and scikit-learn."]
+}

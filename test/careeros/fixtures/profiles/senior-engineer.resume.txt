@@ -1,0 +1,20 @@
+Alex Rivera
+Senior Software Engineer
+
+Experience
+Principal Software Engineer, Orbit Labs (2021-03 to present)
+- Led migration of 40 services to AWS Lambda and EventBridge.
+- Built Python and TypeScript platform tooling used by 120 engineers.
+
+Senior Software Engineer, Nimbus Cloud (2017-01 to 2021-02)
+- Designed Kubernetes deployment pipeline with Terraform.
+- Mentored 6 engineers and ran incident response.
+
+Software Engineer, Bytehouse (2013-06 to 2016-12)
+- Developed Java services for billing and analytics.
+
+Education
+BSc Computer Science, University College Dublin, 2013
+
+Certifications
+AWS Certified Solutions Architect Professional

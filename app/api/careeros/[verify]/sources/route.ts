@@ -10,6 +10,20 @@ import { pingLevelsFyi } from "@/lib/careeros/sources/levelsfyi"
 import { pingSecEdgar } from "@/lib/careeros/sources/sec-edgar"
 import { pingArxiv } from "@/lib/careeros/sources/arxiv"
 import { pingLayoffsFyi } from "@/lib/careeros/sources/layoffs-fyi"
+import { pingArxivFeed } from "@/lib/careeros/sources/arxiv-feed"
+import { pingAnthropicNews } from "@/lib/careeros/sources/anthropic-news"
+import { pingOpenAiNews } from "@/lib/careeros/sources/openai-news"
+import { pingDeepMindBlog } from "@/lib/careeros/sources/deepmind-blog"
+import { pingMetaAiBlog } from "@/lib/careeros/sources/meta-ai-blog"
+import { pingHuggingFacePapers } from "@/lib/careeros/sources/huggingface-papers"
+import { pingPapersWithCode } from "@/lib/careeros/sources/papers-with-code"
+import { pingHackerNews } from "@/lib/careeros/sources/hacker-news"
+import { pingGithubTrending } from "@/lib/careeros/sources/github-trending"
+import { pingPragmaticEngineer } from "@/lib/careeros/sources/pragmatic-engineer"
+import { pingTechCrunchAi } from "@/lib/careeros/sources/techcrunch-ai"
+import { pingMicrosoftResearchBlog } from "@/lib/careeros/sources/microsoft-research-blog"
+import { pingMistralNews } from "@/lib/careeros/sources/mistral-news"
+import { pingEleutherAiBlog } from "@/lib/careeros/sources/eleutherai-blog"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -43,6 +57,20 @@ export async function GET(
     ["sec-edgar", pingSecEdgar],
     ["arxiv", pingArxiv],
     ["layoffs-fyi", pingLayoffsFyi],
+    ["feed-arxiv", pingArxivFeed],
+    ["feed-anthropic-news", pingAnthropicNews],
+    ["feed-openai-news", pingOpenAiNews],
+    ["feed-deepmind-blog", pingDeepMindBlog],
+    ["feed-meta-ai-blog", pingMetaAiBlog],
+    ["feed-huggingface-papers", pingHuggingFacePapers],
+    ["feed-papers-with-code", pingPapersWithCode],
+    ["feed-hacker-news", pingHackerNews],
+    ["feed-github-trending", pingGithubTrending],
+    ["feed-pragmatic-engineer", pingPragmaticEngineer],
+    ["feed-techcrunch-ai", pingTechCrunchAi],
+    ["feed-microsoft-research-blog", pingMicrosoftResearchBlog],
+    ["feed-mistral-news", pingMistralNews],
+    ["feed-eleutherai-blog", pingEleutherAiBlog],
   ]
 
   const results: Record<string, unknown> = {}

@@ -19,6 +19,20 @@ This document defines cross-cutting schema contracts used by CareerOS workers an
 
 - Lowercase hex string (64 chars)
 
+### Module 1.2 canonical payload (`careeros/profile.extract`)
+
+`input_data_version` for skill/profile extraction is computed from canonical JSON over:
+
+- `user_id`
+- `resume_text_hash`
+- `linkedin_text_hash`
+- `user_stated_role`
+- `user_stated_years_experience`
+- `schema_version`
+- `prompt_version`
+
+Implementation lives in `lib/careeros/audit/input-hash.ts`. Keys are sorted recursively and arrays preserve order.
+
 ## Generation payload scrubbing (GDPR pseudonymisation)
 
 On account deletion, `careeros.generation_runs` rows are pseudonymised by:

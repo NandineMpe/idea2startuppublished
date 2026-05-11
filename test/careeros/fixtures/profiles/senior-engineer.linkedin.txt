@@ -1,0 +1,10 @@
+About
+Engineering leader focused on distributed systems, AWS, and platform reliability.
+
+Experience
+Orbit Labs - Principal Software Engineer (2021-03 to Present)
+Nimbus Cloud - Senior Software Engineer (2017-01 to 2021-02)
+Bytehouse - Software Engineer (2013-06 to 2016-12)
+
+Skills
+Python, AWS Lambda, Kubernetes, Terraform, Incident Management, People Mentoring

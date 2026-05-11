@@ -103,49 +103,6 @@ export function extractOccupationSearchArray(parsed: Record<string, unknown>): u
   return Array.isArray(list) ? list : []
 }
 
-/**
- * Lightweight probe used by cache refresh jobs — does not persist to Postgres yet.
- */
-export async function probeOnetOccupationsKeyword(
-  keyword: string,
-): Promise<OnetKeywordProbeResult> {
-  const headers = getOnetAuthHeaders()
-  if (!headers) {
-    return { ok: false, status: 0, skippedReason: "missing_credentials" }
-  }
-
-  const hasV2Key = usingOnetV2KeyForRouting()
-  const authMode = hasV2Key ? "v2_api_key" : "v19_basic"
-  const url = buildOnetKeywordSearchUrl(keyword, hasV2Key)
-
-  const response = await fetch(url, {
-    headers,
-  })
-
-  if (!response.ok) {
-    return { ok: false, status: response.status, authMode }
-  }
-
-  const text = await response.text()
-  let occupationCount: number | undefined
-
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>
-    const list = extractOccupationSearchArray(parsed)
-    occupationCount = list.length
-  } catch {
-    const matches = text.match(/<occupation\b/gi)
-    occupationCount = matches?.length
-  }
-
-  return {
-    ok: true,
-    status: response.status,
-    occupationCount,
-    authMode,
-  }
-}
-
 export type OnetOccupationHit = {
   soc_code: string
   title?: string
@@ -196,6 +153,89 @@ export function parseOccupationSearchHits(bodyText: string): OnetOccupationHit[]
     return out
   } catch {
     return []
+  }
+}
+
+export type OnetKeywordSearchDetailedResult = {
+  ok: boolean
+  status: number
+  skippedReason?: "missing_credentials"
+  authMode?: "v2_api_key" | "v19_basic"
+  /** Parsed SOC rows from JSON (empty when non-JSON body). */
+  hits: OnetOccupationHit[]
+  /** Same count heuristic as {@link probeOnetOccupationsKeyword} when JSON parse fails. */
+  occupationCount?: number
+}
+
+/**
+ * Full keyword search response for Module 2.1 cache ingestion — one HTTP round-trip,
+ * parsed occupation hits plus legacy XML-ish fallback count.
+ */
+export async function fetchOnetKeywordSearchDetailed(
+  keyword: string,
+): Promise<OnetKeywordSearchDetailedResult> {
+  const headers = getOnetAuthHeaders()
+  if (!headers) {
+    return { ok: false, status: 0, skippedReason: "missing_credentials", hits: [] }
+  }
+
+  const hasV2Key = usingOnetV2KeyForRouting()
+  const authMode = hasV2Key ? "v2_api_key" : "v19_basic"
+  const url = buildOnetKeywordSearchUrl(keyword, hasV2Key)
+
+  const response = await fetch(url, {
+    headers,
+  })
+
+  if (!response.ok) {
+    return { ok: false, status: response.status, authMode, hits: [] }
+  }
+
+  const text = await response.text()
+  const hits = parseOccupationSearchHits(text)
+  let occupationCount = hits.length
+
+  if (occupationCount === 0) {
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>
+      const list = extractOccupationSearchArray(parsed)
+      occupationCount = list.length
+    } catch {
+      const matches = text.match(/<occupation\b/gi)
+      occupationCount = matches?.length ?? 0
+    }
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    occupationCount,
+    authMode,
+    hits,
+  }
+}
+
+/** Lightweight probe used by cache refresh jobs (wraps {@link fetchOnetKeywordSearchDetailed}). */
+export async function probeOnetOccupationsKeyword(
+  keyword: string,
+): Promise<OnetKeywordProbeResult> {
+  const detailed = await fetchOnetKeywordSearchDetailed(keyword)
+  if (detailed.skippedReason === "missing_credentials") {
+    return { ok: false, status: 0, skippedReason: "missing_credentials" }
+  }
+  if (!detailed.ok) {
+    return {
+      ok: false,
+      status: detailed.status,
+      authMode: detailed.authMode,
+    }
+  }
+
+  return {
+    ok: true,
+    status: detailed.status,
+    occupationCount: detailed.occupationCount,
+    authMode: detailed.authMode,
   }
 }
 
@@ -253,11 +293,17 @@ export function flattenOnetCareerSkillElements(payload: unknown): Array<{ id: st
  * - **Basic** (`ONET_USERNAME` + `ONET_PASSWORD`): tries legacy `services.onetcenter.org/ws/...` first.
  * - **API key only** (`ONET_API_KEY`, no Basic): tries v2 (`api-v2.onetcenter.org`) first, then legacy.
  */
-export async function fetchOnetCareerSkillsFlat(socCode: string): Promise<{
+export type OnetCareerSkillsFetchResult = {
   ok: boolean
   status: number
   skills: Array<{ id: string; name: string }>
-}> {
+  /** Raw hierarchical JSON from O*NET (Module 1.4 skill graph storage). Present when `ok`. */
+  raw_graph?: unknown
+  /** Which URL succeeded (v2 vs legacy), for debugging only. */
+  endpoint_used?: string
+}
+
+export async function fetchOnetCareerSkillsFlat(socCode: string): Promise<OnetCareerSkillsFetchResult> {
   const headers = getOnetAuthHeaders()
   if (!headers) {
     return { ok: false, status: 0, skills: [] }
@@ -278,10 +324,15 @@ export async function fetchOnetCareerSkillsFlat(socCode: string): Promise<{
     if (!response.ok) continue
     try {
       const parsed = JSON.parse(text) as unknown
+      const endpoint_used = url.includes("services.onetcenter.org")
+        ? "legacy_ws_mnm_careers_skills"
+        : "api_v2_mnm_careers_skills"
       return {
         ok: true,
         status: response.status,
         skills: flattenOnetCareerSkillElements(parsed),
+        raw_graph: parsed,
+        endpoint_used,
       }
     } catch {
       continue

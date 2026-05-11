@@ -1,0 +1,12 @@
+{
+  "current_role": "Marketing Director",
+  "years_experience": 12,
+  "skills": [
+    { "skill_name": "Brand strategy", "canonical_skill_key": "brand-strategy", "proficiency_band": null, "source_type": "linkedin", "evidence": "Skills: Brand strategy, campaign planning, media buying, stakeholder management" }
+  ],
+  "past_roles": [
+    { "title": "Marketing Director", "company": "Northstar Retail", "start_date": "2018-05", "end_date": "present", "description": "Led brand campaigns across channels.", "is_current": true }
+  ],
+  "education": [],
+  "notable_achievements": []
+}

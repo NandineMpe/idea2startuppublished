@@ -1,0 +1,5 @@
+About
+Finance professional pivoting into data science.
+
+Skills
+SQL, Python, pandas, scikit-learn, financial modeling

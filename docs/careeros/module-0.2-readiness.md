@@ -26,7 +26,7 @@ npm run careeros:cache:refresh
 npm run careeros:cache:refresh -- "software developer" "registered nurse"
 ```
 
-HTTP calls live in `lib/careeros/integrations/onet-request.ts`. Persisting rows into `careeros.onet_*_cache` tables can be added in the same `step.run` blocks when ingestion is ready.
+HTTP calls live in `lib/careeros/integrations/onet-request.ts`. **Module 2.1** persists keyword-search hits into `careeros.onet_occupations_cache` from `careeros-market-cache-refresh` (see `docs/careeros/module-2.1.md`).
 
 ## Vercel in Cursor
 

@@ -4,5 +4,11 @@
     "app/api/inngest/route.ts": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/careeros/cron/skill-velocity-weekly",
+      "schedule": "5 14 * * 0"
+    }
+  ]
 }
