@@ -33,7 +33,7 @@ export const feedPersonaliseForUser = careerosInngest.createFunction(
   {
     id: "careeros-feed-personalise-for-user",
     retries: 2,
-    concurrency: { limit: 50 },
+    concurrency: { limit: 5 },
     triggers: [{ event: "careeros/feed.personalise-for-user" }],
   },
   async ({ event, step }) => {

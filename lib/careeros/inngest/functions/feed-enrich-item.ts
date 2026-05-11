@@ -5,7 +5,7 @@ export const feedEnrichItem = careerosInngest.createFunction(
   {
     id: "careeros-feed-enrich-item",
     retries: 2,
-    concurrency: { limit: 20 },
+    concurrency: { limit: 5 },
     triggers: [{ event: "careeros/feed.enrich-item" }],
   },
   async ({ event, step }) => {

@@ -53,7 +53,7 @@ export const skillsComputeHalfLife = careerosInngest.createFunction(
     id: "careeros-skills-compute-half-life-for-user",
     name: "CareerOS skills.compute-half-life-for-user",
     retries: 2,
-    concurrency: { limit: 30 },
+    concurrency: { limit: 5 },
     triggers: [{ event: "careeros/skills.compute-half-life-for-user" }],
   },
   async ({ step, event }) => {
