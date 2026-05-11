@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase"
-import { careerosInngest } from "../client"
+import { careerosInngest, sendCareerOSEvent } from "../client"
 import { DEMAND_TOP_REGIONS } from "@/lib/careeros/market/demand-regions"
 import { DEMAND_WINDOW_CODES, type DemandWindowCode } from "@/lib/careeros/market/demand-windows"
 import {
@@ -131,6 +131,29 @@ export const marketRefreshSkillVelocity = careerosInngest.createFunction(
         },
         source_attribution: {},
       })
+    })
+
+    // Fan out half-life computation for all active users now that velocity data is fresh
+    await step.run("fanout-half-life-computation", async () => {
+      const { data: userRows, error } = await supabaseAdmin
+        .schema("careeros")
+        .from("user_skills")
+        .select("user_id")
+        .eq("is_active", true)
+
+      if (error) throw error
+
+      const uniqueUserIds = [...new Set((userRows ?? []).map((r) => String(r.user_id)))]
+      if (uniqueUserIds.length === 0) return { fanned_out: 0 }
+
+      await careerosInngest.send(
+        uniqueUserIds.map((user_id) => ({
+          name: "careeros/skills.compute-half-life-for-user" as const,
+          data: { user_id },
+        })),
+      )
+
+      return { fanned_out: uniqueUserIds.length }
     })
 
     return {

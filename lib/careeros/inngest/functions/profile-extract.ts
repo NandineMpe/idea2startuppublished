@@ -292,6 +292,13 @@ export const profileExtract = careerosInngest.createFunction(
         })
       })
 
+      await step.run("enqueue-half-life-computation", async () => {
+        await sendCareerOSEvent({
+          name: "careeros/skills.compute-half-life-for-user",
+          data: { user_id: userId },
+        })
+      })
+
       return {
         user_id: userId,
         extraction_id: extractionId,

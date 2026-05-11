@@ -69,6 +69,12 @@ type CareerOSEvents = {
       enriched_item_id: string
     }
   }
+  "careeros/skills.compute-half-life-for-user": {
+    data: { user_id: string }
+  }
+  "careeros/skills.refresh-exposure-scores": {
+    data: Record<string, never>
+  }
 }
 
 export const careerosInngest = new Inngest({

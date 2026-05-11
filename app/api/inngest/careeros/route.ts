@@ -15,6 +15,8 @@ import {
   feedPersonaliseForAllUsers,
   feedPersonaliseForUser,
 } from "@/lib/careeros/inngest/functions/feed-personalise"
+import { skillsComputeHalfLife } from "@/lib/careeros/inngest/functions/skills-compute-half-life"
+import { exposureScoreRefresh } from "@/lib/careeros/inngest/functions/exposure-score-refresh"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -35,5 +37,7 @@ export const { GET, POST, PUT } = serve({
     feedEnrichItem,
     feedPersonaliseForAllUsers,
     feedPersonaliseForUser,
+    skillsComputeHalfLife,
+    exposureScoreRefresh,
   ],
 })
