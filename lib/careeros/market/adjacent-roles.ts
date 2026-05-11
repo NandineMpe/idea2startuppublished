@@ -79,6 +79,53 @@ function prettySkillLabel(skillKey: string): string {
     .join(" ")
 }
 
+type AdjacentPersonalisation = {
+  bridgeSkills: string[]
+  targetSalary: number | null
+  targetDemand: number | null
+  salaryDeltaUsd: number | null
+  salaryDeltaPct: number | null
+  demandDeltaPctPoints: number | null
+}
+
+function buildAdjacentPersonalisation(args: {
+  targetSocCode: string
+  userSkills: Set<string>
+  salaryMidBySoc: Map<string, number>
+  demandDeltaBySoc: Map<string, number>
+  sourceMidSalary: number | null
+  sourceDemandDelta: number | null
+}): AdjacentPersonalisation {
+  const targetSoc = String(args.targetSocCode)
+  const targetSkills = inferTargetRoleSkills(targetSoc)
+  const bridgeSkills = targetSkills
+    .filter((k) => !args.userSkills.has(k))
+    .filter((k) => !GENERIC_SKILL_KEYS.has(k))
+    .slice(0, 5)
+  const targetSalary = args.salaryMidBySoc.get(targetSoc) ?? null
+  const targetDemand = args.demandDeltaBySoc.get(targetSoc) ?? null
+  const salaryDeltaUsd =
+    targetSalary != null && args.sourceMidSalary != null
+      ? Math.round(targetSalary - args.sourceMidSalary)
+      : null
+  const salaryDeltaPct =
+    targetSalary != null && args.sourceMidSalary != null && args.sourceMidSalary > 0
+      ? Number((((targetSalary - args.sourceMidSalary) / args.sourceMidSalary) * 100).toFixed(1))
+      : null
+  const demandDeltaPctPoints =
+    targetDemand != null && args.sourceDemandDelta != null
+      ? Number((targetDemand - args.sourceDemandDelta).toFixed(1))
+      : null
+  return {
+    bridgeSkills,
+    targetSalary,
+    targetDemand,
+    salaryDeltaUsd,
+    salaryDeltaPct,
+    demandDeltaPctPoints,
+  }
+}
+
 function socPrefix(soc: string): string {
   return soc.slice(0, 2)
 }
@@ -358,99 +405,80 @@ export async function getAdjacentRolesForUser(userId: string) {
     source_attribution: { source_dataset_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION },
   })
 
-  const itemRows = marketRows.map((r) => ({
-    ...(function () {
-      const targetSoc = String(r.target_soc_code)
-      const targetSkills = inferTargetRoleSkills(targetSoc)
-      const bridgeSkills = targetSkills
-        .filter((k) => !userSkills.has(k))
-        .filter((k) => !GENERIC_SKILL_KEYS.has(k))
-        .slice(0, 5)
-      const targetSalary = salaryMidBySoc.get(targetSoc) ?? null
-      const targetDemand = demandDeltaBySoc.get(targetSoc) ?? null
-      return {
-        target_salary_mid: targetSalary,
-        target_demand_delta: targetDemand,
-        source_salary_mid: sourceMidSalary,
-        source_demand_delta: sourceDemandDelta,
-        bridge_skills: bridgeSkills,
-      }
-    })(),
-    user_id: userId,
-    snapshot_id: snapshotId,
-    source_soc_code: soc,
-    target_soc_code: String(r.target_soc_code),
-    market_adjacent_role_id: r.id,
-    rank_position: Number(r.rank_position),
-    personalised_fit_score: Number(r.similarity_score),
-    explain_payload: {
-      ...(r.explain_payload && typeof r.explain_payload === "object" ? r.explain_payload : {}),
-      ...(function () {
-        const targetSoc = String(r.target_soc_code)
-        const targetSkills = inferTargetRoleSkills(targetSoc)
-        const bridgeSkills = targetSkills
-          .filter((k) => !userSkills.has(k))
-          .filter((k) => !GENERIC_SKILL_KEYS.has(k))
-          .slice(0, 5)
-        const targetSalary = salaryMidBySoc.get(targetSoc) ?? null
-        const targetDemand = demandDeltaBySoc.get(targetSoc) ?? null
-        return {
-          bridge_skills: bridgeSkills,
-          salary_mid_delta_usd:
-            targetSalary != null && sourceMidSalary != null
-              ? Math.round(targetSalary - sourceMidSalary)
-              : null,
-          demand_delta_pct_points:
-            targetDemand != null && sourceDemandDelta != null
-              ? Number((targetDemand - sourceDemandDelta).toFixed(1))
-              : null,
-        }
-      })(),
-    },
-    model_version: "heuristic-v1",
-    prompt_version: "none",
-    schema_version: "1",
-    input_data_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION,
-    source_attribution: {},
-  }))
+  const itemRows = marketRows.map((r) => {
+    const p = buildAdjacentPersonalisation({
+      targetSocCode: String(r.target_soc_code),
+      userSkills,
+      salaryMidBySoc,
+      demandDeltaBySoc,
+      sourceMidSalary,
+      sourceDemandDelta,
+    })
+    return {
+      target_salary_mid: p.targetSalary,
+      target_demand_delta: p.targetDemand,
+      source_salary_mid: sourceMidSalary,
+      source_demand_delta: sourceDemandDelta,
+      bridge_skills: p.bridgeSkills,
+      user_id: userId,
+      snapshot_id: snapshotId,
+      source_soc_code: soc,
+      target_soc_code: String(r.target_soc_code),
+      market_adjacent_role_id: r.id,
+      rank_position: Number(r.rank_position),
+      personalised_fit_score: Number(r.similarity_score),
+      explain_payload: {
+        ...(r.explain_payload && typeof r.explain_payload === "object" ? r.explain_payload : {}),
+        bridge_skills: p.bridgeSkills,
+        salary_mid_delta_usd:
+          p.targetSalary != null && sourceMidSalary != null
+            ? Math.round(p.targetSalary - sourceMidSalary)
+            : null,
+        demand_delta_pct_points:
+          p.targetDemand != null && sourceDemandDelta != null
+            ? Number((p.targetDemand - sourceDemandDelta).toFixed(1))
+            : null,
+      },
+      model_version: "heuristic-v1",
+      prompt_version: "none",
+      schema_version: "1",
+      input_data_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION,
+      source_attribution: {},
+    }
+  })
 
   await supabaseAdmin.schema("careeros").from("user_adjacent_role_items").insert(itemRows)
 
   return {
     status: "ready" as const,
     source_soc_code: soc,
-    items: marketRows.map((r) => ({
-      ...(function () {
-        const targetSoc = String(r.target_soc_code)
-        const targetSkills = inferTargetRoleSkills(targetSoc)
-        const bridgeSkills = targetSkills
-          .filter((k) => !userSkills.has(k))
-          .filter((k) => !GENERIC_SKILL_KEYS.has(k))
-          .slice(0, 5)
-        const targetSalary = salaryMidBySoc.get(targetSoc) ?? null
-        const targetDemand = demandDeltaBySoc.get(targetSoc) ?? null
-        const salaryDeltaUsd =
-          targetSalary != null && sourceMidSalary != null ? Math.round(targetSalary - sourceMidSalary) : null
-        const salaryDeltaPct =
-          targetSalary != null && sourceMidSalary != null && sourceMidSalary > 0
-            ? Number((((targetSalary - sourceMidSalary) / sourceMidSalary) * 100).toFixed(1))
-            : null
-        const demandDeltaPctPoints =
-          targetDemand != null && sourceDemandDelta != null
-            ? Number((targetDemand - sourceDemandDelta).toFixed(1))
-            : null
-        return {
-          bridge_skills: bridgeSkills.map(prettySkillLabel),
-          bridge_skill_keys: bridgeSkills,
-          salary_mid_delta_usd: salaryDeltaUsd,
-          salary_mid_delta_pct: salaryDeltaPct,
-          demand_delta_pct_points: demandDeltaPctPoints,
-        }
-      })(),
-      target_soc_code: String(r.target_soc_code),
-      target_title: occBySoc.get(String(r.target_soc_code)) ?? String(r.target_soc_code),
-      rank_position: Number(r.rank_position),
-      similarity_score: Number(r.similarity_score),
-    })),
+    items: marketRows.map((r) => {
+      const p = buildAdjacentPersonalisation({
+        targetSocCode: String(r.target_soc_code),
+        userSkills,
+        salaryMidBySoc,
+        demandDeltaBySoc,
+        sourceMidSalary,
+        sourceDemandDelta,
+      })
+      return {
+        bridge_skills: p.bridgeSkills.map(prettySkillLabel),
+        bridge_skill_keys: p.bridgeSkills,
+        salary_mid_delta_usd: p.salaryDeltaUsd,
+        salary_mid_delta_pct: p.salaryDeltaPct,
+        demand_delta_pct_points: p.demandDeltaPctPoints,
+        source_salary_mid: sourceMidSalary,
+        target_salary_mid: p.targetSalary,
+        source_demand_delta_pct: sourceDemandDelta,
+        target_demand_delta_pct: p.targetDemand,
+        bridge_skill_count: p.bridgeSkills.length,
+        target_soc_code: String(r.target_soc_code),
+        target_title: occBySoc.get(String(r.target_soc_code)) ?? String(r.target_soc_code),
+        rank_position: Number(r.rank_position),
+        similarity_score: Number(r.similarity_score),
+      }
+    }),
   }
 }
+
+export type AdjacentRolesForUserResult = Awaited<ReturnType<typeof getAdjacentRolesForUser>>

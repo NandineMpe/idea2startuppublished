@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { getSalaryBandsForUser } from "@/lib/careeros/market/salary-bands"
 import { getPersonalSkillVelocityForUser } from "@/lib/careeros/market/skill-velocity"
 import { getAdjacentRolesForUser } from "@/lib/careeros/market/adjacent-roles"
+import { buildAdjacentRoleTrajectoryPack } from "@/lib/careeros/market/adjacent-trajectory"
 import { getDemandTrajectoryForUser } from "@/lib/careeros/market/demand-trajectory"
+import { AdjacentRoleTrajectoryCard } from "@/components/careeros/adjacent-role-trajectory-card"
 
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -28,6 +30,11 @@ export default async function CareerOSMarketPage() {
   const demand = await getDemandTrajectoryForUser(user.id, { triggerRefreshOnMiss: true })
   const velocity = await getPersonalSkillVelocityForUser(user.id, "M360")
   const adjacent = await getAdjacentRolesForUser(user.id)
+  const trajectory = await buildAdjacentRoleTrajectoryPack({
+    userId: user.id,
+    salary,
+    adjacent,
+  })
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
@@ -325,6 +332,10 @@ export default async function CareerOSMarketPage() {
           )}
         </CardContent>
       </Card>
+
+      {trajectory.status === "ready" && trajectory.rows.length > 0 ? (
+        <AdjacentRoleTrajectoryCard rows={trajectory.rows} />
+      ) : null}
     </main>
   )
 }
