@@ -30,7 +30,11 @@ CREATE TRIGGER careeros_skill_ai_exposure_set_updated_at
 GRANT SELECT ON careeros.skill_ai_exposure_scores TO authenticated;
 GRANT ALL ON careeros.skill_ai_exposure_scores TO service_role;
 
--- 2. Extend user_skill_half_life with missing columns
+-- 2. Fix original schema: half_life_days was NOT NULL but stable/rising skills have no half-life
+ALTER TABLE careeros.user_skill_half_life
+  ALTER COLUMN half_life_days DROP NOT NULL;
+
+-- 3. Extend user_skill_half_life with missing columns
 ALTER TABLE careeros.user_skill_half_life
   ADD COLUMN IF NOT EXISTS status text CHECK (status IN ('rising', 'stable', 'declining', 'at-risk')),
   ADD COLUMN IF NOT EXISTS confidence text CHECK (confidence IN ('high', 'medium', 'low')),
