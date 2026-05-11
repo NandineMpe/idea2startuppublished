@@ -54,6 +54,14 @@ Module 2.4 builds an adjacent-role cache and a user-personalized read path that 
 - Adjacent read path now exposes `source_salary_mid`, `target_salary_mid`, `source_demand_delta_pct`, `target_demand_delta_pct`, `bridge_skill_count` on each ready item: `lib/careeros/market/adjacent-roles.ts`
 - UI: `components/careeros/adjacent-role-trajectory-card.tsx` (per-target **Trajectory** tabs on Market)
 
+9. **Automated gate (five personas, no DB)**
+
+```bash
+npm run careeros:verify:trajectory
+```
+
+Runs deterministic fixtures aligned to the same five persona ids as Career Health verify (`senior-engineer`, `career-changer`, `freelancer-designer`, `non-tech-marketing`, `recent-grad-pm`). Asserts finite money lines, bridge-week floor, implied growth bounds, and that methodology text stays attached. Uses `buildAdjacentTrajectoryRowsFromInputs` in `lib/careeros/market/adjacent-trajectory.ts` (same path logic as production after bands load).
+
 **Inputs (curriculum alignment)**
 
 | Input | Source |

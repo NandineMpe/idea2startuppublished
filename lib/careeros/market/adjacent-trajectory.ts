@@ -82,7 +82,8 @@ async function loadYearsExperience(userId: string): Promise<number | null> {
   return typeof y === "number" && Number.isFinite(y) ? y : null
 }
 
-type BandRow = {
+/** One seniority slice from `market_salary_bands` (or a fixture). */
+export type TrajectoryBandRow = {
   seniority_band: string
   salary_min: number
   salary_mid: number | null
@@ -92,7 +93,7 @@ type BandRow = {
 async function loadBandsForSoc(
   onetSocCode: string,
   regionCode: string,
-): Promise<Map<SalarySeniorityBand, BandRow>> {
+): Promise<Map<SalarySeniorityBand, TrajectoryBandRow>> {
   const { data, error } = await supabaseAdmin
     .schema("careeros")
     .from("market_salary_bands")
@@ -102,7 +103,7 @@ async function loadBandsForSoc(
     .eq("source_dataset_version", SALARY_SOURCE_DATASET_VERSION)
     .limit(20)
   if (error) throw new Error(error.message)
-  const m = new Map<SalarySeniorityBand, BandRow>()
+  const m = new Map<SalarySeniorityBand, TrajectoryBandRow>()
   for (const row of data ?? []) {
     const b = String(row.seniority_band)
     if (b === "junior" || b === "mid" || b === "senior") {
@@ -117,28 +118,26 @@ async function loadBandsForSoc(
   return m
 }
 
-/**
- * Builds per-target trajectory rows for the Market page. Does not call `getAdjacentRolesForUser`
- * again (avoids duplicate snapshots). Pass the result of a single adjacent read plus salary bands.
- */
-export async function buildAdjacentRoleTrajectoryPack(input: {
-  userId: string
-  salary: UserSalaryBandsResult
-  adjacent: AdjacentRolesForUserResult
-}): Promise<AdjacentTrajectoryPack> {
-  if (input.salary.status !== "ready") {
-    return { status: "unavailable", reason: "salary_bands_not_ready" }
-  }
-  if (input.adjacent.status !== "ready") {
-    return { status: "unavailable", reason: "adjacent_roles_not_ready" }
-  }
+const METHODOLOGY_NOTE =
+  "Growth rates blend a base merit curve with your M360 posting trend for each role. They are not BLS wage forecasts. The 3-year switch path assumes you land near market-mid for the target title at your seniority after the bridge window."
 
-  const [learningHpw, yearsExp] = await Promise.all([
-    loadLearningHoursPerWeek(input.userId),
-    loadYearsExperience(input.userId),
-  ])
-  const seniority = inferSeniorityBandForTrajectory(yearsExp)
-  const region = input.salary.region_code
+type SalaryReady = Extract<UserSalaryBandsResult, { status: "ready" }>
+type AdjacentReady = Extract<AdjacentRolesForUserResult, { status: "ready" }>
+
+/**
+ * Pure assembly of trajectory rows (no DB). Used by the Market page after loading bands,
+ * and by `careeros:verify:trajectory` with fixture maps.
+ */
+export function buildAdjacentTrajectoryRowsFromInputs(input: {
+  salary: SalaryReady
+  adjacent: AdjacentReady
+  learningHoursPerWeek: number
+  yearsExperience: number | null
+  sourceBands: Map<SalarySeniorityBand, TrajectoryBandRow>
+  bandsByTarget: Map<string, Map<SalarySeniorityBand, TrajectoryBandRow>>
+}): AdjacentTrajectoryRow[] {
+  const learningHpw = Math.max(1, Math.min(40, Math.round(input.learningHoursPerWeek)))
+  const seniority = inferSeniorityBandForTrajectory(input.yearsExperience)
   const baseline =
     input.salary.current_salary_usd != null && input.salary.current_salary_usd > 0
       ? input.salary.current_salary_usd
@@ -147,26 +146,15 @@ export async function buildAdjacentRoleTrajectoryPack(input: {
         : null
 
   if (baseline == null || baseline <= 0) {
-    return { status: "unavailable", reason: "missing_baseline_comp" }
+    return []
   }
 
-  const sourceBands = await loadBandsForSoc(input.adjacent.source_soc_code, region)
-  const sourceBand = sourceBands.get(seniority) ?? null
-
+  const sourceBand = input.sourceBands.get(seniority) ?? null
   const targets = input.adjacent.items.slice(0, 6)
-  const targetSocs = [...new Set(targets.map((t) => t.target_soc_code))]
-
-  const bandsByTarget = new Map<string, Map<SalarySeniorityBand, BandRow>>()
-  await Promise.all(
-    targetSocs.map(async (soc) => {
-      bandsByTarget.set(soc, await loadBandsForSoc(soc, region))
-    }),
-  )
-
   const rows: AdjacentTrajectoryRow[] = []
 
   for (const item of targets) {
-    const tb = bandsByTarget.get(item.target_soc_code)?.get(seniority) ?? null
+    const tb = input.bandsByTarget.get(item.target_soc_code)?.get(seniority) ?? null
     const targetMid = tb?.salary_mid ?? item.target_salary_mid ?? null
     if (targetMid == null || targetMid <= 0) continue
 
@@ -208,10 +196,65 @@ export async function buildAdjacentRoleTrajectoryPack(input: {
       stay_path_year3_usd: stayY3,
       switch_path_year3_usd: switchY3,
       excess_comp_cagr_pct_vs_stay: excessCompCagrPctVsStay(stayY3, switchY3),
-      methodology_note:
-        "Growth rates blend a base merit curve with your M360 posting trend for each role. They are not BLS wage forecasts. The 3-year switch path assumes you land near market-mid for the target title at your seniority after the bridge window.",
+      methodology_note: METHODOLOGY_NOTE,
     })
   }
+
+  return rows
+}
+
+/**
+ * Builds per-target trajectory rows for the Market page. Does not call `getAdjacentRolesForUser`
+ * again (avoids duplicate snapshots). Pass the result of a single adjacent read plus salary bands.
+ */
+export async function buildAdjacentRoleTrajectoryPack(input: {
+  userId: string
+  salary: UserSalaryBandsResult
+  adjacent: AdjacentRolesForUserResult
+}): Promise<AdjacentTrajectoryPack> {
+  if (input.salary.status !== "ready") {
+    return { status: "unavailable", reason: "salary_bands_not_ready" }
+  }
+  if (input.adjacent.status !== "ready") {
+    return { status: "unavailable", reason: "adjacent_roles_not_ready" }
+  }
+
+  const [learningHpw, yearsExp] = await Promise.all([
+    loadLearningHoursPerWeek(input.userId),
+    loadYearsExperience(input.userId),
+  ])
+  const region = input.salary.region_code
+  const baseline =
+    input.salary.current_salary_usd != null && input.salary.current_salary_usd > 0
+      ? input.salary.current_salary_usd
+      : input.salary.current_band?.salary_mid != null && input.salary.current_band.salary_mid > 0
+        ? input.salary.current_band.salary_mid
+        : null
+
+  if (baseline == null || baseline <= 0) {
+    return { status: "unavailable", reason: "missing_baseline_comp" }
+  }
+
+  const sourceBands = await loadBandsForSoc(input.adjacent.source_soc_code, region)
+
+  const targets = input.adjacent.items.slice(0, 6)
+  const targetSocs = [...new Set(targets.map((t) => t.target_soc_code))]
+
+  const bandsByTarget = new Map<string, Map<SalarySeniorityBand, TrajectoryBandRow>>()
+  await Promise.all(
+    targetSocs.map(async (soc) => {
+      bandsByTarget.set(soc, await loadBandsForSoc(soc, region))
+    }),
+  )
+
+  const rows = buildAdjacentTrajectoryRowsFromInputs({
+    salary: input.salary,
+    adjacent: input.adjacent,
+    learningHoursPerWeek: learningHpw,
+    yearsExperience: yearsExp,
+    sourceBands,
+    bandsByTarget,
+  })
 
   if (!rows.length) {
     return { status: "unavailable", reason: "missing_target_salary_mid" }

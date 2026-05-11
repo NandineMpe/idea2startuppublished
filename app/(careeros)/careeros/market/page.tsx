@@ -8,6 +8,8 @@ import { buildAdjacentRoleTrajectoryPack } from "@/lib/careeros/market/adjacent-
 import { getDemandTrajectoryForUser } from "@/lib/careeros/market/demand-trajectory"
 import { AdjacentRoleTrajectoryCard } from "@/components/careeros/adjacent-role-trajectory-card"
 
+export const dynamic = "force-dynamic"
+
 function fmtMoney(n: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

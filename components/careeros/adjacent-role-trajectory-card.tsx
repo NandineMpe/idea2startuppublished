@@ -31,7 +31,7 @@ export function AdjacentRoleTrajectoryCard(props: { rows: AdjacentTrajectoryRow[
           Each tab compares staying in your current title versus switching to one adjacent role. Bridge time
           uses your bridge skill count, hours per skill, and learning hours per week (from CareerOS settings when
           set). Pay growth blends a base merit curve with M360 posting momentum for each role, not a government
-          wage index.
+          wage index. After salary or demand cache refreshes, reload this page to pull the latest cached numbers.
         </CardDescription>
       </CardHeader>
       <CardContent>

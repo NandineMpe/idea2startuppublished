@@ -18,6 +18,7 @@
     "careeros:feed:ingest:direct": "npx tsx scripts/careeros-feed-ingest-direct.ts",
     "careeros:feed:verify:personas": "npx tsx scripts/careeros-verify-feed-personas.ts",
     "careeros:verify:health": "npx tsx test/careeros/career-health/verify-quality-gate.ts",
+    "careeros:verify:trajectory": "npx tsx test/careeros/market/verify-trajectory-gate.ts",
     "billing:setup:juno": "node scripts/setup-lemonsqueezy-billing.cjs",
     "db:apply:024": "node scripts/apply-024-lookalike-migration.cjs",
     "db:migrate": "node scripts/apply-all-supabase-migrations.cjs",
