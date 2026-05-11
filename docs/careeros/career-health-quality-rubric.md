@@ -22,9 +22,11 @@ The script asserts:
 Skim each persona’s **live** report once Qwen is wired (or read `report_payload` from staging):
 
 1. **Tone:** Sounds like one person, not a template stack. Short beats, no lecture voice.
-2. **Grounding:** Numbers in prose match `pillar_scores` and composite (no invented deltas).
-3. **Layoff:** If `layoff.status` is `phase_4_employer_not_resolved` or `not_linked`, copy should not imply employer-specific risk.
-4. **Actions:** Each item is doable in a week and maps to the stated `related_pillar`.
-5. **Gaps:** Missing salary or demand cache called out once, then the brief moves on.
+2. **Factual, not alarmist:** No catastrophising beyond what scores and layoff blocks support. Middling scores read as calm, not doom.
+3. **Supportive, not generic:** Encouragement ties to their role, region, or numbers. Actions feel written for this profile, not a blog post.
+4. **Grounding:** Numbers in prose match `pillar_scores` and composite (no invented deltas).
+5. **Layoff:** If `layoff.status` is `phase_4_employer_not_resolved` or `not_linked`, copy should not imply employer-specific risk.
+6. **Actions:** Each item is doable in a week and maps to the stated `related_pillar`.
+7. **Gaps:** Missing salary or demand cache called out once, then the brief moves on.
 
 Sign-off: note date, environment, and who reviewed in your release checklist.
