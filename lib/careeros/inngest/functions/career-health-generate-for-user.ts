@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto"
-import { z } from "zod"
 import { supabaseAdmin } from "@/lib/supabase"
 import { careerosInngest } from "../client"
 import { qwenGenerateObject, QWEN_MODEL_NAME, QWEN_MODEL_VERSION } from "@/lib/careeros/ai/qwen"
@@ -10,40 +9,17 @@ import {
 } from "@/lib/careeros/prompts/career-health-report.v1"
 import { careerHealthInputDataVersion, gatherCareerHealthInputs } from "@/lib/careeros/career-health/gather-inputs"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
+import {
+  careerHealthNarrativeSchema,
+  type CareerHealthNarrative,
+} from "@/lib/careeros/career-health/narrative-schema"
 
 const SCHEMA_VERSION = "1"
-
-const PillarKeyZ = z.enum([
-  "ai_exposure_for_role",
-  "skill_currency",
-  "market_demand",
-  "compensation_positioning",
-  "layoff_risk",
-  "career_velocity",
-])
-
-const ReportNarrativeSchema = z.object({
-  headline: z.string().max(180),
-  subhead: z.string().max(220).optional(),
-  opening: z.string().max(1400),
-  closing: z.string().max(900),
-  recommended_actions: z
-    .array(
-      z.object({
-        title: z.string().max(100),
-        detail: z.string().max(500),
-        related_pillar: PillarKeyZ,
-        priority: z.number().int().min(1).max(5),
-      }),
-    )
-    .min(3)
-    .max(5),
-})
 
 function fallbackNarrative(args: {
   period_label: string
   composite: number
-}): z.infer<typeof ReportNarrativeSchema> {
+}): CareerHealthNarrative {
   return {
     headline: `Your ${args.period_label} Career Health score is ${args.composite}`,
     subhead: "We hit a temporary model error, so this is a short auto summary.",
@@ -131,7 +107,7 @@ export const careerHealthGenerateForUser = careerosInngest.createFunction(
       )
       try {
         const { object } = await qwenGenerateObject({
-          schema: ReportNarrativeSchema,
+          schema: careerHealthNarrativeSchema,
           systemPrompt: mergeSystemWithWritingRules(CAREER_HEALTH_SYSTEM_PROMPT),
           userPrompt: buildCareerHealthUserPrompt(json),
         })
