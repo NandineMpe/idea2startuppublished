@@ -29,24 +29,28 @@ export function mockNarrativeForVerify(
         detail: "Sort skills by exposure score and half-life status.",
         related_pillar: "ai_exposure_for_role",
         priority: 1,
+        career_os_href: "/careeros/skills",
       },
       {
         title: "Check posting trend",
         detail: "Open Market demand and read M360 delta for your SOC.",
         related_pillar: "market_demand",
         priority: 2,
+        career_os_href: "/careeros/market",
       },
       {
         title: "Calibrate salary input",
         detail: "If pay is blank, add current salary so comp positioning is not neutral.",
         related_pillar: "compensation_positioning",
         priority: 3,
+        career_os_href: "/careeros/market",
       },
       {
         title: "Stabilise one at-risk skill",
         detail: "Pick one declining label and add proof via project or course.",
         related_pillar: "skill_currency",
         priority: 4,
+        career_os_href: "/careeros/skills",
       },
     ],
   }

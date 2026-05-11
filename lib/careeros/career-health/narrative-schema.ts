@@ -1,5 +1,18 @@
 import { z } from "zod"
 
+export const CAREEROS_ACTION_HREFS = [
+  "/careeros",
+  "/careeros/skills",
+  "/careeros/market",
+  "/careeros/feed",
+  "/careeros/onboarding",
+  "/careeros/health-report",
+] as const
+
+export type CareerOsActionHref = (typeof CAREEROS_ACTION_HREFS)[number]
+
+export const careerOsActionHrefZ = z.enum(CAREEROS_ACTION_HREFS)
+
 export const careerHealthPillarKeyZ = z.enum([
   "ai_exposure_for_role",
   "skill_currency",
@@ -21,6 +34,8 @@ export const careerHealthNarrativeSchema = z.object({
         detail: z.string().max(500),
         related_pillar: careerHealthPillarKeyZ,
         priority: z.number().int().min(1).max(5),
+        /** Deep link into CareerOS (same-origin path only). */
+        career_os_href: careerOsActionHrefZ,
       }),
     )
     .min(3)

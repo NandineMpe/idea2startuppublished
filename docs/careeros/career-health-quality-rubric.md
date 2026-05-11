@@ -26,7 +26,7 @@ Skim each persona’s **live** report once Qwen is wired (or read `report_payloa
 3. **Supportive, not generic:** Encouragement ties to their role, region, or numbers. Actions feel written for this profile, not a blog post.
 4. **Grounding:** Numbers in prose match `pillar_scores` and composite (no invented deltas).
 5. **Layoff:** If `layoff.status` is `phase_4_employer_not_resolved` or `not_linked`, copy should not imply employer-specific risk.
-6. **Actions:** Each item is doable in a week and maps to the stated `related_pillar`.
+6. **Actions:** Each item is doable in a week and maps to the stated `related_pillar`. Each `career_os_href` should match the action (Skills, Market, Feed, Onboarding, home, or this report) and stay on the allowlist.
 7. **Gaps:** Missing salary or demand cache called out once, then the brief moves on.
 
 Sign-off: note date, environment, and who reviewed in your release checklist.

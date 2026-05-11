@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { resolveRecommendedActionHref } from "@/lib/careeros/career-health/action-hrefs"
 import { createClient } from "@/lib/supabase/server"
 import { queueCareerHealthReport } from "./actions"
 
@@ -22,6 +23,7 @@ type Narrative = {
     detail: string
     related_pillar: string
     priority: number
+    career_os_href?: string
   }>
 }
 
@@ -208,17 +210,28 @@ export default async function CareerHealthReportPage({ searchParams }: PageProps
               <CardContent className="space-y-4">
                 {[...narrative.recommended_actions]
                   .sort((a, b) => a.priority - b.priority)
-                  .map((a, i) => (
-                    <div key={`${a.title}-${i}`} className="rounded-lg border border-border p-4">
-                      <p className="text-sm font-semibold">
-                        {i + 1}. {a.title}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">{a.detail}</p>
-                      <p className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">
-                        {a.related_pillar.replace(/_/g, " ")}
-                      </p>
-                    </div>
-                  ))}
+                  .map((a, i) => {
+                    const href = resolveRecommendedActionHref(a.related_pillar, a.career_os_href)
+                    return (
+                      <div key={`${a.title}-${i}`} className="rounded-lg border border-border p-4">
+                        <p className="text-sm font-semibold">
+                          {i + 1}. {a.title}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">{a.detail}</p>
+                        <p className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">
+                          {a.related_pillar.replace(/_/g, " ")}
+                        </p>
+                        <p className="mt-3">
+                          <Link
+                            href={href}
+                            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Open in CareerOS
+                          </Link>
+                        </p>
+                      </div>
+                    )
+                  })}
               </CardContent>
             </Card>
           )}

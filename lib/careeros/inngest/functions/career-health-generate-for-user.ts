@@ -9,18 +9,14 @@ import {
 } from "@/lib/careeros/prompts/career-health-report.v1"
 import { careerHealthInputDataVersion, gatherCareerHealthInputs } from "@/lib/careeros/career-health/gather-inputs"
 import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
-import {
-  careerHealthNarrativeSchema,
-  type CareerHealthNarrative,
-} from "@/lib/careeros/career-health/narrative-schema"
+import type { CareerHealthNarrative } from "@/lib/careeros/career-health/narrative-schema"
+import { careerHealthNarrativeSchema } from "@/lib/careeros/career-health/narrative-schema"
+import { normalizeCareerHealthNarrativeHrefs } from "@/lib/careeros/career-health/action-hrefs"
 
 const SCHEMA_VERSION = "1"
 
-function fallbackNarrative(args: {
-  period_label: string
-  composite: number
-}): CareerHealthNarrative {
-  return {
+function fallbackNarrative(args: { period_label: string; composite: number }): CareerHealthNarrative {
+  return normalizeCareerHealthNarrativeHrefs({
     headline: `Your ${args.period_label} Career Health score is ${args.composite}`,
     subhead: "We hit a temporary model error, so this is a short auto summary.",
     opening:
@@ -32,21 +28,24 @@ function fallbackNarrative(args: {
         detail: "Open Market and let demand caches populate for your region.",
         related_pillar: "market_demand",
         priority: 1,
+        career_os_href: "/careeros/market",
       },
       {
         title: "Confirm salary and seniority",
         detail: "Add current salary and years in role so compensation positioning is not neutral.",
         related_pillar: "compensation_positioning",
         priority: 2,
+        career_os_href: "/careeros/market",
       },
       {
         title: "Review at-risk skills",
         detail: "Sort skills by status and plan one upskill or redeploy move this month.",
         related_pillar: "skill_currency",
         priority: 3,
+        career_os_href: "/careeros/skills",
       },
     ],
-  }
+  })
 }
 
 export const careerHealthGenerateForUser = careerosInngest.createFunction(
@@ -112,7 +111,7 @@ export const careerHealthGenerateForUser = careerosInngest.createFunction(
           userPrompt: buildCareerHealthUserPrompt(json),
         })
         const sorted = [...object.recommended_actions].sort((a, b) => a.priority - b.priority)
-        return { ...object, recommended_actions: sorted }
+        return normalizeCareerHealthNarrativeHrefs({ ...object, recommended_actions: sorted })
       } catch {
         return fallbackNarrative({
           period_label: inputs.period_label,
