@@ -1,5 +1,41 @@
 # Module 3.1 Cost Budget
 
+Status: feed-source hardening deployed to production; module completion still pending final operational checks.
+
+## Latest deployment snapshot
+
+- Commit: `5348871` ("Stabilize CareerOS feed source adapters")
+- Production alias: `https://usejuno-ai.com`
+- Build verification: local `npm run build` pass + Vercel production build pass
+- Runtime verification: live adapter smoke checks returned items across feed sources (including Mistral recovery from zero-result state)
+
+## Feed-source hardening delivered
+
+- Fixed dead/brittle adapters for:
+  - Anthropic
+  - Meta AI
+  - Mistral
+  - EleutherAI
+  - DeepMind
+  - Papers with Code
+  - Hacker News
+  - GitHub Trending
+  - Microsoft Research
+  - Pragmatic Engineer
+- Added reusable HTML-link ingestion for sources without stable RSS feeds.
+- Added arXiv pagination with required `3s` inter-page throttling.
+- Normalized noisy titles so feed cards do not surface SVG/date/category artifacts.
+- Added ping-window metadata; arXiv verification now uses `96h` window to handle Monday/weekend publication gaps.
+
+## Sign-off checklist (do not mark complete yet)
+
+- [x] Feed-source adapter hardening deployed to production.
+- [x] Production alias verified (`usejuno-ai.com`).
+- [ ] Production Inngest runs validated for sustained scheduler health.
+- [ ] Production diagnostic verification completed and archived.
+- [ ] Feed populated for test users using production pipeline.
+- [ ] Manual note-quality review completed on generated user feed notes.
+
 Estimated daily run-rate (early stage):
 
 | Item | Count/day | Cost |
