@@ -44,10 +44,20 @@ export type AdjacentTrajectoryPack =
 
 function readLearningHoursPerWeek(onboardingState: unknown): number | null {
   if (!onboardingState || typeof onboardingState !== "object") return null
-  const raw = (onboardingState as Record<string, unknown>).learning_hours_per_week
-  if (typeof raw !== "number" || !Number.isFinite(raw)) return null
-  if (raw < 1 || raw > 40) return null
-  return raw
+  const st = onboardingState as Record<string, unknown>
+  const rawTop = st.learning_hours_per_week
+  const rawM11 = typeof st.module_1_1 === "object" && st.module_1_1 !== null ? (st.module_1_1 as Record<string, unknown>).learning_hours_per_week : undefined
+
+  const pick =
+    typeof rawTop === "number" && Number.isFinite(rawTop)
+      ? rawTop
+      : typeof rawM11 === "number" && Number.isFinite(rawM11)
+        ? rawM11
+        : null
+
+  if (pick == null) return null
+  if (pick < 1 || pick > 40) return null
+  return pick
 }
 
 async function loadLearningHoursPerWeek(userId: string): Promise<number> {

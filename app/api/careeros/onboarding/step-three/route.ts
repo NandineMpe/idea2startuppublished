@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       locationLabel?: unknown
       yearsExperience?: unknown
       currentSalaryUsd?: unknown
+      learningHoursPerWeek?: unknown
       mergeLlmToBrain?: unknown
     }
 
@@ -57,6 +58,22 @@ export async function POST(request: Request) {
         )
       }
       currentSalaryUsd = Math.round(n * 100) / 100
+    }
+
+    let learningHoursPerWeek: number | null = null
+    if (
+      body.learningHoursPerWeek !== undefined &&
+      body.learningHoursPerWeek !== null &&
+      body.learningHoursPerWeek !== ""
+    ) {
+      const n = Number(body.learningHoursPerWeek)
+      if (!Number.isFinite(n) || n < 1 || n > 40) {
+        return NextResponse.json(
+          { error: "Learning hours per week must be between 1 and 40" },
+          { status: 400 },
+        )
+      }
+      learningHoursPerWeek = Math.round(n)
     }
 
     if (!currentRoleTitle || !locationLabel) {
@@ -116,6 +133,7 @@ export async function POST(request: Request) {
         status: "running",
         startedAt: now,
       },
+      ...(learningHoursPerWeek != null ? { learning_hours_per_week: learningHoursPerWeek } : {}),
     })
 
     const onboardingCompletionId = randomUUID()

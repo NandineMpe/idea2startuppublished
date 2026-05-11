@@ -50,7 +50,7 @@ Module 2.4 builds an adjacent-role cache and a user-personalized read path that 
 **Where it lives**
 
 - Model constants and pure math: `lib/careeros/market/adjacent-trajectory-model.ts` (`TRAJECTORY_MODEL_VERSION`)
-- Data assembly (batch salary bands, user learning hours from `user_settings.onboarding_state.learning_hours_per_week`, profile seniority): `lib/careeros/market/adjacent-trajectory.ts` — `buildAdjacentRoleTrajectoryPack`
+- Data assembly (batch salary bands, user learning hours from `user_settings.onboarding_state.module_1_1.learning_hours_per_week` with fallback default, profile seniority): `lib/careeros/market/adjacent-trajectory.ts` — `buildAdjacentRoleTrajectoryPack`
 - Adjacent read path now exposes `source_salary_mid`, `target_salary_mid`, `source_demand_delta_pct`, `target_demand_delta_pct`, `bridge_skill_count` on each ready item: `lib/careeros/market/adjacent-roles.ts`
 - UI: `components/careeros/adjacent-role-trajectory-card.tsx` (per-target **Trajectory** tabs on Market)
 
@@ -61,7 +61,7 @@ Module 2.4 builds an adjacent-role cache and a user-personalized read path that 
 | Current vs target salary band (same seniority) | `market_salary_bands` (Module 2.2) for source SOC, target SOC, user region |
 | 12-month pay growth signal (both roles) | Heuristic: base merit % + tilt from `market_demand_trajectories` M360 `demand_delta_pct` (posting momentum, **not** a wage index). Labelled as “implied annual pay growth (12m window model)” in UI |
 | Bridge skill gap | Module 2.4 bridge list (`inferTargetRoleSkills` minus user `user_skills`) |
-| Bridge calendar time | `bridge_skill_count × HOURS_PER_BRIDGE_SKILL ÷ learning_hours_per_week`, with a floor when the gap is empty |
+| Bridge calendar time | `bridge_skill_count × HOURS_PER_BRIDGE_SKILL ÷ learning_hours_per_week` (from onboarding; fallback default when unset), with a floor when the gap is empty |
 | Implied return on switch | Excess geometric CAGR of the 3-year **ending compensation** under switch vs stay (see model file) |
 
 **Outputs**

@@ -32,6 +32,7 @@ export function CareerOsOnboardingWizard() {
   const [locationLabel, setLocationLabel] = useState("")
   const [yearsExperience, setYearsExperience] = useState("")
   const [currentSalaryUsd, setCurrentSalaryUsd] = useState("")
+  const [learningHoursPerWeek, setLearningHoursPerWeek] = useState("")
   const [mergeLlmToBrain, setMergeLlmToBrain] = useState(true)
 
   async function submitStepOne(ev: React.FormEvent<HTMLFormElement>) {
@@ -101,6 +102,10 @@ export function CareerOsOnboardingWizard() {
             yearsExperience.trim() === "" ? undefined : Number(yearsExperience),
           currentSalaryUsd:
             currentSalaryUsd.trim() === "" ? undefined : Number(currentSalaryUsd),
+          learningHoursPerWeek:
+            learningHoursPerWeek.trim() === ""
+              ? undefined
+              : Number(learningHoursPerWeek),
           mergeLlmToBrain,
         }),
       })
@@ -409,6 +414,22 @@ export function CareerOsOnboardingWizard() {
                   onChange={(e) => setCurrentSalaryUsd(e.target.value)}
                   placeholder="e.g. 145000"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="learningHoursPerWeek">Learning hours per week (optional)</Label>
+                <Input
+                  id="learningHoursPerWeek"
+                  type="number"
+                  min={1}
+                  max={40}
+                  step={1}
+                  value={learningHoursPerWeek}
+                  onChange={(e) => setLearningHoursPerWeek(e.target.value)}
+                  placeholder="e.g. 6"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used to estimate bridge time in the adjacent-role trajectory view.
+                </p>
               </div>
               <div className="flex items-start gap-2 rounded-md border border-border p-3">
                 <Checkbox
