@@ -64,13 +64,19 @@ export default async function CareerOSFeedPage() {
             item.source_attribution && typeof item.source_attribution === "object"
               ? (item.source_attribution as Record<string, unknown>)
               : {}
+          const feedType = String(item.feed_type)
+          const isCareerHealth = feedType === "career_health_report"
           const sourceUrl = String(payload.source_url ?? sourceAttr.source_url ?? "#")
           const summary = String(payload.summary ?? "")
+          const reportHref =
+            typeof payload.href === "string" && payload.href.startsWith("/")
+              ? payload.href
+              : "/careeros/health-report"
           return (
             <Card key={item.id}>
               <CardHeader className="pb-2">
-                <CardDescription className={entityColor(String(item.feed_type))}>
-                  {String(item.feed_type)} · {new Date(String(item.feed_at)).toLocaleDateString()}
+                <CardDescription className={entityColor(feedType)}>
+                  {feedType} · {new Date(String(item.feed_at)).toLocaleDateString()}
                 </CardDescription>
                 <CardTitle className="text-lg">{String(item.title)}</CardTitle>
               </CardHeader>
@@ -84,11 +90,17 @@ export default async function CareerOSFeedPage() {
                   Source: {String(sourceAttr.source_key ?? payload.source_key ?? "unknown")} ·{" "}
                   {new Date(String(item.feed_at)).toISOString().slice(0, 10)}
                 </p>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex flex-wrap items-center gap-3 text-sm">
                   <FeedItemActions itemId={String(item.id)} />
-                  <a href={sourceUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    Open original →
-                  </a>
+                  {isCareerHealth ? (
+                    <Link href={reportHref} className="text-primary hover:underline">
+                      Open report
+                    </Link>
+                  ) : (
+                    <a href={sourceUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      Open original →
+                    </a>
+                  )}
                 </div>
               </CardContent>
             </Card>

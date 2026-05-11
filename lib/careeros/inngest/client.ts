@@ -75,6 +75,12 @@ type CareerOSEvents = {
   "careeros/skills.refresh-exposure-scores": {
     data: Record<string, never>
   }
+  "careeros/career-health.daily-scheduler": {
+    data: Record<string, never>
+  }
+  "careeros/career-health.generate-for-user": {
+    data: { user_id: string }
+  }
 }
 
 export const careerosInngest = new Inngest({

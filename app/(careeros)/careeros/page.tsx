@@ -341,6 +341,9 @@ export default async function CareerOSPage() {
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+        <Link href="/careeros/health-report" className="text-sm text-primary hover:underline">
+          Career Health Report
+        </Link>
         <Link href="/careeros/feed" className="text-sm text-primary hover:underline">
           Open AI Updates Feed
         </Link>
