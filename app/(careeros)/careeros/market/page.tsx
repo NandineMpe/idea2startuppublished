@@ -6,6 +6,7 @@ import { getPersonalSkillVelocityForUser } from "@/lib/careeros/market/skill-vel
 import { getAdjacentRolesForUser } from "@/lib/careeros/market/adjacent-roles"
 import { buildAdjacentRoleTrajectoryPack } from "@/lib/careeros/market/adjacent-trajectory"
 import { getDemandTrajectoryForUser } from "@/lib/careeros/market/demand-trajectory"
+import { getFrontierRolesForUser } from "@/lib/careeros/market/frontier-roles"
 import { AdjacentRoleTrajectoryCard } from "@/components/careeros/adjacent-role-trajectory-card"
 
 export const dynamic = "force-dynamic"
@@ -32,11 +33,14 @@ export default async function CareerOSMarketPage() {
   const demand = await getDemandTrajectoryForUser(user.id, { triggerRefreshOnMiss: true })
   const velocity = await getPersonalSkillVelocityForUser(user.id, "M360")
   const adjacent = await getAdjacentRolesForUser(user.id)
-  const trajectory = await buildAdjacentRoleTrajectoryPack({
-    userId: user.id,
-    salary,
-    adjacent,
-  })
+  const [trajectory, frontier] = await Promise.all([
+    buildAdjacentRoleTrajectoryPack({
+      userId: user.id,
+      salary,
+      adjacent,
+    }),
+    getFrontierRolesForUser(user.id, { adjacent }),
+  ])
 
   return (
     <main className="mx-auto w-full max-w-5xl space-y-6 p-6">
@@ -209,6 +213,86 @@ export default async function CareerOSMarketPage() {
           ) : (
             <p className="text-sm text-muted-foreground">
               Complete role + region mapping in onboarding to unlock demand trajectory.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Roles on the frontier</CardTitle>
+          <CardDescription>
+            Curated titles with rising posting volume in your market region, filtered to your O*NET major group,
+            adjacent role groups, and tagged skills.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {frontier.status === "ready" && frontier.items.length > 0 ? (
+            <>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-3 py-2 font-medium">Title</th>
+                      <th className="px-3 py-2 font-medium">First seen</th>
+                      <th className="px-3 py-2 font-medium">Postings</th>
+                      <th className="px-3 py-2 font-medium">vs prior week</th>
+                      <th className="px-3 py-2 font-medium">Avg comp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {frontier.items.map((row) => (
+                      <tr key={row.clusterSlug} className="border-b last:border-0">
+                        <td className="px-3 py-2 align-top">
+                          <div className="font-medium">{row.canonicalTitle}</div>
+                          {row.aliases.length > 0 ? (
+                            <div className="mt-0.5 text-[11px] text-muted-foreground">
+                              Also: {row.aliases.slice(0, 3).join(" · ")}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 align-top text-muted-foreground">
+                          {row.firstSeenWeek ?? "—"}
+                          <div className="text-[11px]">Our snapshots</div>
+                        </td>
+                        <td className="px-3 py-2 align-top font-medium">{row.count30d}</td>
+                        <td className="px-3 py-2 align-top">
+                          {row.growthVsPriorWeekPct == null ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <span
+                              className={
+                                row.growthVsPriorWeekPct >= 0 ? "text-emerald-700 font-medium" : "text-amber-800"
+                              }
+                            >
+                              {row.growthVsPriorWeekPct >= 0 ? "+" : ""}
+                              {row.growthVsPriorWeekPct.toFixed(1)}%
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 align-top text-muted-foreground">n/a</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Week {frontier.snapshot_week} · {frontier.footnote} Title-level salary is not in this release.
+              </p>
+            </>
+          ) : frontier.status === "ready" ? (
+            <p className="text-sm text-muted-foreground">
+              No frontier clusters matched your SOC neighbourhood and skills for {frontier.region_code} this week.
+              Add skills (for example ai-llm, machine-learning) if you want more AI-adjacent titles in the list.
+            </p>
+          ) : frontier.status === "cache_miss" ? (
+            <p className="text-sm text-muted-foreground">
+              Weekly TheirStack snapshot is not loaded yet for {frontier.region_code}. It fills after the Sunday cron
+              run, or when an operator triggers the refresh job.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Complete O*NET role mapping and a supported market region in onboarding to unlock frontier roles.
             </p>
           )}
         </CardContent>
