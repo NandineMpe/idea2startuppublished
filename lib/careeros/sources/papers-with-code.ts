@@ -9,12 +9,15 @@ export async function fetchRecentPapersWithCode(hoursBack = 48): Promise<RawFeed
   if (!res.ok) throw new Error(`paperswithcode returned ${res.status}`)
   const html = await res.text()
   const published = new Date(Date.now() - Math.min(hoursBack, 24) * 60 * 60 * 1000)
-  const blocks = html.match(/<div class="infinite-item"[\s\S]*?<\/div>\s*<\/div>/gi) ?? []
-  return blocks
-    .map((b, idx) => {
-      const link = /<h1[^>]*>\s*<a[^>]*href="([^"]+)"/i.exec(b)?.[1]
-      const title = /<h1[^>]*>\s*<a[^>]*>([\s\S]*?)<\/a>/i.exec(b)?.[1]?.replace(/\s+/g, " ").trim()
+  const links = [...html.matchAll(/<h3[^>]*>[\s\S]*?<a[^>]*href="(\/papers\/[^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h3>/gi)]
+  const seen = new Set<string>()
+  return links
+    .map((m, idx) => {
+      const link = m[1]
+      const title = m[2]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
       if (!link || !title) return null
+      if (seen.has(link)) return null
+      seen.add(link)
       const url = link.startsWith("http") ? link : `https://paperswithcode.com${link}`
       return {
         source_key: "papers-with-code",

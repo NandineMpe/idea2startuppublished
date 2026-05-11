@@ -4,7 +4,7 @@ export function fetchRecentMicrosoftResearchBlog(hoursBack = 72) {
   return fetchRssLikeSource({
     sourceKey: "microsoft-research-blog",
     url: "https://www.microsoft.com/en-us/research/feed/",
-    hoursBack,
+    hoursBack: Math.max(hoursBack, 24 * 30),
   })
 }
 

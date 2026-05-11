@@ -7,10 +7,12 @@ function decodeXml(text: string): string {
   return text
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
 }
 
 function stripHtml(text: string): string {
@@ -92,13 +94,87 @@ export async function fetchRssLikeSource(params: {
     }))
 }
 
-export async function pingFeedAdapter(fetcher: (hoursBack: number) => Promise<RawFeedItem[]>): Promise<FeedPingResult> {
+export async function fetchHtmlLinkSource(params: {
+  sourceKey: string
+  url: string
+  hoursBack: number
+  includePath: RegExp
+  excludeTitle?: RegExp
+  fallbackBody?: string
+  maxTitleLength?: number
+  transformTitle?: (title: string, path: string) => string
+}): Promise<RawFeedItem[]> {
+  const res = await fetch(params.url, {
+    headers: {
+      Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      "User-Agent": CAREEROS_FEED_USER_AGENT,
+    },
+    cache: "no-store",
+  })
+  if (!res.ok) throw new Error(`${params.sourceKey} returned HTTP ${res.status}`)
+  const html = await res.text()
+  const anchors = [...html.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)]
+  const seen = new Set<string>()
+  const published = new Date(Date.now() - Math.min(params.hoursBack, 24) * 60 * 60 * 1000)
+  const out: RawFeedItem[] = []
+
+  for (const match of anchors) {
+    const href = decodeXml(match[1] ?? "").trim()
+    if (!href || href.startsWith("#") || href.startsWith("mailto:")) continue
+    let url: string
+    try {
+      url = new URL(href, params.url).toString()
+    } catch {
+      continue
+    }
+    const path = new URL(url).pathname
+    if (!params.includePath.test(path)) continue
+    if (seen.has(url)) continue
+
+    const title = stripHtml(match[2] ?? "")
+    const genericTitle = /^(featured|learn more|read more|blog|news|research)$/i.test(title)
+    const derivedTitle = genericTitle
+      ? path
+          .split("/")
+          .filter(Boolean)
+          .at(-1)
+          ?.replace(/[-_]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .trim() ?? ""
+      : title
+    const finalTitle = params.transformTitle?.(derivedTitle, path) ?? derivedTitle
+    const maxTitleLength = params.maxTitleLength ?? 180
+    if (!finalTitle || finalTitle.length < 8 || finalTitle.length > maxTitleLength) continue
+    if (params.excludeTitle?.test(title)) continue
+    seen.add(url)
+    out.push({
+      source_key: params.sourceKey,
+      source_item_id: url,
+      title: finalTitle,
+      body: params.fallbackBody ?? finalTitle,
+      url,
+      published_at: published,
+      authors: [],
+      raw_payload: { source_url: params.url, discovered_from: "html-link-list" },
+    })
+    if (out.length >= 25) break
+  }
+
+  return out
+}
+
+export async function pingFeedAdapter(
+  fetcher: (hoursBack: number) => Promise<RawFeedItem[]>,
+  options: { hoursBack?: number } = {},
+): Promise<FeedPingResult> {
   try {
-    const items = await fetcher(48)
+    const hoursBack = options.hoursBack ?? 48
+    const items = await fetcher(hoursBack)
     return {
       ok: items.length > 0,
       status: 200,
       count_48h: items.length,
+      window_hours: hoursBack,
       sample: items.slice(0, 5).map((i) => ({
         title: i.title,
         published_at: i.published_at.toISOString(),
@@ -110,6 +186,7 @@ export async function pingFeedAdapter(fetcher: (hoursBack: number) => Promise<Ra
       ok: false,
       status: 500,
       count_48h: 0,
+      window_hours: options.hoursBack ?? 48,
       sample: [],
       error: e instanceof Error ? e.message : String(e),
     }

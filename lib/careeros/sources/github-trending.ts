@@ -1,6 +1,15 @@
 import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
 import { CAREEROS_FEED_USER_AGENT, pingFeedAdapter } from "@/lib/careeros/sources/feed-utils"
 
+function cleanText(text: string): string {
+  return text
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*\/\s*/g, "/")
+    .trim()
+}
+
 export async function fetchRecentGithubTrending(hoursBack = 48): Promise<RawFeedItem[]> {
   const res = await fetch("https://github.com/trending?since=daily", {
     headers: { "User-Agent": CAREEROS_FEED_USER_AGENT },
@@ -13,10 +22,11 @@ export async function fetchRecentGithubTrending(hoursBack = 48): Promise<RawFeed
   return blocks
     .map((b) => {
       const path = /<h2[\s\S]*?<a[^>]*href="([^"]+)"/i.exec(b)?.[1]?.trim()
-      const title = /<h2[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i.exec(b)?.[1]?.replace(/\s+/g, " ").trim()
+      const titleRaw = /<h2[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i.exec(b)?.[1] ?? ""
+      const title = cleanText(titleRaw)
       if (!path || !title) return null
       const url = `https://github.com${path}`
-      const description = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(b)?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() ?? ""
+      const description = cleanText(/<p[^>]*>([\s\S]*?)<\/p>/i.exec(b)?.[1] ?? "")
       const language = /itemprop="programmingLanguage"[^>]*>([^<]+)</i.exec(b)?.[1]?.trim() ?? null
       const starsText = /([\d,]+)\s*stars today/i.exec(b)?.[1] ?? null
       const starsToday = starsText ? Number(starsText.replace(/,/g, "")) : null

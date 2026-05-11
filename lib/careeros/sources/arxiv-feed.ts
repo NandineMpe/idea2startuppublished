@@ -2,6 +2,8 @@ import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
 import { CAREEROS_FEED_USER_AGENT, pingFeedAdapter } from "@/lib/careeros/sources/feed-utils"
 
 let lastArxivCallMs = 0
+const ARXIV_PAGE_SIZE = 200
+const ARXIV_MAX_PAGES = 5
 
 async function throttleArxiv() {
   const now = Date.now()
@@ -38,17 +40,29 @@ export async function fetchRecentArxivPapers(
   hoursBack = 36,
   categories: string[] = ["cs.AI", "cs.CL", "cs.LG", "cs.IR", "cs.MA"],
 ): Promise<RawFeedItem[]> {
-  await throttleArxiv()
   const query = categories.map((c) => `cat:${c}`).join("+OR+")
-  const url = `http://export.arxiv.org/api/query?search_query=${query}&start=0&max_results=200&sortBy=submittedDate&sortOrder=descending`
-  const res = await fetch(url, {
-    headers: { "User-Agent": CAREEROS_FEED_USER_AGENT },
-    cache: "no-store",
-  })
-  if (!res.ok) throw new Error(`arXiv API returned ${res.status}`)
-  const xml = await res.text()
   const cutoff = Date.now() - hoursBack * 60 * 60 * 1000
-  return parseArxivEntries(xml)
+
+  const papers: ReturnType<typeof parseArxivEntries> = []
+  for (let page = 0; page < ARXIV_MAX_PAGES; page += 1) {
+    await throttleArxiv()
+    const start = page * ARXIV_PAGE_SIZE
+    const url = `http://export.arxiv.org/api/query?search_query=${query}&start=${start}&max_results=${ARXIV_PAGE_SIZE}&sortBy=submittedDate&sortOrder=descending`
+    const res = await fetch(url, {
+      headers: { "User-Agent": CAREEROS_FEED_USER_AGENT },
+      cache: "no-store",
+    })
+    if (!res.ok) throw new Error(`arXiv API returned ${res.status}`)
+
+    const xml = await res.text()
+    const pagePapers = parseArxivEntries(xml)
+    papers.push(...pagePapers)
+
+    const oldest = pagePapers.at(-1)?.published.getTime() ?? 0
+    if (pagePapers.length < ARXIV_PAGE_SIZE || oldest < cutoff) break
+  }
+
+  return papers
     .filter((p) => p.published.getTime() >= cutoff)
     .map((p) => ({
       source_key: "arxiv",
@@ -63,5 +77,5 @@ export async function fetchRecentArxivPapers(
 }
 
 export function pingArxivFeed() {
-  return pingFeedAdapter((hoursBack) => fetchRecentArxivPapers(hoursBack))
+  return pingFeedAdapter((hoursBack) => fetchRecentArxivPapers(hoursBack), { hoursBack: 96 })
 }

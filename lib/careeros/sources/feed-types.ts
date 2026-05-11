@@ -13,6 +13,7 @@ export type FeedPingResult = {
   ok: boolean
   status: number
   count_48h: number
+  window_hours?: number
   sample: Array<{ title: string; published_at: string; url: string }>
   error?: string
 }
