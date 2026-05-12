@@ -17,6 +17,7 @@
     "careeros:feed:ingest": "npx tsx scripts/careeros-feed-ingest.ts",
     "careeros:feed:ingest:direct": "npx tsx scripts/careeros-feed-ingest-direct.ts",
     "careeros:feed:verify:personas": "npx tsx scripts/careeros-verify-feed-personas.ts",
+    "careeros:frontier:verify:users": "npx tsx scripts/careeros-verify-frontier-users.ts",
     "careeros:verify:health": "npx tsx test/careeros/career-health/verify-quality-gate.ts",
     "careeros:verify:trajectory": "npx tsx test/careeros/market/verify-trajectory-gate.ts",
     "billing:setup:juno": "node scripts/setup-lemonsqueezy-billing.cjs",

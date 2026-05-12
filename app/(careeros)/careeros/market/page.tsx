@@ -236,8 +236,8 @@ export default async function CareerOSMarketPage() {
                       <th className="px-3 py-2 font-medium">Title</th>
                       <th className="px-3 py-2 font-medium">First seen</th>
                       <th className="px-3 py-2 font-medium">Postings</th>
-                      <th className="px-3 py-2 font-medium">vs prior week</th>
-                      <th className="px-3 py-2 font-medium">Avg comp</th>
+                      <th className="px-3 py-2 font-medium">vs prior month</th>
+                      <th className="px-3 py-2 font-medium">Example posting</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -252,43 +252,56 @@ export default async function CareerOSMarketPage() {
                           ) : null}
                         </td>
                         <td className="px-3 py-2 align-top text-muted-foreground">
-                          {row.firstSeenWeek ?? "—"}
-                          <div className="text-[11px]">Our snapshots</div>
+                          {row.firstSeenPeriod ?? "—"}
+                          <div className="text-[11px]">Monthly snapshots</div>
                         </td>
                         <td className="px-3 py-2 align-top font-medium">{row.count30d}</td>
                         <td className="px-3 py-2 align-top">
-                          {row.growthVsPriorWeekPct == null ? (
+                          {row.growthVsPriorPeriodPct == null ? (
                             <span className="text-muted-foreground">—</span>
                           ) : (
                             <span
                               className={
-                                row.growthVsPriorWeekPct >= 0 ? "text-emerald-700 font-medium" : "text-amber-800"
+                                row.growthVsPriorPeriodPct >= 0 ? "text-emerald-700 font-medium" : "text-amber-800"
                               }
                             >
-                              {row.growthVsPriorWeekPct >= 0 ? "+" : ""}
-                              {row.growthVsPriorWeekPct.toFixed(1)}%
+                              {row.growthVsPriorPeriodPct >= 0 ? "+" : ""}
+                              {row.growthVsPriorPeriodPct.toFixed(1)}%
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 align-top text-muted-foreground">n/a</td>
+                        <td className="px-3 py-2 align-top text-muted-foreground">
+                          {row.examplePostingUrl ? (
+                            <a
+                              href={row.examplePostingUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              {row.examplePostingTitle?.trim() || "View posting"}
+                            </a>
+                          ) : (
+                            <span>n/a</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <p className="text-xs text-muted-foreground">
-                Week {frontier.snapshot_week} · {frontier.footnote} Title-level salary is not in this release.
+                Month {frontier.snapshot_period} · {frontier.footnote} Title-level salary is not in this release.
               </p>
             </>
           ) : frontier.status === "ready" ? (
             <p className="text-sm text-muted-foreground">
-              No frontier clusters matched your SOC neighbourhood and skills for {frontier.region_code} this week.
+              No frontier clusters matched your SOC neighbourhood and skills for {frontier.region_code} this month.
               Add skills (for example ai-llm, machine-learning) if you want more AI-adjacent titles in the list.
             </p>
           ) : frontier.status === "cache_miss" ? (
             <p className="text-sm text-muted-foreground">
-              Weekly TheirStack snapshot is not loaded yet for {frontier.region_code}. It fills after the Sunday cron
-              run, or when an operator triggers the refresh job.
+              Monthly TheirStack snapshot is not loaded yet for {frontier.region_code}. It fills after the month-start
+              cron run, or when an operator triggers the refresh job.
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">

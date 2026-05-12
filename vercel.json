@@ -11,8 +11,8 @@
       "schedule": "5 14 * * 0"
     },
     {
-      "path": "/api/careeros/cron/frontier-roles-weekly",
-      "schedule": "25 14 * * 0"
+      "path": "/api/careeros/cron/frontier-roles-monthly",
+      "schedule": "25 14 1 * *"
     }
   ]
 }

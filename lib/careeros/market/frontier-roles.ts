@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase"
 import type { AdjacentRolesForUserResult } from "@/lib/careeros/market/adjacent-roles"
 import { fetchTheirStackJobCount } from "@/lib/careeros/integrations/theirstack-job-count"
+import { fetchTheirStackFrontierExample } from "@/lib/careeros/integrations/theirstack-frontier-example"
 import { delayForCareerOsVendor } from "@/lib/careeros/integrations/rate-limits"
 import {
   DEMAND_TOP_REGIONS,
@@ -18,27 +19,28 @@ export type FrontierRoleItem = {
   canonicalTitle: string
   aliases: string[]
   theirstackQueryTitle: string
-  firstSeenWeek: string | null
+  /** Earliest monthly snapshot period (UTC month start) with enough volume in our history. */
+  firstSeenPeriod: string | null
   count30d: number
-  growthVsPriorWeekPct: number | null
+  growthVsPriorPeriodPct: number | null
+  examplePostingTitle: string | null
+  examplePostingUrl: string | null
 }
 
 const MIN_COUNT_FOR_FIRST_SEEN = 2
 
-function mondayUtcWeekStart(from: Date): Date {
-  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()))
-  const day = d.getUTCDay() === 0 ? 7 : d.getUTCDay()
-  d.setUTCDate(d.getUTCDate() - (day - 1))
-  return d
+/** Calendar month start, UTC (YYYY-MM-01). */
+export function monthStartUtc(from: Date): Date {
+  return new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1))
 }
 
 function dateIso(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-function addDays(d: Date, days: number): Date {
+function addMonths(d: Date, delta: number): Date {
   const x = new Date(d)
-  x.setUTCDate(x.getUTCDate() + days)
+  x.setUTCMonth(x.getUTCMonth() + delta)
   return x
 }
 
@@ -59,13 +61,13 @@ function clusterMatchesUserRelates(
 
 export async function refreshMarketFrontierRoleSnapshots(options?: { regionCodes?: string[] }) {
   const tsKey = process.env.THEIRSTACK_API_KEY?.trim()
-  if (!tsKey) {
-    return { snapshot_week: dateIso(mondayUtcWeekStart(new Date())), rows: 0, errors: ["missing_theirstack_api_key"] }
-  }
+  const periodStart = monthStartUtc(new Date())
+  const periodIso = dateIso(periodStart)
+  const prevPeriodIso = dateIso(addMonths(periodStart, -1))
 
-  const weekStart = mondayUtcWeekStart(new Date())
-  const weekIso = dateIso(weekStart)
-  const prevWeekIso = dateIso(addDays(weekStart, -7))
+  if (!tsKey) {
+    return { snapshot_period: periodIso, rows: 0, errors: ["missing_theirstack_api_key"] }
+  }
 
   const regionProfiles = options?.regionCodes?.length
     ? options.regionCodes.map((c) => getDemandRegionProfile(c)).filter((r): r is NonNullable<typeof r> => Boolean(r))
@@ -75,7 +77,7 @@ export async function refreshMarketFrontierRoleSnapshots(options?: { regionCodes
     .schema("careeros")
     .from("market_frontier_role_weekly")
     .select("cluster_slug,region_code,count_30d")
-    .eq("snapshot_week", prevWeekIso)
+    .eq("snapshot_week", prevPeriodIso)
   if (priorErr) throw priorErr
 
   const priorMap = new Map<string, number>()
@@ -100,26 +102,41 @@ export async function refreshMarketFrontierRoleSnapshots(options?: { regionCodes
       const prior = priorMap.has(key) ? priorMap.get(key)! : null
       const count30 = r.ok && typeof r.totalResults === "number" ? r.totalResults : 0
       if (!r.ok) {
-        errors.push(`${key}: ${r.error ?? String(r.status)}`)
+        errors.push(`${key}:count:${r.error ?? String(r.status)}`)
       }
       let growth: number | null = null
       if (prior != null && prior > 0) {
         growth = Number((((count30 - prior) / prior) * 100).toFixed(2))
       }
+
+      await delayForCareerOsVendor("theirstack")
+      const ex = await fetchTheirStackFrontierExample({
+        jobTitle: cluster.theirstackQueryTitle,
+        postedMaxAgeDays: 90,
+        countryCodes: profile.theirstack_country_codes,
+      })
+      if (!ex.ok) {
+        errors.push(`${key}:example:${ex.error ?? "unknown"}`)
+      }
+
       insertRows.push({
         cluster_slug: cluster.slug,
         canonical_title: cluster.canonicalTitle,
         region_code: regionCode,
-        snapshot_week: weekIso,
+        snapshot_week: periodIso,
         count_30d: count30,
         prior_week_count_30d: prior,
         growth_vs_prior_week_pct: growth,
+        example_posting_title: ex.title ?? null,
+        example_posting_url: ex.url ?? null,
         source_dataset_version: FRONTIER_ROLES_DATASET_VERSION,
         source_attribution: {
           vendor: "theirstack",
           posted_at_max_age_days: 30,
+          example_posted_max_age_days: 90,
           query_title: cluster.theirstackQueryTitle,
           count_ok: r.ok,
+          example_ok: ex.ok,
         },
       })
     }
@@ -134,13 +151,12 @@ export async function refreshMarketFrontierRoleSnapshots(options?: { regionCodes
   }
 
   const windowEnd = new Date()
-  const freshStart = new Date(windowEnd)
-  freshStart.setUTCDate(freshStart.getUTCDate() - 7)
+  const freshStart = addMonths(periodStart, -1)
   const freshness = `[${dateIso(freshStart)},${dateIso(windowEnd)}]`
 
   await supabaseAdmin.schema("careeros").from("cache_refresh_runs").insert({
     dataset_key: "market_frontier_role_weekly",
-    workflow_name: "careeros-frontier-roles-weekly",
+    workflow_name: "careeros-frontier-roles-monthly",
     started_at: startedAt,
     completed_at: new Date().toISOString(),
     status: errors.length ? "completed_with_errors" : "completed",
@@ -151,14 +167,14 @@ export async function refreshMarketFrontierRoleSnapshots(options?: { regionCodes
     data_source_version: FRONTIER_ROLES_DATASET_VERSION,
     freshness_window: freshness,
     run_stats: {
-      snapshot_week: weekIso,
+      snapshot_period: periodIso,
       regions: regionProfiles.map((p) => p.region_code),
-      errors: errors.slice(0, 30),
+      errors: errors.slice(0, 40),
     },
     source_attribution: { vendor: "theirstack" },
   })
 
-  return { snapshot_week: weekIso, rows: insertRows.length, errors }
+  return { snapshot_period: periodIso, rows: insertRows.length, errors }
 }
 
 export async function getFrontierRolesForUser(
@@ -215,20 +231,22 @@ export async function getFrontierRolesForUser(
     .limit(1)
     .maybeSingle()
 
-  const latestWeek = latestRow?.snapshot_week as string | undefined
-  if (!latestWeek) {
+  const latestPeriod = latestRow?.snapshot_week as string | undefined
+  if (!latestPeriod) {
     return { status: "cache_miss" as const, region_code: region, source_soc_code: soc }
   }
 
-  const { data: weekRows, error: wErr } = await supabaseAdmin
+  const { data: periodRows, error: wErr } = await supabaseAdmin
     .schema("careeros")
     .from("market_frontier_role_weekly")
-    .select("cluster_slug,canonical_title,count_30d,growth_vs_prior_week_pct,snapshot_week")
+    .select(
+      "cluster_slug,canonical_title,count_30d,growth_vs_prior_week_pct,snapshot_week,example_posting_title,example_posting_url",
+    )
     .eq("region_code", region)
-    .eq("snapshot_week", latestWeek)
+    .eq("snapshot_week", latestPeriod)
     .eq("source_dataset_version", FRONTIER_ROLES_DATASET_VERSION)
   if (wErr) throw wErr
-  if (!weekRows?.length) {
+  if (!periodRows?.length) {
     return { status: "cache_miss" as const, region_code: region, source_soc_code: soc }
   }
 
@@ -250,26 +268,30 @@ export async function getFrontierRolesForUser(
 
   const seeds = seedBySlug()
   const ranked: FrontierRoleItem[] = []
-  for (const row of weekRows) {
+  for (const row of periodRows) {
     const slug = String(row.cluster_slug)
     const seed = seeds.get(slug)
     if (!seed) continue
     if (!clusterMatchesUserRelates(seed, relatePrefixes, userSkills)) continue
+    const exTitle = (row.example_posting_title as string | null)?.trim() || null
+    const exUrl = (row.example_posting_url as string | null)?.trim() || null
     ranked.push({
       clusterSlug: slug,
       canonicalTitle: seed.canonicalTitle,
       aliases: seed.aliases,
       theirstackQueryTitle: seed.theirstackQueryTitle,
-      firstSeenWeek: firstSeenBySlug.get(slug) ?? null,
+      firstSeenPeriod: firstSeenBySlug.get(slug) ?? null,
       count30d: Number(row.count_30d ?? 0),
-      growthVsPriorWeekPct:
+      growthVsPriorPeriodPct:
         row.growth_vs_prior_week_pct == null ? null : Number(row.growth_vs_prior_week_pct),
+      examplePostingTitle: exTitle,
+      examplePostingUrl: exUrl,
     })
   }
 
   ranked.sort((a, b) => {
-    const ga = a.growthVsPriorWeekPct ?? -1e9
-    const gb = b.growthVsPriorWeekPct ?? -1e9
+    const ga = a.growthVsPriorPeriodPct ?? -1e9
+    const gb = b.growthVsPriorPeriodPct ?? -1e9
     if (gb !== ga) return gb - ga
     return b.count30d - a.count30d
   })
@@ -280,10 +302,10 @@ export async function getFrontierRolesForUser(
     status: "ready" as const,
     region_code: region,
     source_soc_code: soc,
-    snapshot_week: latestWeek,
+    snapshot_period: latestPeriod,
     items,
     footnote:
-      "First seen week is from our weekly snapshot history, not a global first-ever posting date. Growth compares this week's 30 day rolling count to last week's 30 day rolling count.",
+      "First seen is the earliest monthly snapshot in our data where volume crossed a small floor, not a claim about the first job ever posted. Growth compares this month's 30 day rolling count to the prior month's snapshot. Example jobs come from the same TheirStack search (one row) and may rotate between refreshes.",
   }
 }
 

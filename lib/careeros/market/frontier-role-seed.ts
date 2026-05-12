@@ -1,6 +1,6 @@
 /**
- * Curated frontier title clusters (MVP). Each cluster maps to one TheirStack
- * `job_title_or` query (count mode) to avoid OR-inflated totals.
+ * Curated frontier title clusters. Each cluster maps to one TheirStack
+ * `job_title_or` query (count mode + one sample job for a credibility link).
  */
 export type FrontierRoleClusterSeed = {
   slug: string
