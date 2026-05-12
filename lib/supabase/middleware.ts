@@ -34,8 +34,14 @@ export async function updateSession(request: NextRequest) {
         )
     }
 
+    // Forward pathname to server components via header so layouts can gate on it.
+    const requestWithPathname = new Request(request, {
+        headers: new Headers(request.headers),
+    })
+    requestWithPathname.headers.set("x-pathname", request.nextUrl.pathname)
+
     let supabaseResponse = NextResponse.next({
-        request,
+        request: requestWithPathname,
     })
 
     const supabase = createServerClient(
