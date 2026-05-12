@@ -78,7 +78,7 @@ const osOptions = [
     hoverBg: "hover:bg-emerald-50/80 dark:hover:bg-emerald-500/[0.06]",
     description: "Your intelligent career co-pilot for job search, networking, and career growth.",
     tagline: "For professionals building careers",
-    status: "Coming soon",
+    status: "Beta",
     statusColor: "bg-emerald-500",
   },
 ] as const
