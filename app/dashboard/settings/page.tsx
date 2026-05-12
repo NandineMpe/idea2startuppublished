@@ -1,16 +1,49 @@
 "use client"
 
 import { useState } from "react"
-import { Bell, ChevronRight, Shield } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Bell, ChevronRight, Shield, Trash2 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [pushNotifications, setPushNotifications] = useState(true)
   const [marketingEmails, setMarketingEmails] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    try {
+      const res = await fetch("/api/careeros/account/delete", { method: "DELETE" })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: "Unknown error" }))
+        throw new Error(error)
+      }
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.replace("/login")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not delete account.")
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -153,6 +186,43 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Danger zone — always visible regardless of tab */}
+      <Card className="border-red-500/30">
+        <CardHeader>
+          <CardTitle className="text-foreground text-base">Danger zone</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Permanently delete your account and all associated data. This cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={deleting}>
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {deleting ? "Deleting…" : "Delete account"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently deletes your account and all data. It cannot be recovered.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Yes, delete my account
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
     </div>
   )
 }
