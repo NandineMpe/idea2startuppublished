@@ -181,13 +181,23 @@ async function findSupabaseUserByEmail(email: string): Promise<SupabaseAuthUser 
   return null
 }
 
+type ProductType = "founder" | "career" | "creator"
+
+function pagePathToProduct(pagePath: string): ProductType {
+  if (pagePath === "/career") return "career"
+  if (pagePath === "/creator") return "creator"
+  return "founder"
+}
+
 function mergeUserMetadata(
   currentMetadata: Record<string, unknown> | null | undefined,
   name: string,
+  product?: ProductType,
 ) {
   return {
     ...(currentMetadata ?? {}),
     full_name: name,
+    ...(product ? { product } : {}),
   }
 }
 
@@ -195,10 +205,12 @@ async function createSupabaseUser({
   email,
   password,
   name,
+  product,
 }: {
   email: string
   password: string
   name: string
+  product?: ProductType
 }) {
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -206,6 +218,7 @@ async function createSupabaseUser({
     password,
     user_metadata: {
       full_name: name,
+      ...(product ? { product } : {}),
     },
   })
 
@@ -359,10 +372,12 @@ export async function signUpWithBetterAuthBridge({
   email,
   name,
   password,
+  product,
 }: {
   email: string
   name: string
   password: string
+  product: ProductType
 }) {
   const normalizedEmail = normalizeEmail(email)
   const displayName = resolvedName({
@@ -396,6 +411,7 @@ export async function signUpWithBetterAuthBridge({
       email: normalizedEmail,
       name: displayName,
       password,
+      product,
     })
 
     await syncBetterAuthUserRecord({
@@ -436,9 +452,12 @@ export async function signUpWithBetterAuthBridge({
 export async function signInWithBetterAuthBridge({
   email,
   password,
+  requiredProduct,
 }: {
   email: string
   password: string
+  /** When set, throws if the account belongs to a different product. */
+  requiredProduct?: ProductType
 }) {
   const normalizedEmail = normalizeEmail(email)
 
@@ -448,6 +467,22 @@ export async function signInWithBetterAuthBridge({
   })
 
   if (!supabaseSignIn.error && supabaseSignIn.user) {
+    // Enforce one-product-per-account: reject if the user signed up under a different product.
+    if (requiredProduct) {
+      const accountProduct =
+        (supabaseSignIn.user.user_metadata?.product as ProductType | undefined) ?? "founder"
+      if (accountProduct !== requiredProduct) {
+        const productLabels: Record<ProductType, string> = {
+          founder: "Founder OS — sign in at /login",
+          career: "Career OS — sign in at /career",
+          creator: "Creator OS — sign in at /creator",
+        }
+        throw new Error(
+          `This account is registered for ${productLabels[accountProduct]}.`,
+        )
+      }
+    }
+
     const name = resolvedName({
       email: normalizedEmail,
       storedName: String(supabaseSignIn.user.user_metadata?.full_name ?? ""),

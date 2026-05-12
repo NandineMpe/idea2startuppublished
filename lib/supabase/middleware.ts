@@ -78,15 +78,46 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
-        request.nextUrl.pathname.startsWith('/dashboard')
-    ) {
-        // no user, potentially respond by redirecting the user to the login page
+    const pathname = request.nextUrl.pathname
+
+    // Unauthenticated users: bounce to the right login door
+    if (!user) {
+        const protectedPrefixes: Array<[string, string]> = [
+            ['/dashboard', '/login'],
+            ['/career/dashboard', '/career'],
+            ['/creator/dashboard', '/creator'],
+            ['/careeros', '/career'],
+        ]
+        for (const [prefix, loginPath] of protectedPrefixes) {
+            if (pathname.startsWith(prefix)) {
+                const url = request.nextUrl.clone()
+                url.pathname = loginPath
+                const redirectResponse = NextResponse.redirect(url)
+                applyReferralCaptureCookie(redirectResponse, refFromQuery)
+                return redirectResponse
+            }
+        }
+        applyReferralCaptureCookie(supabaseResponse, refFromQuery)
+        return supabaseResponse
+    }
+
+    // Authenticated users: enforce one-product-per-account.
+    // A career user cannot access founder routes, and vice versa.
+    const product = (user.user_metadata?.product as string | undefined) ?? 'founder'
+
+    const wrongProduct =
+        (product === 'career' && (pathname.startsWith('/dashboard') || pathname.startsWith('/creator/dashboard'))) ||
+        (product === 'creator' && (pathname.startsWith('/dashboard') || pathname.startsWith('/career/dashboard') || pathname.startsWith('/careeros'))) ||
+        (product === 'founder' && (pathname.startsWith('/career/dashboard') || pathname.startsWith('/careeros') || pathname.startsWith('/creator/dashboard')))
+
+    if (wrongProduct) {
+        const homeByProduct: Record<string, string> = {
+            founder: '/dashboard',
+            career: '/career/dashboard',
+            creator: '/creator/dashboard',
+        }
         const url = request.nextUrl.clone()
-        url.pathname = '/login'
+        url.pathname = homeByProduct[product] ?? '/dashboard'
         const redirectResponse = NextResponse.redirect(url)
         applyReferralCaptureCookie(redirectResponse, refFromQuery)
         return redirectResponse
