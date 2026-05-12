@@ -9,7 +9,16 @@ export default async function Home() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect("/dashboard")
+    // Route to the product the user actually belongs to.
+    // CareerOS users have a row in careeros.user_profiles; everyone else goes to FounderOS.
+    const { data: careerProfile } = await supabase
+      .schema("careeros")
+      .from("user_profiles")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    redirect(careerProfile ? "/career/dashboard" : "/dashboard")
   }
 
   return <OsPortalPage />

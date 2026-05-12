@@ -356,7 +356,7 @@ export default async function CareerOSPage() {
             Start onboarding (Module 1.1)
           </Link>
         )}
-        <Link href="/dashboard" className="text-sm text-muted-foreground hover:underline">
+        <Link href="/career/dashboard" className="text-sm text-muted-foreground hover:underline">
           Return to dashboard
         </Link>
       </div>
