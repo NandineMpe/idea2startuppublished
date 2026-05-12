@@ -1,19 +1,7 @@
 "use client"
 
 import type React from "react"
-import {
-  Briefcase,
-  FileText,
-  Network,
-  GraduationCap,
-  MessageCircle,
-  BarChart3,
-  Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Layers,
-  Target,
-} from "lucide-react"
+import { Briefcase, Newspaper, Brain, TrendingUp, Settings, PanelLeftClose, PanelLeftOpen, Layers } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
@@ -27,13 +15,10 @@ type NavItem = {
 }
 
 const navItems: NavItem[] = [
-  { title: "Career Hub", href: "/career/dashboard", icon: Briefcase, exact: true },
-  { title: "Job Tracker", href: "/career/dashboard/jobs", icon: Target },
-  { title: "Resume Builder", href: "/career/dashboard/resume", icon: FileText },
-  { title: "Network", href: "/career/dashboard/network", icon: Network },
-  { title: "Interview Prep", href: "/career/dashboard/interviews", icon: MessageCircle },
-  { title: "Skills & Learning", href: "/career/dashboard/skills", icon: GraduationCap },
-  { title: "Analytics", href: "/career/dashboard/analytics", icon: BarChart3 },
+  { title: "Home", href: "/career/dashboard", icon: Briefcase, exact: true },
+  { title: "AI Feed", href: "/careeros/feed", icon: Newspaper },
+  { title: "Skill Portfolio", href: "/careeros/skills", icon: Brain },
+  { title: "Market", href: "/careeros/market", icon: TrendingUp },
 ]
 
 export function CareerSidebar() {
@@ -44,9 +29,10 @@ export function CareerSidebar() {
     <aside
       className={cn(
         "h-full flex flex-col border-r border-border bg-card transition-all duration-200",
-        expanded ? "w-[220px]" : "w-[52px]",
+        expanded ? "w-[200px]" : "w-[52px]",
       )}
     >
+      {/* Logo */}
       <div className={cn(
         "flex items-center gap-3 border-b border-border shrink-0",
         expanded ? "px-4 py-4" : "px-2 py-4 justify-center"
@@ -56,8 +42,8 @@ export function CareerSidebar() {
         </div>
         {expanded && (
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-foreground truncate">Juno</p>
-            <p className="text-[11px] text-muted-foreground truncate">Career workspace</p>
+            <p className="text-[13px] font-semibold text-foreground truncate">Career OS</p>
+            <p className="text-[11px] text-muted-foreground truncate">Beta</p>
           </div>
         )}
         {expanded && (
@@ -70,6 +56,7 @@ export function CareerSidebar() {
         )}
       </div>
 
+      {/* Nav */}
       <nav className={cn("flex-1 overflow-y-auto scrollbar-auto-hide py-2 space-y-px", expanded ? "px-2" : "px-1")}>
         {navItems.map((navItem) => {
           const isActive = navItem.exact
@@ -102,6 +89,7 @@ export function CareerSidebar() {
         })}
       </nav>
 
+      {/* Bottom */}
       <div className={cn("border-t border-border shrink-0", expanded ? "p-2" : "p-1")}>
         {!expanded && (
           <button
@@ -132,10 +120,10 @@ export function CareerSidebar() {
               "flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-accent",
               expanded ? "px-2.5 py-[7px]" : "px-0 py-[7px] justify-center",
             )}
-            title={expanded ? undefined : "All modes"}
+            title={expanded ? undefined : "Switch OS"}
           >
             <Layers className={cn("shrink-0", expanded ? "h-4 w-4" : "h-[18px] w-[18px]")} />
-            {expanded && <span>All modes</span>}
+            {expanded && <span>Switch OS</span>}
           </Link>
         </div>
       </div>
