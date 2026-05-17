@@ -165,9 +165,15 @@ If you encounter any issues:
 2. Search existing [issues](./issues)
 3. Create a new issue with detailed information
 
+
 ---
 
 Built with ❤️ for entrepreneurs and startup founders.
-\`\`\`
 
-Let's also create a simple setup script to help with the initial configuration:
+### Setup Script
+
+A helper script is available to bootstrap the project:
+
+```bash
+bash scripts/setup.sh
+```
