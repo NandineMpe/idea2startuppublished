@@ -101,6 +101,7 @@ async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
 export default function FloatingJuno() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const expandedWidth = typeof window !== "undefined" ? window.innerWidth - 192 : 900
   const [view, setView] = useState<View>("chat")
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<Message[]>([WELCOME])
@@ -341,7 +342,7 @@ export default function FloatingJuno() {
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, x: 20, width: 380 }}
-            animate={{ opacity: 1, x: 0, width: isExpanded ? "calc(100vw - 192px)" : 380 }}
+            animate={{ opacity: 1, x: 0, width: isExpanded ? expandedWidth : 380 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col"
