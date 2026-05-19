@@ -1,9 +1,15 @@
 import { generateText } from "ai"
+import { createAnthropic } from "@ai-sdk/anthropic"
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
 import { getCompanyContext } from "@/lib/company-context"
-import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
+import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE } from "@/lib/llm-provider"
 import { createClient } from "@/lib/supabase/server"
+
+function claudeModel() {
+  const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  return anthropic("claude-sonnet-4-6")
+}
 
 export const maxDuration = 60
 
@@ -82,7 +88,7 @@ export async function POST(req: Request) {
     }
     const { messages, sessionId } = parsed
 
-    if (!isLlmConfigured()) {
+    if (!process.env.ANTHROPIC_API_KEY && !isLlmConfigured()) {
       return NextResponse.json({ error: LLM_API_KEY_MISSING_MESSAGE }, { status: 503 })
     }
 
@@ -143,7 +149,7 @@ You are NOT a generic chatbot. Every answer should feel like it came from someon
     let text: string
     try {
       const out = await generateText({
-        model: qwenModel(),
+        model: claudeModel(),
         system: systemPrompt,
         messages: conversationMessages,
         maxOutputTokens: 2500,

@@ -29,6 +29,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.78",
     "@ai-sdk/openai": "latest",
     "@ai-sdk/react": "^3.0.143",
     "@elevenlabs/elevenlabs-js": "^2.48.0",
