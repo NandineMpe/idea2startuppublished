@@ -61,12 +61,53 @@ async function speakText(text: string): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     })
-    if (!res.ok) return
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
+    if (!res.ok || !res.body) return
+
+    // Stream audio — start playing as soon as first chunk arrives
+    const mediaSource = new MediaSource()
+    const url = URL.createObjectURL(mediaSource)
     const audio = new Audio(url)
+
+    await new Promise<void>((resolve, reject) => {
+      mediaSource.addEventListener("sourceopen", async () => {
+        const mime = 'audio/mpeg'
+        if (!MediaSource.isTypeSupported(mime)) {
+          // Fallback: buffer the whole response
+          URL.revokeObjectURL(url)
+          const blob = await res.clone().blob()
+          const fallbackUrl = URL.createObjectURL(blob)
+          const fallback = new Audio(fallbackUrl)
+          fallback.onended = () => URL.revokeObjectURL(fallbackUrl)
+          await fallback.play()
+          resolve()
+          return
+        }
+
+        const sb = mediaSource.addSourceBuffer(mime)
+        const reader = res.body!.getReader()
+
+        const pump = async () => {
+          const { done, value } = await reader.read()
+          if (done) {
+            if (!sb.updating) mediaSource.endOfStream()
+            else sb.addEventListener("updateend", () => mediaSource.endOfStream(), { once: true })
+            return
+          }
+          if (sb.updating) {
+            await new Promise(r => sb.addEventListener("updateend", r, { once: true }))
+          }
+          sb.appendBuffer(value)
+          sb.addEventListener("updateend", pump, { once: true })
+        }
+
+        audio.play().then(() => resolve()).catch(reject)
+        await pump()
+      }, { once: true })
+
+      audio.onerror = reject
+    })
+
     audio.onended = () => URL.revokeObjectURL(url)
-    await audio.play()
   } catch {
     // Silently fail — voice is a nice-to-have
   }
