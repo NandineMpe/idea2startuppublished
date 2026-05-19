@@ -52,7 +52,6 @@ function formatRelativeTime(dateStr: string) {
 
 export default function FloatingJuno() {
   const [isOpen, setIsOpen] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [view, setView] = useState<View>("chat")
   const [input, setInput] = useState("")
@@ -234,14 +233,13 @@ export default function FloatingJuno() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              "mb-3 rounded-xl border border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300",
-              isExpanded ? "w-[min(50vw,720px)]" : "w-[360px]",
-              isMinimized ? "h-[52px]" : isExpanded ? "h-[min(50vh,600px)]" : "h-[500px]",
+              "fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300",
+              isExpanded ? "w-[min(50vw,720px)]" : "w-[380px]",
             )}
           >
             {/* Header */}
@@ -276,7 +274,7 @@ export default function FloatingJuno() {
                 </div>
               </div>
               <div className="flex items-center gap-0.5">
-                {view === "chat" && !isMinimized && (
+                {view === "chat" && (
                   <>
                     <Button
                       variant="ghost"
@@ -298,25 +296,14 @@ export default function FloatingJuno() {
                     </Button>
                   </>
                 )}
-                {!isMinimized && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    title={isExpanded ? "Collapse" : "Expand to half page"}
-                  >
-                    {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-                  </Button>
-                )}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  title={isMinimized ? "Restore" : "Minimise"}
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  title={isExpanded ? "Collapse" : "Expand"}
                 >
-                  {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+                  {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                 </Button>
                 <Button
                   variant="ghost"
@@ -329,8 +316,7 @@ export default function FloatingJuno() {
               </div>
             </div>
 
-            {!isMinimized && (
-              <>
+            <>
                 {/* History View */}
                 {view === "history" && (
                   <div className="flex flex-col flex-1 overflow-hidden">
@@ -460,8 +446,7 @@ export default function FloatingJuno() {
                     </div>
                   </>
                 )}
-              </>
-            )}
+            </>
           </motion.div>
         )}
       </AnimatePresence>
