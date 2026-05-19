@@ -53,63 +53,15 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
-async function speakText(text: string): Promise<void> {
-  try {
-    const res = await fetch("/api/voice/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    })
-    if (!res.ok || !res.body) return
-
-    // Stream audio — start playing as soon as first chunk arrives
-    const mediaSource = new MediaSource()
-    const url = URL.createObjectURL(mediaSource)
-    const audio = new Audio(url)
-
-    await new Promise<void>((resolve, reject) => {
-      mediaSource.addEventListener("sourceopen", async () => {
-        const mime = 'audio/mpeg'
-        if (!MediaSource.isTypeSupported(mime)) {
-          // Fallback: buffer the whole response
-          URL.revokeObjectURL(url)
-          const blob = await res.clone().blob()
-          const fallbackUrl = URL.createObjectURL(blob)
-          const fallback = new Audio(fallbackUrl)
-          fallback.onended = () => URL.revokeObjectURL(fallbackUrl)
-          await fallback.play()
-          resolve()
-          return
-        }
-
-        const sb = mediaSource.addSourceBuffer(mime)
-        const reader = res.body!.getReader()
-
-        const pump = async () => {
-          const { done, value } = await reader.read()
-          if (done) {
-            if (!sb.updating) mediaSource.endOfStream()
-            else sb.addEventListener("updateend", () => mediaSource.endOfStream(), { once: true })
-            return
-          }
-          if (sb.updating) {
-            await new Promise(r => sb.addEventListener("updateend", r, { once: true }))
-          }
-          sb.appendBuffer(value)
-          sb.addEventListener("updateend", pump, { once: true })
-        }
-
-        audio.play().then(() => resolve()).catch(reject)
-        await pump()
-      }, { once: true })
-
-      audio.onerror = reject
-    })
-
-    audio.onended = () => URL.revokeObjectURL(url)
-  } catch {
-    // Silently fail — voice is a nice-to-have
-  }
+async function fetchAudioBlob(text: string): Promise<string | null> {
+  const res = await fetch("/api/voice/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) return null
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
 }
 
 export default function FloatingJuno() {
@@ -130,7 +82,11 @@ export default function FloatingJuno() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const spokenCountRef = useRef(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const voiceEnabledRef = useRef(voiceEnabled)
+
+  // Keep ref in sync so handleSend closure always reads current value
+  useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -194,10 +150,14 @@ export default function FloatingJuno() {
   )
 
   const startNewChat = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setIsSpeaking(false)
     setMessages([WELCOME])
     setSessionId(null)
     setView("chat")
-    spokenCountRef.current = 0
   }, [])
 
   const ensureSession = useCallback(async (firstMessage: string): Promise<string | null> => {
@@ -290,10 +250,39 @@ export default function FloatingJuno() {
       setMessages((prev) => [...prev, { role: "assistant", content: reply }])
 
       // Speak the reply via ElevenLabs
-      if (voiceEnabled) {
+      if (voiceEnabledRef.current) {
+        // Stop any currently playing audio
+        if (audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current = null
+        }
         setIsSpeaking(true)
-        await speakText(reply)
-        setIsSpeaking(false)
+        try {
+          const blobUrl = await fetchAudioBlob(reply)
+          if (blobUrl && voiceEnabledRef.current) {
+            await new Promise<void>((resolve) => {
+              const audio = new Audio(blobUrl)
+              audioRef.current = audio
+              audio.onended = () => {
+                URL.revokeObjectURL(blobUrl)
+                audioRef.current = null
+                resolve()
+              }
+              audio.onerror = () => {
+                URL.revokeObjectURL(blobUrl)
+                audioRef.current = null
+                resolve()
+              }
+              audio.play().catch(() => {
+                URL.revokeObjectURL(blobUrl)
+                audioRef.current = null
+                resolve()
+              })
+            })
+          }
+        } finally {
+          setIsSpeaking(false)
+        }
       }
     } catch {
       setMessages((prev) => [
@@ -395,7 +384,18 @@ export default function FloatingJuno() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                      onClick={() => setVoiceEnabled(v => !v)}
+                      onClick={() => {
+                        setVoiceEnabled(v => {
+                          const next = !v
+                          voiceEnabledRef.current = next
+                          if (!next && audioRef.current) {
+                            audioRef.current.pause()
+                            audioRef.current = null
+                            setIsSpeaking(false)
+                          }
+                          return next
+                        })
+                      }}
                       title={voiceEnabled ? "Mute voice responses" : "Enable voice responses"}
                     >
                       {voiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
