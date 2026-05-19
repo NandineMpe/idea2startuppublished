@@ -51,52 +51,53 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
+let _audioCtx: AudioContext | null = null
+let _audioSource: AudioBufferSourceNode | null = null
+
+/** Must be called synchronously inside a click handler — before any await. */
+function ensureAudioContext() {
+  if (!_audioCtx || _audioCtx.state === "closed") {
+    _audioCtx = new AudioContext()
+  }
+  if (_audioCtx.state === "suspended") {
+    _audioCtx.resume()
+  }
+}
+
 function unlockAudio() {
-  // No-op — Web Speech API needs no unlock
+  ensureAudioContext()
 }
 
 function stopCurrentAudio() {
-  if (typeof window === "undefined") return
-  window.speechSynthesis?.cancel()
-}
-
-function speakWithBrowser(text: string, onEnd: () => void) {
-  if (typeof window === "undefined" || !window.speechSynthesis) { onEnd(); return }
-  window.speechSynthesis.cancel()
-  const utt = new SpeechSynthesisUtterance(text)
-  utt.rate = 1.05
-  utt.pitch = 1
-  utt.volume = 1
-  utt.onend = onEnd
-  utt.onerror = () => onEnd()
-  window.speechSynthesis.speak(utt)
+  try { _audioSource?.stop() } catch {}
+  _audioSource = null
 }
 
 async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
-  // Try ElevenLabs first via a fresh Audio element created inline
+  stopCurrentAudio()
+  const ctx = _audioCtx
+  if (!ctx) { onEnd(); return }
+
   try {
     const res = await fetch("/api/voice/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     })
-    if (res.ok) {
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-      audio.onended = () => { URL.revokeObjectURL(url); onEnd() }
-      audio.onerror = () => {
-        URL.revokeObjectURL(url)
-        // ElevenLabs failed to play — fall back to browser TTS
-        speakWithBrowser(text, onEnd)
-      }
-      await audio.play()
-      return
-    }
+    if (!res.ok) { onEnd(); return }
+
+    const arrayBuffer = await res.arrayBuffer()
+    if (ctx.state === "suspended") await ctx.resume()
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+    const source = ctx.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(ctx.destination)
+    source.onended = onEnd
+    _audioSource = source
+    source.start(0)
   } catch {
-    // fall through to browser TTS
+    onEnd()
   }
-  speakWithBrowser(text, onEnd)
 }
 
 export default function FloatingJuno() {
@@ -216,6 +217,9 @@ export default function FloatingJuno() {
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim()
     if (!text || isLoading) return
+
+    // Must be synchronous — before any await — to count as user gesture
+    if (voiceEnabledRef.current) ensureAudioContext()
 
     const userMessage: Message = { role: "user", content: text }
     const isFirstUserMessage = messages.filter((m) => m.role === "user").length === 0
