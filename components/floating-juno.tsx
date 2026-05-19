@@ -52,15 +52,51 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
-async function fetchAudioBlob(text: string): Promise<string | null> {
+// Singleton AudioContext — unlocked on first user gesture, reused for all playback
+let _audioCtx: AudioContext | null = null
+let _audioSource: AudioBufferSourceNode | null = null
+
+function getAudioContext(): AudioContext {
+  if (!_audioCtx || _audioCtx.state === "closed") {
+    _audioCtx = new AudioContext()
+  }
+  return _audioCtx
+}
+
+/** Call on any user click to unlock audio before we need it. */
+function unlockAudio() {
+  const ctx = getAudioContext()
+  if (ctx.state === "suspended") ctx.resume()
+}
+
+function stopCurrentAudio() {
+  try { _audioSource?.stop() } catch {}
+  _audioSource = null
+}
+
+async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
+  stopCurrentAudio()
+
   const res = await fetch("/api/voice/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   })
-  if (!res.ok) return null
-  const blob = await res.blob()
-  return URL.createObjectURL(blob)
+  if (!res.ok) { onEnd(); return }
+
+  const arrayBuffer = await res.arrayBuffer()
+  const ctx = getAudioContext()
+
+  // Resume in case it suspended while we were waiting
+  if (ctx.state === "suspended") await ctx.resume()
+
+  const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+  const source = ctx.createBufferSource()
+  source.buffer = audioBuffer
+  source.connect(ctx.destination)
+  source.onended = onEnd
+  _audioSource = source
+  source.start(0)
 }
 
 export default function FloatingJuno() {
@@ -81,7 +117,6 @@ export default function FloatingJuno() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const voiceEnabledRef = useRef(voiceEnabled)
 
   // Keep ref in sync so handleSend closure always reads current value
@@ -149,10 +184,7 @@ export default function FloatingJuno() {
   )
 
   const startNewChat = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
+    stopCurrentAudio()
     setIsSpeaking(false)
     setMessages([WELCOME])
     setSessionId(null)
@@ -250,36 +282,10 @@ export default function FloatingJuno() {
 
       // Speak the reply via ElevenLabs
       if (voiceEnabledRef.current) {
-        // Stop any currently playing audio
-        if (audioRef.current) {
-          audioRef.current.pause()
-          audioRef.current = null
-        }
         setIsSpeaking(true)
         try {
-          const blobUrl = await fetchAudioBlob(reply)
-          if (blobUrl && voiceEnabledRef.current) {
-            await new Promise<void>((resolve) => {
-              const audio = new Audio(blobUrl)
-              audioRef.current = audio
-              audio.onended = () => {
-                URL.revokeObjectURL(blobUrl)
-                audioRef.current = null
-                resolve()
-              }
-              audio.onerror = () => {
-                URL.revokeObjectURL(blobUrl)
-                audioRef.current = null
-                resolve()
-              }
-              audio.play().catch(() => {
-                URL.revokeObjectURL(blobUrl)
-                audioRef.current = null
-                resolve()
-              })
-            })
-          }
-        } finally {
+          await speakViaTTS(reply, () => setIsSpeaking(false))
+        } catch {
           setIsSpeaking(false)
         }
       }
@@ -384,12 +390,12 @@ export default function FloatingJuno() {
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={() => {
+                        unlockAudio()
                         setVoiceEnabled(v => {
                           const next = !v
                           voiceEnabledRef.current = next
-                          if (!next && audioRef.current) {
-                            audioRef.current.pause()
-                            audioRef.current = null
+                          if (!next) {
+                            stopCurrentAudio()
                             setIsSpeaking(false)
                           }
                           return next
@@ -585,12 +591,13 @@ export default function FloatingJuno() {
                           placeholder="Ask anything..."
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && void handleSend()}
+                          onKeyDown={(e) => { if (e.key === "Enter") { unlockAudio(); void handleSend() } }}
                           className="text-[13px] h-9 bg-muted border-border focus:border-primary"
                         />
                         {/* Mic button */}
                         <VoiceInput
                           onStart={() => {
+                            unlockAudio()
                             if (!isListening) toggleListening()
                           }}
                           onStop={() => {
@@ -602,7 +609,7 @@ export default function FloatingJuno() {
                         />
                         {/* Send button */}
                         <Button
-                          onClick={() => void handleSend()}
+                          onClick={() => { unlockAudio(); void handleSend() }}
                           disabled={isLoading || !input.trim()}
                           size="sm"
                           className="h-9 w-9 p-0 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
@@ -621,7 +628,7 @@ export default function FloatingJuno() {
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { unlockAudio(); setIsOpen(!isOpen) }}
         className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow"
       >
         {isOpen ? <X size={20} /> : <MessageCircle size={20} />}
