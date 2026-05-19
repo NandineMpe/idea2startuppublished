@@ -7,7 +7,6 @@ import {
   X,
   Send,
   Sparkles,
-  Loader2,
   Minimize2,
   Maximize2,
   History,
@@ -539,10 +538,25 @@ export default function FloatingJuno() {
                           </div>
                         ))}
                         {isLoading && (
-                          <div className="flex justify-start">
-                            <div className="bg-muted px-3 py-2 rounded-lg flex items-center gap-2">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                              <span className="text-[12px] text-muted-foreground">Thinking...</span>
+                          <div className="flex justify-start py-2 pl-1">
+                            <div className="relative flex items-center justify-center w-8 h-8">
+                              <div
+                                className="absolute w-7 h-7 rounded-full animate-spin"
+                                style={{
+                                  backgroundImage: "linear-gradient(rgb(186,66,255) 35%, rgb(0,225,255))",
+                                  filter: "blur(1px)",
+                                  boxShadow: "0px -3px 10px 0px rgb(186,66,255), 0px 3px 10px 0px rgb(0,225,255)",
+                                  animationDuration: "1.7s",
+                                  animationTimingFunction: "linear",
+                                }}
+                              />
+                              <div
+                                className="absolute w-7 h-7 rounded-full"
+                                style={{
+                                  backgroundColor: "rgb(36,36,36)",
+                                  filter: "blur(4px)",
+                                }}
+                              />
                             </div>
                           </div>
                         )}
