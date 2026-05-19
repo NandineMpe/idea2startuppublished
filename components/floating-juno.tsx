@@ -51,52 +51,52 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
-// Single persistent audio element — unlocked on first user gesture
-const _audio = typeof window !== "undefined" ? new Audio() : null
-
-/** Call on any user interaction to unlock the audio element for autoplay. */
 function unlockAudio() {
-  if (!_audio) return
-  _audio.muted = true
-  _audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
-  _audio.play().catch(() => {})
-  _audio.muted = false
+  // No-op — Web Speech API needs no unlock
 }
 
 function stopCurrentAudio() {
-  if (!_audio) return
-  _audio.pause()
-  _audio.src = ""
+  if (typeof window === "undefined") return
+  window.speechSynthesis?.cancel()
+}
+
+function speakWithBrowser(text: string, onEnd: () => void) {
+  if (typeof window === "undefined" || !window.speechSynthesis) { onEnd(); return }
+  window.speechSynthesis.cancel()
+  const utt = new SpeechSynthesisUtterance(text)
+  utt.rate = 1.05
+  utt.pitch = 1
+  utt.volume = 1
+  utt.onend = onEnd
+  utt.onerror = () => onEnd()
+  window.speechSynthesis.speak(utt)
 }
 
 async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
-  if (!_audio) { onEnd(); return }
-  stopCurrentAudio()
-
-  const res = await fetch("/api/voice/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-  })
-  if (!res.ok) { onEnd(); return }
-
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  _audio.src = url
-  _audio.onended = () => {
-    URL.revokeObjectURL(url)
-    onEnd()
-  }
-  _audio.onerror = () => {
-    URL.revokeObjectURL(url)
-    onEnd()
-  }
+  // Try ElevenLabs first via a fresh Audio element created inline
   try {
-    await _audio.play()
+    const res = await fetch("/api/voice/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+    if (res.ok) {
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => { URL.revokeObjectURL(url); onEnd() }
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        // ElevenLabs failed to play — fall back to browser TTS
+        speakWithBrowser(text, onEnd)
+      }
+      await audio.play()
+      return
+    }
   } catch {
-    URL.revokeObjectURL(url)
-    onEnd()
+    // fall through to browser TTS
   }
+  speakWithBrowser(text, onEnd)
 }
 
 export default function FloatingJuno() {
