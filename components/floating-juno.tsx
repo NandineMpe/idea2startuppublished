@@ -544,24 +544,25 @@ export default function FloatingJuno() {
                         ))}
                         {isLoading && (
                           <div className="flex justify-start py-2 pl-1">
-                            <div className="relative flex items-center justify-center w-8 h-8">
+                            <div className="relative flex items-center justify-center w-9 h-9">
+                              {/* Spinning gradient ring */}
                               <div
-                                className="absolute w-7 h-7 rounded-full animate-spin"
+                                className="absolute inset-0 rounded-full animate-spin"
                                 style={{
-                                  backgroundImage: "linear-gradient(rgb(186,66,255) 35%, rgb(0,225,255))",
-                                  filter: "blur(1px)",
-                                  boxShadow: "0px -3px 10px 0px rgb(186,66,255), 0px 3px 10px 0px rgb(0,225,255)",
+                                  background: "conic-gradient(from 0deg, rgb(186,66,255), rgb(0,225,255), rgb(186,66,255))",
                                   animationDuration: "1.7s",
                                   animationTimingFunction: "linear",
                                 }}
                               />
+                              {/* Glow layer */}
                               <div
-                                className="absolute w-7 h-7 rounded-full"
+                                className="absolute inset-0 rounded-full"
                                 style={{
-                                  backgroundColor: "rgb(36,36,36)",
-                                  filter: "blur(4px)",
+                                  boxShadow: "0 0 8px 2px rgb(186,66,255,0.5), 0 0 8px 2px rgb(0,225,255,0.4)",
                                 }}
                               />
+                              {/* Sharp dark inner circle */}
+                              <div className="absolute inset-[3px] rounded-full bg-card" />
                             </div>
                           </div>
                         )}
