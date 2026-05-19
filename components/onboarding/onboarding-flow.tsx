@@ -53,12 +53,28 @@ const LLM_EXPORT_TIPS = [
 // ─── shared util ──────────────────────────────────────────────────────────────
 
 async function markOnboardingComplete() {
-  await fetch("/api/company/profile", {
+  await fetch("/api/company/profile?scope=owner", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
     body: JSON.stringify({ company_name: "My Company" }),
   }).catch(() => {})
+}
+
+async function saveOwnerKnowledgeBaseFromFile(file: File) {
+  const lowerName = file.name.toLowerCase()
+  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".txt")) return
+  const text = await file.text()
+  if (!text.trim()) return
+  await fetch("/api/company/profile?scope=owner", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      company_name: "My Company",
+      knowledge_base_md: text,
+    }),
+  })
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
@@ -145,6 +161,7 @@ function UploadMode({ onDone }: { onDone: () => void }) {
           const d = await res.json().catch(() => ({}))
           throw new Error(typeof d.error === "string" ? d.error : "Upload failed")
         }
+        await saveOwnerKnowledgeBaseFromFile(file)
         names.push(file.name)
       }
       setUploaded((p) => [...p, ...names])
@@ -599,24 +616,27 @@ function ChooseMode({ onChoose }: { onChoose: (m: "upload" | "speak" | "write" |
 export function OnboardingFlow() {
   const router = useRouter()
   const [mode, setMode] = useState<Mode>("choose")
+  const [finishing, setFinishing] = useState(false)
 
   async function handleActivationDone() {
+    if (finishing) return
+    setFinishing(true)
     setMode("done")
     await markOnboardingComplete()
-    setTimeout(() => router.push("/dashboard"), 2200)
+    router.push("/dashboard")
   }
 
   return (
     <div className="mx-auto max-w-[600px] px-5 py-12">
       {mode === "choose" && <ChooseMode onChoose={(m) => setMode(m)} />}
-      {mode === "upload" && <UploadMode onDone={() => setMode("activate")} />}
+      {mode === "upload" && <UploadMode onDone={() => void handleActivationDone()} />}
       {mode === "speak" && <SpeakMode onDone={() => setMode("activate")} />}
       {mode === "write" && <WriteMode onDone={() => setMode("activate")} />}
       {mode === "activate" && <AgentActivation onFinish={handleActivationDone} />}
       {mode === "done" && (
         <div className="pt-[18vh] text-center">
           <h2 className="text-xl font-semibold">Your first daily brief is on its way</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Opening your command centre…</p>
+          <p className="mt-2 text-sm text-muted-foreground">Opening your command centre...</p>
         </div>
       )}
     </div>

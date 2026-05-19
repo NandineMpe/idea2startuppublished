@@ -6,6 +6,7 @@ import {
   persistTextDocument,
 } from "@/lib/careeros/documents/persist-user-document"
 import { mergeCareerOsOnboardingState } from "@/lib/careeros/onboarding/user-settings"
+import { appendCareerOsMarkdownToJunoBrain } from "@/lib/careeros/brain/append-llm-to-brain"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -13,6 +14,7 @@ export const maxDuration = 120
 const MAX_PDF_BYTES = 10 * 1024 * 1024
 const MAX_MD_BYTES = 2 * 1024 * 1024
 const MAX_TEXT_CHARS = 120_000
+const MAX_MARKDOWN_CHARS = 120_000
 
 function str(v: unknown): string {
   return typeof v === "string" ? v : ""
@@ -72,7 +74,10 @@ export async function POST(request: Request) {
       resumeText?: { documentId: string; deduped: boolean }
       llmMarkdownFile?: { documentId: string; deduped: boolean }
       llmMarkdownPaste?: { documentId: string; deduped: boolean }
+      llmMarkdownBrain?: { merged: boolean; reason?: string; scope?: string }
     } = {}
+    let latestLlmMarkdownText: string | null = null
+    let latestLlmMarkdownSourceLabel: string | null = null
 
     if (hasPdf) {
       const file = resumePdf as File
@@ -124,39 +129,40 @@ export async function POST(request: Request) {
       }
       const buf = Buffer.from(await file.arrayBuffer())
       const text = buf.toString("utf8")
-      const persisted = await persistTextDocument({
-        userId: user.id,
-        docType: "llm_markdown",
-        plainText: text,
-        contentType: "text/markdown",
-        parserName: "careeros-onboarding",
-        parserVersion: "1",
-        fileExtension: "md",
-      })
-      result.llmMarkdownFile = {
-        documentId: persisted.documentId,
-        deduped: persisted.deduped,
+      if (text.length > MAX_MARKDOWN_CHARS) {
+        return NextResponse.json({ error: "Markdown file too large (max 120,000 characters)" }, { status: 400 })
       }
+      const brain = await appendCareerOsMarkdownToJunoBrain(user.id, text, {
+        sourceLabel: file.name,
+        forceOwnerScope: true,
+      })
+      result.llmMarkdownBrain = brain.ok
+        ? { merged: true, scope: brain.scope }
+        : { merged: false, reason: brain.reason }
+      latestLlmMarkdownText = text
+      latestLlmMarkdownSourceLabel = file.name
     }
 
     if (hasMdText) {
-      const persisted = await persistTextDocument({
-        userId: user.id,
-        docType: "llm_markdown",
-        plainText: llmMarkdownTextRaw,
-        contentType: "text/markdown",
-        parserName: "careeros-onboarding",
-        parserVersion: "1",
-        fileExtension: "md",
+      const brain = await appendCareerOsMarkdownToJunoBrain(user.id, llmMarkdownTextRaw, {
+        sourceLabel: "Pasted LLM markdown",
+        forceOwnerScope: true,
       })
-      result.llmMarkdownPaste = {
-        documentId: persisted.documentId,
-        deduped: persisted.deduped,
-      }
+      result.llmMarkdownBrain = brain.ok
+        ? { merged: true, scope: brain.scope }
+        : { merged: false, reason: brain.reason }
+      latestLlmMarkdownText = llmMarkdownTextRaw
+      latestLlmMarkdownSourceLabel = "Pasted LLM markdown"
     }
 
     await mergeCareerOsOnboardingState(user.id, {
       step1CompletedAt: new Date().toISOString(),
+      ...(latestLlmMarkdownText
+        ? {
+            latestLlmMarkdownText,
+            latestLlmMarkdownSourceLabel,
+          }
+        : {}),
     })
 
     return NextResponse.json({ ok: true, documents: result })

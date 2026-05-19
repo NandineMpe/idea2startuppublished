@@ -14,6 +14,10 @@ import {
   Plus,
   ChevronLeft,
   Trash2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +54,24 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
+async function speakText(text: string): Promise<void> {
+  try {
+    const res = await fetch("/api/voice/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+    if (!res.ok) return
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    audio.onended = () => URL.revokeObjectURL(url)
+    await audio.play()
+  } catch {
+    // Silently fail — voice is a nice-to-have
+  }
+}
+
 export default function FloatingJuno() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
@@ -62,6 +84,13 @@ export default function FloatingJuno() {
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [chatAuthenticated, setChatAuthenticated] = useState<boolean | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Voice state
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const spokenCountRef = useRef(0)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -128,6 +157,7 @@ export default function FloatingJuno() {
     setMessages([WELCOME])
     setSessionId(null)
     setView("chat")
+    spokenCountRef.current = 0
   }, [])
 
   const ensureSession = useCallback(async (firstMessage: string): Promise<string | null> => {
@@ -151,17 +181,17 @@ export default function FloatingJuno() {
     return null
   }, [sessionId])
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoading) return
+  const handleSend = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim()
+    if (!text || isLoading) return
 
-    const userMessage: Message = { role: "user", content: input.trim() }
+    const userMessage: Message = { role: "user", content: text }
     const isFirstUserMessage = messages.filter((m) => m.role === "user").length === 0
 
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
 
-    // Create a session if this is the first user message
     let activeSessionId = sessionId
     if (isFirstUserMessage) {
       activeSessionId = await ensureSession(userMessage.content)
@@ -218,6 +248,13 @@ export default function FloatingJuno() {
       }
 
       setMessages((prev) => [...prev, { role: "assistant", content: reply }])
+
+      // Speak the reply via ElevenLabs
+      if (voiceEnabled) {
+        setIsSpeaking(true)
+        await speakText(reply)
+        setIsSpeaking(false)
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -226,7 +263,44 @@ export default function FloatingJuno() {
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, messages, sessionId, ensureSession])
+  }, [input, isLoading, messages, sessionId, ensureSession, voiceEnabled])
+
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const SpeechRecognition =
+      (window as typeof window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
+      (window as typeof window & { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Try Chrome.")
+      return
+    }
+
+    const recognition = new SpeechRecognition()
+    recognition.lang = "en-US"
+    recognition.interimResults = false
+    recognition.maxAlternatives = 1
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript
+      setInput(transcript)
+      setIsListening(false)
+      // Auto-send after voice input
+      void handleSend(transcript)
+    }
+
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }, [isListening, handleSend])
 
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end">
@@ -276,6 +350,16 @@ export default function FloatingJuno() {
               <div className="flex items-center gap-0.5">
                 {view === "chat" && (
                   <>
+                    {/* Voice mute toggle */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => setVoiceEnabled(v => !v)}
+                      title={voiceEnabled ? "Mute voice responses" : "Enable voice responses"}
+                    >
+                      {voiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -290,7 +374,7 @@ export default function FloatingJuno() {
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-foreground"
                       onClick={openHistory}
-                      title="History for this floating chat (not Context page)"
+                      title="History"
                     >
                       <History size={13} />
                     </Button>
@@ -421,6 +505,22 @@ export default function FloatingJuno() {
                             </div>
                           </div>
                         )}
+                        {isSpeaking && (
+                          <div className="flex justify-start">
+                            <div className="bg-muted px-3 py-2 rounded-lg flex items-center gap-1.5">
+                              <span className="flex gap-0.5 items-end h-3">
+                                {[0, 1, 2].map((i) => (
+                                  <span
+                                    key={i}
+                                    className="w-0.5 bg-primary rounded-full animate-pulse"
+                                    style={{ height: `${6 + i * 3}px`, animationDelay: `${i * 150}ms` }}
+                                  />
+                                ))}
+                              </span>
+                              <span className="text-[12px] text-muted-foreground">Speaking...</span>
+                            </div>
+                          </div>
+                        )}
                         <div ref={messagesEndRef} />
                       </div>
                     </ScrollArea>
@@ -428,14 +528,32 @@ export default function FloatingJuno() {
                     <div className="p-3 border-t border-border shrink-0">
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Ask anything..."
+                          placeholder={isListening ? "Listening..." : "Ask anything..."}
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                          className="text-[13px] h-9 bg-muted border-border focus:border-primary"
+                          onKeyDown={(e) => e.key === "Enter" && void handleSend()}
+                          className={cn(
+                            "text-[13px] h-9 bg-muted border-border focus:border-primary",
+                            isListening && "border-primary/60",
+                          )}
                         />
+                        {/* Mic button */}
                         <Button
-                          onClick={handleSend}
+                          type="button"
+                          onClick={toggleListening}
+                          size="sm"
+                          variant={isListening ? "default" : "outline"}
+                          className={cn(
+                            "h-9 w-9 p-0 shrink-0",
+                            isListening && "bg-primary text-primary-foreground animate-pulse",
+                          )}
+                          title={isListening ? "Stop listening" : "Speak your message"}
+                        >
+                          {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                        </Button>
+                        {/* Send button */}
+                        <Button
+                          onClick={() => void handleSend()}
                           disabled={isLoading || !input.trim()}
                           size="sm"
                           className="h-9 w-9 p-0 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
@@ -443,6 +561,11 @@ export default function FloatingJuno() {
                           <Send size={14} />
                         </Button>
                       </div>
+                      {isListening && (
+                        <p className="text-[10px] text-primary/70 mt-1.5 text-center animate-pulse">
+                          Listening — speak now, then pause to send
+                        </p>
+                      )}
                     </div>
                   </>
                 )}

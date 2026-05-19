@@ -17,6 +17,7 @@ export function CareerOsOnboardingWizard() {
   const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [busy, setBusy] = useState(false)
+  const [stepOneError, setStepOneError] = useState<string | null>(null)
   const [module12Status, setModule12Status] = useState<
     "idle" | "running" | "completed" | "failed"
   >("idle")
@@ -37,6 +38,7 @@ export function CareerOsOnboardingWizard() {
 
   async function submitStepOne(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault()
+    setStepOneError(null)
     setBusy(true)
     try {
       const form = ev.currentTarget
@@ -47,6 +49,17 @@ export function CareerOsOnboardingWizard() {
       fd.append("llmMarkdownText", llmMarkdownPaste)
       const mdEl = form.elements.namedItem("llmMarkdownFile") as HTMLInputElement | null
       if (mdEl?.files?.[0]) fd.append("llmMarkdownFile", mdEl.files[0])
+
+      const hasInput =
+        Boolean(pdfEl?.files?.[0]) ||
+        Boolean(mdEl?.files?.[0]) ||
+        resumeText.trim().length > 0 ||
+        llmMarkdownPaste.trim().length > 0
+      if (!hasInput) {
+        setStepOneError("Add at least one input: resume PDF, resume text, markdown file, or pasted markdown.")
+        return
+      }
+
       const res = await fetch("/api/careeros/onboarding/step-one", {
         method: "POST",
         body: fd,
@@ -54,11 +67,17 @@ export function CareerOsOnboardingWizard() {
       })
       const json = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) {
-        toast.error(json.error || "Could not save documents")
+        const message = json.error || "Could not save documents"
+        setStepOneError(message)
+        toast.error(message)
         return
       }
       toast.success("Step 1 saved")
       setStep(2)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save documents"
+      setStepOneError(message)
+      toast.error(message)
     } finally {
       setBusy(false)
     }
@@ -157,7 +176,7 @@ export function CareerOsOnboardingWizard() {
         if (!active || typeof status !== "string") return
         if (status === "running") {
           setModule12Status("running")
-          setModule12Message("Extracting skills and role signals from your onboarding documents…")
+          setModule12Message("Extracting skills and role insights from your onboarding materials…")
         } else if (status === "completed") {
           setModule12Status("completed")
           setModule12SkillsCount(
@@ -167,11 +186,7 @@ export function CareerOsOnboardingWizard() {
           setTimeout(() => router.push("/careeros"), 1200)
         } else if (status === "failed") {
           setModule12Status("failed")
-          setModule12Message(
-            typeof json.module_1_2?.error === "string" && json.module_1_2.error
-              ? json.module_1_2.error
-              : "Extraction failed. You can retry now.",
-          )
+          setModule12Message("We could not finish your career profile. You can retry now.")
         } else {
           setModule12Status("idle")
         }
@@ -197,7 +212,7 @@ export function CareerOsOnboardingWizard() {
           <CardHeader>
             <CardTitle>We&apos;re building your career profile</CardTitle>
             <CardDescription>
-              Module 1.2 is running now. {module12Message}
+              {module12Message}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -213,7 +228,7 @@ export function CareerOsOnboardingWizard() {
                   if (startedModule12Ref.current) return
                   startedModule12Ref.current = true
                   setModule12Status("running")
-                  setModule12Message("Retrying extraction…")
+                  setModule12Message("Retrying your skills and role insights…")
                   try {
                     const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
                       method: "POST",
@@ -239,7 +254,7 @@ export function CareerOsOnboardingWizard() {
               <Link href="/careeros">Continue to CareerOS</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/dashboard/context">Open Company Brain</Link>
+              <Link href="/dashboard/context">Open Career Context</Link>
             </Button>
           </CardContent>
         </Card>
@@ -311,6 +326,14 @@ export function CareerOsOnboardingWizard() {
                   className="font-mono text-sm"
                 />
               </div>
+              <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                You only need one input. A markdown file by itself is enough.
+              </p>
+              {stepOneError ? (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {stepOneError}
+                </p>
+              ) : null}
               <Button type="submit" disabled={busy}>
                 {busy ? "Saving…" : "Continue"}
               </Button>

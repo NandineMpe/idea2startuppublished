@@ -3,7 +3,7 @@
  * (`company_profile.knowledge_base_md` or workspace `client_workspace_profiles`).
  */
 import { supabaseAdmin } from "@/lib/supabase"
-import { resolveOrganizationSelection } from "@/lib/organizations"
+import { ensurePersonalOrganization, resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 export type AppendBrainResult =
@@ -13,16 +13,20 @@ export type AppendBrainResult =
 export async function appendCareerOsMarkdownToJunoBrain(
   userId: string,
   markdown: string,
+  options?: { forceOwnerScope?: boolean; sourceLabel?: string },
 ): Promise<AppendBrainResult> {
   const trimmed = markdown.trim()
   if (!trimmed) return { ok: false, reason: "empty" }
 
-  const workspace = await resolveWorkspaceSelection(userId, {
-    useCookieWorkspace: true,
-  })
+  const workspace = options?.forceOwnerScope
+    ? null
+    : await resolveWorkspaceSelection(userId, {
+        useCookieWorkspace: true,
+      })
   const organization = workspace
     ? null
-    : await resolveOrganizationSelection(userId, { useCookieOrganization: true })
+    : (await resolveOrganizationSelection(userId, { useCookieOrganization: true })) ??
+      (options?.forceOwnerScope ? await ensurePersonalOrganization(userId) : null)
 
   if (!workspace && !organization) {
     return { ok: false, reason: "no_scope" }
@@ -51,7 +55,8 @@ export async function appendCareerOsMarkdownToJunoBrain(
       : ""
 
   const stamp = new Date().toISOString().slice(0, 10)
-  const block = `\n\n---\n\n## CareerOS — LLM import (${stamp})\n\n${trimmed}\n`
+  const label = options?.sourceLabel?.trim()
+  const block = `\n\n---\n\n## CareerOS — ${label ? `${label} ` : "LLM import "}(${stamp})\n\n${trimmed}\n`
   const nextKb = `${previous.trim()}${block}`.trim()
 
   const now = new Date().toISOString()

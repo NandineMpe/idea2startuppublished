@@ -142,9 +142,9 @@ export default async function CareerOSPage() {
           <>Extraction failed on the latest run. Retry from onboarding to generate a fresh profile.</>
         ) : (
           <>
-            Upload resume context and confirm your role in a short flow (Module 1.1). After that,
+            Upload resume context and confirm your role in a short flow. After that,
             you&apos;ll see the &quot;building your career profile&quot; step while we extract skills
-            from your materials (Module 1.2).
+            from your materials.
           </>
         )}
       </p>
@@ -163,7 +163,7 @@ export default async function CareerOSPage() {
           <CardHeader>
             <CardTitle>Profile extraction failed</CardTitle>
             <CardDescription>
-              {module12Error ?? "The latest extraction run failed."} Use retry to queue a fresh run.
+              We could not finish your career profile. Use retry to queue a fresh run.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

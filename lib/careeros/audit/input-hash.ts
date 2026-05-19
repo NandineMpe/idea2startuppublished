@@ -4,6 +4,7 @@ export interface ProfileExtractInput {
   user_id: string
   resume_text_hash: string | null
   linkedin_text_hash: string | null
+  llm_markdown_hash?: string | null
   user_stated_role: string | null
   user_stated_years_experience: number | null
   schema_version: number

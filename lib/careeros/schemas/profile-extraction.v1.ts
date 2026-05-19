@@ -30,7 +30,7 @@ export const ExtractedSkillSchema = z.object({
       "Lowercased, hyphenated, normalised key (e.g. 'python', 'aws-lambda', 'product-management')",
     ),
   proficiency_band: z.enum(["novice", "intermediate", "advanced", "expert"]).nullable(),
-  source_type: z.enum(["resume", "linkedin"]),
+  source_type: z.enum(["resume", "linkedin", "inferred"]),
   evidence: z.string().describe("The exact phrase or sentence in the source that mentions this skill"),
 })
 

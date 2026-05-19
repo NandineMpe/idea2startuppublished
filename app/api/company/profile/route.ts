@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { normalizeVaultFolders } from "@/lib/vault-context-shared"
 import { parseRedditIntentSubreddits } from "@/lib/company-context"
-import { resolveOrganizationSelection } from "@/lib/organizations"
+import { ensurePersonalOrganization, resolveOrganizationSelection } from "@/lib/organizations"
 import { resolveWorkspaceSelection } from "@/lib/workspaces"
 
 function hasOwn(body: Record<string, unknown>, key: string): boolean {
@@ -92,13 +92,13 @@ export async function PUT(request: Request) {
     const workspace = await getWorkspaceForRequest(user.id, request)
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
 
-    const organization =
+    let organization =
       workspace === null
         ? await resolveOrganizationSelection(user.id, { useCookieOrganization: true })
         : null
 
     if (!workspace && !organization) {
-      return NextResponse.json({ error: "No active organization" }, { status: 400 })
+      organization = await ensurePersonalOrganization(user.id)
     }
 
     const { data: existingRow } = workspace

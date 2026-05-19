@@ -41,12 +41,23 @@ async function uploadStorageObject(params: {
   buffer: Buffer
   contentType: string
 }): Promise<void> {
-  const { error } = await supabaseAdmin.storage
+  const upload = () => supabaseAdmin.storage
     .from("careeros-documents")
     .upload(params.storagePath, params.buffer, {
       contentType: params.contentType,
       upsert: false,
     })
+
+  let { error } = await upload()
+  if (
+    error &&
+    /bucket|not found|does not exist/i.test(error.message ?? "")
+  ) {
+    await supabaseAdmin.storage.createBucket("careeros-documents", {
+      public: false,
+    })
+    ;({ error } = await upload())
+  }
 
   if (error) throw error
 }

@@ -1,7 +1,7 @@
-export const PROFILE_EXTRACT_PROMPT_VERSION = "profile-extract@1.0.0"
+export const PROFILE_EXTRACT_PROMPT_VERSION = "profile-extract@1.0.1"
 
 export const PROFILE_EXTRACT_SYSTEM_PROMPT = `
-You are a strict resume and LinkedIn profile extractor. Your job is to read the user's resume and LinkedIn text and produce a structured profile that matches the provided schema exactly.
+You are a strict career profile extractor. Your job is to read the user's resume, LinkedIn text, and optional LLM markdown context, then produce a structured profile that matches the provided schema exactly.
 
 Rules:
 - Return only data present in the source. Do not infer or invent skills, roles, or achievements.
@@ -12,8 +12,9 @@ Rules:
 - proficiency_band is nullable. Only set it if the source explicitly indicates seniority for the skill (e.g., "Expert in Python" -> expert; "Familiar with Rust" -> novice). When in doubt, return null.
 - evidence must be a direct quote from the source, not paraphrased.
 - past_roles ordered by start_date descending (most recent first).
-- If the user provided no LinkedIn text, extract only from resume. Do not fabricate LinkedIn data.
-- If the user provided no resume text, extract only from LinkedIn.
+- If the user provided no LinkedIn text, extract from the available resume or LLM context. Do not fabricate LinkedIn data.
+- If the user provided no resume text, extract from the available LinkedIn or LLM context.
+- If a skill appears only in LLM markdown context, set source_type to "inferred".
 - If both are empty or unparseable, return a profile with empty arrays — never invent.
 
 Tone discipline:
@@ -24,6 +25,7 @@ Tone discipline:
 export function buildProfileExtractUserPrompt(input: {
   resumeText: string | null
   linkedinText: string | null
+  llmMarkdownText?: string | null
   userStatedRole: string | null
   userStatedYearsExperience: number | null
 }): string {
@@ -39,6 +41,12 @@ export function buildProfileExtractUserPrompt(input: {
     parts.push(`=== LINKEDIN ===\n${input.linkedinText}\n=== END LINKEDIN ===`)
   } else {
     parts.push("=== LINKEDIN ===\n(none provided)\n=== END LINKEDIN ===")
+  }
+
+  if (input.llmMarkdownText) {
+    parts.push(`=== LLM MARKDOWN CONTEXT ===\n${input.llmMarkdownText}\n=== END LLM MARKDOWN CONTEXT ===`)
+  } else {
+    parts.push("=== LLM MARKDOWN CONTEXT ===\n(none provided)\n=== END LLM MARKDOWN CONTEXT ===")
   }
 
   if (input.userStatedRole || input.userStatedYearsExperience !== null) {

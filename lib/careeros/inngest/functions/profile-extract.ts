@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "crypto"
 import { careerosInngest } from "../client"
 import {
+  type ProfileExtraction,
   ProfileExtractionSchema,
   PROFILE_EXTRACTION_SCHEMA_VERSION,
 } from "@/lib/careeros/schemas/profile-extraction.v1"
@@ -22,10 +23,97 @@ function sha256(text: string): string {
 type SourceDocs = {
   resumeText: string | null
   linkedinText: string | null
+  llmMarkdownText: string | null
   resumeDocId: string | null
   linkedinDocId: string | null
+  llmMarkdownDocId: string | null
   userStatedRole: string | null
   userStatedYearsExperience: number | null
+}
+
+const MAX_LLM_MARKDOWN_SOURCE_CHARS = 120_000
+
+function truncateSourceText(text: string | null | undefined): string | null {
+  const trimmed = text?.trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, MAX_LLM_MARKDOWN_SOURCE_CHARS)
+}
+
+async function loadOwnerBrainMarkdown(userId: string): Promise<string | null> {
+  const { data: organization } = await supabaseAdmin
+    .from("organizations")
+    .select("id")
+    .eq("created_by_user_id", userId)
+    .eq("is_personal", true)
+    .maybeSingle()
+
+  const organizationId = organization?.id as string | undefined
+  if (!organizationId) return null
+
+  const { data: profile, error } = await supabaseAdmin
+    .from("company_profile")
+    .select("knowledge_base_md")
+    .eq("organization_id", organizationId)
+    .maybeSingle()
+  if (error) throw error
+
+  const text =
+    typeof profile?.knowledge_base_md === "string" ? profile.knowledge_base_md : null
+  return truncateSourceText(text)
+}
+
+const FALLBACK_SKILL_NAMES = [
+  "python",
+  "javascript",
+  "typescript",
+  "react",
+  "next.js",
+  "node.js",
+  "sql",
+  "postgres",
+  "supabase",
+  "aws",
+  "excel",
+  "financial modeling",
+  "data analysis",
+  "product management",
+  "project management",
+  "machine learning",
+  "ai",
+  "prompt engineering",
+]
+
+function canonicalSkillKey(skill: string): string {
+  return skill.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+}
+
+function findEvidence(text: string, skill: string): string {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const hit = lines.find((line) => line.toLowerCase().includes(skill.toLowerCase()))
+  return (hit ?? skill).slice(0, 240)
+}
+
+function buildFallbackExtraction(source: SourceDocs): ProfileExtraction {
+  const combined = [source.resumeText, source.linkedinText, source.llmMarkdownText]
+    .filter(Boolean)
+    .join("\n")
+  const lower = combined.toLowerCase()
+  const skills = FALLBACK_SKILL_NAMES.filter((skill) => lower.includes(skill)).map((skill) => ({
+    skill_name: skill,
+    canonical_skill_key: canonicalSkillKey(skill),
+    proficiency_band: null,
+    source_type: "inferred" as const,
+    evidence: findEvidence(combined, skill),
+  }))
+
+  return {
+    current_role: source.userStatedRole ?? "",
+    years_experience: source.userStatedYearsExperience ?? 0,
+    skills,
+    past_roles: [],
+    education: [],
+    notable_achievements: [],
+  }
 }
 
 async function loadSourceDocuments(userId: string): Promise<SourceDocs> {
@@ -34,7 +122,7 @@ async function loadSourceDocuments(userId: string): Promise<SourceDocs> {
     .from("user_documents")
     .select("id,doc_type,version")
     .eq("user_id", userId)
-    .in("doc_type", ["resume", "linkedin"])
+      .in("doc_type", ["resume", "linkedin", "llm_markdown"])
     .order("version", { ascending: false })
   if (docsError) throw docsError
 
@@ -64,8 +152,10 @@ async function loadSourceDocuments(userId: string): Promise<SourceDocs> {
 
   const resumeDocId = latestByType.get("resume") ?? null
   const linkedinDocId = latestByType.get("linkedin") ?? null
+  const llmMarkdownDocId = latestByType.get("llm_markdown") ?? null
   const resumeText = resumeDocId ? parsedByDocId.get(resumeDocId) ?? null : null
   const linkedinText = linkedinDocId ? parsedByDocId.get(linkedinDocId) ?? null : null
+  let llmMarkdownText = llmMarkdownDocId ? parsedByDocId.get(llmMarkdownDocId) ?? null : null
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .schema("careeros")
@@ -75,11 +165,39 @@ async function loadSourceDocuments(userId: string): Promise<SourceDocs> {
     .maybeSingle()
   if (profileError) throw profileError
 
+  if (!llmMarkdownText) {
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .schema("careeros")
+      .from("user_settings")
+      .select("onboarding_state")
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (settingsError) throw settingsError
+
+    const onboardingState =
+      (settings?.onboarding_state as Record<string, unknown> | null | undefined) ?? {}
+    const module11 =
+      typeof onboardingState.module_1_1 === "object" && onboardingState.module_1_1 !== null
+        ? (onboardingState.module_1_1 as Record<string, unknown>)
+        : {}
+    llmMarkdownText = truncateSourceText(
+      typeof module11.latestLlmMarkdownText === "string"
+        ? module11.latestLlmMarkdownText
+        : null,
+    )
+  }
+
+  if (!llmMarkdownText) {
+    llmMarkdownText = await loadOwnerBrainMarkdown(userId)
+  }
+
   return {
     resumeText,
     linkedinText,
+    llmMarkdownText,
     resumeDocId,
     linkedinDocId,
+    llmMarkdownDocId,
     userStatedRole: (profile?.current_role_title as string | null) ?? null,
     userStatedYearsExperience: (profile?.years_experience as number | null) ?? null,
   }
@@ -106,8 +224,8 @@ export const profileExtract = careerosInngest.createFunction(
 
     try {
       const source = await step.run("load-source-documents", async () => loadSourceDocuments(userId))
-      if (!source.resumeText && !source.linkedinText) {
-        throw new Error("No resume or LinkedIn text available")
+      if (!source.resumeText && !source.linkedinText && !source.llmMarkdownText) {
+        throw new Error("No resume, LinkedIn, or markdown context available")
       }
 
       const inputDataVersion = await step.run("compute-input-hash", async () =>
@@ -115,6 +233,7 @@ export const profileExtract = careerosInngest.createFunction(
           user_id: userId,
           resume_text_hash: source.resumeText ? sha256(source.resumeText) : null,
           linkedin_text_hash: source.linkedinText ? sha256(source.linkedinText) : null,
+          llm_markdown_hash: source.llmMarkdownText ? sha256(source.llmMarkdownText) : null,
           user_stated_role: source.userStatedRole,
           user_stated_years_experience: source.userStatedYearsExperience,
           schema_version: PROFILE_EXTRACTION_SCHEMA_VERSION,
@@ -125,24 +244,36 @@ export const profileExtract = careerosInngest.createFunction(
       const userPrompt = buildProfileExtractUserPrompt({
         resumeText: source.resumeText,
         linkedinText: source.linkedinText,
+        llmMarkdownText: source.llmMarkdownText,
         userStatedRole: source.userStatedRole,
         userStatedYearsExperience: source.userStatedYearsExperience,
       })
 
       const started = Date.now()
-      const { object: extraction, usage } = await step.run("qwen-extract", async () =>
-        qwenGenerateObject({
-          schema: ProfileExtractionSchema,
-          systemPrompt: PROFILE_EXTRACT_SYSTEM_PROMPT,
-          userPrompt,
-        }),
-      )
+      const { object: extraction, usage } = await step.run("qwen-extract", async () => {
+        try {
+          return await qwenGenerateObject({
+            schema: ProfileExtractionSchema,
+            systemPrompt: PROFILE_EXTRACT_SYSTEM_PROMPT,
+            userPrompt,
+          })
+        } catch (error) {
+          console.error(
+            "[careeros-profile-extract] structured extraction failed, using fallback",
+            error instanceof Error ? error.message : String(error),
+          )
+          return {
+            object: buildFallbackExtraction(source),
+            usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          }
+        }
+      })
       const latencyMs = Date.now() - started
       const outputHash = sha256(JSON.stringify(extraction))
 
       const extractionId = await step.run("write-extraction", async () => {
-        const baseDocId = source.resumeDocId ?? source.linkedinDocId
-        if (!baseDocId) throw new Error("No base document id found for extraction row")
+        const baseDocId = source.resumeDocId ?? source.linkedinDocId ?? source.llmMarkdownDocId
+        if (!baseDocId) return null
 
         const { data: curr, error: currErr } = await supabaseAdmin
           .schema("careeros")
@@ -178,6 +309,7 @@ export const profileExtract = careerosInngest.createFunction(
             source_attribution: {
               resume_used: Boolean(source.resumeText),
               linkedin_used: Boolean(source.linkedinText),
+              llm_markdown_used: Boolean(source.llmMarkdownText),
               onboarding_completion_id,
             },
           })
@@ -255,6 +387,7 @@ export const profileExtract = careerosInngest.createFunction(
             source_attribution: {
               resume_used: Boolean(source.resumeText),
               linkedin_used: Boolean(source.linkedinText),
+              llm_markdown_used: Boolean(source.llmMarkdownText),
             },
             input_hash: inputDataVersion,
             output_hash: outputHash,
@@ -273,7 +406,7 @@ export const profileExtract = careerosInngest.createFunction(
             skillsCount: extraction.skills.length,
             topSkills: extraction.skills.slice(0, 8).map((s) => s.skill_name),
             suggestedRoles: extraction.past_roles.slice(0, 3).map((r) => r.title),
-            extractionId,
+            ...(extractionId ? { extractionId } : {}),
           },
         })
       })

@@ -330,6 +330,7 @@ export function ContextBrainPage() {
   const [markdown, setMarkdown] = useState("")
   const [markdownDirty, setMarkdownDirty] = useState(false)
   const [savingMd, setSavingMd] = useState(false)
+  const [loadingMarkdownFile, setLoadingMarkdownFile] = useState(false)
   const [importingVault, setImportingVault] = useState(false)
   const [erasingKb, setErasingKb] = useState(false)
   const [contextScope, setContextScope] = useState<"owner" | "workspace" | null>(null)
@@ -371,33 +372,72 @@ export function ContextBrainPage() {
 
   useEffect(() => { void refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file) return
-    file.text()
-      .then((text) => { setMarkdown(text); setMarkdownDirty(true); toast({ title: "File loaded", description: file.name }) })
-      .catch(() => toast({ title: "Could not read file", variant: "destructive" }))
+    const lowerName = file.name.toLowerCase()
+    if (!lowerName.endsWith(".md") && !lowerName.endsWith(".txt")) {
+      toast({
+        title: "Unsupported file type",
+        description: "Upload a .md or .txt file.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoadingMarkdownFile(true)
+    try {
+      const text = await file.text()
+      setMarkdown(text)
+      const saved = await saveMarkdownText(text, {
+        successTitle: "File uploaded and saved",
+        successDescription: `${file.name} is now stored as your knowledge base.`,
+      })
+      if (saved) {
+        toast({
+          title: "Ready",
+          description: "Refresh should keep this document now.",
+        })
+      }
+    } catch {
+      toast({ title: "Could not read file", variant: "destructive" })
+    } finally {
+      setLoadingMarkdownFile(false)
+    }
   }
 
-  async function saveMarkdown() {
+  async function saveMarkdownText(
+    nextMarkdown: string,
+    messages?: { successTitle?: string; successDescription?: string },
+  ): Promise<boolean> {
     setSavingMd(true)
     try {
       const res = await fetch("/api/company/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ knowledge_base_md: markdown }),
+        body: JSON.stringify({ knowledge_base_md: nextMarkdown }),
       })
       const json = (await res.json().catch(() => ({}))) as { error?: string }
       if (!res.ok) throw new Error(json.error || "Failed to save")
       await refresh()
-      toast({ title: "Knowledge base saved" })
+      setMarkdownDirty(false)
+      toast({
+        title: messages?.successTitle ?? "Knowledge base saved",
+        description: messages?.successDescription,
+      })
+      return true
     } catch (e) {
       toast({ title: "Could not save", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
+      return false
     } finally {
       setSavingMd(false)
     }
+  }
+
+  async function saveMarkdown() {
+    await saveMarkdownText(markdown)
   }
 
   const vaultHasCache =
@@ -610,9 +650,11 @@ export function ContextBrainPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1.5">
-              <FileUp className="h-3.5 w-3.5" />
-              Upload .md file
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <label htmlFor="knowledge-base-md-upload" className={loadingMarkdownFile ? "pointer-events-none opacity-70" : "cursor-pointer"}>
+                {loadingMarkdownFile ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+                {loadingMarkdownFile ? "Loading file..." : "Upload .md file"}
+              </label>
             </Button>
             <Button
               type="button"
@@ -629,7 +671,15 @@ export function ContextBrainPage() {
             {contextData.knowledge.updatedAt && (
               <span className="text-xs text-muted-foreground">Last saved {formatDateTime(contextData.knowledge.updatedAt)}</span>
             )}
-            <input ref={fileInputRef} type="file" accept=".md,.txt" className="hidden" onChange={handleFileUpload} />
+            <input
+              id="knowledge-base-md-upload"
+              ref={fileInputRef}
+              type="file"
+              accept=".md,.txt,text/markdown,text/plain"
+              className="sr-only"
+              disabled={loadingMarkdownFile}
+              onChange={(e) => void handleFileUpload(e)}
+            />
           </div>
 
           <Textarea
