@@ -386,6 +386,37 @@ export default function FloatingJuno() {
               <div className="flex items-center gap-0.5">
                 {view === "chat" && (
                   <>
+                    {/* Test voice — direct click → plays immediately */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      title="Test ElevenLabs voice"
+                      onClick={async () => {
+                        ensureAudioContext()
+                        const ctx = _audioCtx
+                        if (!ctx) return
+                        try {
+                          const res = await fetch("/api/voice/tts", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ text: "Hey, Juno here. Voice is working." }),
+                          })
+                          if (!res.ok) { alert(`TTS API error: ${res.status}`); return }
+                          const ab = await res.arrayBuffer()
+                          if (ctx.state === "suspended") await ctx.resume()
+                          const buf = await ctx.decodeAudioData(ab)
+                          const src = ctx.createBufferSource()
+                          src.buffer = buf
+                          src.connect(ctx.destination)
+                          src.start(0)
+                        } catch (e) {
+                          alert(`Voice error: ${e}`)
+                        }
+                      }}
+                    >
+                      <span className="text-[10px] font-bold">▶</span>
+                    </Button>
                     {/* Voice mute toggle */}
                     <Button
                       variant="ghost"
