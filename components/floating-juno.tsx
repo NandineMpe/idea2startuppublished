@@ -36,8 +36,7 @@ type View = "chat" | "history"
 
 const WELCOME: Message = {
   role: "assistant",
-  content:
-    "Hi. Ask anything (strategy, GTM, product, or unrelated). When you are signed in, replies use your company profile. This thread is only for this button, not Context → Update context.",
+  content: "Hi Nano, what's up? Ask me anything — strategy, GTM, product, or whatever's on your mind.",
 }
 
 function formatRelativeTime(dateStr: string) {
@@ -54,6 +53,7 @@ function formatRelativeTime(dateStr: string) {
 export default function FloatingJuno() {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [view, setView] = useState<View>("chat")
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<Message[]>([WELCOME])
@@ -239,8 +239,9 @@ export default function FloatingJuno() {
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              "mb-3 w-[360px] rounded-xl border border-border bg-card shadow-xl overflow-hidden flex flex-col",
-              isMinimized ? "h-[52px]" : "h-[500px]",
+              "mb-3 rounded-xl border border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300",
+              isExpanded ? "w-[min(50vw,720px)]" : "w-[360px]",
+              isMinimized ? "h-[52px]" : isExpanded ? "h-[min(50vh,600px)]" : "h-[500px]",
             )}
           >
             {/* Header */}
@@ -264,7 +265,7 @@ export default function FloatingJuno() {
                   </p>
                   {view === "chat" && (
                     <p className="text-[10px] text-muted-foreground leading-tight">
-                      Any topic · company context when signed in
+                      Any topic
                     </p>
                   )}
                   {view === "history" && (
@@ -297,11 +298,23 @@ export default function FloatingJuno() {
                     </Button>
                   </>
                 )}
+                {!isMinimized && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    title={isExpanded ? "Collapse" : "Expand to half page"}
+                  >
+                    {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
                   onClick={() => setIsMinimized(!isMinimized)}
+                  title={isMinimized ? "Restore" : "Minimise"}
                 >
                   {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
                 </Button>
