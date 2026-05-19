@@ -340,12 +340,11 @@ export default function FloatingJuno() {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, x: 20, width: 380 }}
+            animate={{ opacity: 1, x: 0, width: isExpanded ? "calc(100vw - 192px)" : 380 }}
             exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300"
-            style={{ width: isExpanded ? "calc(100vw - 192px)" : "380px" }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
