@@ -51,29 +51,26 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`
 }
 
-// Singleton AudioContext — unlocked on first user gesture, reused for all playback
-let _audioCtx: AudioContext | null = null
-let _audioSource: AudioBufferSourceNode | null = null
+// Single persistent audio element — unlocked on first user gesture
+const _audio = typeof window !== "undefined" ? new Audio() : null
 
-function getAudioContext(): AudioContext {
-  if (!_audioCtx || _audioCtx.state === "closed") {
-    _audioCtx = new AudioContext()
-  }
-  return _audioCtx
-}
-
-/** Call on any user click to unlock audio before we need it. */
+/** Call on any user interaction to unlock the audio element for autoplay. */
 function unlockAudio() {
-  const ctx = getAudioContext()
-  if (ctx.state === "suspended") ctx.resume()
+  if (!_audio) return
+  _audio.muted = true
+  _audio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+  _audio.play().catch(() => {})
+  _audio.muted = false
 }
 
 function stopCurrentAudio() {
-  try { _audioSource?.stop() } catch {}
-  _audioSource = null
+  if (!_audio) return
+  _audio.pause()
+  _audio.src = ""
 }
 
 async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
+  if (!_audio) { onEnd(); return }
   stopCurrentAudio()
 
   const res = await fetch("/api/voice/tts", {
@@ -83,19 +80,23 @@ async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
   })
   if (!res.ok) { onEnd(); return }
 
-  const arrayBuffer = await res.arrayBuffer()
-  const ctx = getAudioContext()
-
-  // Resume in case it suspended while we were waiting
-  if (ctx.state === "suspended") await ctx.resume()
-
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
-  const source = ctx.createBufferSource()
-  source.buffer = audioBuffer
-  source.connect(ctx.destination)
-  source.onended = onEnd
-  _audioSource = source
-  source.start(0)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  _audio.src = url
+  _audio.onended = () => {
+    URL.revokeObjectURL(url)
+    onEnd()
+  }
+  _audio.onerror = () => {
+    URL.revokeObjectURL(url)
+    onEnd()
+  }
+  try {
+    await _audio.play()
+  } catch {
+    URL.revokeObjectURL(url)
+    onEnd()
+  }
 }
 
 export default function FloatingJuno() {
