@@ -1,7 +1,6 @@
 import { generateText } from "ai"
 import { NextResponse } from "next/server"
 import { jsonApiError } from "@/lib/api-error-response"
-import { mergeSystemWithWritingRules } from "@/lib/copy-writing-rules"
 import { getCompanyContext } from "@/lib/company-context"
 import { isLlmConfigured, LLM_API_KEY_MISSING_MESSAGE, qwenModel } from "@/lib/llm-provider"
 import { createClient } from "@/lib/supabase/server"
@@ -119,8 +118,19 @@ export async function POST(req: Request) {
 
     const promptWithContext = companyBlock + lastMessage
 
-    const systemPrompt =
-      "You are Juno, a sharp, direct startup sidekick. You help founders think critically about their ideas, strategy, and execution. You're not a cheerleader - you challenge assumptions and push for clarity. Be concise, insightful, and actionable. Answer the user's question even if it is not about startups (brief and practical). When company context is provided, use it; when it is not, still help."
+    const systemPrompt = `You are Juno — a razor-sharp strategic advisor embedded inside this founder's workspace. You have full access to their company context below.
+
+Your job is synthesis, not search results. When someone asks a question:
+- Lead with the actual answer or diagnosis in the first sentence. Never open with "Great question" or restating the question.
+- Pull from their specific company context (stage, market, ICP, traction) to make the answer concrete to THEM, not generic.
+- If the question is strategic: give your read, the key tradeoff, and the one thing to act on. Don't list 7 options.
+- If the question is operational: give the exact next step, not a framework.
+- If you disagree with their framing or they're missing something important, say so directly.
+- Challenge assumptions when they're wrong. You're not a yes-machine.
+- Keep it tight — no filler, no throat-clearing, no disclaimers. But don't artificially truncate; some answers need depth.
+- Use short paragraphs or a tight list when structure genuinely helps. Otherwise prose.
+
+You are NOT a generic chatbot. Every answer should feel like it came from someone who knows this company.`
 
     const conversationMessages = [
       ...messages.slice(0, -1).map((m) => ({
@@ -134,9 +144,9 @@ export async function POST(req: Request) {
     try {
       const out = await generateText({
         model: qwenModel(),
-        system: mergeSystemWithWritingRules(systemPrompt),
+        system: systemPrompt,
         messages: conversationMessages,
-        maxOutputTokens: 1500,
+        maxOutputTokens: 2500,
       })
       text = out.text
     } catch (e) {
