@@ -13,14 +13,13 @@ import {
   Plus,
   ChevronLeft,
   Trash2,
-  Mic,
-  MicOff,
   Volume2,
   VolumeX,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { VoiceInput } from "@/components/ui/voice-input"
 import { cn } from "@/lib/utils"
 
 interface Message {
@@ -583,29 +582,24 @@ export default function FloatingJuno() {
                     <div className="p-3 border-t border-border shrink-0">
                       <div className="flex gap-2">
                         <Input
-                          placeholder={isListening ? "Listening..." : "Ask anything..."}
+                          placeholder="Ask anything..."
                           value={input}
                           onChange={(e) => setInput(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && void handleSend()}
-                          className={cn(
-                            "text-[13px] h-9 bg-muted border-border focus:border-primary",
-                            isListening && "border-primary/60",
-                          )}
+                          className="text-[13px] h-9 bg-muted border-border focus:border-primary"
                         />
                         {/* Mic button */}
-                        <Button
-                          type="button"
-                          onClick={toggleListening}
-                          size="sm"
-                          variant={isListening ? "default" : "outline"}
-                          className={cn(
-                            "h-9 w-9 p-0 shrink-0",
-                            isListening && "bg-primary text-primary-foreground animate-pulse",
-                          )}
-                          title={isListening ? "Stop listening" : "Speak your message"}
-                        >
-                          {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-                        </Button>
+                        <VoiceInput
+                          onStart={() => {
+                            if (!isListening) toggleListening()
+                          }}
+                          onStop={() => {
+                            if (isListening) {
+                              recognitionRef.current?.stop()
+                              setIsListening(false)
+                            }
+                          }}
+                        />
                         {/* Send button */}
                         <Button
                           onClick={() => void handleSend()}
@@ -616,11 +610,6 @@ export default function FloatingJuno() {
                           <Send size={14} />
                         </Button>
                       </div>
-                      {isListening && (
-                        <p className="text-[10px] text-primary/70 mt-1.5 text-center animate-pulse">
-                          Listening — speak now, then pause to send
-                        </p>
-                      )}
                     </div>
                   </>
                 )}
