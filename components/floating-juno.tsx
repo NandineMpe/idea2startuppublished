@@ -68,10 +68,10 @@ export default function FloatingJuno() {
   }, [])
 
   useEffect(() => {
-    if (isOpen && !isMinimized && view === "chat") {
+    if (isOpen && view === "chat") {
       scrollToBottom()
     }
-  }, [messages, isOpen, isMinimized, view, scrollToBottom])
+  }, [messages, isOpen, view, scrollToBottom])
 
   const fetchSessions = useCallback(async () => {
     setLoadingSessions(true)
@@ -239,7 +239,7 @@ export default function FloatingJuno() {
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
               "fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300",
-              isExpanded ? "w-[min(50vw,720px)]" : "w-[380px]",
+              isExpanded ? "w-[720px]" : "w-[380px]",
             )}
           >
             {/* Header */}
