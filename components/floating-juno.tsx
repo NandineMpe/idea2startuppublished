@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  MessageCircle,
   X,
   Send,
   Sparkles,
@@ -627,12 +626,35 @@ export default function FloatingJuno() {
       </AnimatePresence>
 
       <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.93 }}
         onClick={() => { unlockAudio(); setIsOpen(!isOpen) }}
-        className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:shadow-xl transition-shadow"
+        className="relative flex items-center justify-center w-14 h-14 rounded-full focus:outline-none"
+        aria-label={isOpen ? "Close Juno" : "Open Juno"}
       >
-        {isOpen ? <X size={20} /> : <MessageCircle size={20} />}
+        {/* Spinning gradient ring */}
+        <div
+          className="absolute inset-0 rounded-full animate-spin"
+          style={{
+            background: "conic-gradient(from 0deg, rgb(186,66,255), rgb(0,225,255), rgb(186,66,255))",
+            animationDuration: "1.7s",
+            animationTimingFunction: "linear",
+          }}
+        />
+        {/* Glow */}
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            boxShadow: "0 0 18px 4px rgba(186,66,255,0.55), 0 0 18px 4px rgba(0,225,255,0.45)",
+          }}
+        />
+        {/* Inner dark circle with icon */}
+        <div className="absolute inset-[3px] rounded-full bg-[rgb(22,22,22)] flex items-center justify-center">
+          {isOpen
+            ? <X size={18} className="text-white" />
+            : <Sparkles size={16} className="text-white" />
+          }
+        </div>
       </motion.button>
     </div>
   )
