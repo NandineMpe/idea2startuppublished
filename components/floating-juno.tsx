@@ -344,10 +344,8 @@ export default function FloatingJuno() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className={cn(
-              "fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300",
-              isExpanded ? "w-[720px]" : "w-[380px]",
-            )}
+            className="fixed top-0 right-0 h-screen border-l border-border bg-card shadow-xl overflow-hidden flex flex-col transition-all duration-300"
+            style={{ width: isExpanded ? "calc(100vw - 192px)" : "380px" }}
           >
             {/* Header */}
             <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0">
