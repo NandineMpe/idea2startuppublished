@@ -101,7 +101,7 @@ async function speakViaTTS(text: string, onEnd: () => void): Promise<void> {
 export default function FloatingJuno() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
-  const expandedWidth = typeof window !== "undefined" ? window.innerWidth - 192 : 900
+  const expandedWidth = typeof window !== "undefined" ? window.innerWidth - 172 : 900
   const [view, setView] = useState<View>("chat")
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<Message[]>([WELCOME])
@@ -629,6 +629,8 @@ export default function FloatingJuno() {
         onClick={() => { unlockAudio(); setIsOpen(!isOpen) }}
         className="relative flex items-center justify-center w-14 h-14 rounded-full focus:outline-none"
         aria-label={isOpen ? "Close Juno" : "Open Juno"}
+        animate={{ opacity: isOpen ? 0 : 1, pointerEvents: isOpen ? "none" : "auto" }}
+        transition={{ duration: 0.15 }}
       >
         {/* Spinning gradient ring */}
         <div
