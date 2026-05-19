@@ -402,7 +402,7 @@ export default function FloatingJuno() {
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ text: "Hey, Juno here. Voice is working." }),
                           })
-                          if (!res.ok) { alert(`TTS API error: ${res.status}`); return }
+                          if (!res.ok) { const e = await res.json().catch(() => ({})); alert(`TTS error ${res.status}: ${JSON.stringify(e)}`); return }
                           const ab = await res.arrayBuffer()
                           if (ctx.state === "suspended") await ctx.resume()
                           const buf = await ctx.decodeAudioData(ab)

@@ -14,23 +14,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
   }
 
-  const audio = await elevenlabs.textToSpeech.convert(voiceId, {
-    text,
-    modelId: 'eleven_flash_v2_5',
-    outputFormat: 'mp3_44100_128', // universally supported by browsers
-  })
+  try {
+    const audio = await elevenlabs.textToSpeech.convert(voiceId, {
+      text,
+      modelId: 'eleven_flash_v2_5',
+      outputFormat: 'mp3_44100_128',
+    })
 
-  const chunks: Uint8Array[] = []
-  for await (const chunk of audio) {
-    chunks.push(chunk)
+    const chunks: Uint8Array[] = []
+    for await (const chunk of audio) {
+      chunks.push(chunk)
+    }
+    const buffer = Buffer.concat(chunks)
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': buffer.length.toString(),
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[TTS] ElevenLabs error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
-  const buffer = Buffer.concat(chunks)
-
-  return new NextResponse(buffer, {
-    headers: {
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': buffer.length.toString(),
-      'Cache-Control': 'no-store',
-    },
-  })
 }
