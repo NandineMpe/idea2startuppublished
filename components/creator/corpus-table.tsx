@@ -4,7 +4,12 @@ import { useState, useTransition } from "react"
 import { Trash2 } from "lucide-react"
 import { deleteCreatorContent } from "@/lib/creator/actions"
 import { cn } from "@/lib/utils"
-import type { CreatorPost, TranscriptStatus } from "@/lib/creator/types"
+import {
+  engagementRate,
+  formatEngagementRate,
+  type CreatorPost,
+  type TranscriptStatus,
+} from "@/lib/creator/types"
 
 const TRANSCRIPT_CLASS: Record<TranscriptStatus, string> = {
   done: "text-emerald-600 dark:text-emerald-400",
@@ -26,6 +31,18 @@ const TRANSCRIPT_HELP: Record<TranscriptStatus, string> = {
 function compact(n: number | null | undefined): string {
   if (typeof n !== "number") return "—"
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n)
+}
+
+/**
+ * Bands rather than a gradient, so the column is scannable. TikTok engagement
+ * is typically low single digits, so 10%+ is genuinely exceptional and worth
+ * calling out as the thing to make more of.
+ */
+function engagementClass(rate: number | null): string {
+  if (rate === null) return "text-muted-foreground"
+  if (rate >= 10) return "text-emerald-600 dark:text-emerald-400"
+  if (rate >= 5) return "text-foreground"
+  return "text-muted-foreground"
 }
 
 const TH = "px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground font-medium"
@@ -130,6 +147,15 @@ export function CorpusTable({ posts }: { posts: CreatorPost[] }) {
               <th className={TH}>Transcript</th>
               <th className={cn(TH, "text-right")}>Views</th>
               <th className={cn(TH, "text-right")}>Likes</th>
+              <th className={cn(TH, "text-right")} title="Bookmarks — the strongest intent signal">
+                Saves
+              </th>
+              <th
+                className={cn(TH, "text-right")}
+                title="(likes + comments + shares + saves) ÷ views. Measures whether the content earned a response, not how far it was pushed."
+              >
+                Engagement
+              </th>
               <th className={cn(TH, "w-10")}>
                 <span className="sr-only">Delete</span>
               </th>
@@ -170,6 +196,22 @@ export function CorpusTable({ posts }: { posts: CreatorPost[] }) {
                 </td>
                 <td className="px-4 py-2.5 text-[12px] text-foreground text-right tabular-nums">
                   {compact(post.metrics?.likes)}
+                </td>
+                <td className="px-4 py-2.5 text-[12px] text-foreground text-right tabular-nums">
+                  {compact(post.metrics?.saves)}
+                </td>
+                <td
+                  className={cn(
+                    "px-4 py-2.5 text-[12px] text-right tabular-nums font-medium",
+                    engagementClass(engagementRate(post.metrics)),
+                  )}
+                  title={
+                    post.metrics
+                      ? `${post.metrics.likes} likes + ${post.metrics.comments} comments + ${post.metrics.shares} shares + ${post.metrics.saves ?? 0} saves ÷ ${post.metrics.views} views`
+                      : undefined
+                  }
+                >
+                  {formatEngagementRate(engagementRate(post.metrics))}
                 </td>
                 <td className="px-4 py-2.5 text-right whitespace-nowrap">
                   {confirming === post.id ? (

@@ -7,6 +7,7 @@ import { creatorOpportunitiesSweep } from "@/lib/creator/inngest/functions/oppor
 import { creatorCorpusIngested } from "@/lib/creator/inngest/functions/corpus-ingested"
 import { creatorContentTranscribe } from "@/lib/creator/inngest/functions/content-transcribe"
 import { creatorContentEnrich } from "@/lib/creator/inngest/functions/content-enrich"
+import { creatorMetricsRefresh } from "@/lib/creator/inngest/functions/metrics-refresh"
 import { creatorCanonDerive } from "@/lib/creator/inngest/functions/canon-derive"
 import { creatorWriterDraft } from "@/lib/creator/inngest/functions/writer-draft"
 
@@ -22,6 +23,7 @@ export const { GET, POST, PUT } = serve({
     creatorOpportunitiesSweep,
     creatorCorpusIngested,
     creatorContentEnrich,
+    creatorMetricsRefresh,
     creatorContentTranscribe,
     creatorCanonDerive,
     creatorWriterDraft,

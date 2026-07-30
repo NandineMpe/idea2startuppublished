@@ -19,6 +19,9 @@ export type CreatorEvents = {
   "creator/content.enrich": {
     data: { user_id: string; content_id: string }
   }
+  "creator/metrics.refresh": {
+    data: { user_id?: string }
+  }
   "creator/content.transcribe": {
     data: { user_id: string; content_id: string }
   }

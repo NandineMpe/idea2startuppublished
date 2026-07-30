@@ -43,6 +43,33 @@ export type PostMetrics = {
   likes: number
   comments: number
   shares: number
+  /** Bookmarks. Optional because rows captured before it was collected lack it. */
+  saves?: number
+}
+
+/**
+ * Engagement rate: the share of viewers who did something deliberate.
+ *
+ * Raw views measure distribution — mostly how far the algorithm pushed a post.
+ * Engagement measures whether the content earned a response once it arrived,
+ * which is what a brand is buying and what predicts whether a format repeats.
+ * A 20k-view post at 12% is a stronger signal than a 1M-view post at 2%.
+ *
+ * Saves are included and weighted equally: a bookmark is the strongest intent
+ * signal on the platform, since it means the viewer expects to come back.
+ * Returns null rather than 0 when views are missing, so "unknown" never renders
+ * as "nobody engaged".
+ */
+export function engagementRate(metrics: PostMetrics | null | undefined): number | null {
+  if (!metrics || typeof metrics.views !== "number" || metrics.views <= 0) return null
+  const actions =
+    (metrics.likes ?? 0) + (metrics.comments ?? 0) + (metrics.shares ?? 0) + (metrics.saves ?? 0)
+  return (actions / metrics.views) * 100
+}
+
+export function formatEngagementRate(rate: number | null): string {
+  if (rate === null) return "—"
+  return `${rate.toFixed(rate >= 10 ? 0 : 1)}%`
 }
 
 export type CreatorPost = {

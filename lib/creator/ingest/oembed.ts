@@ -29,7 +29,7 @@ export function isTikTokVideoUrl(url: string): boolean {
 export type TikTokVideoDetail = {
   caption: string | null
   postedAt: string | null
-  metrics: { views: number; likes: number; comments: number; shares: number } | null
+  metrics: { views: number; likes: number; comments: number; shares: number; saves: number } | null
   durationSeconds: number | null
   hashtags: string[]
   /** Spoken content, from TikTok's own subtitle track. Null when none exists. */
@@ -140,6 +140,8 @@ export async function fetchTikTokVideoDetail(url: string): Promise<TikTokVideoDe
             likes,
             comments: toCount(stats.commentCount) ?? 0,
             shares: toCount(stats.shareCount) ?? 0,
+            // Bookmarks. Sent as a string by TikTok, unlike the other counts.
+            saves: toCount(stats.collectCount) ?? 0,
           }
         : null,
     durationSeconds: toCount(video.duration),
