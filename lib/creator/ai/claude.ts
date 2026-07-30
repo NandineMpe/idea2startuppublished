@@ -1,6 +1,7 @@
 import { generateObject } from "ai"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import type { z } from "zod"
+import { NO_EM_DASH_RULE, stripEmDashesDeep } from "@/lib/creator/text"
 
 /**
  * Creator OS Claude helper. Separate from the careeros helper because agent
@@ -29,7 +30,10 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
     const result = await generateObject({
       model: creatorClaudeModel(),
       schema: args.schema,
-      system: args.system,
+      // Appended to every system prompt rather than repeated per agent: the
+      // sanitiser below guarantees the result, but prose written without them
+      // reads better than prose repaired afterwards.
+      system: `${args.system}\n\n${NO_EM_DASH_RULE}`,
       prompt: args.prompt,
       // Generous by default: this model thinks, and thinking is charged against
       // the same ceiling as the response, so a tight budget truncates the JSON
@@ -38,7 +42,9 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
     })
 
     return {
-      object: result.object,
+      // Enforced at the single chokepoint every generation passes through, so
+      // no caller can forget it and no new agent can reintroduce them.
+      object: stripEmDashesDeep(result.object),
       usage: { totalTokens: result.usage?.totalTokens ?? 0 },
     }
   } catch (e) {
