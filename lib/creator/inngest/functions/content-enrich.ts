@@ -19,10 +19,13 @@ export const creatorContentEnrich = creatorInngest.createFunction(
     id: "creator-content-enrich",
     name: "Creator OS: enrich content from URL",
     retries: 2,
-    // Deliberately slow: these are unauthenticated page loads, and hammering
-    // them is the fastest way to start getting challenge pages instead of data.
-    concurrency: { limit: 2 },
-    throttle: { limit: 20, period: "1m" },
+    // Paced rather than crawling. The original 2/20-per-minute was a guess made
+    // before the source had been measured; a back-to-back probe of 8 pages
+    // returned 200 in ~500ms each with no challenge, so this sits near 1 req/s —
+    // slow enough to stay unremarkable, fast enough that a 30-post corpus
+    // refreshes in a minute rather than an afternoon.
+    concurrency: { limit: 5 },
+    throttle: { limit: 60, period: "1m" },
     triggers: [{ event: "creator/content.enrich" }],
   },
   async ({ event, step }) => {
