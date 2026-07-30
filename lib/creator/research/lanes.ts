@@ -28,6 +28,52 @@ export type LaneSignal = RawFeedItem & {
 
 const UA = "Juno Creator OS Research (contact: nandini@augentik.com)"
 
+const STOPWORDS = new Set([
+  "the", "and", "for", "with", "how", "why", "what", "who", "are", "was", "were",
+  "from", "into", "about", "that", "this", "these", "those", "your", "you", "its",
+  "using", "use", "used", "new", "more", "most", "can", "will", "study", "report",
+  "research", "paper", "analysis", "based", "towards", "toward", "via",
+])
+
+function meaningfulTokens(text: string): string[] {
+  return [
+    ...new Set(
+      text
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+        .split(/\s+/)
+        .filter((w) => w.length >= 2 && !STOPWORDS.has(w)),
+    ),
+  ]
+}
+
+/**
+ * Keep only results that are actually about the query.
+ *
+ * arXiv's `all:` matches full text including references, so a paper can satisfy
+ * an AND of terms while being about something else entirely — a search for
+ * chatbot dependence returned a paper on avian bone classification. An
+ * irrelevant paper is worse than none, because it reaches synthesis and gets
+ * cited as a receipt in a dossier.
+ *
+ * Matching is on title and summary only, and demands two distinct query terms
+ * (one when the query itself is that short), which is strict enough to drop the
+ * bird bones and loose enough to keep papers phrased differently to the query.
+ */
+function filterByRelevance(items: RawFeedItem[], query: string): RawFeedItem[] {
+  const wanted = meaningfulTokens(query)
+  if (!wanted.length) return items
+  const required = wanted.length <= 2 ? 1 : 2
+
+  return items.filter((item) => {
+    const haystack = meaningfulTokens(`${item.title} ${item.body ?? ""}`)
+    const hits = wanted.filter((w) =>
+      haystack.some((h) => h === w || (w.length >= 5 && h.startsWith(w.slice(0, 5)))),
+    ).length
+    return hits >= required
+  })
+}
+
 /**
  * Turn a canon topic label into search queries.
  *
@@ -260,9 +306,10 @@ export async function sweepTopicAcrossLanes(
   }
 
   const [news, papers, books, discussion] = await Promise.all([
+    // News search already ranks by relevance; the others match too loosely.
     across("news", (q) => fetchNews(q, hoursBack)),
-    across("papers", (q) => fetchPapers(q, hoursBack)),
-    across("books", (q) => fetchBooks(q)),
+    across("papers", async (q) => filterByRelevance(await fetchPapers(q, hoursBack), q)),
+    across("books", async (q) => filterByRelevance(await fetchBooks(q), q)),
     across("discussion", (q) => fetchDiscussion(q, hoursBack)),
   ])
 
