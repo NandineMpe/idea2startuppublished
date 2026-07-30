@@ -16,6 +16,9 @@ export type CreatorEvents = {
   "creator/corpus.ingested": {
     data: { user_id: string; content_ids: string[] }
   }
+  "creator/content.enrich": {
+    data: { user_id: string; content_id: string }
+  }
   "creator/content.transcribe": {
     data: { user_id: string; content_id: string }
   }

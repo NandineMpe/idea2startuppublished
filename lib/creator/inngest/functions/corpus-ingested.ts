@@ -16,6 +16,30 @@ export const creatorCorpusIngested = creatorInngest.createFunction(
   async ({ event, step }) => {
     const { user_id: userId, content_ids: contentIds } = event.data
 
+    // Pasted URLs arrive with no caption; oEmbed can recover it.
+    const needsEnrich = await step.run("find-rows-needing-caption", async () => {
+      const { data, error } = await supabaseAdmin
+        .schema("creator")
+        .from("creator_content")
+        .select("id")
+        .eq("user_id", userId)
+        .in("id", contentIds)
+        .is("caption", null)
+        .not("url", "is", null)
+      if (error) throw error
+      return (data ?? []).map((row) => row.id as string)
+    })
+
+    if (needsEnrich.length) {
+      await step.sendEvent(
+        "fan-out-enrich",
+        needsEnrich.map((id) => ({
+          name: "creator/content.enrich" as const,
+          data: { user_id: userId, content_id: id },
+        })),
+      )
+    }
+
     const pendingIds = await step.run("find-pending-transcripts", async () => {
       const { data, error } = await supabaseAdmin
         .schema("creator")
@@ -43,6 +67,11 @@ export const creatorCorpusIngested = creatorInngest.createFunction(
       data: { user_id: userId },
     })
 
-    return { user_id: userId, ingested: contentIds.length, transcriptions_queued: pendingIds.length }
+    return {
+      user_id: userId,
+      ingested: contentIds.length,
+      enrich_queued: needsEnrich.length,
+      transcriptions_queued: pendingIds.length,
+    }
   },
 )

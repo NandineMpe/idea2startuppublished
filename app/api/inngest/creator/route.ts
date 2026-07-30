@@ -6,6 +6,7 @@ import { creatorResearchSynthesise } from "@/lib/creator/inngest/functions/resea
 import { creatorOpportunitiesSweep } from "@/lib/creator/inngest/functions/opportunities-sweep"
 import { creatorCorpusIngested } from "@/lib/creator/inngest/functions/corpus-ingested"
 import { creatorContentTranscribe } from "@/lib/creator/inngest/functions/content-transcribe"
+import { creatorContentEnrich } from "@/lib/creator/inngest/functions/content-enrich"
 import { creatorCanonDerive } from "@/lib/creator/inngest/functions/canon-derive"
 import { creatorWriterDraft } from "@/lib/creator/inngest/functions/writer-draft"
 
@@ -20,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     creatorResearchSynthesise,
     creatorOpportunitiesSweep,
     creatorCorpusIngested,
+    creatorContentEnrich,
     creatorContentTranscribe,
     creatorCanonDerive,
     creatorWriterDraft,
