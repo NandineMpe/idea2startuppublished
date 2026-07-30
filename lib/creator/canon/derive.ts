@@ -36,6 +36,9 @@ const derivationSchema = z.object({
     label: z.string(),
     weight: z.number().min(0).max(1),
     adjacent: z.array(z.string()),
+    search_queries: z.array(z.string()).min(1).max(3).describe(
+      "2-3 queries a person would actually type to find current material on this topic. These are used verbatim against news, arXiv, book and forum search — the label is for display and is usually unsearchable.",
+    ),
   })).max(12),
 })
 
@@ -46,6 +49,7 @@ Rules:
 - Formats are repeatable STRUCTURES they return to (how a post is built), independent of topic. A format needs at least 2 posts to exist.
 - Voice comes from transcripts first, captions second. never_says (what they demonstrably avoid) matters more than the positive patterns. Return null voice rather than a generic one.
 - Topic weights reflect share of the corpus and must sum to roughly 1. "adjacent" = topics one step away that they have NOT worked — the stretch surface.
+- search_queries are what a researcher would type into Google News, arXiv or a bookshop to find current material on the topic. Write them as plain searchable phrases, not as the editorial label: for "Big Four, audit & accounting disruption" write ["Big Four accounting firms AI", "audit automation", "accounting profession disruption"], never the label itself. No commas, ampersands or slashes inside a query.
 - Post indexes refer to the numbered list. Never reference an index that does not exist.`
 
 type PostRow = {

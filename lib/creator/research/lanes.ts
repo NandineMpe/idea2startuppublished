@@ -28,6 +28,43 @@ export type LaneSignal = RawFeedItem & {
 
 const UA = "Juno Creator OS Research (contact: nandini@augentik.com)"
 
+/**
+ * Turn a canon topic label into search queries.
+ *
+ * Canon labels are editorial phrases written to read well on the Canon screen
+ * — "AI accountability, lawsuits & copyright", "Big Four, audit & accounting
+ * disruption". Handed to a search API verbatim they return nothing at all, in
+ * every lane including news, because no document contains that exact compound.
+ *
+ * Splitting on the separators recovers the searchable parts, and short
+ * fragments are re-anchored to the label's leading term so "copyright" does not
+ * go out unqualified and drag back the whole of copyright law.
+ */
+export function topicToQueries(label: string): string[] {
+  const cleaned = label.replace(/\s+/g, " ").trim()
+  if (!cleaned) return []
+
+  const fragments = cleaned
+    .split(/[,;&/]|\band\b/i)
+    .map((f) => f.replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim())
+    .filter((f) => f.length > 2)
+
+  if (fragments.length <= 1) return [cleaned.replace(/[^\p{L}\p{N}\s-]/gu, " ").replace(/\s+/g, " ").trim()]
+
+  // The first fragment carries the domain ("AI accountability" -> "AI").
+  const anchor = fragments[0].split(" ")[0]
+  const queries = fragments.map((fragment, i) => {
+    if (i === 0) return fragment
+    const words = fragment.split(" ")
+    // Re-anchor only genuinely bare fragments; leave specific ones alone.
+    return words.length <= 2 && !fragment.toLowerCase().includes(anchor.toLowerCase())
+      ? `${anchor} ${fragment}`
+      : fragment
+  })
+
+  return [...new Set(queries)].slice(0, 3)
+}
+
 function tag(items: RawFeedItem[], lane: ResearchLane, stance: TopicStance, topic: string): LaneSignal[] {
   return items.map((item) => ({ ...item, lane, stance, topic }))
 }
@@ -50,8 +87,24 @@ async function fetchNews(topic: string, hoursBack: number): Promise<RawFeedItem[
 // Preprints are where a claim appears months before the news notices.
 // ---------------------------------------------------------------------------
 
+/**
+ * arXiv hosts every discipline, so an unscoped term search returns particle
+ * physics for "accountability". Constraining to the CS categories that actually
+ * carry this material — AI, computers-and-society, ML, language, crypto/security
+ * — is the difference between a relevant paper and noise that pollutes synthesis.
+ */
+const ARXIV_CATEGORIES = "cat:cs.AI+OR+cat:cs.CY+OR+cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.CR"
+
 async function fetchPapers(topic: string, hoursBack: number): Promise<RawFeedItem[]> {
-  const q = encodeURIComponent(`all:"${topic}"`)
+  // AND of terms rather than an exact phrase: arXiv titles rarely echo a topic
+  // verbatim. Two-character tokens are kept — "AI" and "EU" are load-bearing.
+  const terms = topic
+    .split(/\s+/)
+    .filter((w) => w.length >= 2)
+    .slice(0, 3)
+    .map((w) => `all:${encodeURIComponent(w)}`)
+    .join("+AND+")
+  const q = terms ? `(${ARXIV_CATEGORIES})+AND+${terms}` : ARXIV_CATEGORIES
   return fetchRssLikeSource({
     sourceKey: `papers:${slug(topic)}`,
     // https, not http: plain-HTTP outbound fails in some serverless runtimes,
@@ -171,28 +224,46 @@ export async function sweepTopicAcrossLanes(
   hoursBack: number,
 ): Promise<LaneOutcome> {
   const errors: string[] = []
+  // The label is for reading; the queries are for searching. Each lane runs the
+  // derived queries and the results are pooled under the original topic.
+  const queries = topicToQueries(topic)
+  if (!queries.length) return { signals: [], errors: [`${topic}: produced no searchable query`] }
 
   /**
    * Per-lane isolation, but never silent: an empty lane and a broken lane look
    * identical in the output, and the first version of this swallowed the
    * difference — which hid four dead lanes behind a working news feed.
    */
-  async function lane<T>(name: ResearchLane, fn: () => Promise<T[]>): Promise<T[]> {
-    try {
-      const out = await fn()
-      if (!out.length) errors.push(`${name}: returned 0 items`)
-      return out
-    } catch (e) {
-      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`)
-      return []
-    }
+  /** Run a lane across every derived query and pool the results. */
+  async function across(
+    name: ResearchLane,
+    fn: (q: string) => Promise<RawFeedItem[]>,
+  ): Promise<RawFeedItem[]> {
+    const results = await Promise.all(
+      queries.map((q) =>
+        fn(q).catch((e) => {
+          errors.push(`${name} [${q}]: ${e instanceof Error ? e.message : String(e)}`)
+          return [] as RawFeedItem[]
+        }),
+      ),
+    )
+    const pooled = results.flat()
+    // De-duplicate: derived queries overlap by design.
+    const seen = new Set<string>()
+    const unique = pooled.filter((item) => {
+      if (seen.has(item.source_item_id)) return false
+      seen.add(item.source_item_id)
+      return true
+    })
+    if (!unique.length) errors.push(`${name}: 0 items across ${queries.length} quer${queries.length === 1 ? "y" : "ies"}`)
+    return unique
   }
 
   const [news, papers, books, discussion] = await Promise.all([
-    lane("news", () => fetchNews(topic, hoursBack)),
-    lane("papers", () => fetchPapers(topic, hoursBack)),
-    lane("books", () => fetchBooks(topic)),
-    lane("discussion", () => fetchDiscussion(topic, hoursBack)),
+    across("news", (q) => fetchNews(q, hoursBack)),
+    across("papers", (q) => fetchPapers(q, hoursBack)),
+    across("books", (q) => fetchBooks(q)),
+    across("discussion", (q) => fetchDiscussion(q, hoursBack)),
   ])
 
   return {

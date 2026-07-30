@@ -20,7 +20,8 @@ import { fetchReleases, sweepTopicAcrossLanes, type LaneSignal, type TopicStance
  * without payoff. The columns exist for when that changes.
  */
 
-const MAX_CORE_TOPICS = 5
+// Counted in queries, not topics: one canon topic yields up to three.
+const MAX_CORE_TOPICS = 8
 const MAX_ADJACENT_TOPICS = 4
 
 export type SweepResult = {
@@ -190,14 +191,28 @@ export async function loadResearchTopics(
     .maybeSingle()
 
   const canonTopics = Array.isArray(canon?.topics)
-    ? (canon.topics as Array<{ label?: string; weight?: number; adjacent?: string[] }>)
+    ? (canon.topics as Array<{
+        label?: string
+        weight?: number
+        adjacent?: string[]
+        search_queries?: string[]
+      }>)
     : []
 
   if (canonTopics.length) {
     const ranked = [...canonTopics].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+    // Prefer the queries the derivation wrote for searching; the label is for
+    // display and is usually unsearchable ("Big Four, audit & accounting
+    // disruption" returns nothing anywhere, including news).
     const core = ranked
-      .map((t) => t.label)
-      .filter((l): l is string => Boolean(l))
+      .flatMap((t) =>
+        Array.isArray(t.search_queries) && t.search_queries.length
+          ? t.search_queries
+          : t.label
+            ? [t.label]
+            : [],
+      )
+      .filter(Boolean)
       .slice(0, MAX_CORE_TOPICS)
 
     // Adjacency is drawn from the heaviest topics first: the stretch that
