@@ -6,6 +6,13 @@ import { auth, applyBetterAuthResponseHeaders, hashBetterAuthPassword } from "@/
 import { supabaseAdmin } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/server"
 import { recordReferralAttributionIfEligible } from "@/lib/referrals"
+import {
+  LOGIN_PATH_BY_PRODUCT,
+  PRODUCT_LABELS,
+  entitledProducts,
+  hasProduct,
+  type ProductType as ProductTypeCanonical,
+} from "@/lib/products"
 
 type BetterAuthUserRow = {
   id: string
@@ -181,7 +188,9 @@ async function findSupabaseUserByEmail(email: string): Promise<SupabaseAuthUser 
   return null
 }
 
-type ProductType = "founder" | "career" | "creator"
+// Canonical definition lives in lib/products.ts so the middleware and the auth
+// bridge can never disagree about what a product is or who may access one.
+type ProductType = ProductTypeCanonical
 
 function pagePathToProduct(pagePath: string): ProductType {
   if (pagePath === "/career") return "career"
@@ -467,20 +476,14 @@ export async function signInWithBetterAuthBridge({
   })
 
   if (!supabaseSignIn.error && supabaseSignIn.user) {
-    // Enforce one-product-per-account: reject if the user signed up under a different product.
-    if (requiredProduct) {
-      const accountProduct =
-        (supabaseSignIn.user.user_metadata?.product as ProductType | undefined) ?? "founder"
-      if (accountProduct !== requiredProduct) {
-        const productLabels: Record<ProductType, string> = {
-          founder: "Founder OS — sign in at /login",
-          career: "Career OS — sign in at /career",
-          creator: "Creator OS — sign in at /creator",
-        }
-        throw new Error(
-          `This account is registered for ${productLabels[accountProduct]}.`,
-        )
-      }
+    // Gate on entitlement: an account may hold several products, so this only
+    // rejects when the requested OS is not among them.
+    if (requiredProduct && !hasProduct(supabaseSignIn.user.user_metadata, requiredProduct)) {
+      const entitled = entitledProducts(supabaseSignIn.user.user_metadata)
+      const doors = entitled
+        .map((p) => `${PRODUCT_LABELS[p]} — sign in at ${LOGIN_PATH_BY_PRODUCT[p]}`)
+        .join(", ")
+      throw new Error(`This account does not have ${PRODUCT_LABELS[requiredProduct]}. It has: ${doors}.`)
     }
 
     const name = resolvedName({

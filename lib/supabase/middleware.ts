@@ -6,6 +6,12 @@ import {
     isMutatingMethod,
     isPreviewApiAllowed,
 } from '@/lib/preview-mode'
+import {
+    HOME_PATH_BY_PRODUCT,
+    hasProduct,
+    primaryProduct,
+    productForPath,
+} from '@/lib/products'
 
 function applyReferralCaptureCookie(response: NextResponse, ref: string | null) {
     if (!ref) return
@@ -107,23 +113,14 @@ export async function updateSession(request: NextRequest) {
         return supabaseResponse
     }
 
-    // Authenticated users: enforce one-product-per-account.
-    // A career user cannot access founder routes, and vice versa.
-    const product = (user.user_metadata?.product as string | undefined) ?? 'founder'
+    // Authenticated users: gate on entitlement, not on a single product.
+    // One account may hold several products (a founder who also creates), so
+    // access is denied only when the requested OS is not in the entitled set.
+    const requestedProduct = productForPath(pathname)
 
-    const wrongProduct =
-        (product === 'career' && (pathname.startsWith('/dashboard') || pathname.startsWith('/creator/dashboard'))) ||
-        (product === 'creator' && (pathname.startsWith('/dashboard') || pathname.startsWith('/career/dashboard') || pathname.startsWith('/careeros'))) ||
-        (product === 'founder' && (pathname.startsWith('/career/dashboard') || pathname.startsWith('/careeros') || pathname.startsWith('/creator/dashboard')))
-
-    if (wrongProduct) {
-        const homeByProduct: Record<string, string> = {
-            founder: '/dashboard',
-            career: '/career/dashboard',
-            creator: '/creator/dashboard',
-        }
+    if (requestedProduct && !hasProduct(user.user_metadata, requestedProduct)) {
         const url = request.nextUrl.clone()
-        url.pathname = homeByProduct[product] ?? '/dashboard'
+        url.pathname = HOME_PATH_BY_PRODUCT[primaryProduct(user.user_metadata)]
         const redirectResponse = NextResponse.redirect(url)
         applyReferralCaptureCookie(redirectResponse, refFromQuery)
         return redirectResponse

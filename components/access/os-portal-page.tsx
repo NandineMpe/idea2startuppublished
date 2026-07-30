@@ -3,6 +3,8 @@ import localFont from "next/font/local"
 import { ArrowRight, Rocket, Palette, Briefcase } from "lucide-react"
 import { LandingThemeToggle } from "@/components/landing-theme-toggle"
 import { JunoBlueDotMark } from "@/components/juno/blue-dot-mark"
+import { EnableProductButton } from "@/components/access/enable-product-button"
+import { HOME_PATH_BY_PRODUCT } from "@/lib/products"
 
 const casualHumanBold = localFont({
   src: "../../app/fonts/CasualHuman-Bold.otf",
@@ -75,7 +77,16 @@ const osOptions = [
   },
 ] as const
 
-export function OsPortalPage() {
+export type OsPortalAccess = {
+  signedIn: boolean
+  entitled: string[]
+  primary: string
+}
+
+export function OsPortalPage({ access }: { access?: OsPortalAccess }) {
+  const signedIn = access?.signedIn ?? false
+  const entitled = access?.entitled ?? []
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#eef3fb] text-slate-950 transition-colors duration-700 dark:bg-[#061219] dark:text-slate-100">
       <div className="pointer-events-none absolute inset-0">
@@ -124,18 +135,29 @@ export function OsPortalPage() {
               Welcome to Juno AI
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-base leading-8 text-slate-600 dark:text-slate-300">
-              One platform, three modes. Pick the operating system that fits where you are right now.
+              {signedIn
+                ? "You're signed in. Switch between the operating systems on your account, or turn on a new one."
+                : "One platform, three modes. Pick the operating system that fits where you are right now."}
             </p>
           </div>
 
           <div className="mt-12 grid w-full max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {osOptions.map((os) => {
               const Icon = os.icon
+              const hasIt = entitled.includes(os.slug)
+              const cardClass = `group relative flex flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 p-8 shadow-[0_26px_70px_rgba(148,163,184,0.14)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-[#071923]/90 dark:shadow-[0_28px_90px_rgba(2,8,14,0.42)] ${os.hoverBg}`
+              // Signed in without this OS: the card can't be a link, because the
+              // destination doesn't exist for this account until it's enabled.
+              const Wrapper = signedIn && !hasIt ? "div" : Link
+              const wrapperProps =
+                signedIn && !hasIt
+                  ? {}
+                  : { href: signedIn ? HOME_PATH_BY_PRODUCT[os.slug] : os.href }
               return (
-                <Link
+                <Wrapper
                   key={os.slug}
-                  href={os.href}
-                  className={`group relative flex flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 p-8 shadow-[0_26px_70px_rgba(148,163,184,0.14)] backdrop-blur-xl transition-all duration-300 dark:border-white/10 dark:bg-[#071923]/90 dark:shadow-[0_28px_90px_rgba(2,8,14,0.42)] ${os.hoverBg}`}
+                  {...(wrapperProps as { href: string })}
+                  className={cardClass}
                 >
                   <div className="flex items-center justify-between">
                     <div className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${os.accentBg}/10 ${os.accentGlow}`}>
@@ -160,11 +182,21 @@ export function OsPortalPage() {
                     {os.description}
                   </p>
 
-                  <div className={`mt-6 inline-flex items-center gap-2 text-sm font-medium ${os.accentText} transition-transform duration-200 group-hover:translate-x-1`}>
-                    Enter {os.name.split(" ")[0]} OS
-                    <ArrowRight className="h-4 w-4" />
-                  </div>
-                </Link>
+                  {signedIn && !hasIt ? (
+                    <div className="mt-6">
+                      <EnableProductButton
+                        product={os.slug}
+                        label={`Turn on ${os.name}`}
+                        className={`inline-flex items-center gap-2 rounded-full border border-current px-4 py-1.5 text-sm font-medium ${os.accentText} transition-opacity hover:opacity-80 disabled:opacity-50`}
+                      />
+                    </div>
+                  ) : (
+                    <div className={`mt-6 inline-flex items-center gap-2 text-sm font-medium ${os.accentText} transition-transform duration-200 group-hover:translate-x-1`}>
+                      {signedIn ? `Open ${os.name}` : `Enter ${os.name.split(" ")[0]} OS`}
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  )}
+                </Wrapper>
               )
             })}
           </div>
