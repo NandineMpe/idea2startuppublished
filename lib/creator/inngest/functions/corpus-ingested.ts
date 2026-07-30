@@ -16,18 +16,20 @@ export const creatorCorpusIngested = creatorInngest.createFunction(
   async ({ event, step }) => {
     const { user_id: userId, content_ids: contentIds } = event.data
 
-    // Pasted URLs arrive with no caption; oEmbed can recover it.
-    const needsEnrich = await step.run("find-rows-needing-caption", async () => {
+    // Pasted URLs arrive with neither caption nor counts; enrichment recovers
+    // both, plus the true publish date, from the video page.
+    const needsEnrich = await step.run("find-rows-needing-enrichment", async () => {
       const { data, error } = await supabaseAdmin
         .schema("creator")
         .from("creator_content")
-        .select("id")
+        .select("id,caption,metrics")
         .eq("user_id", userId)
         .in("id", contentIds)
-        .is("caption", null)
         .not("url", "is", null)
       if (error) throw error
-      return (data ?? []).map((row) => row.id as string)
+      return (data ?? [])
+        .filter((row) => !row.caption || !row.metrics)
+        .map((row) => row.id as string)
     })
 
     if (needsEnrich.length) {
