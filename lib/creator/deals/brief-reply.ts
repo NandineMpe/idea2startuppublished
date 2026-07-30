@@ -30,16 +30,24 @@ const replySchema = z.object({
     .describe(
       "Terms that cost money or freedom and are easy to agree to by accident: perpetual or broad usage rights, exclusivity windows, paid-media whitelisting, unlimited revisions, approval chains, tight turnarounds, undisclosed-ad requests.",
     ),
-  recommended_format: z.object({
-    label: z.string().describe("Which of the creator's proven formats fits this brief."),
-    why: z.string().describe("Why this format suits the ask, referencing its real performance."),
-  }),
-  quoted_rate: z.object({
-    low: z.number(),
-    high: z.number(),
-    currency: z.string(),
-    basis: z.string().describe("The one-line justification a brand can check, using the supplied figures."),
-  }),
+  /**
+   * Flat scalars rather than nested objects.
+   *
+   * A bare nested object in this schema makes the model emit its tool-call
+   * parameter markup into the JSON — `"<parameter name=\"label\">..."` — and it
+   * then abandons every field after it, so the reply itself never arrives. Flat
+   * fields are reassembled in code, which costs nothing and cannot fail.
+   */
+  recommended_format_label: z.string().describe("Which of the creator's proven formats fits this brief."),
+  recommended_format_why: z
+    .string()
+    .describe("Why this format suits the ask, referencing its real performance."),
+  quoted_rate_low: z.number(),
+  quoted_rate_high: z.number(),
+  quoted_rate_currency: z.string(),
+  quoted_rate_basis: z
+    .string()
+    .describe("The one-line justification a brand can check, using the supplied figures."),
   reply: z
     .string()
     .describe(
@@ -47,7 +55,17 @@ const replySchema = z.object({
     ),
 })
 
-export type BriefReply = z.infer<typeof replySchema>
+/** The shape the UI consumes — nesting restored after generation. */
+export type BriefReply = {
+  brand?: string | null
+  what_they_want: string
+  deliverables: string[]
+  stated_budget?: string | null
+  watch_outs: string[]
+  recommended_format: { label: string; why: string }
+  quoted_rate: { low: number; high: number; currency: string; basis: string }
+  reply: string
+}
 
 const SYSTEM_PROMPT = `You are the account manager for a creator, replying to an inbound brand brief.
 
@@ -169,7 +187,26 @@ Read the brief and draft the reply.`,
       maxOutputTokens: 16000,
     })
 
-    return { ok: true, reply: object, tokens: usage.totalTokens }
+    const reply: BriefReply = {
+      brand: object.brand,
+      what_they_want: object.what_they_want,
+      deliverables: object.deliverables,
+      stated_budget: object.stated_budget,
+      watch_outs: object.watch_outs,
+      recommended_format: {
+        label: object.recommended_format_label,
+        why: object.recommended_format_why,
+      },
+      quoted_rate: {
+        low: object.quoted_rate_low,
+        high: object.quoted_rate_high,
+        currency: object.quoted_rate_currency,
+        basis: object.quoted_rate_basis,
+      },
+      reply: object.reply,
+    }
+
+    return { ok: true, reply, tokens: usage.totalTokens }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not draft a reply." }
   }
