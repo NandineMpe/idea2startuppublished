@@ -21,7 +21,7 @@ export const marketRefreshSkillVelocity = careerosInngest.createFunction(
     id: "careeros-market-refresh-skill-velocity",
     name: "CareerOS market.refresh-skill-velocity",
     retries: 1,
-    triggers: [{ cron: "0 14 * * 0" }, { event: "careeros/market.refresh-skill-velocity" }],
+    triggers: [{ event: "careeros/market.refresh-skill-velocity" }],
   },
   async ({ step, event }) => {
     const data =

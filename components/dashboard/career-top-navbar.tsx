@@ -1,134 +1,44 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import {
-  Search,
-  Bell,
-  Settings,
-  LogOut,
-  User as UserIcon,
-  Briefcase,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
-import { authClient } from "@/lib/better-auth-client"
-import { createClient } from "@/lib/supabase/client"
-import { User } from "@supabase/supabase-js"
+import { usePathname } from "next/navigation"
+import { CareerOsIcon } from "@/components/careeros/icon"
+import { CareerOsBtn } from "@/components/careeros/ui"
+import { matchCareerOsRoute } from "@/components/careeros/career-os-routes"
 
-export function CareerTopNavbar() {
-  const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [supabase] = useState(() => createClient())
+type CareerTopNavbarProps = {
+  onOpenBrainChat?: () => void
+}
 
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
-  }, [supabase])
-
-  const handleSignOut = async () => {
-    try {
-      await authClient.signOut()
-    } catch {
-      /* best effort */
-    }
-    await supabase.auth.signOut()
-    router.push("/career")
-    router.refresh()
-  }
-
-  const userEmail = user?.email || "guest@juno.ai"
-  const userInitials = userEmail.substring(0, 2).toUpperCase()
-  const userName = user?.user_metadata?.full_name || userEmail.split("@")[0]
+export function CareerTopNavbar({ onOpenBrainChat }: CareerTopNavbarProps) {
+  const pathname = usePathname() ?? ""
+  const route = matchCareerOsRoute(pathname)
 
   return (
-    <header className="sticky top-0 z-40 flex h-[52px] shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-md">
-      <div className="flex items-center gap-3">
-        <button className="flex w-64 items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">
-          <Search className="h-3.5 w-3.5" />
-          <span>Search opportunities...</span>
-          <kbd className="ml-auto flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground/60">
-            <Briefcase className="h-2.5 w-2.5" /> K
-          </kbd>
-        </button>
+    <div className="topbar">
+      <div className="crumbs">
+        {route.crumb.map((c, i) => (
+          <span key={c} style={{ display: "contents" }}>
+            {i > 0 && <span className="sep">/</span>}
+            <span className={i === route.crumb.length - 1 ? "here" : ""}>{c}</span>
+          </span>
+        ))}
       </div>
-
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="relative h-8 w-8 text-muted-foreground hover:bg-accent hover:text-foreground"
+      <div className="top-actions">
+        <button
+          type="button"
+          className="icon-btn"
+          title="Open Juno CareerOS voice"
+          onClick={onOpenBrainChat}
         >
-          <Bell className="h-4 w-4" />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="relative h-8 w-8 rounded-full p-0 transition-all hover:ring-2 hover:ring-border"
-            >
-              <Avatar className="h-7 w-7">
-                <AvatarImage src="" alt={userName} />
-                <AvatarFallback className="bg-emerald-500/10 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-64 border-border bg-popover" align="end" forceMount>
-            <DropdownMenuLabel className="p-3 font-normal">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-emerald-500/10 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex min-w-0 flex-col">
-                  <p className="truncate text-sm font-medium capitalize text-foreground">
-                    {userName}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer px-3 py-2 text-[13px]">
-              <UserIcon className="mr-2.5 h-4 w-4 text-muted-foreground" />
-              Professional Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="cursor-pointer px-3 py-2 text-[13px]"
-              onClick={() => router.push("/career/dashboard/settings")}
-            >
-              <Settings className="mr-2.5 h-4 w-4 text-muted-foreground" />
-              Account Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              className="cursor-pointer px-3 py-2 text-[13px] text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2.5 h-4 w-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <CareerOsIcon name="brain" size={16} />
+        </button>
+        <button type="button" className="icon-btn has-badge" title="Notifications">
+          <CareerOsIcon name="bell" size={16} />
+        </button>
+        <CareerOsBtn href="/careeros/health-report" sm>
+          <CareerOsIcon name="sparkles" size={13} /> New report
+        </CareerOsBtn>
       </div>
-    </header>
+    </div>
   )
 }

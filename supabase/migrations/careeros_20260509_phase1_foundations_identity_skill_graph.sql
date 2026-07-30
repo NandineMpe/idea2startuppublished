@@ -69,7 +69,7 @@ create table if not exists careeros.user_settings (
 create table if not exists careeros.user_documents (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  doc_type text not null check (doc_type in ('resume', 'linkedin')),
+  doc_type text not null,
   version integer not null check (version > 0),
   storage_bucket text not null default 'careeros-documents',
   storage_path text not null,

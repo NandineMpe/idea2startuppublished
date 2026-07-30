@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation"
+import {
+  parseCareerDisplayPreferences,
+  resolveCareerDisplayIdentity,
+} from "@/lib/careeros/display-preferences"
 import { createClient } from "@/lib/supabase/server"
 import { CareerSettingsClient } from "./settings-client"
 
@@ -13,7 +17,7 @@ export default async function CareerSettingsPage() {
   const { data: settings } = await supabase
     .schema("careeros")
     .from("user_settings")
-    .select("onboarding_state")
+    .select("onboarding_state, privacy_preferences")
     .eq("user_id", user.id)
     .maybeSingle()
 
@@ -27,10 +31,18 @@ export default async function CareerSettingsPage() {
   const onboardingState = (settings?.onboarding_state as Record<string, unknown> | null) ?? {}
   const module11 = (onboardingState.module_1_1 as Record<string, unknown> | null) ?? {}
   const onboardingComplete = module11.module_1_1_complete === true
+  const displayPrefs = parseCareerDisplayPreferences(settings?.privacy_preferences)
+  const identity = resolveCareerDisplayIdentity(displayPrefs, {
+    email: user.email,
+    user_metadata: user.user_metadata as Record<string, unknown> | undefined,
+  })
 
   return (
     <CareerSettingsClient
-      email={user.email ?? ""}
+      accountEmail={user.email ?? ""}
+      displayName={displayPrefs.displayName ?? ""}
+      hideEmail={displayPrefs.hideEmail}
+      publicName={identity.name}
       onboardingComplete={onboardingComplete}
       profile={profile ?? null}
     />

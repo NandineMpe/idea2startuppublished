@@ -5,7 +5,7 @@ export const FEED_ENRICHMENT_SYSTEM_PROMPT = `You are an AI/tech industry analys
 For each item, produce:
 1. A neutral 2-3 sentence summary. No hype, no doom. Plain factual.
 2. The entity type (one of: model_release, research_finding, product_launch, policy, industry_news).
-3. The entities involved: specific models named, companies, capabilities introduced or changed.
+3. The entities involved: specific models and product names (e.g. Copilot, Claude, GPT-4.1, Gemini), companies, capabilities introduced or changed. For legal/research AI, tag capabilities like "legal-research" or "contract-review" when the source supports it.
 4. The functions affected: which O*NET occupational functions are most likely to feel this in their day-to-day work? Use general categories like "software-engineering", "data-science", "product-management", "design", "marketing", "legal", "operations".
 5. The skills affected: canonical skill keys (lowercased, hyphenated) where this item meaningfully changes the value or relevance of the skill.
 6. The seniority levels affected: which seniority brackets feel the impact most?

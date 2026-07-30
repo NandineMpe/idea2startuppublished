@@ -25,10 +25,7 @@ export const exposureScoreRefresh = careerosInngest.createFunction(
     id: "careeros-exposure-score-refresh",
     name: "CareerOS skills.refresh-exposure-scores",
     retries: 1,
-    triggers: [
-      { cron: "0 0 1 */3 *" },
-      { event: "careeros/skills.refresh-exposure-scores" },
-    ],
+    triggers: [{ event: "careeros/skills.refresh-exposure-scores" }],
   },
   async ({ step }) => {
     // Step 1: Find unscored skills

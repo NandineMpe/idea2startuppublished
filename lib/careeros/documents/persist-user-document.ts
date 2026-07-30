@@ -41,14 +41,13 @@ async function uploadStorageObject(params: {
   buffer: Buffer
   contentType: string
 }): Promise<void> {
-  const upload = () => supabaseAdmin.storage
-    .from("careeros-documents")
-    .upload(params.storagePath, params.buffer, {
+  const upload = (upsert: boolean) =>
+    supabaseAdmin.storage.from("careeros-documents").upload(params.storagePath, params.buffer, {
       contentType: params.contentType,
-      upsert: false,
+      upsert,
     })
 
-  let { error } = await upload()
+  let { error } = await upload(false)
   if (
     error &&
     /bucket|not found|does not exist/i.test(error.message ?? "")
@@ -56,7 +55,12 @@ async function uploadStorageObject(params: {
     await supabaseAdmin.storage.createBucket("careeros-documents", {
       public: false,
     })
-    ;({ error } = await upload())
+    ;({ error } = await upload(false))
+  }
+
+  // Retry after failed step-one left objects in storage without a user_documents row.
+  if (error && /already exists|duplicate|409/i.test(error.message ?? "")) {
+    ;({ error } = await upload(true))
   }
 
   if (error) throw error
@@ -70,6 +74,31 @@ async function insertExtraction(params: {
   parserVersion: string
   inputDataVersion: string
 }): Promise<void> {
+  const { error: clearError } = await supabaseAdmin
+    .schema("careeros")
+    .from("user_document_extractions")
+    .update({ is_current: false })
+    .eq("user_document_id", params.userDocumentId)
+    .eq("parser_name", params.parserName)
+    .eq("is_current", true)
+
+  if (clearError) throw clearError
+
+  const { data: latestExtraction, error: versionReadError } = await supabaseAdmin
+    .schema("careeros")
+    .from("user_document_extractions")
+    .select("extraction_version")
+    .eq("user_document_id", params.userDocumentId)
+    .eq("parser_name", params.parserName)
+    .order("extraction_version", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (versionReadError) throw versionReadError
+
+  const extractionVersion =
+    ((latestExtraction?.extraction_version as number | undefined) ?? 0) + 1
+
   const { error } = await supabaseAdmin
     .schema("careeros")
     .from("user_document_extractions")
@@ -78,7 +107,7 @@ async function insertExtraction(params: {
       user_document_id: params.userDocumentId,
       parser_name: params.parserName,
       parser_version: params.parserVersion,
-      extraction_version: 1,
+      extraction_version: extractionVersion,
       is_current: true,
       parsed_payload: { plain_text: params.plainText },
       input_data_version: params.inputDataVersion,

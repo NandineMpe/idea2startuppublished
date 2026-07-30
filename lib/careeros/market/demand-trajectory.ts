@@ -85,7 +85,7 @@ export async function getDemandTrajectoryForUser(
   }
 
   const list = rows ?? []
-  if (!list.length && options?.triggerRefreshOnMiss !== false) {
+  if (!list.length && options?.triggerRefreshOnMiss === true) {
     await sendCareerOSEvent({
       name: "careeros/market.refresh-demand",
       data: {

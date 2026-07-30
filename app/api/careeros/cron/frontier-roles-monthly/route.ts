@@ -1,28 +1,28 @@
 import { NextResponse } from "next/server"
-import { refreshMarketFrontierRoleSnapshots } from "@/lib/careeros/market/frontier-roles"
+import { triggerCareerOSWorkflows } from "@/lib/careeros/inngest/trigger-workflows"
+import { isCareerOSWorkflowAdmin } from "@/lib/careeros/workflows-auth"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 300
+export const maxDuration = 30
 
-function isAuthorised(request: Request): boolean {
-  const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  const cronSecret = process.env.CRON_SECRET?.trim()
-  const verifyToken = process.env.VERIFY_TOKEN?.trim()
-  if (bearer && cronSecret && bearer === cronSecret) return true
-  if (bearer && verifyToken && bearer === verifyToken) return true
-  return request.headers.get("x-vercel-cron") != null
-}
-
+/** On-demand: queue frontier roles refresh (was Vercel cron). */
 export async function GET(request: Request) {
-  if (!isAuthorised(request)) {
+  if (!isCareerOSWorkflowAdmin(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-
-  try {
-    const result = await refreshMarketFrontierRoleSnapshots()
-    return NextResponse.json({ ok: true, ...result })
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  if (!process.env.INNGEST_EVENT_KEY?.trim()) {
+    return NextResponse.json({ error: "INNGEST_EVENT_KEY" }, { status: 501 })
   }
+
+  const result = await triggerCareerOSWorkflows({
+    workflow: "careeros/market.refresh-frontier-roles",
+    admin: true,
+  })
+
+  return NextResponse.json({
+    ok: true,
+    mode: "on_demand",
+    workflow: "careeros/market.refresh-frontier-roles",
+    ...result,
+  })
 }

@@ -6,6 +6,8 @@ import { appendCareerOsMarkdownToJunoBrain } from "@/lib/careeros/brain/append-l
 import { loadLatestLlmMarkdownPlainText } from "@/lib/careeros/documents/load-latest-llm"
 import { sendCareerOSEvent } from "@/lib/careeros/inngest/client"
 import { mergeCareerOsOnboardingState } from "@/lib/careeros/onboarding/user-settings"
+import { upsertCareerOsUserProfile } from "@/lib/careeros/onboarding/upsert-user-profile"
+import { matchUserRegionToDemandRegion } from "@/lib/careeros/market/demand-regions"
 import { supabaseAdmin } from "@/lib/supabase"
 
 export const runtime = "nodejs"
@@ -84,77 +86,132 @@ export async function POST(request: Request) {
     }
 
     const mergeLlmToBrain = body.mergeLlmToBrain === true
-
     const now = new Date().toISOString()
+    const locationRegionCode = matchUserRegionToDemandRegion(locationLabel)
 
-    const { error: profileError } = await supabaseAdmin
-      .schema("careeros")
-      .from("user_profiles")
-      .upsert(
+    // Prefer the signed-in client (RLS) so profile save works even if service_role grants lag.
+    let profileResult = await upsertCareerOsUserProfile(supabase, {
+      userId: user.id,
+      currentRoleTitle,
+      targetRoleTitle: targetRoleTitle || null,
+      locationLabel,
+      locationRegionCode,
+      yearsExperience,
+      currentSalaryUsd,
+      updatedAt: now,
+    })
+
+    if (!profileResult.ok) {
+      profileResult = await upsertCareerOsUserProfile(supabaseAdmin, {
+        userId: user.id,
+        currentRoleTitle,
+        targetRoleTitle: targetRoleTitle || null,
+        locationLabel,
+        locationRegionCode,
+        yearsExperience,
+        currentSalaryUsd,
+        updatedAt: now,
+      })
+    }
+
+    if (!profileResult.ok) {
+      return NextResponse.json(
         {
-          user_id: user.id,
-          current_role_title: currentRoleTitle,
-          target_role_title: targetRoleTitle || null,
-          location_label: locationLabel,
-          years_experience: yearsExperience,
-          current_salary_usd: currentSalaryUsd,
-          updated_at: now,
+          error: profileResult.message,
+          code: profileResult.code ?? null,
         },
-        { onConflict: "user_id" },
+        { status: 500 },
       )
-
-    if (profileError) throw profileError
+    }
 
     let brain:
       | { merged: false; reason?: string }
       | { merged: true; scope: "workspace" | "owner" } = { merged: false }
 
     if (mergeLlmToBrain) {
-      const md = await loadLatestLlmMarkdownPlainText(user.id)
-      if (!md) {
-        brain = { merged: false, reason: "no_llm_markdown" }
-      } else {
-        const append = await appendCareerOsMarkdownToJunoBrain(user.id, md)
-        if (!append.ok) {
-          brain =
-            append.reason === "no_scope"
-              ? { merged: false, reason: "no_brain_scope" }
-              : { merged: false, reason: append.reason }
+      try {
+        const md = await loadLatestLlmMarkdownPlainText(user.id)
+        if (!md) {
+          brain = { merged: false, reason: "no_llm_markdown" }
         } else {
-          brain = { merged: true, scope: append.scope }
+          const append = await appendCareerOsMarkdownToJunoBrain(user.id, md)
+          if (!append.ok) {
+            brain =
+              append.reason === "no_scope"
+                ? { merged: false, reason: "no_brain_scope" }
+                : { merged: false, reason: append.reason }
+          } else {
+            brain = { merged: true, scope: append.scope }
+          }
         }
+      } catch (brainError) {
+        console.error(
+          "[careeros onboarding step-three] brain merge failed (profile saved)",
+          brainError,
+        )
+        brain = { merged: false, reason: "brain_merge_failed" }
       }
     }
 
-    await mergeCareerOsOnboardingState(user.id, {
-      step3CompletedAt: now,
-      module_1_1_complete: true,
-      module_1_2: {
-        status: "running",
-        startedAt: now,
-      },
-      ...(learningHoursPerWeek != null ? { learning_hours_per_week: learningHoursPerWeek } : {}),
-    })
+    let onboardingStateWarning: string | null = null
+    try {
+      await mergeCareerOsOnboardingState(user.id, {
+        step3CompletedAt: now,
+        module_1_1_complete: true,
+        module_1_2: {
+          status: "running",
+          startedAt: now,
+        },
+        ...(learningHoursPerWeek != null ? { learning_hours_per_week: learningHoursPerWeek } : {}),
+        ...(currentSalaryUsd != null ? { stated_current_salary_usd: currentSalaryUsd } : {}),
+        ...(locationRegionCode ? { location_region_code: locationRegionCode } : {}),
+      })
+    } catch (stateError) {
+      onboardingStateWarning =
+        stateError instanceof Error ? stateError.message : "Could not update onboarding state"
+      console.error("[careeros onboarding step-three] onboarding state merge failed", stateError)
+    }
 
     const onboardingCompletionId = randomUUID()
-    await sendCareerOSEvent({
-      name: "careeros/profile.extract",
-      data: {
-        user_id: user.id,
-        onboarding_completion_id: onboardingCompletionId,
-      },
-    })
+    let extractionQueued = true
+    let extractionQueueError: string | null = null
+    try {
+      if (!process.env.INNGEST_EVENT_KEY?.trim()) {
+        extractionQueued = false
+        extractionQueueError = "INNGEST_EVENT_KEY is not set"
+      } else {
+        await sendCareerOSEvent({
+          name: "careeros/profile.extract",
+          data: {
+            user_id: user.id,
+            onboarding_completion_id: onboardingCompletionId,
+          },
+        })
+      }
+    } catch (queueError) {
+      extractionQueued = false
+      extractionQueueError =
+        queueError instanceof Error ? queueError.message : "Could not queue profile extraction"
+      console.error("[careeros onboarding step-three] profile.extract queue failed", queueError)
+    }
 
     return NextResponse.json({
       ok: true,
-      module_1_2: { status: "running", onboardingCompletionId },
+      module_1_2: {
+        status: extractionQueued ? "running" : "idle",
+        onboardingCompletionId,
+        extractionQueued,
+        extractionQueueError,
+      },
       profile: {
         currentRoleTitle,
         targetRoleTitle: targetRoleTitle || null,
         locationLabel,
+        locationRegionCode,
         yearsExperience,
         currentSalaryUsd,
       },
+      ...(onboardingStateWarning ? { onboardingStateWarning } : {}),
       ...(mergeLlmToBrain ? { brain } : {}),
     })
   } catch (error) {

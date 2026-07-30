@@ -18,6 +18,7 @@ export function CareerOsOnboardingWizard() {
   const [step, setStep] = useState<Step>(1)
   const [busy, setBusy] = useState(false)
   const [stepOneError, setStepOneError] = useState<string | null>(null)
+  const [stepThreeError, setStepThreeError] = useState<string | null>(null)
   const [module12Status, setModule12Status] = useState<
     "idle" | "running" | "completed" | "failed"
   >("idle")
@@ -105,8 +106,41 @@ export function CareerOsOnboardingWizard() {
     }
   }
 
+  async function startProfileExtraction() {
+    if (startedModule12Ref.current) return false
+    startedModule12Ref.current = true
+    setModule12Status("running")
+    setModule12Message("Extracting skills and role insights from your onboarding materials…")
+    try {
+      const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
+        method: "POST",
+        credentials: "include",
+      })
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        startedModule12Ref.current = false
+        setModule12Status("failed")
+        setModule12Message(json.error || "Could not start profile extraction.")
+        return false
+      }
+      return true
+    } catch {
+      startedModule12Ref.current = false
+      setModule12Status("failed")
+      setModule12Message("Could not start profile extraction. Check your connection and retry.")
+      return false
+    }
+  }
+
   async function submitStepThree(ev: React.FormEvent) {
     ev.preventDefault()
+    setStepThreeError(null)
+
+    if (!currentRole.trim() || !locationLabel.trim()) {
+      setStepThreeError("Current role and location are required.")
+      return
+    }
+
     setBusy(true)
     try {
       const res = await fetch("/api/careeros/onboarding/step-three", {
@@ -130,11 +164,25 @@ export function CareerOsOnboardingWizard() {
       })
       const json = (await res.json().catch(() => ({}))) as {
         error?: string
+        code?: string | null
         brain?: { merged: boolean; reason?: string; scope?: string }
+        onboardingStateWarning?: string
+        module_1_2?: {
+          status?: string
+          extractionQueued?: boolean
+          extractionQueueError?: string | null
+        }
       }
       if (!res.ok) {
-        toast.error(json.error || "Could not save profile")
+        const message = json.error || "Could not save profile"
+        const detail = json.code ? `${message} (${json.code})` : message
+        setStepThreeError(detail)
+        toast.error(detail)
         return
+      }
+
+      if (json.onboardingStateWarning) {
+        toast.message(json.onboardingStateWarning)
       }
 
       if (mergeLlmToBrain && json.brain) {
@@ -153,7 +201,31 @@ export function CareerOsOnboardingWizard() {
         toast.success("Profile saved.")
       }
 
+      const extractionQueued = json.module_1_2?.extractionQueued !== false
+      if (!extractionQueued) {
+        toast.message(
+          json.module_1_2?.extractionQueueError
+            ? `Profile saved, but extraction did not queue: ${json.module_1_2.extractionQueueError}`
+            : "Profile saved. Tap Retry extraction on the next screen if skills do not appear.",
+        )
+      }
+
+      setModule12Status(extractionQueued ? "running" : "idle")
+      setModule12Message(
+        extractionQueued
+          ? "Extracting skills and role insights from your onboarding materials…"
+          : "Profile saved. Start extraction below if it did not start automatically.",
+      )
       setStep("building")
+
+      if (!extractionQueued) {
+        startedModule12Ref.current = false
+        void startProfileExtraction()
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save profile"
+      setStepThreeError(message)
+      toast.error(message)
     } finally {
       setBusy(false)
     }
@@ -221,33 +293,15 @@ export function CareerOsOnboardingWizard() {
               <span className="font-medium text-foreground capitalize">{module12Status}</span>
               {module12SkillsCount !== null ? ` • Skills extracted: ${module12SkillsCount}` : ""}
             </p>
-            {module12Status === "failed" ? (
+            {module12Status === "failed" || module12Status === "idle" ? (
               <Button
                 type="button"
-                onClick={async () => {
-                  if (startedModule12Ref.current) return
-                  startedModule12Ref.current = true
-                  setModule12Status("running")
-                  setModule12Message("Retrying your skills and role insights…")
-                  try {
-                    const res = await fetch("/api/careeros/onboarding/module-1-2/start", {
-                      method: "POST",
-                      credentials: "include",
-                    })
-                    const json = (await res.json().catch(() => ({}))) as { error?: string }
-                    if (!res.ok) {
-                      setModule12Status("failed")
-                      setModule12Message(json.error || "Could not queue retry.")
-                    }
-                  } catch {
-                    setModule12Status("failed")
-                    setModule12Message("Could not queue retry.")
-                  } finally {
-                    startedModule12Ref.current = false
-                  }
+                onClick={() => {
+                  startedModule12Ref.current = false
+                  void startProfileExtraction()
                 }}
               >
-                Retry extraction
+                {module12Status === "failed" ? "Retry extraction" : "Start extraction"}
               </Button>
             ) : null}
             <Button asChild>
@@ -268,7 +322,7 @@ export function CareerOsOnboardingWizard() {
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CareerOS</p>
         <h1 className="mt-1 text-2xl font-semibold text-foreground">Onboarding</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Step {step} of 3 — Module 1.1
+          Step {step} of 3
         </p>
       </div>
 
@@ -465,6 +519,11 @@ export function CareerOsOnboardingWizard() {
                   when you have an active organisation or workspace selected.
                 </Label>
               </div>
+              {stepThreeError ? (
+                <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {stepThreeError}
+                </p>
+              ) : null}
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => setStep(2)}>
                   Back

@@ -249,7 +249,10 @@ function inferSeniorityBand(yearsExperience: number | null): SalarySeniorityBand
   return "senior"
 }
 
-export async function getSalaryBandsForUser(userId: string): Promise<UserSalaryBandsResult> {
+export async function getSalaryBandsForUser(
+  userId: string,
+  options?: { triggerRefreshOnMiss?: boolean },
+): Promise<UserSalaryBandsResult> {
   const { data: profile, error } = await supabaseAdmin
     .schema("careeros")
     .from("user_profiles")
@@ -281,15 +284,23 @@ export async function getSalaryBandsForUser(userId: string): Promise<UserSalaryB
   if (rowsError) throw new Error(rowsError.message)
 
   if (!rows?.length) {
-    await sendCareerOSEvent({
-      name: "careeros/market.refresh-salary",
-      data: { soc_codes: [onet], region_codes: [region], max_combos: 1, offset: 0 },
-    })
+    if (options?.triggerRefreshOnMiss === true) {
+      await sendCareerOSEvent({
+        name: "careeros/market.refresh-salary",
+        data: { soc_codes: [onet], region_codes: [region], max_combos: 1, offset: 0 },
+      })
+      return {
+        status: "cache_miss",
+        onet_soc_code: onet,
+        region_code: region,
+        refresh_requested: true,
+      }
+    }
     return {
       status: "cache_miss",
       onet_soc_code: onet,
       region_code: region,
-      refresh_requested: true,
+      refresh_requested: false,
     }
   }
 

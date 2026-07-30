@@ -22,7 +22,7 @@ export const marketRefreshSalary = careerosInngest.createFunction(
     id: "careeros-market-refresh-salary",
     name: "CareerOS market.refresh-salary (salary bands)",
     retries: 1,
-    triggers: [{ cron: "30 2 * * 0" }, { event: "careeros/market.refresh-salary" }],
+    triggers: [{ event: "careeros/market.refresh-salary" }],
   },
   async ({ step, event }) => {
     const data =

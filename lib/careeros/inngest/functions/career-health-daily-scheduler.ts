@@ -11,7 +11,7 @@ export const careerHealthDailyScheduler = careerosInngest.createFunction(
     id: "careeros-career-health-daily-scheduler",
     name: "CareerOS career-health.daily-scheduler",
     retries: 1,
-    triggers: [{ cron: "25 14 * * *" }, { event: "careeros/career-health.daily-scheduler" }],
+    triggers: [{ event: "careeros/career-health.daily-scheduler" }],
   },
   async ({ step }) => {
     const dueUserIds = await step.run("scan-eligible-users", async () => {

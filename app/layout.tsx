@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ToastProvider } from "@/components/ui/toast-context"
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner"
 import { Analytics } from "@vercel/analytics/react"
 import { Suspense } from "react"
 
@@ -31,6 +32,7 @@ export default function RootLayout({
           <ToastProvider>
             <Suspense>{children}</Suspense>
             <Toaster />
+            <SonnerToaster richColors closeButton position="top-center" />
           </ToastProvider>
         </ThemeProvider>
         <Analytics />

@@ -8,7 +8,7 @@ export const feedIngest = careerosInngest.createFunction(
   {
     id: "careeros-feed-ingest",
     retries: 2,
-    triggers: [{ cron: "TZ=UTC 0 6 * * *" }, { event: "careeros/feed.ingest" }],
+    triggers: [{ event: "careeros/feed.ingest" }],
   },
   async ({ step }) => {
     const startedAt = new Date().toISOString()

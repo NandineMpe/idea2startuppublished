@@ -15,6 +15,10 @@ import { computeInputDataVersion } from "@/lib/careeros/audit/input-hash"
 import { mergeCareerOsOnboardingState } from "@/lib/careeros/onboarding/user-settings"
 import { supabaseAdmin } from "@/lib/supabase"
 import { sendCareerOSEvent } from "../client"
+import {
+  extractProfileFromLlmMarkdown,
+  hasMarkdownProfileSignal,
+} from "@/lib/careeros/extraction/markdown-profile-fallback"
 
 function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex")
@@ -39,77 +43,12 @@ function truncateSourceText(text: string | null | undefined): string | null {
   return trimmed.slice(0, MAX_LLM_MARKDOWN_SOURCE_CHARS)
 }
 
-async function loadOwnerBrainMarkdown(userId: string): Promise<string | null> {
-  const { data: organization } = await supabaseAdmin
-    .from("organizations")
-    .select("id")
-    .eq("created_by_user_id", userId)
-    .eq("is_personal", true)
-    .maybeSingle()
-
-  const organizationId = organization?.id as string | undefined
-  if (!organizationId) return null
-
-  const { data: profile, error } = await supabaseAdmin
-    .from("company_profile")
-    .select("knowledge_base_md")
-    .eq("organization_id", organizationId)
-    .maybeSingle()
-  if (error) throw error
-
-  const text =
-    typeof profile?.knowledge_base_md === "string" ? profile.knowledge_base_md : null
-  return truncateSourceText(text)
-}
-
-const FALLBACK_SKILL_NAMES = [
-  "python",
-  "javascript",
-  "typescript",
-  "react",
-  "next.js",
-  "node.js",
-  "sql",
-  "postgres",
-  "supabase",
-  "aws",
-  "excel",
-  "financial modeling",
-  "data analysis",
-  "product management",
-  "project management",
-  "machine learning",
-  "ai",
-  "prompt engineering",
-]
-
-function canonicalSkillKey(skill: string): string {
-  return skill.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-}
-
-function findEvidence(text: string, skill: string): string {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-  const hit = lines.find((line) => line.toLowerCase().includes(skill.toLowerCase()))
-  return (hit ?? skill).slice(0, 240)
-}
-
+/** When structured LLM extraction fails, keep stated role only — no keyword-inferred placeholder skills. */
 function buildFallbackExtraction(source: SourceDocs): ProfileExtraction {
-  const combined = [source.resumeText, source.linkedinText, source.llmMarkdownText]
-    .filter(Boolean)
-    .join("\n")
-  const lower = combined.toLowerCase()
-  const skills = FALLBACK_SKILL_NAMES.filter((skill) => lower.includes(skill)).map((skill) => ({
-    skill_name: skill,
-    canonical_skill_key: canonicalSkillKey(skill),
-    proficiency_band: null,
-    source_type: "inferred" as const,
-    evidence: findEvidence(combined, skill),
-  }))
-
   return {
     current_role: source.userStatedRole ?? "",
     years_experience: source.userStatedYearsExperience ?? 0,
-    skills,
+    skills: [],
     past_roles: [],
     education: [],
     notable_achievements: [],
@@ -180,15 +119,11 @@ async function loadSourceDocuments(userId: string): Promise<SourceDocs> {
       typeof onboardingState.module_1_1 === "object" && onboardingState.module_1_1 !== null
         ? (onboardingState.module_1_1 as Record<string, unknown>)
         : {}
-    llmMarkdownText = truncateSourceText(
+    const legacyMarkdown =
       typeof module11.latestLlmMarkdownText === "string"
         ? module11.latestLlmMarkdownText
-        : null,
-    )
-  }
-
-  if (!llmMarkdownText) {
-    llmMarkdownText = await loadOwnerBrainMarkdown(userId)
+        : null
+    llmMarkdownText = truncateSourceText(legacyMarkdown)
   }
 
   return {
@@ -250,21 +185,36 @@ export const profileExtract = careerosInngest.createFunction(
       })
 
       const started = Date.now()
-      const { object: extraction, usage } = await step.run("qwen-extract", async () => {
+      const { object: extraction, usage, extractionMethod } = await step.run("qwen-extract", async () => {
         try {
-          return await qwenGenerateObject({
+          const result = await qwenGenerateObject({
             schema: ProfileExtractionSchema,
             systemPrompt: PROFILE_EXTRACT_SYSTEM_PROMPT,
             userPrompt,
           })
+          return { ...result, extractionMethod: "llm_structured" as const }
         } catch (error) {
           console.error(
-            "[careeros-profile-extract] structured extraction failed, using fallback",
+            "[careeros-profile-extract] structured extraction failed",
             error instanceof Error ? error.message : String(error),
           )
+          if (source.llmMarkdownText) {
+            const markdownParsed = extractProfileFromLlmMarkdown(source.llmMarkdownText, {
+              userStatedRole: source.userStatedRole,
+              userStatedYearsExperience: source.userStatedYearsExperience,
+            })
+            if (hasMarkdownProfileSignal(markdownParsed)) {
+              return {
+                object: markdownParsed,
+                usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+                extractionMethod: "markdown_heuristic" as const,
+              }
+            }
+          }
           return {
             object: buildFallbackExtraction(source),
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+            extractionMethod: "fallback_minimal" as const,
           }
         }
       })
@@ -306,6 +256,7 @@ export const profileExtract = careerosInngest.createFunction(
             is_current: true,
             parsed_payload: extraction,
             input_data_version: inputDataVersion,
+            extraction_method: extractionMethod,
             source_attribution: {
               resume_used: Boolean(source.resumeText),
               linkedin_used: Boolean(source.linkedinText),
@@ -334,16 +285,24 @@ export const profileExtract = careerosInngest.createFunction(
             seen.add(s.canonical_skill_key)
             return true
           })
-          .map((s) => ({
-            user_id: userId,
-            canonical_skill_key: s.canonical_skill_key,
-            skill_name: s.skill_name,
-            proficiency_band: s.proficiency_band,
-            evidence_payload: { evidence: s.evidence, source: s.source_type },
-            source_type: s.source_type,
-            is_active: true,
-            last_seen_at: new Date().toISOString(),
-          }))
+          .map((s) => {
+            const isDocumentSourced =
+              s.source_type === "resume" ||
+              s.source_type === "linkedin" ||
+              s.source_type === "llm_markdown"
+            return {
+              user_id: userId,
+              canonical_skill_key: s.canonical_skill_key,
+              skill_name: s.skill_name,
+              proficiency_band: s.proficiency_band,
+              evidence_payload: { evidence: s.evidence, source: s.source_type },
+              source_type: s.source_type,
+              is_active: isDocumentSourced,
+              is_placeholder: !isDocumentSourced,
+              provenance_workflow: "careeros/profile.extract",
+              last_seen_at: new Date().toISOString(),
+            }
+          })
 
         if (rows.length > 0) {
           const { error } = await supabaseAdmin.schema("careeros").from("user_skills").insert(rows)
@@ -353,6 +312,13 @@ export const profileExtract = careerosInngest.createFunction(
 
       await step.run("update-user-profile", async () => {
         const currentRoleFromExtraction = extraction.past_roles.find((r) => r.is_current)?.title
+        const documentSkillCount = extraction.skills.filter(
+          (s) =>
+            s.source_type === "resume" ||
+            s.source_type === "linkedin" ||
+            s.source_type === "llm_markdown",
+        ).length
+        const now = new Date().toISOString()
         const { error } = await supabaseAdmin
           .schema("careeros")
           .from("user_profiles")
@@ -362,6 +328,9 @@ export const profileExtract = careerosInngest.createFunction(
               years_experience: source.userStatedYearsExperience ?? extraction.years_experience,
               current_role_title:
                 source.userStatedRole ?? currentRoleFromExtraction ?? extraction.current_role,
+              last_profile_extraction_id: extractionId,
+              profile_ready_at: documentSkillCount > 0 ? now : null,
+              updated_at: now,
             },
             { onConflict: "user_id" },
           )
@@ -418,12 +387,7 @@ export const profileExtract = careerosInngest.createFunction(
         })
       })
 
-      await step.run("enqueue-skills-embed", async () => {
-        await sendCareerOSEvent({
-          name: "careeros/skills.embed",
-          data: { user_id: userId },
-        })
-      })
+      // skills.embed runs after profile.onet-map completes (needs onet_skill_id on rows)
 
       await step.run("enqueue-half-life-computation", async () => {
         await sendCareerOSEvent({

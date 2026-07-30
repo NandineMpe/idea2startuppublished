@@ -1,0 +1,42 @@
+[
+  {
+    "id": "software-engineer",
+    "current_role_title": "Senior Software Engineer",
+    "target_role_title": "Staff Engineer",
+    "years_experience": 8,
+    "top_skills": ["Python", "TypeScript", "AWS", "Kubernetes"],
+    "expected_soc_prefix": "15-"
+  },
+  {
+    "id": "solicitor-ai-governance",
+    "current_role_title": "3 PQE Solicitor",
+    "target_role_title": "AI governance",
+    "years_experience": 3,
+    "top_skills": ["UK GDPR", "ISO 42001", "Data Protection Impact Assessments"],
+    "expected_soc_prefix": "23-"
+  },
+  {
+    "id": "product-manager",
+    "current_role_title": "Product Manager",
+    "target_role_title": "Director of Product",
+    "years_experience": 6,
+    "top_skills": ["Roadmapping", "SQL", "Stakeholder management"],
+    "expected_soc_prefix": "11-"
+  },
+  {
+    "id": "data-analyst",
+    "current_role_title": "Data Analyst",
+    "target_role_title": "Analytics Lead",
+    "years_experience": 4,
+    "top_skills": ["SQL", "Tableau", "Python"],
+    "expected_soc_prefix": "15-"
+  },
+  {
+    "id": "registered-nurse",
+    "current_role_title": "Registered Nurse",
+    "target_role_title": "Clinical Nurse Specialist",
+    "years_experience": 5,
+    "top_skills": ["Patient care", "Triage", "Electronic health records"],
+    "expected_soc_prefix": "29-"
+  }
+]

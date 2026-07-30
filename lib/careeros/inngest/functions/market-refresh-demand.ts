@@ -41,10 +41,7 @@ export const marketRefreshDemand = careerosInngest.createFunction(
     id: "careeros-market-refresh-demand",
     name: "CareerOS market.refresh-demand (trajectory cache)",
     retries: 1,
-    triggers: [
-      { cron: "0 2 * * 0" },
-      { event: "careeros/market.refresh-demand" },
-    ],
+    triggers: [{ event: "careeros/market.refresh-demand" }],
   },
   async ({ step, event }) => {
     const windowCodes = parseWindowCodes()

@@ -1,0 +1,161 @@
+.career-convai-sdk-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.career-convai-sdk-root * {
+  pointer-events: auto;
+}
+
+.career-convai-sdk-fab {
+  display: flex;
+  height: 56px;
+  width: 56px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: none;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  cursor: pointer;
+}
+
+.career-convai-sdk-fab:hover {
+  filter: brightness(1.05);
+}
+
+.career-convai-sdk-panel {
+  width: min(320px, calc(100vw - 40px));
+  border-radius: 16px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.15);
+  overflow: hidden;
+}
+
+.career-convai-sdk-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.career-convai-sdk-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.career-convai-sdk-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 12px;
+}
+
+.career-convai-sdk-orb {
+  display: flex;
+  height: 88px;
+  width: 88px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.5);
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.career-convai-sdk-orb.is-speaking {
+  border-color: hsl(var(--primary));
+  transform: scale(1.04);
+}
+
+.career-convai-sdk-orb.is-listening {
+  border-color: hsl(var(--primary) / 0.5);
+}
+
+.career-convai-sdk-orb.is-connecting {
+  animation: career-convai-pulse 1.2s ease-in-out infinite;
+}
+
+.career-convai-sdk-orb.is-error {
+  border-color: hsl(var(--destructive) / 0.6);
+}
+
+@keyframes career-convai-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.career-convai-sdk-status {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+
+.career-convai-sdk-transcript {
+  margin: 0;
+  max-height: 48px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  color: hsl(var(--muted-foreground) / 0.9);
+}
+
+.career-convai-sdk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.career-convai-sdk-icon-btn {
+  display: flex;
+  height: 40px;
+  width: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+
+.career-convai-sdk-icon-btn.is-muted {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+.career-convai-sdk-end {
+  padding: 8px 16px;
+  border-radius: 9999px;
+  border: none;
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}

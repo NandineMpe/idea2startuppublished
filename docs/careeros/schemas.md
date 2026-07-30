@@ -2,6 +2,24 @@
 
 This document defines cross-cutting schema contracts used by CareerOS workers and migrations.
 
+## Profile truthfulness (2026-05-20)
+
+Migration: `careeros_20260520_profile_truthfulness.sql`
+
+| Object | Purpose |
+| --- | --- |
+| `user_skills.is_placeholder` | Legacy inferred/keyword skills; cannot be `is_active` when true. |
+| `user_skills.provenance_workflow` | Workflow that created the row (e.g. `careeros/profile.extract`). |
+| `user_document_extractions.extraction_method` | `llm_structured` or `fallback_minimal`. |
+| `user_profiles.last_profile_extraction_id` | FK to latest profile extract. |
+| `user_profiles.profile_ready_at` | Set when extract produced document-sourced active skills. |
+| `careeros.v_user_portfolio_skills` | Read model: active resume/linkedin/manual skills only. |
+
+Constraints:
+
+- `careeros_user_skills_active_not_placeholder`: active rows must not be placeholders.
+- `careeros_user_skills_portfolio_source_check`: active non-placeholder rows must be `resume`, `linkedin`, or `manual`.
+
 ## input_data_version
 
 `input_data_version` is a SHA-256 hash of a canonical JSON snapshot of generation inputs.

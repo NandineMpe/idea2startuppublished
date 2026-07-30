@@ -10,6 +10,7 @@ import { fetchRecentHackerNews } from "@/lib/careeros/sources/hacker-news"
 import { fetchRecentGithubTrending } from "@/lib/careeros/sources/github-trending"
 import { fetchRecentPragmaticEngineer } from "@/lib/careeros/sources/pragmatic-engineer"
 import { fetchRecentTechCrunchAi } from "@/lib/careeros/sources/techcrunch-ai"
+import { fetchRecentMicrosoftAiBlog } from "@/lib/careeros/sources/microsoft-ai-blog"
 import { fetchRecentMicrosoftResearchBlog } from "@/lib/careeros/sources/microsoft-research-blog"
 import { fetchRecentMistralNews } from "@/lib/careeros/sources/mistral-news"
 import { fetchRecentEleutherAiBlog } from "@/lib/careeros/sources/eleutherai-blog"
@@ -26,6 +27,7 @@ export const FEED_SOURCE_KEYS = [
   "github-trending",
   "pragmatic-engineer",
   "techcrunch-ai",
+  "microsoft-ai-blog",
   "microsoft-research-blog",
   "mistral-news",
   "eleutherai-blog",
@@ -45,6 +47,7 @@ const FEED_FETCHERS: Record<FeedSourceKey, (hoursBack: number) => Promise<RawFee
   "github-trending": fetchRecentGithubTrending,
   "pragmatic-engineer": fetchRecentPragmaticEngineer,
   "techcrunch-ai": fetchRecentTechCrunchAi,
+  "microsoft-ai-blog": fetchRecentMicrosoftAiBlog,
   "microsoft-research-blog": fetchRecentMicrosoftResearchBlog,
   "mistral-news": fetchRecentMistralNews,
   "eleutherai-blog": fetchRecentEleutherAiBlog,

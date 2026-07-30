@@ -6,6 +6,7 @@ import { LandingThemeToggle } from "@/components/landing-theme-toggle"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/server"
 import { JunoAuthForm } from "@/components/access/juno-auth-form"
+import { JunoBlueDotMark } from "@/components/juno/blue-dot-mark"
 
 const casualHuman = localFont({
   src: "../../app/fonts/CasualHuman.otf",
@@ -19,15 +20,6 @@ const casualHumanBold = localFont({
 
 const editorialHeading = {
   fontFamily: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
-}
-
-function BlueDotMark({ className = "" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`inline-block rounded-full bg-blue-500 shadow-[0_0_0_10px_rgba(59,130,246,0.09),0_18px_40px_rgba(37,99,235,0.26)] ${className}`}
-    />
-  )
 }
 
 function ResortDarkBackdrop() {
@@ -119,7 +111,7 @@ export async function JunoAuthPage({
         <header className="flex items-center justify-between gap-4 rounded-[1.7rem] border border-white/90 bg-white/70 px-3 py-2 shadow-[0_18px_50px_rgba(148,163,184,0.12)] backdrop-blur-xl transition-colors duration-700 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_24px_70px_rgba(2,8,14,0.4)]">
           <Link href={pagePath} className="flex items-center gap-3 rounded-full px-2 py-1">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full">
-              <BlueDotMark className="h-5 w-5" />
+              <JunoBlueDotMark className="h-5 w-5" />
             </span>
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500 dark:text-sky-100/55">
@@ -148,7 +140,7 @@ export async function JunoAuthPage({
             <div className="absolute right-[-5rem] top-[-5rem] h-56 w-56 rounded-full border border-sky-200/70 bg-white/35 blur-sm dark:border-sky-200/15 dark:bg-white/[0.05]" />
             <div className="absolute right-10 top-14 flex h-28 w-28 items-center justify-center rounded-full border border-sky-200/80 bg-white/65 shadow-[0_24px_70px_rgba(59,130,246,0.2)] dark:border-sky-100/15 dark:bg-white/[0.05]">
               <span className="absolute inset-4 rounded-full border border-sky-200/80 dark:border-sky-100/15" />
-              <BlueDotMark className="h-10 w-10" />
+              <JunoBlueDotMark className="h-10 w-10" />
             </div>
 
             <div className="relative max-w-2xl">

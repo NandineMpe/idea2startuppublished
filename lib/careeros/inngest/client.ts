@@ -1,7 +1,7 @@
 import { Inngest } from "inngest"
 
 // CareerOS event-type contract. Every event name must start with "careeros/".
-type CareerOSEvents = {
+export type CareerOSEvents = {
   "careeros/system.ping": {
     data: { source: string; timestamp: string }
   }
@@ -68,6 +68,16 @@ type CareerOSEvents = {
       user_id: string
       enriched_item_id: string
     }
+  }
+  "careeros/feed.personalise-pending-for-user": {
+    data: {
+      user_id: string
+      days_back?: number
+      limit?: number
+    }
+  }
+  "careeros/market.refresh-frontier-roles": {
+    data: Record<string, never>
   }
   "careeros/skills.compute-half-life-for-user": {
     data: { user_id: string }

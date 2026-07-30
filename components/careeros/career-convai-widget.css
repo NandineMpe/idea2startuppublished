@@ -1,0 +1,27 @@
+/* Floating FAB (default ElevenLabs position: bottom-right). */
+.career-convai-floating-root elevenlabs-convai {
+  z-index: 60;
+}
+
+/* Inline embed inside a panel (legacy). */
+.career-convai-widget-host {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.career-convai-widget-host elevenlabs-convai {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 360px;
+  --elevenlabs-convai-widget-width: 100%;
+  --elevenlabs-convai-widget-height: 100%;
+}

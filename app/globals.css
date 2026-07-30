@@ -7,46 +7,43 @@
 @tailwind utilities;
 
 @layer base {
-  /* Ambient Minimalism — warm, sage, serene */
+  /* Juno — emerald on white */
   :root {
-    --background: 45 22% 97%;
-    --foreground: 25 15% 18%;
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 25 15% 18%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 25 15% 18%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Muted sage green — present but never shouting */
-    --primary: 152 26% 40%;
+    /* Tailwind emerald-500 / emerald-600 */
+    --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 40 18% 93%;
-    --secondary-foreground: 25 12% 28%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 215 25% 27%;
 
-    --muted: 40 14% 94%;
-    --muted-foreground: 25 10% 52%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    /* Featherlight sage accent */
-    --accent: 150 14% 92%;
-    --accent-foreground: 152 26% 28%;
+    --accent: 152 81% 96%;
+    --accent-foreground: 161 94% 30%;
 
-    --destructive: 5 68% 50%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    /* Soft warm borders */
-    --border: 40 16% 88%;
-    --input: 40 16% 88%;
-    --ring: 152 26% 40%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 160 84% 39%;
 
     --radius: 0.75rem;
 
-    /* Warm elevation layers */
-    --surface-0: 45 22% 97%;
-    --surface-1: 40 18% 95%;
-    --surface-2: 40 14% 92%;
-    --surface-3: 40 12% 88%;
+    --surface-0: 0 0% 100%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 152 81% 96%;
+    --surface-3: 214 32% 91%;
   }
 
   .dark {
@@ -59,29 +56,29 @@
     --popover: 30 7% 13%;
     --popover-foreground: 40 18% 90%;
 
-    --primary: 152 26% 50%;
+    --primary: 160 77% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 6% 20%;
-    --secondary-foreground: 40 14% 82%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
 
-    --muted: 30 6% 20%;
-    --muted-foreground: 35 8% 58%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 30 6% 20%;
-    --accent-foreground: 40 18% 90%;
+    --accent: 164 86% 16%;
+    --accent-foreground: 152 81% 90%;
 
-    --destructive: 5 60% 42%;
-    --destructive-foreground: 40 18% 90%;
+    --destructive: 0 63% 51%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 30 6% 22%;
-    --input: 30 6% 22%;
-    --ring: 152 26% 50%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 160 77% 52%;
 
-    --surface-0: 30 8% 9%;
-    --surface-1: 30 7% 13%;
-    --surface-2: 30 6% 17%;
-    --surface-3: 30 6% 22%;
+    --surface-0: 222 47% 11%;
+    --surface-1: 217 33% 17%;
+    --surface-2: 215 28% 22%;
+    --surface-3: 215 25% 27%;
   }
 
   * {
@@ -196,7 +193,7 @@
   /* Muted sage gradient */
   .green-gradient-text {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(152 26% 34%), hsl(152 30% 52%));
+    background-image: linear-gradient(135deg, hsl(161 94% 30%), hsl(160 84% 45%));
   }
 
   @keyframes pulse-subtle {

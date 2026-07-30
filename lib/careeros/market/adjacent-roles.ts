@@ -293,7 +293,11 @@ export async function refreshMarketAdjacentRoles(options?: {
   return { rows_written: rows.length, source_count: sources.length, top_k: topK }
 }
 
-export async function getAdjacentRolesForUser(userId: string) {
+export async function getAdjacentRolesForUser(
+  userId: string,
+  options?: { persistSnapshot?: boolean },
+) {
+  const persistSnapshot = options?.persistSnapshot !== false
   const { data: profile, error: pErr } = await supabaseAdmin
     .schema("careeros")
     .from("user_profiles")
@@ -382,30 +386,32 @@ export async function getAdjacentRolesForUser(userId: string) {
   const sourceMidSalary = salaryMidBySoc.get(soc) ?? null
   const sourceDemandDelta = demandDeltaBySoc.get(soc) ?? null
 
-  // snapshot rows (per-user audit trail)
-  const snapshotId = randomUUID()
-  await supabaseAdmin
-    .schema("careeros")
-    .from("user_adjacent_role_snapshots")
-    .update({ is_current: false })
-    .eq("user_id", userId)
-    .eq("is_current", true)
+  const snapshotId = persistSnapshot ? randomUUID() : null
+  if (persistSnapshot && snapshotId) {
+    await supabaseAdmin
+      .schema("careeros")
+      .from("user_adjacent_role_snapshots")
+      .update({ is_current: false })
+      .eq("user_id", userId)
+      .eq("is_current", true)
 
-  await supabaseAdmin.schema("careeros").from("user_adjacent_role_snapshots").insert({
-    id: snapshotId,
-    user_id: userId,
-    source_role_soc_code: soc,
-    snapshot_window_code: "M360",
-    generated_at: new Date().toISOString(),
-    is_current: true,
-    model_version: "heuristic-v1",
-    prompt_version: "none",
-    schema_version: "1",
-    input_data_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION,
-    source_attribution: { source_dataset_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION },
-  })
+    await supabaseAdmin.schema("careeros").from("user_adjacent_role_snapshots").insert({
+      id: snapshotId,
+      user_id: userId,
+      source_role_soc_code: soc,
+      snapshot_window_code: "M360",
+      generated_at: new Date().toISOString(),
+      is_current: true,
+      model_version: "heuristic-v1",
+      prompt_version: "none",
+      schema_version: "1",
+      input_data_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION,
+      source_attribution: { source_dataset_version: ADJACENT_ROLES_SOURCE_DATASET_VERSION },
+    })
+  }
 
-  const itemRows = marketRows.map((r) => {
+  const itemRows = persistSnapshot
+    ? marketRows.map((r) => {
     const p = buildAdjacentPersonalisation({
       targetSocCode: String(r.target_soc_code),
       userSkills,
@@ -446,8 +452,11 @@ export async function getAdjacentRolesForUser(userId: string) {
       source_attribution: {},
     }
   })
+    : []
 
-  await supabaseAdmin.schema("careeros").from("user_adjacent_role_items").insert(itemRows)
+  if (persistSnapshot && itemRows.length) {
+    await supabaseAdmin.schema("careeros").from("user_adjacent_role_items").insert(itemRows)
+  }
 
   return {
     status: "ready" as const,

@@ -11,10 +11,12 @@ import { skillsEmbed } from "@/lib/careeros/inngest/functions/skills-embed"
 import { systemPing } from "@/lib/careeros/inngest/functions/system-ping"
 import { feedIngest } from "@/lib/careeros/inngest/functions/feed-ingest"
 import { feedEnrichItem } from "@/lib/careeros/inngest/functions/feed-enrich-item"
+import { feedPersonalisePendingForUser } from "@/lib/careeros/inngest/functions/feed-personalise-pending"
 import {
   feedPersonaliseForAllUsers,
   feedPersonaliseForUser,
 } from "@/lib/careeros/inngest/functions/feed-personalise"
+import { marketRefreshFrontierRoles } from "@/lib/careeros/inngest/functions/market-refresh-frontier-roles"
 import { skillsComputeHalfLife } from "@/lib/careeros/inngest/functions/skills-compute-half-life"
 import { exposureScoreRefresh } from "@/lib/careeros/inngest/functions/exposure-score-refresh"
 import { careerHealthDailyScheduler } from "@/lib/careeros/inngest/functions/career-health-daily-scheduler"
@@ -39,6 +41,8 @@ export const { GET, POST, PUT } = serve({
     feedEnrichItem,
     feedPersonaliseForAllUsers,
     feedPersonaliseForUser,
+    feedPersonalisePendingForUser,
+    marketRefreshFrontierRoles,
     skillsComputeHalfLife,
     exposureScoreRefresh,
     careerHealthDailyScheduler,

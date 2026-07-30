@@ -17,11 +17,7 @@ export const marketCacheRefresh = careerosInngest.createFunction(
     id: "careeros-market-cache-refresh",
     name: "CareerOS market cache refresh (O*NET paced)",
     retries: 2,
-    triggers: [
-      // Weekly Sunday 03:00 UTC — aligns with “weekly market cache” cadence; adjust as needed.
-      { cron: "0 3 * * 0" },
-      { event: "careeros/cache.refresh" },
-    ],
+    triggers: [{ event: "careeros/cache.refresh" }],
   },
   async ({ step, event }) => {
     const keywordsFromEvent =

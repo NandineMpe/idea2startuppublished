@@ -2,6 +2,7 @@ import Link from "next/link"
 import localFont from "next/font/local"
 import { ArrowRight, Rocket, Palette, Briefcase } from "lucide-react"
 import { LandingThemeToggle } from "@/components/landing-theme-toggle"
+import { JunoBlueDotMark } from "@/components/juno/blue-dot-mark"
 
 const casualHumanBold = localFont({
   src: "../../app/fonts/CasualHuman-Bold.otf",
@@ -10,15 +11,6 @@ const casualHumanBold = localFont({
 
 const editorialHeading = {
   fontFamily: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
-}
-
-function BlueDotMark({ className = "" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`inline-block rounded-full bg-blue-500 shadow-[0_0_0_10px_rgba(59,130,246,0.09),0_18px_40px_rgba(37,99,235,0.26)] ${className}`}
-    />
-  )
 }
 
 function ResortDarkBackdrop() {
@@ -106,7 +98,7 @@ export function OsPortalPage() {
         <header className="flex items-center justify-between gap-4 rounded-[1.7rem] border border-white/90 bg-white/70 px-3 py-2 shadow-[0_18px_50px_rgba(148,163,184,0.12)] backdrop-blur-xl transition-colors duration-700 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_24px_70px_rgba(2,8,14,0.4)]">
           <div className="flex items-center gap-3 rounded-full px-2 py-1">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-full">
-              <BlueDotMark className="h-5 w-5" />
+              <JunoBlueDotMark className="h-5 w-5" />
             </span>
             <div>
               <p className={`${casualHumanBold.className} text-2xl leading-none text-slate-950 dark:text-white`}>

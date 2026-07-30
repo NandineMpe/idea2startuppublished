@@ -7,10 +7,7 @@ export const marketRefreshAdjacentRoles = careerosInngest.createFunction(
   {
     id: "careeros-market-refresh-adjacent-roles",
     retries: 1,
-    triggers: [
-      { event: "careeros/market.refresh-adjacent-roles" },
-      { cron: "TZ=UTC 0 15 * * 0" },
-    ],
+    triggers: [{ event: "careeros/market.refresh-adjacent-roles" }],
   },
   async ({ event, step }) => {
     const startedAt = new Date().toISOString()

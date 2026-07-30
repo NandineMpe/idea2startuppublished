@@ -1,41 +1,27 @@
 import { createHash, randomUUID } from "crypto"
+import { getAnthropicApiKey } from "@/lib/careeros/ai/claude"
 import { careerosMinIntervalMs } from "@/lib/careeros/integrations/rate-limits"
 import {
   fetchOnetCareerSkillsFlat,
   getOnetAuthHeaders,
-  onetSearchFirstOccupation,
 } from "@/lib/careeros/integrations/onet-request"
+import {
+  matchOccupationWithVectorAndClaude,
+  type OccupationMatchContext,
+} from "@/lib/careeros/onet/occupation-match"
+import {
+  matchSkillsWithVectorAndClaude,
+  type UserSkillRow,
+} from "@/lib/careeros/onet/skill-match"
 import {
   mergeCareerOsModule14State,
   mergeCareerOsOnboardingState,
 } from "@/lib/careeros/onboarding/user-settings"
 import { supabaseAdmin } from "@/lib/supabase"
-import { careerosInngest } from "../client"
+import { careerosInngest, sendCareerOSEvent } from "../client"
 
 function sha256Hex(text: string): string {
   return createHash("sha256").update(text).digest("hex")
-}
-
-/** Rough fuzzy score between user skill label and O*NET skill phrase (Content Model element label). */
-function scoreSkillMatch(userLabel: string, onetName: string): number {
-  const u = userLabel.toLowerCase().trim()
-  const o = onetName.toLowerCase().trim()
-  if (!u || !o) return 0
-  if (u === o) return 1
-  if (o.includes(u) || u.includes(o)) return 0.85
-  const tokenize = (s: string) =>
-    new Set(
-      s
-        .replace(/[^a-z0-9]+/g, " ")
-        .split(/\s+/)
-        .filter((w) => w.length > 2),
-    )
-  const ut = tokenize(u)
-  const ot = tokenize(o)
-  if (ut.size === 0 || ot.size === 0) return 0
-  let overlap = 0
-  for (const t of ut) if (ot.has(t)) overlap++
-  return overlap / Math.max(ut.size, ot.size)
 }
 
 export const profileOnetMap = careerosInngest.createFunction(
@@ -52,13 +38,14 @@ export const profileOnetMap = careerosInngest.createFunction(
         module_1_3: {
           status: "running",
           startedAt: new Date().toISOString(),
+          method: "vector_claude_v1",
         },
       })
     })
 
     try {
       if (!getOnetAuthHeaders()) {
-        await step.run("skip-no-credentials", async () => {
+        await step.run("skip-no-onet-credentials", async () => {
           await mergeCareerOsOnboardingState(userId, {
             module_1_3: {
               status: "skipped",
@@ -67,14 +54,29 @@ export const profileOnetMap = careerosInngest.createFunction(
             },
           })
         })
-        return { user_id: userId, skipped: true as const }
+        return { user_id: userId, skipped: true as const, reason: "missing_onet_credentials" }
+      }
+
+      if (!getAnthropicApiKey()) {
+        await step.run("skip-no-claude", async () => {
+          await mergeCareerOsOnboardingState(userId, {
+            module_1_3: {
+              status: "skipped",
+              reason: "missing_anthropic_api_key",
+              completedAt: new Date().toISOString(),
+            },
+          })
+        })
+        return { user_id: userId, skipped: true as const, reason: "missing_anthropic_api_key" }
       }
 
       const profile = await step.run("load-profile", async () => {
         const { data, error } = await supabaseAdmin
           .schema("careeros")
           .from("user_profiles")
-          .select("current_role_title,target_role_title")
+          .select(
+            "current_role_title,target_role_title,years_experience,location_label",
+          )
           .eq("user_id", userId)
           .maybeSingle()
         if (error) throw error
@@ -85,43 +87,96 @@ export const profileOnetMap = careerosInngest.createFunction(
         const { data, error } = await supabaseAdmin
           .schema("careeros")
           .from("user_skills")
-          .select("id,skill_name,canonical_skill_key,onet_skill_id")
+          .select("id,skill_name,canonical_skill_key,source_type,evidence_payload,onet_skill_id")
           .eq("user_id", userId)
           .eq("is_active", true)
         if (error) throw error
-        return (data ?? []).filter((r) => !r.onet_skill_id)
+        return (data ?? []) as UserSkillRow[]
       })
 
-      const keyword =
-        (typeof profile?.current_role_title === "string" && profile.current_role_title.trim()) ||
-        (typeof profile?.target_role_title === "string" && profile.target_role_title.trim()) ||
-        "professional"
+      const topSkillNames = skillRows.map((s) => String(s.skill_name)).slice(0, 15)
+
+      const occCtx: OccupationMatchContext = {
+        current_role_title: (profile?.current_role_title as string | null) ?? null,
+        target_role_title: (profile?.target_role_title as string | null) ?? null,
+        years_experience:
+          typeof profile?.years_experience === "number" ? profile.years_experience : null,
+        top_skill_names: topSkillNames,
+        location_label: (profile?.location_label as string | null) ?? null,
+      }
 
       await step.sleep("onet-pace-before-search", careerosMinIntervalMs("onet"))
 
-      const search = await step.run("onet-search-occupation", async () =>
-        onetSearchFirstOccupation(keyword),
+      const occupationMatch = await step.run("match-occupation-vector-claude", async () =>
+        matchOccupationWithVectorAndClaude(occCtx),
       )
 
-      if (!search.hit) {
-        if (search.status === 401 || search.status === 403) {
-          throw new Error(
-            `O*NET rejected credentials (HTTP ${search.status}). Confirm ONET_USERNAME / ONET_PASSWORD in Vercel, or obtain ONET_API_KEY if migrating to Web Services v2.`,
-          )
-        }
-        if (search.status >= 400) {
-          throw new Error(`O*NET occupation search failed (HTTP ${search.status})`)
-        }
-        throw new Error("O*NET occupation search returned no matching SOC code for keyword")
+      if (!occupationMatch) {
+        throw new Error("O*NET occupation mapping failed: no match from vector + Claude pipeline")
       }
 
-      const socCode = search.hit.soc_code
+      const socCode = occupationMatch.soc_code
 
       await step.sleep("onet-pace-before-skills", careerosMinIntervalMs("onet"))
 
       const careerSkills = await step.run("onet-career-skills", async () =>
         fetchOnetCareerSkillsFlat(socCode),
       )
+
+      const occupationSkillCandidates = careerSkills.skills.map((s) => ({
+        id: s.id,
+        name: s.name,
+      }))
+
+      const profileSummary = [
+        `SOC candidate: ${socCode} (${occupationMatch.title})`,
+        occCtx.current_role_title ? `Current: ${occCtx.current_role_title}` : "",
+        occCtx.target_role_title ? `Target: ${occCtx.target_role_title}` : "",
+        typeof occCtx.years_experience === "number"
+          ? `Experience: ${occCtx.years_experience} years`
+          : "",
+        topSkillNames.length ? `Skills: ${topSkillNames.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+
+      const skillDecisions = await step.run("match-skills-vector-claude", async () =>
+        matchSkillsWithVectorAndClaude({
+          userSkills: skillRows,
+          occupationSkills: occupationSkillCandidates,
+          profileSummary,
+          socCode,
+        }),
+      )
+
+      let mapped = 0
+      let needsReview = 0
+
+      await step.run("apply-skill-mappings", async () => {
+        for (const d of skillDecisions) {
+          const review = d.needs_review || !d.onet_skill_id
+          if (review) needsReview += 1
+          else mapped += 1
+
+          const { error } = await supabaseAdmin
+            .schema("careeros")
+            .from("user_skills")
+            .update({
+              onet_skill_id: d.onet_skill_id,
+              onet_needs_review: review,
+              onet_mapping_confidence: Number(d.claude_confidence.toFixed(4)),
+              onet_mapping_payload: {
+                method: d.method,
+                vector_similarity: d.vector_similarity,
+                matched_name: d.onet_skill_name,
+                soc_code: socCode,
+                needs_review: review,
+              },
+            })
+            .eq("id", d.user_skill_id)
+          if (error) throw error
+        }
+      })
 
       const skillGraphStored =
         careerSkills.ok && careerSkills.raw_graph !== undefined
@@ -145,40 +200,6 @@ export const profileOnetMap = careerosInngest.createFunction(
         })
       }
 
-      const flat = careerSkills.skills
-      let mapped = 0
-
-      if (flat.length > 0 && skillRows.length > 0) {
-        await step.run("apply-skill-mappings", async () => {
-          for (const row of skillRows) {
-            const skillName = row.skill_name as string
-            const canon = typeof row.canonical_skill_key === "string" ? row.canonical_skill_key : ""
-            const label = `${skillName} ${canon}`
-            let best: { id: string; name: string; score: number } | null = null
-            for (const s of flat) {
-              const sc = Math.max(scoreSkillMatch(label, s.name), scoreSkillMatch(skillName, s.name))
-              if (!best || sc > best.score) best = { id: s.id, name: s.name, score: sc }
-            }
-            if (best && best.score >= 0.38) {
-              const { error } = await supabaseAdmin
-                .schema("careeros")
-                .from("user_skills")
-                .update({
-                  onet_skill_id: best.id,
-                  onet_mapping_confidence: Number(best.score.toFixed(4)),
-                  onet_mapping_payload: {
-                    method: "occupation_skills_tree",
-                    matched_name: best.name,
-                    soc_code: socCode,
-                  },
-                })
-                .eq("id", row.id as string)
-              if (!error) mapped += 1
-            }
-          }
-        })
-      }
-
       await step.run("update-profile-soc", async () => {
         const { error } = await supabaseAdmin
           .schema("careeros")
@@ -187,13 +208,18 @@ export const profileOnetMap = careerosInngest.createFunction(
             {
               user_id: userId,
               onet_soc_code: socCode,
-              onet_mapping_confidence: careerSkills.ok ? 0.72 : 0.42,
+              onet_mapping_confidence: Number(occupationMatch.claude_confidence.toFixed(4)),
               onet_mapping_payload: {
-                keyword,
-                occupation_title: search.hit?.title ?? null,
-                career_skills_fetch_ok: careerSkills.ok,
-                career_skills_status: careerSkills.status,
+                method: occupationMatch.method,
+                keyword_role: occCtx.current_role_title,
+                occupation_title: occupationMatch.title,
+                vector_similarity: occupationMatch.vector_similarity,
+                vector_rank: occupationMatch.vector_rank,
+                candidates_considered: occupationMatch.candidates_considered,
+                claude_rationale: occupationMatch.rationale,
                 mapped_skill_rows: mapped,
+                needs_review_skill_rows: needsReview,
+                career_skills_fetch_ok: careerSkills.ok,
               },
             },
             { onConflict: "user_id" },
@@ -203,9 +229,9 @@ export const profileOnetMap = careerosInngest.createFunction(
 
       const inputPayload = {
         user_id: userId,
-        keyword,
         soc_code: socCode,
-        skill_row_ids: skillRows.map((s) => s.id as string).sort(),
+        skill_row_ids: skillRows.map((s) => s.id).sort(),
+        method: "vector_claude_v1",
       }
       const inputHash = sha256Hex(JSON.stringify(inputPayload))
 
@@ -216,17 +242,19 @@ export const profileOnetMap = careerosInngest.createFunction(
           artefact_table: "careeros.user_profiles",
           artefact_id: null,
           workflow_name: "careeros/profile.onet-map",
-          provider: "other",
-          model_name: "onet-web-services",
-          model_version: "v2",
-          prompt_version: "onet-keyword+career-skills",
-          schema_version: "1",
+          provider: "anthropic",
+          model_name: "claude-sonnet-4-6",
+          model_version: "vector_claude_v1",
+          prompt_version: "onet-vector-top5-claude-confirm",
+          schema_version: "2",
           input_data_version: inputHash,
-          source_attribution: { keyword, soc_code: socCode },
+          source_attribution: { soc_code: socCode, method: "vector_claude_v1" },
           input_hash: inputHash,
-          output_hash: sha256Hex(JSON.stringify({ mapped, socCode, careerSkillsOk: careerSkills.ok })),
+          output_hash: sha256Hex(
+            JSON.stringify({ mapped, needsReview, socCode, careerSkillsOk: careerSkills.ok }),
+          ),
           latency_ms: null,
-          token_usage: { career_skills_fetch_ok: careerSkills.ok, career_skills_status: careerSkills.status },
+          token_usage: null,
           status: "completed",
         })
         if (error) throw error
@@ -239,7 +267,9 @@ export const profileOnetMap = careerosInngest.createFunction(
             completedAt: new Date().toISOString(),
             onetSocCode: socCode,
             mappedSkillsCount: mapped,
+            needsReviewSkillsCount: needsReview,
             careerSkillsFetchOk: careerSkills.ok,
+            method: "vector_claude_v1",
           },
         })
         await mergeCareerOsModule14State(
@@ -276,11 +306,20 @@ export const profileOnetMap = careerosInngest.createFunction(
         )
       })
 
+      await step.run("enqueue-skills-embed", async () => {
+        await sendCareerOSEvent({
+          name: "careeros/skills.embed",
+          data: { user_id: userId },
+        })
+      })
+
       return {
         user_id: userId,
         soc_code: socCode,
         mapped_skills: mapped,
+        needs_review_skills: needsReview,
         career_skills_ok: careerSkills.ok,
+        method: "vector_claude_v1",
       }
     } catch (error) {
       await step.run("mark-failed", async () => {

@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       llmMarkdownPaste?: { documentId: string; deduped: boolean }
       llmMarkdownBrain?: { merged: boolean; reason?: string; scope?: string }
     } = {}
-    let latestLlmMarkdownText: string | null = null
+    let latestLlmMarkdownDocumentId: string | null = null
     let latestLlmMarkdownSourceLabel: string | null = null
 
     if (hasPdf) {
@@ -132,34 +132,76 @@ export async function POST(request: Request) {
       if (text.length > MAX_MARKDOWN_CHARS) {
         return NextResponse.json({ error: "Markdown file too large (max 120,000 characters)" }, { status: 400 })
       }
-      const brain = await appendCareerOsMarkdownToJunoBrain(user.id, text, {
-        sourceLabel: file.name,
-        forceOwnerScope: true,
+      const persisted = await persistTextDocument({
+        userId: user.id,
+        docType: "llm_markdown",
+        plainText: text,
+        contentType: "text/markdown",
+        parserName: "careeros-onboarding",
+        parserVersion: "1",
+        fileExtension: "md",
       })
-      result.llmMarkdownBrain = brain.ok
-        ? { merged: true, scope: brain.scope }
-        : { merged: false, reason: brain.reason }
-      latestLlmMarkdownText = text
+      result.llmMarkdownFile = {
+        documentId: persisted.documentId,
+        deduped: persisted.deduped,
+      }
+      try {
+        const brain = await appendCareerOsMarkdownToJunoBrain(user.id, text, {
+          sourceLabel: file.name,
+          forceOwnerScope: true,
+        })
+        result.llmMarkdownBrain = brain.ok
+          ? { merged: true, scope: brain.scope }
+          : { merged: false, reason: brain.reason }
+      } catch (brainError) {
+        console.error(
+          "[careeros onboarding step-one] brain merge failed (md file saved)",
+          brainError instanceof Error ? brainError.message : brainError,
+        )
+        result.llmMarkdownBrain = { merged: false, reason: "brain_merge_failed" }
+      }
+      latestLlmMarkdownDocumentId = persisted.documentId
       latestLlmMarkdownSourceLabel = file.name
     }
 
     if (hasMdText) {
-      const brain = await appendCareerOsMarkdownToJunoBrain(user.id, llmMarkdownTextRaw, {
-        sourceLabel: "Pasted LLM markdown",
-        forceOwnerScope: true,
+      const persisted = await persistTextDocument({
+        userId: user.id,
+        docType: "llm_markdown",
+        plainText: llmMarkdownTextRaw,
+        contentType: "text/markdown",
+        parserName: "careeros-onboarding",
+        parserVersion: "1",
+        fileExtension: "md",
       })
-      result.llmMarkdownBrain = brain.ok
-        ? { merged: true, scope: brain.scope }
-        : { merged: false, reason: brain.reason }
-      latestLlmMarkdownText = llmMarkdownTextRaw
+      result.llmMarkdownPaste = {
+        documentId: persisted.documentId,
+        deduped: persisted.deduped,
+      }
+      try {
+        const brain = await appendCareerOsMarkdownToJunoBrain(user.id, llmMarkdownTextRaw, {
+          sourceLabel: "Pasted LLM markdown",
+          forceOwnerScope: true,
+        })
+        result.llmMarkdownBrain = brain.ok
+          ? { merged: true, scope: brain.scope }
+          : { merged: false, reason: brain.reason }
+      } catch (brainError) {
+        console.error(
+          "[careeros onboarding step-one] brain merge failed (md paste saved)",
+          brainError instanceof Error ? brainError.message : brainError,
+        )
+        result.llmMarkdownBrain = { merged: false, reason: "brain_merge_failed" }
+      }
+      latestLlmMarkdownDocumentId = persisted.documentId
       latestLlmMarkdownSourceLabel = "Pasted LLM markdown"
     }
 
     await mergeCareerOsOnboardingState(user.id, {
       step1CompletedAt: new Date().toISOString(),
-      ...(latestLlmMarkdownText
+      ...(latestLlmMarkdownDocumentId
         ? {
-            latestLlmMarkdownText,
+            latestLlmMarkdownDocumentId,
             latestLlmMarkdownSourceLabel,
           }
         : {}),
@@ -167,6 +209,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, documents: result })
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/already exists|duplicate|409/i.test(message)) {
+      return NextResponse.json(
+        {
+          error:
+            "That file was partially saved earlier. Hard refresh and try again, or rename the file and re-upload.",
+        },
+        { status: 409 },
+      )
+    }
     return jsonApiError(500, error, "careeros onboarding step-one")
   }
 }
