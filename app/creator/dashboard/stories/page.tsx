@@ -5,6 +5,7 @@ import { DecideButtons } from "@/components/creator/decide-buttons"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { StoryLineagePanel } from "@/components/creator/story-lineage"
 import { Disclosure } from "@/components/creator/disclosure"
+import { StoryActions } from "@/components/creator/story-actions"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
 
@@ -28,7 +29,10 @@ function StoryCard({ story }: { story: CreatorStory }) {
           </span>
           <h3 className="text-[14px] font-semibold text-foreground leading-snug">{story.thesis}</h3>
         </div>
-        {story.work_item_id && <DecideButtons workId={story.work_item_id} />}
+        <div className="flex items-center gap-2 shrink-0">
+          {story.work_item_id && <DecideButtons workId={story.work_item_id} />}
+          <StoryActions storyId={story.id} />
+        </div>
       </div>
 
       {story.angle && (
@@ -125,12 +129,18 @@ export default async function StoriesPage() {
               </div>
               <div className="rounded-xl border border-dashed border-border overflow-hidden">
                 {context.watchlist.map((story) => (
-                  <div key={story.id} className="px-4 py-3 border-b border-border last:border-b-0">
-                    <p className="text-[13px] text-foreground/85 leading-snug">{story.thesis}</p>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      {KIND_LABELS[story.synthesis_kind]} · {story.receipts.length} receipt
-                      {story.receipts.length === 1 ? "" : "s"}
-                    </p>
+                  <div
+                    key={story.id}
+                    className="px-4 py-3 border-b border-border last:border-b-0 flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] text-foreground/85 leading-snug">{story.thesis}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {KIND_LABELS[story.synthesis_kind]} · {story.receipts.length} receipt
+                        {story.receipts.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <StoryActions storyId={story.id} />
                   </div>
                 ))}
               </div>

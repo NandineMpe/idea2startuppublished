@@ -63,6 +63,68 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
   return { ok: true }
 }
 
+export type StoryActionResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * Clear a story off the screen once it is dealt with.
+ *
+ * Archiving keeps the thesis, which is what the synthesis do-not-repeat list
+ * reads, so an archived story stops the same take resurfacing next week.
+ * Deleting removes it entirely, for a story that was a mistake rather than one
+ * that was used — there, suppressing the topic in future would be wrong.
+ *
+ * Any linked Desk work item goes with it either way, so the two screens cannot
+ * disagree about whether something is still outstanding.
+ */
+export async function archiveOrDeleteStory(
+  storyId: string,
+  action: "archive" | "delete",
+): Promise<StoryActionResult> {
+  const { supabase, userId } = await requireCreatorUser()
+
+  const { data: story, error: loadError } = await supabase
+    .schema("creator")
+    .from("creator_stories")
+    .select("work_item_id")
+    .eq("id", storyId)
+    .eq("user_id", userId)
+    .maybeSingle()
+  if (loadError) return { ok: false, error: loadError.message }
+  if (!story) return { ok: false, error: "Story not found." }
+
+  if (story.work_item_id) {
+    const { error } = await supabase
+      .schema("creator")
+      .from("creator_work")
+      .delete()
+      .eq("id", story.work_item_id)
+      .eq("user_id", userId)
+    if (error) return { ok: false, error: error.message }
+  }
+
+  const { error } =
+    action === "archive"
+      ? await supabase
+          .schema("creator")
+          .from("creator_stories")
+          .update({ state: "archived", decided_at: new Date().toISOString() })
+          .eq("id", storyId)
+          .eq("user_id", userId)
+      : await supabase
+          .schema("creator")
+          .from("creator_stories")
+          .delete()
+          .eq("id", storyId)
+          .eq("user_id", userId)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/creator/dashboard/stories")
+  revalidatePath("/creator/dashboard")
+
+  return { ok: true }
+}
+
 export type DeleteContentResult = { ok: true; deleted: number } | { ok: false; error: string }
 
 /**

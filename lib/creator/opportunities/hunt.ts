@@ -30,21 +30,29 @@ function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10)
 }
 
+type SearchOptions = {
+  /** Only pages published within this window. Without it the index happily
+   *  returns a conference that closed last year, which is worse than nothing. */
+  withinDays?: number
+  includeDomains?: string[]
+  excludeDomains?: string[]
+}
+
 async function exaSearch(
   exa: Exa,
   lane: OpportunityCandidate["lane"],
   query: string,
   numResults: number,
-  /** Only pages published within this window. Without it the index happily
-   *  returns a conference that closed last year, which is worse than nothing. */
-  withinDays = 120,
+  options: SearchOptions = {},
 ): Promise<OpportunityCandidate[]> {
   try {
     const res = await exa.searchAndContents(query, {
       numResults,
       text: { maxCharacters: 1500 },
       type: "auto",
-      startPublishedDate: daysAgo(withinDays),
+      startPublishedDate: daysAgo(options.withinDays ?? 120),
+      ...(options.includeDomains?.length ? { includeDomains: options.includeDomains } : {}),
+      ...(options.excludeDomains?.length ? { excludeDomains: options.excludeDomains } : {}),
     })
     return (res.results ?? [])
       .filter((r) => typeof r.url === "string" && typeof r.title === "string" && r.title.trim())
@@ -60,21 +68,73 @@ async function exaSearch(
   }
 }
 
-/** Brands already sponsoring creators in this topic space. */
+/**
+ * Platforms whose sponsorship coverage is overwhelmingly YouTube-shaped. The
+ * index returns them for a TikTok query because there is simply far more
+ * written about YouTube sponsorships, and a YouTube sponsor list is the wrong
+ * answer for a creator whose entire corpus is TikTok.
+ */
+const NON_TIKTOK_SOURCES = [
+  "youtube.com",
+  "whosponsorsstuff.com",
+  "patreon.com",
+  "twitch.tv",
+  // Product pages, not advertisers. A TikTok Shop listing for a webcam is a
+  // thing being sold on the platform, not a brand buying creator media.
+  "shop.tiktok.com",
+]
+
+/**
+ * Brands already paying for this audience on TikTok specifically.
+ *
+ * Three angles, because no single one is reliable: TikTok's own disclosure
+ * wording, which is the exact string a sponsored post carries; TikTok's ad and
+ * Creative Center surfaces, where advertisers by industry are published; and
+ * campaign write-ups in the trade press. YouTube-dominated sources are excluded
+ * outright rather than hoped away in the prompt.
+ */
 export async function huntSponsors(topics: string[]): Promise<OpportunityCandidate[]> {
   const exa = getExa()
   if (!exa) return []
+  const year = new Date().getFullYear()
   const out: OpportunityCandidate[] = []
+
   for (const topic of topics.slice(0, 3)) {
+    // TikTok labels sponsored posts "Paid partnership with X" — searching the
+    // platform itself finds who is actually running them, not who writes about it.
+    out.push(
+      ...(await exaSearch(exa, "sponsors", `"paid partnership" ${topic} TikTok`, 5, {
+        includeDomains: ["tiktok.com"],
+        excludeDomains: ["shop.tiktok.com"],
+        withinDays: 180,
+      })),
+    )
+
+    // TikTok's own business surfaces, where advertisers are named in case
+    // studies. Restricted to their domain because an open query returns SEO
+    // guides about the Creative Center rather than anyone advertising on it.
     out.push(
       ...(await exaSearch(
         exa,
         "sponsors",
-        `brands sponsoring ${topic} TikTok creators "paid partnership" OR "#ad" OR "sponsored by"`,
-        6,
+        `${topic} brand case study advertising results`,
+        4,
+        { includeDomains: ["ads.tiktok.com", "newsroom.tiktok.com"], withinDays: 365 },
+      )),
+    )
+
+    // Trade-press campaign write-ups, which name the brand and the agency.
+    out.push(
+      ...(await exaSearch(
+        exa,
+        "sponsors",
+        `${topic} brand TikTok campaign OR "creator campaign" case study ${year}`,
+        4,
+        { excludeDomains: NON_TIKTOK_SOURCES, withinDays: 180 },
       )),
     )
   }
+
   return out
 }
 
@@ -101,7 +161,7 @@ export async function huntEvents(topics: string[]): Promise<OpportunityCandidate
         "events",
         `${topic} conference ${thisYear} OR ${nextYear} "call for speakers" OR "call for proposals" OR "speaker applications open" OR "apply to speak"`,
         5,
-        90,
+        { withinDays: 90 },
       )),
     )
     out.push(
@@ -110,7 +170,7 @@ export async function huntEvents(topics: string[]): Promise<OpportunityCandidate
         "events",
         `${topic} podcast "guest" submission OR "pitch a guest" ${thisYear}`,
         3,
-        90,
+        { withinDays: 90 },
       )),
     )
   }
