@@ -3,6 +3,7 @@ import { CheckCircle2, Handshake, Inbox, Mic2 } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadOpportunities } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorWorkItem } from "@/lib/creator/types"
 
@@ -112,6 +113,7 @@ export default async function OpportunitiesPage() {
       <PageHeader
         title="Opportunities"
         subtitle="Deals, events and platform listings your partnerships desk surfaced — each with the pitch already drafted."
+        actions={<RunAgentButton kind="opportunities" label="Hunt now" variant="primary" />}
       />
 
       {context.blocker && <BlockerNotice blocker={context.blocker} />}

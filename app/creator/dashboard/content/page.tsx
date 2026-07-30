@@ -2,6 +2,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadCorpus, summarisePerformance } from "@/lib/creator/load-corpus"
 import { CorpusTable } from "@/components/creator/corpus-table"
 import { ImportCorpus } from "@/components/creator/import-corpus"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { PageBody, PageHeader, StatTile } from "@/components/creator/page-shell"
 import { formatEngagementRate } from "@/lib/creator/types"
 
@@ -29,7 +30,11 @@ export default async function ContentPage() {
 
   return (
     <PageBody className="max-w-[1300px]">
-      <PageHeader title="Content" subtitle="Your corpus. Everything downstream is derived from it." />
+      <PageHeader
+        title="Content"
+        subtitle="Your corpus. Everything downstream is derived from it."
+        actions={<RunAgentButton kind="metrics" label="Refresh metrics" />}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <StatTile

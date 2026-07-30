@@ -2,6 +2,7 @@ import { Eye, Link2, Newspaper } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadStories } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
 
@@ -82,6 +83,7 @@ export default async function StoriesPage() {
       <PageHeader
         title="Stories"
         subtitle="Dossiers from your Researcher — connected dots with receipts, never a restated headline."
+        actions={<RunAgentButton kind="research" label="Run Researcher" variant="primary" />}
       />
 
       {context.blocker && <BlockerNotice blocker={context.blocker} />}

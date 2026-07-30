@@ -3,6 +3,7 @@ import { Fingerprint, TrendingDown, TrendingUp, Minus, HelpCircle } from "lucide
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadCanon, isCanonStale } from "@/lib/creator/load-canon"
 import { ConfidenceBadge } from "@/components/creator/confidence-badge"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { FormatTrend } from "@/lib/creator/types"
 
@@ -68,7 +69,12 @@ export default async function CanonPage() {
       <PageHeader
         title="Canon"
         subtitle="Who you are, derived from what you actually made."
-        actions={<ConfidenceBadge confidence={canon.confidence} sampleSize={canon.corpus_size} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <RunAgentButton kind="canon" label="Re-derive" />
+            <ConfidenceBadge confidence={canon.confidence} sampleSize={canon.corpus_size} />
+          </div>
+        }
       />
 
       {blocker && <BlockerNotice blocker={blocker} />}

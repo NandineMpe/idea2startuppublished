@@ -1,7 +1,8 @@
 import { Lightbulb } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
-import { loadNextFive, NEXT_FIVE_SIZE } from "@/lib/creator/load-next-five"
+import { loadNextFive } from "@/lib/creator/load-next-five"
 import { DraftCard } from "@/components/creator/draft-card"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 
 export const dynamic = "force-dynamic"
@@ -15,13 +16,14 @@ export default async function NextFivePage() {
       <PageHeader
         title="Next Five"
         subtitle="Drafted, in your voice, against formats that already work for you."
+        actions={<RunAgentButton kind="writer" label="Write a draft" variant="primary" withBrief />}
       />
 
       {blocker && !drafts.length ? (
         <EmptyState
           icon={Lightbulb}
           title="No drafts yet"
-          description="Every morning this holds five specific pieces, written against a format you have already proven and traceable to the posts that earned it."
+          description="Drafts are written against a format you have already proven and stay traceable to the posts that earned it."
           blocker={blocker}
         />
       ) : (
@@ -37,7 +39,7 @@ export default async function NextFivePage() {
             <EmptyState
               icon={Lightbulb}
               title="Queue is empty"
-              description={`Your canon is in place. The next run will fill this with ${NEXT_FIVE_SIZE} drafts.`}
+              description="The Writer is commissioned, not scheduled — it runs when you approve a story on Stories, or when you ask for a draft directly with the button above."
             />
           )}
         </>

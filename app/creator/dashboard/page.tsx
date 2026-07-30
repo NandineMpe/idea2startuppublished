@@ -4,6 +4,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadDesk } from "@/lib/creator/load-desk"
 import { ConfidenceBadge } from "@/components/creator/confidence-badge"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { EmptyState, PageBody, PageHeader, StatTile } from "@/components/creator/page-shell"
 import type { CreatorWorkItem } from "@/lib/creator/types"
 
@@ -94,9 +95,13 @@ export default async function CreatorDeskPage() {
         title="The Desk"
         subtitle="What happened overnight, and what needs you."
         actions={
-          desk.canon ? (
-            <ConfidenceBadge confidence={desk.canon.confidence} sampleSize={desk.canon.corpus_size} />
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <RunAgentButton kind="research" label="Run Researcher" />
+            <RunAgentButton kind="opportunities" label="Hunt deals" />
+            {desk.canon ? (
+              <ConfidenceBadge confidence={desk.canon.confidence} sampleSize={desk.canon.corpus_size} />
+            ) : null}
+          </div>
         }
       />
 
