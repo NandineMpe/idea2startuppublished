@@ -31,7 +31,7 @@ const derivationSchema = z.object({
     rhythm_notes: z.array(z.string()),
     vocabulary: z.array(z.string()),
     never_says: z.array(z.string()),
-  }).nullable().describe("Null when there is too little spoken/caption text to read a voice."),
+  }).nullish().describe("Null when there is too little spoken/caption text to read a voice."),
   topics: z.array(z.object({
     label: z.string(),
     weight: z.number().min(0).max(1),

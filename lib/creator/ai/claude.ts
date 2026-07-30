@@ -25,16 +25,30 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
   object: z.infer<TSchema>
   usage: { totalTokens: number }
 }> {
-  const result = await generateObject({
-    model: creatorClaudeModel(),
-    schema: args.schema,
-    system: args.system,
-    prompt: args.prompt,
-    maxOutputTokens: args.maxOutputTokens ?? 8000,
-  })
+  try {
+    const result = await generateObject({
+      model: creatorClaudeModel(),
+      schema: args.schema,
+      system: args.system,
+      prompt: args.prompt,
+      // Generous by default: this model thinks, and thinking is charged against
+      // the same ceiling as the response, so a tight budget truncates the JSON
+      // mid-object and surfaces as an unhelpful schema-mismatch error.
+      maxOutputTokens: args.maxOutputTokens ?? 16000,
+    })
 
-  return {
-    object: result.object,
-    usage: { totalTokens: result.usage?.totalTokens ?? 0 },
+    return {
+      object: result.object,
+      usage: { totalTokens: result.usage?.totalTokens ?? 0 },
+    }
+  } catch (e) {
+    // The SDK's default message ("response did not match schema") says nothing
+    // about which field failed or what the model actually returned, which makes
+    // these failures far more expensive to diagnose than they need to be.
+    const err = e as { message?: string; text?: string; cause?: { message?: string } }
+    const detail = [err.cause?.message, err.text ? `raw: ${err.text.slice(0, 400)}` : null]
+      .filter(Boolean)
+      .join(" | ")
+    throw new Error(detail ? `${err.message ?? "generateObject failed"} — ${detail}` : String(err.message ?? e))
   }
 }

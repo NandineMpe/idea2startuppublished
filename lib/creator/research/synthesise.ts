@@ -48,7 +48,7 @@ const storySchema = z.object({
   why_now: z.string().describe("Why this week, not next month."),
   why_you: z.string().describe("Why THIS creator's audience cares, referencing their pillars/topics where possible."),
   angle: z.string().describe("A suggested opening angle written in the creator's voice."),
-  suggested_pillar_id: z.string().nullable(),
+  suggested_pillar_id: z.string().nullish(),
 })
 
 const synthesisSchema = z.object({

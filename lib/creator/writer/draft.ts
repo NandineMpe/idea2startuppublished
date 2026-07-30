@@ -14,7 +14,7 @@ export const WRITER_PROMPT_VERSION = "creator-writer-v1"
 const draftSchema = z.object({
   hook: z.string().describe("The opening line, in the creator's actual opener style. This is what gets judged first."),
   script: z.string().describe("The full talk-track for a short-form video, written to be spoken. Include beat markers as plain lines like [beat: receipt]."),
-  format_id: z.string().nullable().describe("The id of the derived format used, or null when none fits."),
+  format_id: z.string().nullish().describe("The id of the derived format used, or null when none fits."),
   estimated_duration_seconds: z.number().int().min(10).max(600),
   title: z.string().describe("Working title for the queue."),
 })

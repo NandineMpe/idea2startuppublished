@@ -45,7 +45,7 @@ const lineageSchema = z.object({
     .array(
       z.object({
         title: z.string(),
-        url: z.string().nullable(),
+        url: z.string().nullish(),
         what_it_shows: z.string().describe("The specific finding, not a summary of the abstract."),
       }),
     )

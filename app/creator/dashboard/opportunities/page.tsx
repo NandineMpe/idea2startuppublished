@@ -4,6 +4,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadOpportunities } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
+import { BriefReplyPanel } from "@/components/creator/brief-reply"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorWorkItem } from "@/lib/creator/types"
 
@@ -117,6 +118,10 @@ export default async function OpportunitiesPage() {
       />
 
       {context.blocker && <BlockerNotice blocker={context.blocker} />}
+
+      {/* Inbound briefs arrive whether or not the hunting agents have run, so
+          this sits above the pipeline rather than inside its empty state. */}
+      <BriefReplyPanel />
 
       {empty ? (
         <EmptyState
