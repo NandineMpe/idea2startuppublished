@@ -40,8 +40,11 @@ export const creatorOpportunitiesSweep = creatorInngest.createFunction(
     for (const userId of userIds) {
       const result = await step.run(`sweep-${userId}`, async () => {
         const topics = await loadResearchTopics(supabaseAdmin, userId)
-        if (!topics.length) return null
-        return sweepOpportunitiesForUser(supabaseAdmin, userId, topics)
+        // Brands buy the audience the creator already has, so deals are hunted
+        // against core topics only — adjacency is an editorial bet, not a
+        // credential to pitch on.
+        if (!topics.core.length) return null
+        return sweepOpportunitiesForUser(supabaseAdmin, userId, topics.core)
       })
       if (result) results.push({ user_id: userId, candidates: result.candidates, proposed: result.proposed })
     }

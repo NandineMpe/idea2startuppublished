@@ -21,6 +21,9 @@ const MAX_STORIES_PER_RUN = 5
 const storySchema = z.object({
   thesis: z.string().describe("The unique claim, one or two sentences. Not a headline restated — a take that requires the cited signals together."),
   synthesis_kind: z.enum(["connection", "contradiction", "second_order", "trend_break", "own_content"]),
+  move: z.enum(["consolidate", "expand"]).describe(
+    "consolidate = deepens ground the creator already owns. expand = moves them into an adjacent topic they have not worked yet.",
+  ),
   signal_indexes: z.array(z.number().int()).describe("Indexes into the numbered signal list that this thesis stands on."),
   receipts: z.array(z.object({
     signal_index: z.number().int(),
@@ -44,16 +47,29 @@ type SignalRow = {
   published_at: string | null
   snippet: string | null
   topics: string[]
+  lane: string
+  stance: string
 }
 
 const SYSTEM_PROMPT = `You are the research desk of a one-person creator's management agency. You are an investigative researcher, not an aggregator: your job is to connect dots across signals and produce theses the creator could not get from any single headline.
 
+Each signal is tagged with a LANE and a STANCE.
+
+LANE is the register it came from: news (the cycle), papers (preprints and research), releases (what labs and vendors published themselves), books (long-form argument), discussion (practitioners arguing).
+- The strongest theses join signals from DIFFERENT lanes. A preprint that contradicts a press release, a book-length argument the news cycle forgot, practitioners reporting something the vendor's own release notes deny — these are things the audience could not have assembled alone.
+- Two news items about the same event is the weakest possible connection. Avoid it.
+
+STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch surface they have not worked yet.
+- Set "move" to consolidate when the thesis deepens core ground, expand when it moves them into adjacent territory.
+- An expand story must still connect back to their existing authority — say in "why_you" what earns them the right to this topic. Do not propose a subject they have no standing in.
+
 Rules:
 - A thesis must REQUIRE at least two of the provided signals together (or one signal connected to the creator's own published work for kind "own_content"). If a candidate idea rests on a single headline, do not propose it.
-- Prefer contradiction (received wisdom vs the data), cross-domain connection, and second-order implications for the creator's specific audience.
+- Prefer contradiction (received wisdom vs the data), cross-lane connection, and second-order implications for the creator's specific audience.
 - Never repeat or lightly rephrase a thesis from the "recent theses" list.
-- Receipts must be concrete: a number, a quote, a named action — not "sources say".
+- Receipts must be concrete: a number, a quote, a named finding — not "sources say".
 - Write "angle" in the creator's voice profile if one is provided; otherwise plain and direct.
+- Aim for a mix: mostly consolidate, one or two expand. A slate that is all stretch leaves the creator sounding unmoored.
 - Fewer, stronger stories beat more, weaker ones. Zero stories is an acceptable output.`
 
 export type SynthesisResult = {
@@ -71,7 +87,7 @@ export async function synthesiseStoriesForUser(
 
   const [{ data: signals }, { data: canon }, { data: recentPosts }, { data: recentStories }] = await Promise.all([
     supabase.schema("creator").from("creator_signals")
-      .select("id,source_key,title,url,published_at,snippet,topics")
+      .select("id,source_key,title,url,published_at,snippet,topics,lane,stance")
       .eq("user_id", userId)
       .gte("ingested_at", since)
       .order("published_at", { ascending: false })
@@ -100,7 +116,12 @@ export async function synthesiseStoriesForUser(
   }
 
   const signalList = signalRows
-    .map((s, i) => `[${i}] (${s.source_key}, ${s.published_at ?? "undated"}) ${s.title}${s.snippet ? ` — ${s.snippet.slice(0, 280)}` : ""}`)
+    .map(
+      (s, i) =>
+        `[${i}] lane=${s.lane} stance=${s.stance} topic=${s.topics?.[0] ?? "—"} (${s.published_at ?? "undated"}) ${s.title}${
+          s.snippet ? ` — ${s.snippet.slice(0, 280)}` : ""
+        }`,
+    )
     .join("\n")
 
   const canonBlock = canon
@@ -157,6 +178,7 @@ export async function synthesiseStoriesForUser(
         state,
         thesis: story.thesis,
         synthesis_kind: story.synthesis_kind,
+        move: story.move,
         receipts,
         signal_ids: signalIds,
         why_now: story.why_now,

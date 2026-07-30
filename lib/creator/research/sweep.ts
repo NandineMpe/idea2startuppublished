@@ -1,79 +1,139 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchRssLikeSource } from "@/lib/careeros/sources/feed-utils"
+import { fetchReleases, sweepTopicAcrossLanes, type LaneSignal, type TopicStance } from "./lanes"
 
 /**
- * Signal collection — the Researcher's raw material.
+ * Signal collection across every register the Researcher reads.
  *
- * MVP sourcing is Google News RSS per declared topic: zero API keys, works for
- * any niche. Entity/claim extraction and embeddings are deliberately deferred —
- * at current corpus sizes the synthesis pass reads the recent signals directly,
- * so per-signal enrichment would be spend without payoff. The creator_signals
- * columns for both already exist for when volume demands them.
+ * Two axes, both deliberate:
+ *
+ *  - LANE: news, papers, releases, books, discussion. A thesis assembled from
+ *    a preprint plus a press release is something the audience could not have
+ *    reached alone; two headlines about the same event is not.
+ *
+ *  - STANCE: core topics are the ground the creator already owns; adjacent
+ *    topics come from the canon's own `adjacent` field — the stretch surface.
+ *    Sweeping both is what makes the output about where they should move,
+ *    rather than only where they are.
+ *
+ * Entity extraction and embeddings stay deferred: at these volumes synthesis
+ * reads the recent signals directly, so per-signal enrichment would be spend
+ * without payoff. The columns exist for when that changes.
  */
 
-const MAX_SIGNALS_PER_TOPIC = 15
-
-function googleNewsUrl(topic: string): string {
-  const q = encodeURIComponent(topic)
-  return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`
-}
+const MAX_CORE_TOPICS = 5
+const MAX_ADJACENT_TOPICS = 4
 
 export type SweepResult = {
   topics_swept: number
+  core_topics: number
+  adjacent_topics: number
   signals_fetched: number
   signals_upserted: number
+  by_lane: Record<string, number>
   errors: string[]
+}
+
+async function upsertSignals(
+  supabase: SupabaseClient,
+  userId: string,
+  signals: LaneSignal[],
+): Promise<{ upserted: number; error?: string }> {
+  if (!signals.length) return { upserted: 0 }
+
+  const rows = signals.map((s) => ({
+    user_id: userId,
+    source_key: s.source_key,
+    source_item_id: s.source_item_id,
+    title: s.title,
+    url: s.url,
+    published_at: s.published_at.toISOString(),
+    snippet: s.body?.slice(0, 2000) ?? null,
+    topics: [s.topic],
+    lane: s.lane,
+    stance: s.stance,
+    raw_payload: s.raw_payload,
+  }))
+
+  const { error, count } = await supabase
+    .schema("creator")
+    .from("creator_signals")
+    .upsert(rows, {
+      onConflict: "user_id,source_key,source_item_id",
+      ignoreDuplicates: true,
+      count: "exact",
+    })
+
+  if (error) return { upserted: 0, error: error.message }
+  return { upserted: count ?? rows.length }
 }
 
 export async function sweepSignalsForUser(
   supabase: SupabaseClient,
   userId: string,
-  topics: string[],
+  topics: ResearchTopics,
   hoursBack = 48,
 ): Promise<SweepResult> {
-  const result: SweepResult = { topics_swept: 0, signals_fetched: 0, signals_upserted: 0, errors: [] }
+  const result: SweepResult = {
+    topics_swept: 0,
+    core_topics: topics.core.length,
+    adjacent_topics: topics.adjacent.length,
+    signals_fetched: 0,
+    signals_upserted: 0,
+    by_lane: {},
+    errors: [],
+  }
 
-  for (const topic of topics) {
-    const sourceKey = `google-news:${topic.toLowerCase().trim().replace(/\s+/g, "-")}`
-    let items
+  const plan: Array<{ topic: string; stance: TopicStance }> = [
+    ...topics.core.map((topic) => ({ topic, stance: "core" as const })),
+    ...topics.adjacent.map((topic) => ({ topic, stance: "adjacent" as const })),
+  ]
+
+  for (const { topic, stance } of plan) {
+    let signals: LaneSignal[]
     try {
-      items = await fetchRssLikeSource({ sourceKey, url: googleNewsUrl(topic), hoursBack })
+      signals = await sweepTopicAcrossLanes(topic, stance, hoursBack)
     } catch (e) {
-      result.errors.push(`${sourceKey}: ${e instanceof Error ? e.message : String(e)}`)
+      result.errors.push(`${topic}: ${e instanceof Error ? e.message : String(e)}`)
       continue
     }
     result.topics_swept++
-    result.signals_fetched += items.length
+    result.signals_fetched += signals.length
+    for (const s of signals) result.by_lane[s.lane] = (result.by_lane[s.lane] ?? 0) + 1
 
-    const rows = items.slice(0, MAX_SIGNALS_PER_TOPIC).map((item) => ({
-      user_id: userId,
-      source_key: item.source_key,
-      source_item_id: item.source_item_id,
-      title: item.title,
-      url: item.url,
-      published_at: item.published_at.toISOString(),
-      snippet: item.body?.slice(0, 2000) ?? null,
-      topics: [topic],
-      raw_payload: item.raw_payload,
-    }))
-    if (!rows.length) continue
+    const { upserted, error } = await upsertSignals(supabase, userId, signals)
+    if (error) result.errors.push(`${topic} upsert: ${error}`)
+    result.signals_upserted += upserted
+  }
 
-    const { error, count } = await supabase
-      .schema("creator")
-      .from("creator_signals")
-      .upsert(rows, { onConflict: "user_id,source_key,source_item_id", ignoreDuplicates: true, count: "exact" })
-    if (error) {
-      result.errors.push(`${sourceKey} upsert: ${error.message}`)
-    } else {
-      result.signals_upserted += count ?? rows.length
-    }
+  // Lab and vendor releases are topic-independent — swept once, not per topic.
+  try {
+    const releases = await fetchReleases(hoursBack)
+    result.signals_fetched += releases.length
+    for (const s of releases) result.by_lane[s.lane] = (result.by_lane[s.lane] ?? 0) + 1
+    const { upserted, error } = await upsertSignals(supabase, userId, releases)
+    if (error) result.errors.push(`releases upsert: ${error}`)
+    result.signals_upserted += upserted
+  } catch (e) {
+    result.errors.push(`releases: ${e instanceof Error ? e.message : String(e)}`)
   }
 
   return result
 }
 
-/** Topic list for a user: derived canon topics win; declared settings topics are the stopgap. */
-export async function loadResearchTopics(supabase: SupabaseClient, userId: string): Promise<string[]> {
+export type ResearchTopics = { core: string[]; adjacent: string[] }
+
+/**
+ * What to search on.
+ *
+ * The derived canon wins when it exists: its topics are weighted by what the
+ * creator actually publishes, and its `adjacent` lists are the stretch surface
+ * the derivation identified. Declared settings topics are the stopgap before
+ * a corpus exists, and have no adjacency of their own.
+ */
+export async function loadResearchTopics(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ResearchTopics> {
   const { data: canon } = await supabase
     .schema("creator")
     .from("creator_canon")
@@ -84,9 +144,26 @@ export async function loadResearchTopics(supabase: SupabaseClient, userId: strin
     .maybeSingle()
 
   const canonTopics = Array.isArray(canon?.topics)
-    ? (canon.topics as Array<{ label?: string }>).map((t) => t.label).filter((l): l is string => Boolean(l))
+    ? (canon.topics as Array<{ label?: string; weight?: number; adjacent?: string[] }>)
     : []
-  if (canonTopics.length) return canonTopics.slice(0, 8)
+
+  if (canonTopics.length) {
+    const ranked = [...canonTopics].sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
+    const core = ranked
+      .map((t) => t.label)
+      .filter((l): l is string => Boolean(l))
+      .slice(0, MAX_CORE_TOPICS)
+
+    // Adjacency is drawn from the heaviest topics first: the stretch that
+    // matters is the one next to where the creator already has authority.
+    const adjacent = [
+      ...new Set(ranked.flatMap((t) => (Array.isArray(t.adjacent) ? t.adjacent : []))),
+    ]
+      .filter((label) => label && !core.includes(label))
+      .slice(0, MAX_ADJACENT_TOPICS)
+
+    return { core, adjacent }
+  }
 
   const { data: settings } = await supabase
     .schema("creator")
@@ -95,5 +172,5 @@ export async function loadResearchTopics(supabase: SupabaseClient, userId: strin
     .eq("user_id", userId)
     .maybeSingle()
 
-  return (settings?.niche_topics ?? []).slice(0, 8)
+  return { core: (settings?.niche_topics ?? []).slice(0, MAX_CORE_TOPICS), adjacent: [] }
 }

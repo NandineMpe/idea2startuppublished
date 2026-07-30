@@ -42,7 +42,7 @@ export const creatorResearchSweep = creatorInngest.createFunction(
     for (const userId of userIds) {
       const sweep = await step.run(`sweep-${userId}`, async () => {
         const topics = await loadResearchTopics(supabaseAdmin, userId)
-        if (!topics.length) return null
+        if (!topics.core.length && !topics.adjacent.length) return null
         return sweepSignalsForUser(supabaseAdmin, userId, topics, hoursBack)
       })
       if (sweep) {
