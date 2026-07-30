@@ -63,6 +63,51 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
   return { ok: true }
 }
 
+export type DeleteContentResult = { ok: true; deleted: number } | { ok: false; error: string }
+
+/**
+ * Remove posts from the corpus.
+ *
+ * A hard delete rather than a bin: every field is recoverable by re-importing
+ * the same URL, so a soft-delete flag would add a filter to every corpus query
+ * to protect nothing. What is not recoverable is the canon derived from the old
+ * corpus, so a re-derivation is queued — the canon must never describe posts
+ * that are no longer there. Its debounce collapses a burst of deletes into one.
+ */
+export async function deleteCreatorContent(contentIds: string[]): Promise<DeleteContentResult> {
+  const { supabase, userId } = await requireCreatorUser()
+
+  const ids = contentIds.filter((id) => typeof id === "string" && id.length > 0)
+  if (!ids.length) return { ok: false, error: "Nothing selected." }
+
+  const { data, error } = await supabase
+    .schema("creator")
+    .from("creator_content")
+    .delete()
+    .eq("user_id", userId)
+    .in("id", ids)
+    .select("id")
+
+  if (error) return { ok: false, error: error.message }
+
+  const deleted = data?.length ?? 0
+
+  if (deleted > 0) {
+    try {
+      await sendCreatorEvent({ name: "creator/canon.derive", data: { user_id: userId } })
+    } catch (e) {
+      // A stale canon is worth surfacing, but not worth failing the delete over.
+      console.warn("[creator-actions] canon.derive after delete failed:", e instanceof Error ? e.message : e)
+    }
+  }
+
+  revalidatePath("/creator/dashboard/content")
+  revalidatePath("/creator/dashboard/canon")
+  revalidatePath("/creator/dashboard/worth")
+
+  return { ok: true, deleted }
+}
+
 /**
  * The creator's decision on an agent proposal: approve or kill. RLS scopes the
  * update to their own rows; the linked story (if any) is moved with it so the
