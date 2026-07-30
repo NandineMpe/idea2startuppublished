@@ -1,15 +1,22 @@
 import { requireCreatorUser } from "@/lib/creator/auth"
-import { loadCorpus } from "@/lib/creator/load-corpus"
+import { loadCorpus, summarisePerformance } from "@/lib/creator/load-corpus"
 import { CorpusTable } from "@/components/creator/corpus-table"
 import { ImportCorpus } from "@/components/creator/import-corpus"
 import { PageBody, PageHeader, StatTile } from "@/components/creator/page-shell"
+import { formatEngagementRate } from "@/lib/creator/types"
 
 export const dynamic = "force-dynamic"
+
+function compact(n: number | null | undefined): string {
+  if (typeof n !== "number") return "—"
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n)
+}
 
 export default async function ContentPage() {
   const { supabase, userId } = await requireCreatorUser()
   const { posts, summary } = await loadCorpus(supabase, userId)
   const withText = posts.filter((p) => p.caption?.trim() || p.transcript?.trim()).length
+  const perf = summarisePerformance(posts)
 
   if (!posts.length) {
     return (
@@ -23,6 +30,42 @@ export default async function ContentPage() {
   return (
     <PageBody className="max-w-[1300px]">
       <PageHeader title="Content" subtitle="Your corpus. Everything downstream is derived from it." />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <StatTile
+          label="Total views"
+          value={compact(perf.total_views)}
+          hint={`across ${perf.measured} measured post${perf.measured === 1 ? "" : "s"}`}
+        />
+        <StatTile
+          label="Median views"
+          value={compact(perf.median_views)}
+          hint={
+            perf.views_p25 !== null && perf.views_p75 !== null
+              ? `${compact(perf.views_p25)}–${compact(perf.views_p75)} typical range`
+              : undefined
+          }
+        />
+        <StatTile
+          label="Median engagement"
+          value={formatEngagementRate(perf.median_engagement)}
+          hint={
+            perf.best_engagement !== null
+              ? `best post ${formatEngagementRate(perf.best_engagement)}`
+              : undefined
+          }
+        />
+        <StatTile
+          label="Saves"
+          value={compact(perf.total_saves)}
+          hint={`${compact(perf.total_likes)} likes · ${compact(perf.total_comments)} comments`}
+        />
+      </div>
+
+      <p className="text-[11px] text-muted-foreground mb-6">
+        Medians, not averages — view counts are power-law, so one viral post pulls a mean somewhere
+        no future post will land. Engagement is (likes + comments + shares + saves) ÷ views.
+      </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatTile label="Posts" value={String(summary.total_posts)} />
