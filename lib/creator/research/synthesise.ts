@@ -15,8 +15,24 @@ import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/c
 export const SYNTHESIS_PROMPT_VERSION = "creator-synthesise-v1"
 
 const SIGNAL_WINDOW_HOURS = 72
-const MAX_SIGNALS_IN_PROMPT = 60
-const MAX_STORIES_PER_RUN = 5
+const MAX_STORIES_PER_RUN = 8
+
+/**
+ * Per-lane quotas rather than one "newest N" query.
+ *
+ * Sorting all signals by date and taking the top N silently starves the lanes
+ * that make this worth doing: arXiv carries submission dates and books carry
+ * publication years, so both sort below this week's news and would never reach
+ * the prompt. Quotas guarantee each register is represented, which is the
+ * precondition for the cross-lane connections synthesis is asked to prefer.
+ */
+const LANE_QUOTAS: Record<string, number> = {
+  news: 24,
+  papers: 16,
+  releases: 12,
+  books: 10,
+  discussion: 10,
+}
 
 const storySchema = z.object({
   thesis: z.string().describe("The unique claim, one or two sentences. Not a headline restated — a take that requires the cited signals together."),
@@ -85,13 +101,22 @@ export async function synthesiseStoriesForUser(
 ): Promise<SynthesisResult> {
   const since = new Date(Date.now() - SIGNAL_WINDOW_HOURS * 3600 * 1000).toISOString()
 
-  const [{ data: signals }, { data: canon }, { data: recentPosts }, { data: recentStories }] = await Promise.all([
-    supabase.schema("creator").from("creator_signals")
+  // One query per lane so each register is guaranteed a place in the prompt.
+  const laneQueries = Object.entries(LANE_QUOTAS).map(async ([lane, quota]) => {
+    const { data } = await supabase
+      .schema("creator")
+      .from("creator_signals")
       .select("id,source_key,title,url,published_at,snippet,topics,lane,stance")
       .eq("user_id", userId)
+      .eq("lane", lane)
       .gte("ingested_at", since)
       .order("published_at", { ascending: false })
-      .limit(MAX_SIGNALS_IN_PROMPT),
+      .limit(quota)
+    return (data ?? []) as SignalRow[]
+  })
+
+  const [laneResults, { data: canon }, { data: recentPosts }, { data: recentStories }] = await Promise.all([
+    Promise.all(laneQueries),
     supabase.schema("creator").from("creator_canon")
       .select("version,pillars,voice,topics")
       .eq("user_id", userId)
@@ -110,7 +135,16 @@ export async function synthesiseStoriesForUser(
       .limit(30),
   ])
 
-  const signalRows = (signals ?? []) as SignalRow[]
+  // Interleave lanes so no single register dominates the head of the list —
+  // ordering shapes what the model reaches for first.
+  const byLane = laneResults.filter((rows) => rows.length > 0)
+  const signalRows: SignalRow[] = []
+  for (let i = 0; byLane.some((rows) => i < rows.length); i++) {
+    for (const rows of byLane) {
+      if (i < rows.length) signalRows.push(rows[i])
+    }
+  }
+
   if (signalRows.length < 2) {
     return { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: 0 }
   }
