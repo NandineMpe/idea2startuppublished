@@ -91,7 +91,12 @@ export async function sweepSignalsForUser(
   for (const { topic, stance } of plan) {
     let signals: LaneSignal[]
     try {
-      signals = await sweepTopicAcrossLanes(topic, stance, hoursBack)
+      const outcome = await sweepTopicAcrossLanes(topic, stance, hoursBack)
+      signals = outcome.signals
+      // Surfaced, not swallowed: a lane that returns nothing every run is a
+      // broken adapter, and it is indistinguishable from a quiet week unless
+      // the reason is recorded.
+      for (const err of outcome.errors) result.errors.push(`${topic} / ${err}`)
     } catch (e) {
       result.errors.push(`${topic}: ${e instanceof Error ? e.message : String(e)}`)
       continue

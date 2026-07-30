@@ -114,7 +114,9 @@ export async function deriveLineageForStory(
   const historical = (
     await Promise.all(
       historyQueries(story.thesis, topic).map((q) =>
-        sweepTopicAcrossLanes(q, "core", 24 * 365 * 5).catch(() => []),
+        sweepTopicAcrossLanes(q, "core", 24 * 365 * 5)
+          .then((outcome) => outcome.signals)
+          .catch(() => []),
       ),
     )
   )

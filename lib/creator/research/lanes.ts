@@ -54,7 +54,9 @@ async function fetchPapers(topic: string, hoursBack: number): Promise<RawFeedIte
   const q = encodeURIComponent(`all:"${topic}"`)
   return fetchRssLikeSource({
     sourceKey: `papers:${slug(topic)}`,
-    url: `http://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=12`,
+    // https, not http: plain-HTTP outbound fails in some serverless runtimes,
+    // and the failure was invisible behind a per-lane catch.
+    url: `https://export.arxiv.org/api/query?search_query=${q}&sortBy=submittedDate&sortOrder=descending&max_results=12`,
     // arXiv dates are submission dates; a tight window returns nothing useful.
     hoursBack: Math.max(hoursBack, 24 * 21),
   })
@@ -161,22 +163,45 @@ function slug(topic: string): string {
  * returns four lanes is far more useful than one that returns nothing because
  * arXiv was briefly down.
  */
+export type LaneOutcome = { signals: LaneSignal[]; errors: string[] }
+
 export async function sweepTopicAcrossLanes(
   topic: string,
   stance: TopicStance,
   hoursBack: number,
-): Promise<LaneSignal[]> {
+): Promise<LaneOutcome> {
+  const errors: string[] = []
+
+  /**
+   * Per-lane isolation, but never silent: an empty lane and a broken lane look
+   * identical in the output, and the first version of this swallowed the
+   * difference — which hid four dead lanes behind a working news feed.
+   */
+  async function lane<T>(name: ResearchLane, fn: () => Promise<T[]>): Promise<T[]> {
+    try {
+      const out = await fn()
+      if (!out.length) errors.push(`${name}: returned 0 items`)
+      return out
+    } catch (e) {
+      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`)
+      return []
+    }
+  }
+
   const [news, papers, books, discussion] = await Promise.all([
-    fetchNews(topic, hoursBack).catch(() => []),
-    fetchPapers(topic, hoursBack).catch(() => []),
-    fetchBooks(topic).catch(() => []),
-    fetchDiscussion(topic, hoursBack).catch(() => []),
+    lane("news", () => fetchNews(topic, hoursBack)),
+    lane("papers", () => fetchPapers(topic, hoursBack)),
+    lane("books", () => fetchBooks(topic)),
+    lane("discussion", () => fetchDiscussion(topic, hoursBack)),
   ])
 
-  return [
-    ...tag(news.slice(0, 10), "news", stance, topic),
-    ...tag(papers.slice(0, 6), "papers", stance, topic),
-    ...tag(books.slice(0, 4), "books", stance, topic),
-    ...tag(discussion.slice(0, 5), "discussion", stance, topic),
-  ]
+  return {
+    signals: [
+      ...tag(news.slice(0, 10), "news", stance, topic),
+      ...tag(papers.slice(0, 6), "papers", stance, topic),
+      ...tag(books.slice(0, 4), "books", stance, topic),
+      ...tag(discussion.slice(0, 5), "discussion", stance, topic),
+    ],
+    errors,
+  }
 }
