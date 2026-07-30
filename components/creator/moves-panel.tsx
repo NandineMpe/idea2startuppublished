@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Copy, Compass } from "lucide-react"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { Disclosure } from "@/components/creator/disclosure"
 import { cn } from "@/lib/utils"
 import type { CreatorMove } from "@/lib/creator/types"
 
@@ -84,7 +85,6 @@ export function MovesPanel({ moves }: { moves: CreatorMove[] }) {
 }
 
 function MoveCard({ move }: { move: CreatorMove }) {
-  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const o = move.outline
 
@@ -117,23 +117,22 @@ function MoveCard({ move }: { move: CreatorMove }) {
         <DecideButtons workId={move.id} />
       </div>
 
-      {o && (
-        <div className="mt-3 grid gap-1.5">
-          <Line label="Why now" value={o.why_now} />
-          <Line label="Realistic upside" value={o.realistic_upside} />
-          <Line label="First step" value={o.first_step} />
-        </div>
+      {/* The one line worth reading without opening anything. */}
+      {o?.first_step && (
+        <p className="text-[12px] text-muted-foreground leading-relaxed mt-3">
+          <span className="font-medium text-foreground/80">First step:</span> {o.first_step}
+        </p>
       )}
 
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="mt-3 text-[12px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
-      >
-        {open ? "Hide the plan" : "Show the plan and the script"}
-      </button>
-
-      {open && (
-        <div className="mt-3 grid gap-4">
+      <div className="mt-3">
+        <Disclosure label="The case, the plan and the script">
+        <div className="grid gap-4">
+          {o && (
+            <div className="grid gap-1.5">
+              <Line label="Why now" value={o.why_now} />
+              <Line label="Realistic upside" value={o.realistic_upside} />
+            </div>
+          )}
           {o?.steps?.length ? (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Outline</p>
@@ -185,7 +184,8 @@ function MoveCard({ move }: { move: CreatorMove }) {
             </div>
           ) : null}
         </div>
-      )}
+        </Disclosure>
+      </div>
     </article>
   )
 }

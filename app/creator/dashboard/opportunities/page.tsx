@@ -6,6 +6,7 @@ import { DecideButtons } from "@/components/creator/decide-buttons"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BriefReplyPanel } from "@/components/creator/brief-reply"
 import { MovesPanel } from "@/components/creator/moves-panel"
+import { Disclosure } from "@/components/creator/disclosure"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorWorkItem } from "@/lib/creator/types"
 
@@ -43,26 +44,33 @@ function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDe
         {showDecision && <DecideButtons workId={item.id} />}
       </div>
 
-      {item.body && (
-        <div className="mt-3 rounded-lg bg-muted/40 border border-border px-4 py-3">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">Drafted pitch</p>
-          <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap">{item.body}</p>
-        </div>
-      )}
+      {(item.body || evidence.length > 0) && (
+        <div className="mt-3">
+          <Disclosure label="Drafted pitch and sources">
+            {item.body && (
+              <div className="rounded-lg bg-muted/40 border border-border px-4 py-3">
+                <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                  {item.body}
+                </p>
+              </div>
+            )}
 
-      {evidence.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-          {evidence.slice(0, 4).map((url) => (
-            <a
-              key={url}
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline break-all"
-            >
-              {url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}
-            </a>
-          ))}
+            {evidence.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                {evidence.slice(0, 4).map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline break-all"
+                  >
+                    {url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}
+                  </a>
+                ))}
+              </div>
+            )}
+          </Disclosure>
         </div>
       )}
     </article>

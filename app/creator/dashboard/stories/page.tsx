@@ -4,6 +4,7 @@ import { loadStories } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { StoryLineagePanel } from "@/components/creator/story-lineage"
+import { Disclosure } from "@/components/creator/disclosure"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
 
@@ -52,25 +53,29 @@ function StoryCard({ story }: { story: CreatorStory }) {
       <StoryLineagePanel storyId={story.id} lineage={story.lineage} state={story.lineage_state} />
 
       {story.receipts.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3 grid gap-2">
-          {story.receipts.map((receipt, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <Link2 className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
-              <p className="text-[12px] text-muted-foreground leading-relaxed min-w-0">
-                “{receipt.quote}”{" "}
-                {receipt.url && (
-                  <a
-                    href={receipt.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-violet-600 dark:text-violet-400 hover:underline break-all"
-                  >
-                    {receipt.title || receipt.url}
-                  </a>
-                )}
-              </p>
+        <div className="mt-4 border-t border-border pt-3">
+          <Disclosure label="Receipts" count={story.receipts.length}>
+            <div className="grid gap-2">
+              {story.receipts.map((receipt, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <Link2 className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                  <p className="text-[12px] text-muted-foreground leading-relaxed min-w-0">
+                    “{receipt.quote}”{" "}
+                    {receipt.url && (
+                      <a
+                        href={receipt.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-violet-600 dark:text-violet-400 hover:underline break-all"
+                      >
+                        {receipt.title || receipt.url}
+                      </a>
+                    )}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
+          </Disclosure>
         </div>
       )}
     </article>
