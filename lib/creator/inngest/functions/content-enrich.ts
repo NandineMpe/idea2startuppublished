@@ -32,7 +32,7 @@ export const creatorContentEnrich = creatorInngest.createFunction(
       const { data, error } = await supabaseAdmin
         .schema("creator")
         .from("creator_content")
-        .select("id,url,caption,posted_at,metrics,raw_payload")
+        .select("id,url,caption,posted_at,metrics,transcript,transcript_status,raw_payload")
         .eq("id", contentId)
         .eq("user_id", userId)
         .maybeSingle()
@@ -57,6 +57,26 @@ export const creatorContentEnrich = creatorInngest.createFunction(
     // import-time placeholder a pasted URL was given.
     if (detail?.postedAt) update.posted_at = detail.postedAt
     if (detail?.caption && !row.caption) update.caption = detail.caption
+    if (detail?.durationSeconds) update.duration_seconds = detail.durationSeconds
+
+    // TikTok's own subtitle track is the spoken content — better than our own
+    // ASR would be, and it removes the media download entirely.
+    if (detail?.transcript && !row.transcript) {
+      update.transcript = detail.transcript
+      update.transcript_status = "done"
+    } else if (!row.transcript && detail && !detail.transcript) {
+      // Reached the page but it carries no subtitle track: nothing more to try.
+      update.transcript_status = "unavailable"
+    }
+
+    if (detail && (detail.hashtags.length || detail.originalSound !== null)) {
+      const raw = (row.raw_payload as Record<string, unknown> | null) ?? {}
+      update.raw_payload = {
+        ...raw,
+        hashtags: detail.hashtags,
+        original_sound: detail.originalSound,
+      }
+    }
 
     // Fall back to oEmbed only for what the page did not provide.
     if (!row.caption && !update.caption) {
@@ -94,6 +114,7 @@ export const creatorContentEnrich = creatorInngest.createFunction(
       got_metrics: Boolean(update.metrics),
       got_date: Boolean(update.posted_at),
       got_caption: Boolean(update.caption),
+      got_transcript: Boolean(update.transcript),
     }
   },
 )

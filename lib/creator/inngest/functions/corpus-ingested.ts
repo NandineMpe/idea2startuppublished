@@ -22,13 +22,13 @@ export const creatorCorpusIngested = creatorInngest.createFunction(
       const { data, error } = await supabaseAdmin
         .schema("creator")
         .from("creator_content")
-        .select("id,caption,metrics")
+        .select("id,caption,metrics,transcript")
         .eq("user_id", userId)
         .in("id", contentIds)
         .not("url", "is", null)
       if (error) throw error
       return (data ?? [])
-        .filter((row) => !row.caption || !row.metrics)
+        .filter((row) => !row.caption || !row.metrics || !row.transcript)
         .map((row) => row.id as string)
     })
 

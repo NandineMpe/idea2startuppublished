@@ -1,14 +1,17 @@
 /**
- * TikTok oEmbed enrichment for pasted URLs.
+ * Recovering content from a pasted TikTok URL.
  *
- * A pasted share link carries no content on its own, which left imported rows
- * with a null caption and nothing for the canon to read. TikTok's public
- * oEmbed endpoint needs no key and returns the caption as `title`, plus the
- * author handle and a cover image.
+ * A share link carries nothing on its own, so everything downstream — canon,
+ * voice, Worth — depends on what can be read back from the platform. Two
+ * sources, in order of value:
  *
- * What it cannot give: view/like counts and the true posted date. Those come
- * only from the data export (or the Display API), so a URL-only corpus is
- * always weaker than an exported one — Worth in particular needs the metrics.
+ *  1. the video page's rehydration blob: caption, counts, true publish date,
+ *     duration, hashtags, and — critically — TikTok's own machine-generated
+ *     subtitles, which remove the need to download and transcribe audio
+ *  2. oEmbed: official and keyless, but caption only
+ *
+ * The blob is unofficial and will break when TikTok restructures it; every
+ * failure path returns null so callers can degrade rather than fail.
  */
 
 export type TikTokOEmbed = {
@@ -22,11 +25,35 @@ export function isTikTokVideoUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?tiktok\.com\/@[^/]+\/video\/\d+/i.test(url.trim())
 }
 
-/** Everything the public video page exposes: caption, real post date, and counts. */
+/** Everything the public video page exposes. */
 export type TikTokVideoDetail = {
   caption: string | null
   postedAt: string | null
   metrics: { views: number; likes: number; comments: number; shares: number } | null
+  durationSeconds: number | null
+  hashtags: string[]
+  /** Spoken content, from TikTok's own subtitle track. Null when none exists. */
+  transcript: string | null
+  /** True when the creator used an original sound rather than a trending one. */
+  originalSound: boolean | null
+}
+
+/**
+ * WebVTT to plain prose: drop cue numbers, timestamps and markup, and collapse
+ * the repeated lines that karaoke-style captions emit for the same phrase.
+ */
+export function webVttToText(vtt: string): string {
+  const out: string[] = []
+  for (const raw of vtt.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || line === "WEBVTT") continue
+    if (/^\d+$/.test(line)) continue
+    if (line.includes("-->")) continue
+    if (/^(NOTE|STYLE|REGION)\b/.test(line)) continue
+    const clean = line.replace(/<[^>]+>/g, "").trim()
+    if (clean && out[out.length - 1] !== clean) out.push(clean)
+  }
+  return out.join(" ")
 }
 
 const BROWSER_UA =
@@ -93,6 +120,15 @@ export async function fetchTikTokVideoDetail(url: string): Promise<TikTokVideoDe
   const createTime = toCount(item.createTime)
   const desc = typeof item.desc === "string" && item.desc.trim() ? item.desc.trim() : null
 
+  const video = (item.video ?? {}) as Record<string, unknown>
+  const music = (item.music ?? {}) as Record<string, unknown>
+
+  const hashtags = Array.isArray(item.textExtra)
+    ? (item.textExtra as Array<Record<string, unknown>>)
+        .map((t) => (typeof t.hashtagName === "string" ? t.hashtagName.trim() : ""))
+        .filter(Boolean)
+    : []
+
   return {
     caption: desc,
     postedAt: createTime ? new Date(createTime * 1000).toISOString() : null,
@@ -106,6 +142,43 @@ export async function fetchTikTokVideoDetail(url: string): Promise<TikTokVideoDe
             shares: toCount(stats.shareCount) ?? 0,
           }
         : null,
+    durationSeconds: toCount(video.duration),
+    hashtags,
+    transcript: await fetchTikTokSubtitles(video.subtitleInfos),
+    originalSound: typeof music.original === "boolean" ? music.original : null,
+  }
+}
+
+type SubtitleInfo = { LanguageCodeName?: unknown; Format?: unknown; Url?: unknown }
+
+/**
+ * TikTok machine-transcribes most spoken videos and exposes the result as a
+ * WebVTT track. Reading it is strictly better than downloading the media and
+ * running our own ASR: no audio transfer, no transcription bill, and it is the
+ * same text TikTok itself indexes.
+ */
+async function fetchTikTokSubtitles(raw: unknown): Promise<string | null> {
+  if (!Array.isArray(raw)) return null
+  const tracks = raw as SubtitleInfo[]
+
+  const isVtt = (t: SubtitleInfo) => String(t.Format ?? "").toLowerCase() === "webvtt"
+  const pick =
+    tracks.find((t) => isVtt(t) && /^eng/i.test(String(t.LanguageCodeName ?? ""))) ??
+    tracks.find(isVtt)
+
+  const url = typeof pick?.Url === "string" ? pick.Url : null
+  if (!url) return null
+
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": BROWSER_UA, Referer: "https://www.tiktok.com/" },
+      cache: "no-store",
+    })
+    if (!res.ok) return null
+    const text = webVttToText(await res.text())
+    return text.trim() ? text : null
+  } catch {
+    return null
   }
 }
 
