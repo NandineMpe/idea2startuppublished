@@ -25,12 +25,26 @@ function getExa(): Exa | null {
   return new Exa(key)
 }
 
-async function exaSearch(exa: Exa, lane: OpportunityCandidate["lane"], query: string, numResults: number): Promise<OpportunityCandidate[]> {
+/** ISO date N days ago, for constraining a search to recently published pages. */
+function daysAgo(days: number): string {
+  return new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+async function exaSearch(
+  exa: Exa,
+  lane: OpportunityCandidate["lane"],
+  query: string,
+  numResults: number,
+  /** Only pages published within this window. Without it the index happily
+   *  returns a conference that closed last year, which is worse than nothing. */
+  withinDays = 120,
+): Promise<OpportunityCandidate[]> {
   try {
     const res = await exa.searchAndContents(query, {
       numResults,
       text: { maxCharacters: 1500 },
       type: "auto",
+      startPublishedDate: daysAgo(withinDays),
     })
     return (res.results ?? [])
       .filter((r) => typeof r.url === "string" && typeof r.title === "string" && r.title.trim())
@@ -64,18 +78,39 @@ export async function huntSponsors(topics: string[]): Promise<OpportunityCandida
   return out
 }
 
-/** Speaking, panels, podcast guesting, creator events in the niche. */
+/**
+ * Speaking, panels, podcast guesting, creator events.
+ *
+ * Dated explicitly against the current and next year, and restricted to pages
+ * published in the last 90 days. A conference listing that ranks well is often
+ * a past edition, and proposing a closed call wastes the creator's time and
+ * costs trust in everything else on the screen.
+ */
 export async function huntEvents(topics: string[]): Promise<OpportunityCandidate[]> {
   const exa = getExa()
   if (!exa) return []
+  const now = new Date()
+  const thisYear = now.getFullYear()
+  const nextYear = thisYear + 1
+
   const out: OpportunityCandidate[] = []
   for (const topic of topics.slice(0, 3)) {
     out.push(
       ...(await exaSearch(
         exa,
         "events",
-        `${topic} conference 2026 "call for speakers" OR "apply to speak" OR "podcast guest" OR panel creators`,
+        `${topic} conference ${thisYear} OR ${nextYear} "call for speakers" OR "call for proposals" OR "speaker applications open" OR "apply to speak"`,
         5,
+        90,
+      )),
+    )
+    out.push(
+      ...(await exaSearch(
+        exa,
+        "events",
+        `${topic} podcast "guest" submission OR "pitch a guest" ${thisYear}`,
+        3,
+        90,
       )),
     )
   }

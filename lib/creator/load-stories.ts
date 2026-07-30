@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { safeRows } from "./query"
-import type { CreatorBlocker, CreatorStory, OpportunitiesContext, StoriesContext } from "./types"
+import type {
+  CreatorBlocker,
+  CreatorMove,
+  CreatorStory,
+  OpportunitiesContext,
+  StoriesContext,
+} from "./types"
 import type { CreatorWorkItem } from "./types"
 
 const STORY_COLUMNS =
@@ -56,7 +62,7 @@ export async function loadOpportunities(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<OpportunitiesContext> {
-  const [work, blocker] = await Promise.all([
+  const [work, moves, blocker] = await Promise.all([
     safeRows<CreatorWorkItem>(
       supabase
         .schema("creator")
@@ -67,6 +73,17 @@ export async function loadOpportunities(
         .order("created_at", { ascending: false })
         .limit(80),
     ),
+    safeRows<CreatorMove>(
+      supabase
+        .schema("creator")
+        .from("creator_work")
+        .select(`${WORK_COLUMNS},outline,script`)
+        .eq("user_id", userId)
+        .eq("kind", "move")
+        .eq("state", "proposed")
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ),
     researchTopicsBlocker(supabase, userId),
   ])
 
@@ -74,6 +91,7 @@ export async function loadOpportunities(
     proposed: work.filter((w) => w.state === "proposed"),
     active: work.filter((w) => w.state === "approved" || w.state === "active"),
     done: work.filter((w) => w.state === "done" || w.state === "killed").slice(0, 20),
+    moves,
     blocker,
   }
 }

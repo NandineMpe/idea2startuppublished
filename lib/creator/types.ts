@@ -173,7 +173,18 @@ export type CreatorCanon = {
 // Work — what the agents produced. Always traceable to corpus and canon.
 // ---------------------------------------------------------------------------
 
-export type WorkKind = "draft" | "insight" | "deal" | "event"
+export type WorkKind = "draft" | "insight" | "deal" | "event" | "move"
+
+/** The plan attached to a strategic move — what to do, and what could go wrong. */
+export type MoveOutline = {
+  category: string
+  why_now: string
+  realistic_upside: string
+  effort: "low" | "medium" | "high"
+  first_step: string
+  steps: string[]
+  risks: string[]
+}
 export type WorkState = "proposed" | "approved" | "active" | "done" | "killed"
 
 /** Which tier of autonomy an item sits in. Auto items report; the rest wait. */
@@ -279,10 +290,18 @@ export type StoriesContext = {
 // Opportunities — the partnerships desk's pipeline of deal/event work items.
 // ---------------------------------------------------------------------------
 
+export type CreatorMove = CreatorWorkItem & {
+  kind: "move"
+  outline: MoveOutline | null
+  script: string | null
+}
+
 export type OpportunitiesContext = {
   proposed: CreatorWorkItem[]
   active: CreatorWorkItem[]
   done: CreatorWorkItem[]
+  /** Strategic moves are a different decision from a deal, so they render apart. */
+  moves: CreatorMove[]
   blocker: CreatorBlocker | null
 }
 
