@@ -67,6 +67,47 @@ async function upsertSignals(
   return { upserted: count ?? rows.length }
 }
 
+/**
+ * Sweep one topic and persist it.
+ *
+ * Exposed separately so the Inngest function can give each topic its own step,
+ * and therefore its own execution window. Running nine topics inside a single
+ * step meant one slow source — arXiv is regularly the slow one — could exhaust
+ * the whole invocation and take every lane down with it.
+ */
+export async function sweepOneTopic(
+  supabase: SupabaseClient,
+  userId: string,
+  topic: string,
+  stance: TopicStance,
+  hoursBack: number,
+): Promise<{ fetched: number; upserted: number; by_lane: Record<string, number>; errors: string[] }> {
+  const outcome = await sweepTopicAcrossLanes(topic, stance, hoursBack)
+  const by_lane: Record<string, number> = {}
+  for (const s of outcome.signals) by_lane[s.lane] = (by_lane[s.lane] ?? 0) + 1
+
+  const { upserted, error } = await upsertSignals(supabase, userId, outcome.signals)
+  const errors = [...outcome.errors]
+  if (error) errors.push(`upsert: ${error}`)
+
+  return { fetched: outcome.signals.length, upserted, by_lane, errors }
+}
+
+/** Lab and vendor releases are topic-independent — swept once per run. */
+export async function sweepReleases(
+  supabase: SupabaseClient,
+  userId: string,
+  hoursBack: number,
+): Promise<{ fetched: number; upserted: number; errors: string[] }> {
+  try {
+    const releases = await fetchReleases(hoursBack)
+    const { upserted, error } = await upsertSignals(supabase, userId, releases)
+    return { fetched: releases.length, upserted, errors: error ? [`upsert: ${error}`] : [] }
+  } catch (e) {
+    return { fetched: 0, upserted: 0, errors: [e instanceof Error ? e.message : String(e)] }
+  }
+}
+
 export async function sweepSignalsForUser(
   supabase: SupabaseClient,
   userId: string,

@@ -1,33 +1,33 @@
 import { creatorInngest } from "../client"
 import { supabaseAdmin } from "@/lib/supabase"
-import { loadResearchTopics, sweepSignalsForUser } from "@/lib/creator/research/sweep"
+import { loadResearchTopics, sweepOneTopic, sweepReleases } from "@/lib/creator/research/sweep"
 
 /**
- * The Researcher's standing remit: sweep sources every morning whether or not
- * anyone asked, then hand each user's fresh signals to the synthesis pass.
- * Also triggerable on demand for one user via the event.
+ * The Researcher's standing remit: sweep every register each morning whether or
+ * not anyone asked, then hand the fresh signals to synthesis.
+ *
+ * Each topic gets its own step, and therefore its own execution window. The
+ * first version swept all nine topics inside one step, which meant a single
+ * slow source could exhaust the invocation and silently take every lane with
+ * it — the failure looked like a quiet news day rather than a timeout.
  */
 export const creatorResearchSweep = creatorInngest.createFunction(
   {
     id: "creator-research-sweep",
     name: "Creator OS: research sweep",
     retries: 2,
-    triggers: [
-      { cron: "0 6 * * *" },
-      { event: "creator/research.sweep" },
-    ],
+    triggers: [{ cron: "0 6 * * *" }, { event: "creator/research.sweep" }],
   },
   async ({ event, step }) => {
-    // Cron firings carry CronEventData; only the manual event carries our payload.
-    const manual = event.name === "creator/research.sweep"
-      ? (event.data as { user_id?: string; hours_back?: number })
-      : undefined
+    const manual =
+      event.name === "creator/research.sweep"
+        ? (event.data as { user_id?: string; hours_back?: number })
+        : undefined
     const requestedUserId = manual?.user_id
     const hoursBack = manual?.hours_back ?? 48
 
     const userIds = await step.run("resolve-users", async () => {
       if (requestedUserId) return [requestedUserId]
-      // Standing remit covers everyone who has declared topics or has a canon.
       const { data, error } = await supabaseAdmin
         .schema("creator")
         .from("creator_settings")
@@ -38,20 +38,40 @@ export const creatorResearchSweep = creatorInngest.createFunction(
         .map((row) => row.user_id as string)
     })
 
-    const sweeps: Array<{ user_id: string; upserted: number; errors: string[] }> = []
+    const summaries: Array<{ user_id: string; upserted: number; errors: string[] }> = []
+
     for (const userId of userIds) {
-      const sweep = await step.run(`sweep-${userId}`, async () => {
-        const topics = await loadResearchTopics(supabaseAdmin, userId)
-        if (!topics.core.length && !topics.adjacent.length) return null
-        return sweepSignalsForUser(supabaseAdmin, userId, topics, hoursBack)
+      const topics = await step.run(`topics-${userId}`, async () => {
+        return loadResearchTopics(supabaseAdmin, userId)
       })
-      if (sweep) {
-        sweeps.push({ user_id: userId, upserted: sweep.signals_upserted, errors: sweep.errors })
+
+      const plan = [
+        ...topics.core.map((topic) => ({ topic, stance: "core" as const })),
+        ...topics.adjacent.map((topic) => ({ topic, stance: "adjacent" as const })),
+      ]
+      if (!plan.length) continue
+
+      let upserted = 0
+      const errors: string[] = []
+
+      for (const [i, { topic, stance }] of plan.entries()) {
+        const outcome = await step.run(`sweep-${userId}-${i}`, async () => {
+          return sweepOneTopic(supabaseAdmin, userId, topic, stance, hoursBack)
+        })
+        upserted += outcome.upserted
+        for (const err of outcome.errors) errors.push(`${topic} / ${err}`)
       }
+
+      const releases = await step.run(`releases-${userId}`, async () => {
+        return sweepReleases(supabaseAdmin, userId, hoursBack)
+      })
+      upserted += releases.upserted
+      for (const err of releases.errors) errors.push(`releases / ${err}`)
+
+      summaries.push({ user_id: userId, upserted, errors })
     }
 
-    // Fan out synthesis only for users whose sweep produced anything new.
-    const toSynthesise = sweeps.filter((s) => s.upserted > 0)
+    const toSynthesise = summaries.filter((s) => s.upserted > 0)
     if (toSynthesise.length) {
       await step.sendEvent(
         "fan-out-synthesis",
@@ -62,6 +82,6 @@ export const creatorResearchSweep = creatorInngest.createFunction(
       )
     }
 
-    return { users: userIds.length, sweeps }
+    return { users: userIds.length, summaries }
   },
 )
