@@ -1,17 +1,21 @@
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createElevenLabsClient } from '@/lib/voice/elevenlabs'
 
 export const maxDuration = 60
-
-const elevenlabs = new ElevenLabsClient({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-})
 
 export async function POST(req: NextRequest) {
   const { text, voiceId = 'JBFqnCBsd6RMkjVDRZzb' } = await req.json()
 
   if (!text) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 })
+  }
+
+  // Constructed per request: the SDK throws on a missing key, and at module
+  // scope that failure happens during `next build` page-data collection and
+  // takes down the whole build rather than this one route.
+  const elevenlabs = createElevenLabsClient()
+  if (!elevenlabs) {
+    return NextResponse.json({ error: 'ELEVENLABS_API_KEY is not configured' }, { status: 503 })
   }
 
   try {
