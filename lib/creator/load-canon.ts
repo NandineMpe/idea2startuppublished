@@ -10,7 +10,7 @@ import {
 } from "./types"
 
 const CANON_COLUMNS =
-  "version,derived_at,corpus_size,confidence,pillars,formats,voice,topics"
+  "version,derived_at,corpus_size,confidence,pillars,formats,voice,topics,positioning"
 
 /** Latest canon version for the creator, or null before first derivation. */
 export async function loadCreatorCanon(

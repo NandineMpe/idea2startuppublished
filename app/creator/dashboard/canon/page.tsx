@@ -4,6 +4,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadCanon, isCanonStale } from "@/lib/creator/load-canon"
 import { ConfidenceBadge } from "@/components/creator/confidence-badge"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
+import { PositioningPanel } from "@/components/creator/positioning-panel"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { FormatTrend } from "@/lib/creator/types"
 
@@ -78,6 +79,8 @@ export default async function CanonPage() {
       />
 
       {blocker && <BlockerNotice blocker={blocker} />}
+
+      <PositioningPanel initial={canon.positioning} />
 
       {stale && (
         <div className="mb-5 rounded-lg border border-border bg-muted/40 px-4 py-3">

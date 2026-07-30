@@ -144,6 +144,18 @@ export type CreatorTopic = {
   adjacent: string[]
 }
 
+/** The brand-facing read of the canon. Written separately, on demand. */
+export type CreatorPositioning = {
+  headline: string
+  bio_short: string
+  bio_long: string
+  audience: string
+  why_brands: string[]
+  proof_points: string[]
+  brand_categories: string[]
+  not_a_fit: string[]
+}
+
 export type CreatorCanon = {
   version: number
   derived_at: string
@@ -154,6 +166,7 @@ export type CreatorCanon = {
   formats: CreatorFormat[]
   voice: CreatorVoice | null
   topics: CreatorTopic[]
+  positioning: CreatorPositioning | null
 }
 
 // ---------------------------------------------------------------------------

@@ -42,13 +42,23 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
       usage: { totalTokens: result.usage?.totalTokens ?? 0 },
     }
   } catch (e) {
-    // The SDK's default message ("response did not match schema") says nothing
-    // about which field failed or what the model actually returned, which makes
-    // these failures far more expensive to diagnose than they need to be.
-    const err = e as { message?: string; text?: string; cause?: { message?: string } }
-    const detail = [err.cause?.message, err.text ? `raw: ${err.text.slice(0, 400)}` : null]
-      .filter(Boolean)
-      .join(" | ")
-    throw new Error(detail ? `${err.message ?? "generateObject failed"} — ${detail}` : String(err.message ?? e))
+    // "response did not match schema" names neither the offending field nor the
+    // reason, and the value it echoes is long enough to bury both. Surface the
+    // Zod issue paths instead — that is the part that identifies the fix.
+    const err = e as {
+      message?: string
+      cause?: { message?: string; issues?: Array<{ path?: Array<string | number>; message?: string }> }
+    }
+
+    const issues = err.cause?.issues
+    if (Array.isArray(issues) && issues.length) {
+      const summary = issues
+        .slice(0, 8)
+        .map((i) => `${(i.path ?? []).join(".") || "(root)"}: ${i.message ?? "invalid"}`)
+        .join("; ")
+      throw new Error(`Schema mismatch — ${summary}`)
+    }
+
+    throw new Error(err.message ?? String(e))
   }
 }
