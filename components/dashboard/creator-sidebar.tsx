@@ -2,15 +2,16 @@
 
 import type React from "react"
 import {
-  Calendar,
-  BarChart3,
-  MessageSquare,
-  Users,
   DollarSign,
+  Fingerprint,
+  FileVideo,
+  Handshake,
+  Lightbulb,
+  Newspaper,
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  Palette,
+  Sunrise,
   Layers,
   TrendingUp,
 } from "lucide-react"
@@ -26,14 +27,15 @@ type NavItem = {
   exact?: boolean
 }
 
+// Every entry resolves to a real route. Nothing is listed here before it exists.
 const navItems: NavItem[] = [
-  { title: "Content Hub", href: "/creator/dashboard", icon: Palette, exact: true },
-  { title: "Content Calendar", href: "/creator/dashboard/calendar", icon: Calendar },
-  { title: "Audience Insights", href: "/creator/dashboard/audience", icon: Users },
-  { title: "Brand Voice", href: "/creator/dashboard/brand-voice", icon: MessageSquare },
-  { title: "Collaborations", href: "/creator/dashboard/collaborations", icon: Layers },
-  { title: "Revenue", href: "/creator/dashboard/revenue", icon: DollarSign },
-  { title: "Analytics", href: "/creator/dashboard/analytics", icon: BarChart3 },
+  { title: "The Desk", href: "/creator/dashboard", icon: Sunrise, exact: true },
+  { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper },
+  { title: "Opportunities", href: "/creator/dashboard/opportunities", icon: Handshake },
+  { title: "Next Five", href: "/creator/dashboard/next", icon: Lightbulb },
+  { title: "Worth", href: "/creator/dashboard/worth", icon: DollarSign },
+  { title: "Canon", href: "/creator/dashboard/canon", icon: Fingerprint },
+  { title: "Content", href: "/creator/dashboard/content", icon: FileVideo },
 ]
 
 export function CreatorSidebar() {
