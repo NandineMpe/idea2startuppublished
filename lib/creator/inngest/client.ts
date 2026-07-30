@@ -38,6 +38,9 @@ export type CreatorEvents = {
   "creator/research.synthesise": {
     data: { user_id: string }
   }
+  "creator/story.lineage": {
+    data: { user_id: string; story_id: string }
+  }
 
   // Opportunities: deals, events and marketplace matches, each with a drafted pitch.
   "creator/opportunities.sweep": {

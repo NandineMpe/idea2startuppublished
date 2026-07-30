@@ -3,6 +3,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadStories } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
+import { StoryLineagePanel } from "@/components/creator/story-lineage"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
 
@@ -47,6 +48,8 @@ function StoryCard({ story }: { story: CreatorStory }) {
           </p>
         )}
       </div>
+
+      <StoryLineagePanel storyId={story.id} lineage={story.lineage} state={story.lineage_state} />
 
       {story.receipts.length > 0 && (
         <div className="mt-4 border-t border-border pt-3 grid gap-2">

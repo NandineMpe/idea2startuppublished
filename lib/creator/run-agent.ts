@@ -15,6 +15,30 @@ import { sendCreatorEvent } from "./inngest/client"
 
 export type AgentKind = "research" | "opportunities" | "canon" | "metrics" | "writer"
 
+export type LineageActionResult = { ok: true } | { ok: false; error: string }
+
+/** Ask for a story's historical spine. Separate from runCreatorAgent because it targets one story. */
+export async function deriveStoryLineage(storyId: string): Promise<LineageActionResult> {
+  const { supabase, userId } = await requireCreatorUser()
+
+  const { error: markError } = await supabase
+    .schema("creator")
+    .from("creator_stories")
+    .update({ lineage_state: "running" })
+    .eq("id", storyId)
+    .eq("user_id", userId)
+  if (markError) return { ok: false, error: markError.message }
+
+  try {
+    await sendCreatorEvent({ name: "creator/story.lineage", data: { user_id: userId, story_id: storyId } })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Could not reach the agent runner." }
+  }
+
+  revalidatePath("/creator/dashboard/stories")
+  return { ok: true }
+}
+
 export type RunAgentResult = { ok: true; message: string } | { ok: false; error: string }
 
 const AGENTS_NEEDING_TOPICS: AgentKind[] = ["research", "opportunities"]

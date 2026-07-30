@@ -3,6 +3,7 @@ import { creatorInngest } from "@/lib/creator/inngest/client"
 import { creatorSystemPing } from "@/lib/creator/inngest/functions/system-ping"
 import { creatorResearchSweep } from "@/lib/creator/inngest/functions/research-sweep"
 import { creatorResearchSynthesise } from "@/lib/creator/inngest/functions/research-synthesise"
+import { creatorStoryLineage } from "@/lib/creator/inngest/functions/story-lineage"
 import { creatorOpportunitiesSweep } from "@/lib/creator/inngest/functions/opportunities-sweep"
 import { creatorCorpusIngested } from "@/lib/creator/inngest/functions/corpus-ingested"
 import { creatorContentTranscribe } from "@/lib/creator/inngest/functions/content-transcribe"
@@ -20,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     creatorSystemPing,
     creatorResearchSweep,
     creatorResearchSynthesise,
+    creatorStoryLineage,
     creatorOpportunitiesSweep,
     creatorCorpusIngested,
     creatorContentEnrich,

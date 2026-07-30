@@ -218,6 +218,28 @@ export type StoryReceipt = {
   quote: string
 }
 
+export type LineageConfidence = "documented" | "well_known" | "uncertain"
+
+export type LineageEntry = {
+  period: string
+  event: string
+  relevance: string
+  verify: string
+  confidence: LineageConfidence
+}
+
+/** What a story is the latest instance of — the timeline it sits at the end of. */
+export type StoryLineage = {
+  timeline: LineageEntry[]
+  building_on: string
+  recurring_question: string
+  whats_actually_new: string
+  whats_repeating: string
+  research_base: Array<{ title: string; url: string | null; what_it_shows: string }>
+}
+
+export type LineageState = "none" | "running" | "done" | "failed"
+
 export type CreatorStory = {
   id: string
   state: StoryState
@@ -230,6 +252,8 @@ export type CreatorStory = {
   suggested_pillar_id: string | null
   work_item_id: string | null
   created_at: string
+  lineage: StoryLineage | null
+  lineage_state: LineageState
 }
 
 export type StoriesContext = {

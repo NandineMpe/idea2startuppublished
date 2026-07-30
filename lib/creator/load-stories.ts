@@ -4,7 +4,7 @@ import type { CreatorBlocker, CreatorStory, OpportunitiesContext, StoriesContext
 import type { CreatorWorkItem } from "./types"
 
 const STORY_COLUMNS =
-  "id,state,thesis,synthesis_kind,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at"
+  "id,state,thesis,synthesis_kind,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state"
 
 const WORK_COLUMNS =
   "id,kind,state,autonomy,title,body,rationale,provenance,created_at,decided_at"
