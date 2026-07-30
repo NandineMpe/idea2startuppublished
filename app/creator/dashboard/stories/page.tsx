@@ -6,6 +6,7 @@ import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { StoryLineagePanel } from "@/components/creator/story-lineage"
 import { Disclosure } from "@/components/creator/disclosure"
 import { StoryActions } from "@/components/creator/story-actions"
+import { SeedStoryPanel } from "@/components/creator/seed-story"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
 
@@ -99,6 +100,10 @@ export default async function StoriesPage() {
       />
 
       {context.blocker && <BlockerNotice blocker={context.blocker} />}
+
+      {/* Above the swept dossiers: a lead the creator brought is the one they
+          are already thinking about, and it should not be behind a scroll. */}
+      <SeedStoryPanel />
 
       {!context.proposed.length && !context.watchlist.length ? (
         <EmptyState
