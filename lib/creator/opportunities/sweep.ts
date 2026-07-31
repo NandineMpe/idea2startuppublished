@@ -58,6 +58,9 @@ export async function sweepOpportunitiesForUser(
     supabase.schema("creator").from("creator_work")
       .select("title")
       .eq("user_id", userId)
+      // Archived opportunities still suppress a repeat; deleted ones do not,
+      // because deleting says the item should never have been proposed.
+      .is("deleted_at", null)
       .in("kind", ["deal", "event"])
       .gte("created_at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
       .limit(60),

@@ -3,6 +3,7 @@ import { CheckCircle2, Handshake, Inbox, Mic2 } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadOpportunities } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { ItemActions } from "@/components/creator/item-actions"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BriefReplyPanel } from "@/components/creator/brief-reply"
 import { MovesPanel } from "@/components/creator/moves-panel"
@@ -41,7 +42,15 @@ function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDe
             <p className="text-[12px] text-muted-foreground mt-1.5 leading-relaxed">{item.rationale}</p>
           )}
         </div>
-        {showDecision && <DecideButtons workId={item.id} />}
+        <div className="flex items-center gap-2 shrink-0">
+          {showDecision && <DecideButtons workId={item.id} />}
+          <ItemActions
+            entity="work"
+            id={item.id}
+            noun={item.kind === "event" ? "event" : "deal"}
+            archiveHint="Archive — clears it and stops the hunt re-surfacing the same one"
+          />
+        </div>
       </div>
 
       {(item.body || evidence.length > 0) && (

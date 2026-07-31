@@ -129,6 +129,7 @@ export async function suggestMovesForUser(
       .from("creator_work")
       .select("title")
       .eq("user_id", userId)
+      .is("deleted_at", null)
       .eq("kind", "move")
       .gte("created_at", new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString())
       .limit(30),

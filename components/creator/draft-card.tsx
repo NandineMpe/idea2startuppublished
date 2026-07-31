@@ -1,4 +1,5 @@
 import { Clock, Quote } from "lucide-react"
+import { ItemActions } from "@/components/creator/item-actions"
 import type { CreatorDraft } from "@/lib/creator/types"
 
 function formatDuration(seconds: number | null): string | null {
@@ -21,12 +22,20 @@ export function DraftCard({ draft }: { draft: CreatorDraft }) {
     <article className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-4 py-3 border-b border-border flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-foreground leading-snug">{draft.title}</p>
-        {duration && (
-          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
-            <Clock className="h-3 w-3" />
-            {duration}
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {duration && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
+              <Clock className="h-3 w-3" />
+              {duration}
+            </span>
+          )}
+          <ItemActions
+            entity="work"
+            id={draft.id}
+            noun="draft"
+            archiveHint="Archive — takes it out of the queue without deleting the writing"
+          />
+        </div>
       </div>
 
       {draft.hook && (

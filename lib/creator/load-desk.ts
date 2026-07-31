@@ -28,6 +28,8 @@ export async function loadRecentWork(
       .from("creator_work")
       .select(WORK_COLUMNS)
       .eq("user_id", userId)
+      .is("deleted_at", null)
+      .neq("state", "archived")
       .gte("created_at", windowStart())
       .order("created_at", { ascending: false }),
   )

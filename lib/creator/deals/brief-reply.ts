@@ -123,6 +123,8 @@ export async function draftBriefReply(
       .from("creator_work")
       .select("title,state,created_at")
       .eq("user_id", userId)
+      // A deleted deal must never be quoted back to a brand as a past client.
+      .is("deleted_at", null)
       .eq("kind", "deal")
       .in("state", ["approved", "active", "done"])
       .order("created_at", { ascending: false })

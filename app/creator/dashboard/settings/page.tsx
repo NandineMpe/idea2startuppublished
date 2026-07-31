@@ -1,13 +1,18 @@
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadCreatorSettings } from "@/lib/creator/load-settings"
+import { loadRecycleBin } from "@/lib/creator/load-bin"
 import { SettingsForm } from "@/components/creator/settings-form"
+import { RecentlyDeleted } from "@/components/creator/recently-deleted"
 import { BlockerNotice, PageBody, PageHeader } from "@/components/creator/page-shell"
 
 export const dynamic = "force-dynamic"
 
 export default async function CreatorSettingsPage() {
   const { supabase, userId } = await requireCreatorUser()
-  const { settings, persisted } = await loadCreatorSettings(supabase, userId)
+  const [{ settings, persisted }, binned] = await Promise.all([
+    loadCreatorSettings(supabase, userId),
+    loadRecycleBin(supabase, userId),
+  ])
 
   return (
     <PageBody>
@@ -25,6 +30,8 @@ export default async function CreatorSettingsPage() {
       )}
 
       <SettingsForm settings={settings} persisted={persisted} />
+
+      <RecentlyDeleted items={binned} />
     </PageBody>
   )
 }

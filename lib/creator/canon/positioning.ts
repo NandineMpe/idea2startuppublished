@@ -159,6 +159,8 @@ export async function derivePositioningForUser(
       .from("creator_work")
       .select("title")
       .eq("user_id", userId)
+      // A deleted deal must never turn up as a proof point in a brand-facing bio.
+      .is("deleted_at", null)
       .eq("kind", "deal")
       .in("state", ["approved", "active", "done"])
       .limit(10),

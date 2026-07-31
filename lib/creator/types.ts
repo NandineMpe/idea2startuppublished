@@ -185,7 +185,7 @@ export type MoveOutline = {
   steps: string[]
   risks: string[]
 }
-export type WorkState = "proposed" | "approved" | "active" | "done" | "killed"
+export type WorkState = "proposed" | "approved" | "active" | "done" | "killed" | "archived"
 
 /** Which tier of autonomy an item sits in. Auto items report; the rest wait. */
 export type WorkAutonomy = "auto" | "approve" | "escalate"
@@ -226,7 +226,7 @@ export type CreatorDraft = CreatorWorkItem & {
 // never a restated headline; sub-two-signal candidates stay on the watchlist.
 // ---------------------------------------------------------------------------
 
-export type StoryState = "watchlist" | "proposed" | "approved" | "killed" | "published"
+export type StoryState = "watchlist" | "proposed" | "approved" | "killed" | "published" | "archived"
 
 export type StorySynthesisKind =
   | "connection"

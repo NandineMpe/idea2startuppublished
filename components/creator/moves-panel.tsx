@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Copy, Compass } from "lucide-react"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { ItemActions } from "@/components/creator/item-actions"
 import { Disclosure } from "@/components/creator/disclosure"
 import { cn } from "@/lib/utils"
 import type { CreatorMove } from "@/lib/creator/types"
@@ -114,7 +115,15 @@ function MoveCard({ move }: { move: CreatorMove }) {
             <p className="text-[12px] text-muted-foreground mt-1.5 leading-relaxed">{move.rationale}</p>
           )}
         </div>
-        <DecideButtons workId={move.id} />
+        <div className="flex items-center gap-2 shrink-0">
+          <DecideButtons workId={move.id} />
+          <ItemActions
+            entity="work"
+            id={move.id}
+            noun="move"
+            archiveHint="Archive — shelves it and stops it being suggested again"
+          />
+        </div>
       </div>
 
       {/* The one line worth reading without opening anything. */}

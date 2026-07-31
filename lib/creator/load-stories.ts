@@ -44,6 +44,7 @@ export async function loadStories(supabase: SupabaseClient, userId: string): Pro
         .from("creator_stories")
         .select(STORY_COLUMNS)
         .eq("user_id", userId)
+        .is("deleted_at", null)
         .in("state", ["watchlist", "proposed"])
         .order("created_at", { ascending: false })
         .limit(40),
@@ -69,6 +70,8 @@ export async function loadOpportunities(
         .from("creator_work")
         .select(WORK_COLUMNS)
         .eq("user_id", userId)
+        .is("deleted_at", null)
+        .neq("state", "archived")
         .in("kind", ["deal", "event"])
         .order("created_at", { ascending: false })
         .limit(80),
@@ -81,6 +84,7 @@ export async function loadOpportunities(
         .eq("user_id", userId)
         .eq("kind", "move")
         .eq("state", "proposed")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(12),
     ),

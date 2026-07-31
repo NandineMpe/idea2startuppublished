@@ -27,6 +27,7 @@ export async function loadCreatorDrafts(
       .eq("user_id", userId)
       .eq("kind", "draft")
       .eq("state", "proposed")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(limit),
   )

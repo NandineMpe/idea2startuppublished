@@ -131,6 +131,9 @@ export async function synthesiseStoriesForUser(
     supabase.schema("creator").from("creator_stories")
       .select("thesis")
       .eq("user_id", userId)
+      // An archived thesis is still on the do-not-repeat list, which is the
+      // point of archiving. A deleted one is not.
+      .is("deleted_at", null)
       .gte("created_at", new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString())
       .limit(30),
   ])

@@ -65,63 +65,175 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
 
 export type StoryActionResult = { ok: true } | { ok: false; error: string }
 
+export type BinEntity = "story" | "work"
+
+/** Every screen a story or work item can appear on. Cheap, and none of them can go stale. */
+const CREATOR_PATHS = [
+  "/creator/dashboard",
+  "/creator/dashboard/stories",
+  "/creator/dashboard/next",
+  "/creator/dashboard/opportunities",
+  "/creator/dashboard/settings",
+]
+
+function revalidateCreator(): void {
+  for (const path of CREATOR_PATHS) revalidatePath(path)
+}
+
 /**
- * Clear a story off the screen once it is dealt with.
- *
- * Archiving keeps the thesis, which is what the synthesis do-not-repeat list
- * reads, so an archived story stops the same take resurfacing next week.
- * Deleting removes it entirely, for a story that was a mistake rather than one
- * that was used — there, suppressing the topic in future would be wrong.
- *
- * Any linked Desk work item goes with it either way, so the two screens cannot
- * disagree about whether something is still outstanding.
+ * A story and the Desk item it was promoted to are one thing to the creator,
+ * so an action on either has to move both. Otherwise clearing a story leaves an
+ * orphan waiting for a decision on the Desk, and the two screens disagree about
+ * what is still outstanding.
  */
-export async function archiveOrDeleteStory(
-  storyId: string,
-  action: "archive" | "delete",
+async function linkedPair(
+  supabase: Awaited<ReturnType<typeof requireCreatorUser>>["supabase"],
+  userId: string,
+  entity: BinEntity,
+  id: string,
+): Promise<{ ok: true; storyIds: string[]; workIds: string[] } | { ok: false; error: string }> {
+  if (entity === "story") {
+    const { data, error } = await supabase
+      .schema("creator")
+      .from("creator_stories")
+      .select("work_item_id")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (error) return { ok: false, error: error.message }
+    if (!data) return { ok: false, error: "Story not found." }
+    return { ok: true, storyIds: [id], workIds: data.work_item_id ? [data.work_item_id] : [] }
+  }
+
+  const { data, error } = await supabase
+    .schema("creator")
+    .from("creator_stories")
+    .select("id")
+    .eq("work_item_id", id)
+    .eq("user_id", userId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, storyIds: (data ?? []).map((row) => row.id as string), workIds: [id] }
+}
+
+async function applyToPair(
+  entity: BinEntity,
+  id: string,
+  patch: Record<string, unknown>,
 ): Promise<StoryActionResult> {
   const { supabase, userId } = await requireCreatorUser()
 
-  const { data: story, error: loadError } = await supabase
-    .schema("creator")
-    .from("creator_stories")
-    .select("work_item_id")
-    .eq("id", storyId)
-    .eq("user_id", userId)
-    .maybeSingle()
-  if (loadError) return { ok: false, error: loadError.message }
-  if (!story) return { ok: false, error: "Story not found." }
+  const pair = await linkedPair(supabase, userId, entity, id)
+  if (!pair.ok) return pair
 
-  if (story.work_item_id) {
+  if (pair.storyIds.length) {
+    const { error } = await supabase
+      .schema("creator")
+      .from("creator_stories")
+      .update(patch)
+      .eq("user_id", userId)
+      .in("id", pair.storyIds)
+    if (error) return { ok: false, error: error.message }
+  }
+
+  if (pair.workIds.length) {
+    const { error } = await supabase
+      .schema("creator")
+      .from("creator_work")
+      .update(patch)
+      .eq("user_id", userId)
+      .in("id", pair.workIds)
+    if (error) return { ok: false, error: error.message }
+  }
+
+  revalidateCreator()
+  return { ok: true }
+}
+
+/**
+ * Archive: handled, take it off the screen, but keep it working.
+ *
+ * The thesis of an archived story still sits in the synthesis do-not-repeat
+ * list and an archived move still counts against re-proposing the same idea, so
+ * archiving is how the creator says "seen it" without inviting it back next
+ * week. That is the whole difference from delete.
+ */
+export async function archiveCreatorItem(entity: BinEntity, id: string): Promise<StoryActionResult> {
+  return applyToPair(entity, id, { state: "archived", decided_at: new Date().toISOString() })
+}
+
+/**
+ * Delete: this should not have existed.
+ *
+ * Soft, because none of these rows come back by re-running anything — the
+ * signals behind a story have aged out of the search window and a regenerated
+ * draft is a different draft. It leaves every screen and every dedupe list
+ * immediately, and waits in Recently deleted for the retention window.
+ */
+export async function moveToBin(entity: BinEntity, id: string): Promise<StoryActionResult> {
+  return applyToPair(entity, id, { deleted_at: new Date().toISOString() })
+}
+
+export async function restoreFromBin(entity: BinEntity, id: string): Promise<StoryActionResult> {
+  return applyToPair(entity, id, { deleted_at: null })
+}
+
+/**
+ * The one irreversible action in the set, which is why it is only reachable
+ * from Recently deleted and never from a card.
+ *
+ * Stories go first: creator_stories.work_item_id is ON DELETE SET NULL, so
+ * removing the work row first would sever the link before we could follow it.
+ */
+export async function deleteForever(entity: BinEntity, id: string): Promise<StoryActionResult> {
+  const { supabase, userId } = await requireCreatorUser()
+
+  const pair = await linkedPair(supabase, userId, entity, id)
+  if (!pair.ok) return pair
+
+  if (pair.storyIds.length) {
+    const { error } = await supabase
+      .schema("creator")
+      .from("creator_stories")
+      .delete()
+      .eq("user_id", userId)
+      .in("id", pair.storyIds)
+    if (error) return { ok: false, error: error.message }
+  }
+
+  if (pair.workIds.length) {
     const { error } = await supabase
       .schema("creator")
       .from("creator_work")
       .delete()
-      .eq("id", story.work_item_id)
       .eq("user_id", userId)
+      .in("id", pair.workIds)
     if (error) return { ok: false, error: error.message }
   }
 
-  const { error } =
-    action === "archive"
-      ? await supabase
-          .schema("creator")
-          .from("creator_stories")
-          .update({ state: "archived", decided_at: new Date().toISOString() })
-          .eq("id", storyId)
-          .eq("user_id", userId)
-      : await supabase
-          .schema("creator")
-          .from("creator_stories")
-          .delete()
-          .eq("id", storyId)
-          .eq("user_id", userId)
+  revalidateCreator()
+  return { ok: true }
+}
 
-  if (error) return { ok: false, error: error.message }
+export async function emptyRecycleBin(): Promise<StoryActionResult> {
+  const { supabase, userId } = await requireCreatorUser()
 
-  revalidatePath("/creator/dashboard/stories")
-  revalidatePath("/creator/dashboard")
+  const { error: storyError } = await supabase
+    .schema("creator")
+    .from("creator_stories")
+    .delete()
+    .eq("user_id", userId)
+    .not("deleted_at", "is", null)
+  if (storyError) return { ok: false, error: storyError.message }
 
+  const { error: workError } = await supabase
+    .schema("creator")
+    .from("creator_work")
+    .delete()
+    .eq("user_id", userId)
+    .not("deleted_at", "is", null)
+  if (workError) return { ok: false, error: workError.message }
+
+  revalidateCreator()
   return { ok: true }
 }
 

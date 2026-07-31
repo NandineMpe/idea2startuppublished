@@ -4,6 +4,7 @@ import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadDesk } from "@/lib/creator/load-desk"
 import { ConfidenceBadge } from "@/components/creator/confidence-badge"
 import { DecideButtons } from "@/components/creator/decide-buttons"
+import { ItemActions } from "@/components/creator/item-actions"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { EmptyState, PageBody, PageHeader, StatTile } from "@/components/creator/page-shell"
 import type { CreatorWorkItem } from "@/lib/creator/types"
@@ -30,7 +31,10 @@ function WorkRow({ item, decidable = false }: { item: CreatorWorkItem; decidable
           {item.provenance.agent} · {relative(item.created_at)}
         </p>
       </div>
-      {decidable && <DecideButtons workId={item.id} />}
+      <div className="flex items-center gap-2 shrink-0">
+        {decidable && <DecideButtons workId={item.id} />}
+        <ItemActions entity="work" id={item.id} noun="item" />
+      </div>
     </div>
   )
 }
