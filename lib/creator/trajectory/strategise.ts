@@ -37,23 +37,29 @@ const strategySchema = z.object({
   // Newline-delimited rather than arrays of objects: several string arrays or a
   // nested object in one schema makes this model emit tool-call markup into the
   // JSON and abandon the rest of the response.
-  gap_names: z.string().describe("Each gap between the position held and the position declared, ONE PER LINE. Four to six."),
+  //
+  // Every list that has to line up with another carries an explicit "N:" index
+  // rather than relying on position. Positional alignment failed on the first
+  // real run: asked for one item per line, the model put six items on one line
+  // separated by pipes, and everything after the first row was silently blank.
+  // An index that travels with the item cannot drift.
+  gap_names: z.string().describe("Each gap between the position held and the position declared, ONE PER LINE, prefixed '1: ', '2: ' and so on. Four to six."),
   gap_why: z
     .string()
-    .describe("Why each gap matters for THIS declared position, ONE PER LINE, same order as gap_names."),
+    .describe("Why each gap matters, ONE PER LINE, each prefixed with the matching gap number: '1: because...'."),
   gap_closes_with: z
     .string()
-    .describe("The concrete thing that closes each gap, ONE PER LINE, same order. An artifact, a room, a body of work, a named relationship. Not 'post more'."),
+    .describe("The concrete thing that closes each gap, ONE PER LINE, each prefixed with the matching gap number: '1: ...'. An artifact, a room, a body of work, a named relationship. Not 'post more'."),
 
-  phase_names: z.string().describe("Phases of the plan in order, ONE PER LINE. Three or four."),
-  phase_months: z.string().describe("The months each phase covers, ONE PER LINE, same order. E.g. 'Months 1-3'."),
+  phase_names: z.string().describe("Phases of the plan in order, ONE PER LINE, prefixed '1: ', '2: '. Three or four."),
+  phase_months: z.string().describe("The months each phase covers, ONE PER LINE, prefixed with the matching phase number: '1: Months 1-3'."),
   phase_objectives: z
     .string()
-    .describe("What is true at the end of each phase, ONE PER LINE, same order. A testable state, not an activity."),
+    .describe("What is true at the end of each phase, ONE PER LINE, prefixed with the matching phase number. A testable state, not an activity."),
   phase_plays: z
     .string()
     .describe(
-      "The plays for each phase, ONE PHASE PER LINE, with the individual plays inside a line separated by ' | '. Same order as phase_names.",
+      "Every play, ONE PLAY PER LINE, each prefixed with the number of the phase it belongs to: '1: declare the flagship question'. Several lines may share a phase number. Four to six plays per phase.",
     ),
 
   proof_needed: z
@@ -96,12 +102,60 @@ Rules:
 - If what the creator says they are building commercially conflicts with the audience they are optimising for, say so plainly in a gap.
 - Never flatter. This document is only useful if it tells them something their own analytics cannot.`
 
+/**
+ * Split a plain list.
+ *
+ * Newlines are the contract, but the model reliably reaches for " | " when a
+ * list is long, so a single line carrying pipes is treated as a list too. A real
+ * sentence containing one pipe is not a thing anyone writes.
+ */
 function toLines(value: string, limit = 12): string[] {
-  return value
-    .split(/\r?\n/)
+  const raw = value.split(/\r?\n/).filter((l) => l.trim())
+  const parts = raw.length <= 1 && value.includes("|") ? value.split("|") : raw
+  return parts
     .map((line) => line.replace(/^\s*(?:[-•*–]|\d+[.)])\s+/, "").trim())
     .filter(Boolean)
     .slice(0, limit)
+}
+
+/**
+ * Split a list whose items carry an explicit "N:" index, and return them grouped
+ * by that index. Items with no usable index fall to the end in order, so a
+ * partially compliant response degrades rather than silently losing rows.
+ */
+function toIndexed(value: string, limit = 12): Map<number, string[]> {
+  const grouped = new Map<number, string[]>()
+  const unindexed: string[] = []
+
+  for (const line of toLines(value, limit * 8)) {
+    const match = line.match(/^(\d+)\s*[:.)-]\s*(.+)$/)
+    if (match) {
+      const idx = Number.parseInt(match[1], 10)
+      if (idx >= 1 && idx <= limit) {
+        const list = grouped.get(idx) ?? []
+        list.push(match[2].trim())
+        grouped.set(idx, list)
+        continue
+      }
+    }
+    unindexed.push(line)
+  }
+
+  for (const orphan of unindexed) {
+    for (let i = 1; i <= limit; i++) {
+      if (!grouped.has(i)) {
+        grouped.set(i, [orphan])
+        break
+      }
+    }
+  }
+
+  return grouped
+}
+
+/** The first value recorded at each index, in index order, up to `count`. */
+function firstAt(grouped: Map<number, string[]>, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => grouped.get(i + 1)?.[0] ?? "")
 }
 
 function evidenceBlock(posts: CreatorPost[]): string {
@@ -192,27 +246,24 @@ export async function strategiseTrajectory(
       maxOutputTokens: 24000,
     })
 
-    const gapNames = toLines(object.gap_names, 6)
-    const gapWhy = toLines(object.gap_why, 6)
-    const gapCloses = toLines(object.gap_closes_with, 6)
+    const gapNames = firstAt(toIndexed(object.gap_names, 6), 6).filter(Boolean)
+    const gapWhy = firstAt(toIndexed(object.gap_why, 6), gapNames.length)
+    const gapCloses = firstAt(toIndexed(object.gap_closes_with, 6), gapNames.length)
     const gaps = gapNames.map((gap, i) => ({
       gap,
       why_it_matters: gapWhy[i] ?? "",
       closes_with: gapCloses[i] ?? "",
     }))
 
-    const phaseNames = toLines(object.phase_names, 4)
-    const phaseMonths = toLines(object.phase_months, 4)
-    const phaseObjectives = toLines(object.phase_objectives, 4)
-    const phasePlays = toLines(object.phase_plays, 4)
+    const phaseNames = firstAt(toIndexed(object.phase_names, 4), 4).filter(Boolean)
+    const phaseMonths = firstAt(toIndexed(object.phase_months, 4), phaseNames.length)
+    const phaseObjectives = firstAt(toIndexed(object.phase_objectives, 4), phaseNames.length)
+    const playsByPhase = toIndexed(object.phase_plays, 4)
     const sequence = phaseNames.map((phase, i) => ({
       phase,
       months: phaseMonths[i] ?? "",
       objective: phaseObjectives[i] ?? "",
-      plays: (phasePlays[i] ?? "")
-        .split("|")
-        .map((p) => p.trim())
-        .filter(Boolean),
+      plays: playsByPhase.get(i + 1) ?? [],
     }))
 
     const searchTerritory = toLines(object.search_territory, 8)
