@@ -174,6 +174,8 @@ ALREADY PROPOSED IN THE LAST 60 DAYS — do not repeat:
 ${already}
 
 What should this creator be building that they are not, to hold the position they said they are moving toward?`,
+      agent: "opportunities.moves",
+      log: { supabase, userId },
       maxOutputTokens: 32000,
     })
 

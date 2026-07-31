@@ -199,6 +199,8 @@ ${rateLine}
 PRIOR BRAND PARTNERSHIPS: ${clients || "NONE ON RECORD — do not imply any."}
 
 Write the brand-facing positioning.`,
+      agent: "canon.positioning",
+      log: { supabase, userId },
       maxOutputTokens: 32000,
     })
 

@@ -116,6 +116,8 @@ export async function openThreadsFromCorpus(
       schema: threadSchema,
       system: SYSTEM_PROMPT,
       prompt: `THE CREATOR'S PUBLISHED POSTS (oldest first, numbered):\n${postList}\n\nALREADY TRACKED, do not repeat:\n${alreadyTracked}\n\nWhich of these described something that was not over? Open a file on each.`,
+      agent: "threads.open",
+      log: { supabase, userId },
       maxOutputTokens: 20000,
     })
 

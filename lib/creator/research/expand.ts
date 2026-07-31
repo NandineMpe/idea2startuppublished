@@ -117,6 +117,8 @@ export async function expandCreatorSeed(
       schema: expandedSchema,
       system: SYSTEM_PROMPT,
       prompt: `THE CREATOR'S LEAD:\n"""\n${trimmed.slice(0, 2000)}\n"""\n\nRETRIEVED SOURCES (numbered):\n${sourceList}\n\n${canonBlock}\n\nDoes this stand up? Build the dossier, or say why it does not.`,
+      agent: "research.expand",
+      log: { supabase, userId },
       maxOutputTokens: 32000,
     })
 

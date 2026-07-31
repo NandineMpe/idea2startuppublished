@@ -144,6 +144,8 @@ export async function deriveLineageForStory(
       schema: lineageSchema,
       system: SYSTEM_PROMPT,
       prompt: `THE STORY\nThesis: ${story.thesis}\nWhy now: ${story.why_now ?? "—"}\nWhy this creator: ${story.why_you ?? "—"}\nReceipts: ${receiptBlock}\n\nCURRENT SIGNALS\n${currentBlock || "(none)"}\n\nHISTORICAL AND RESEARCH SOURCES\n${historyBlock}\n\nBuild the lineage: what is this the latest instance of?`,
+      agent: "research.lineage",
+      log: { supabase, userId },
       maxOutputTokens: 6000,
     })
 

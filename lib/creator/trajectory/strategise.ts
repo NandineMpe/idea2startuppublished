@@ -259,6 +259,8 @@ export async function strategiseTrajectory(
       schema: strategySchema,
       system: SYSTEM_PROMPT,
       prompt: `WHERE THE CREATOR SAYS THEY ARE GOING:\n${declared}\n\nWHAT THEY HAVE PUBLISHED SO FAR:\n${canonBlock}\n\n${evidenceBlock(posts)}\n\nWork backwards from the declared position. Where are they actually standing, what is missing, in what order does it get built, and what should they stop doing?`,
+      agent: "trajectory.strategise",
+      log: { supabase, userId },
       maxOutputTokens: 24000,
     })
 

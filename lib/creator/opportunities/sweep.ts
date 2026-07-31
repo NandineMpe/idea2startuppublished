@@ -127,6 +127,8 @@ export async function sweepOpportunitiesForUser(
     schema: sweepSchema,
     system: SYSTEM_PROMPT,
     prompt: `CANDIDATES:\n${candidateList}\n\nMARKETPLACES THE CREATOR COULD LIST ON:\n${marketplaceList}\n\n${worthBlock}\n\n${trajectoryBlock(trajectory)}\n\n${canonBlock}\n\nALREADY PROPOSED (last 30 days — do not repeat):\n${alreadyProposed}\n\nPropose at most ${MAX_OPPORTUNITIES_PER_RUN} opportunities, each with a ready-to-send pitch.`,
+    agent: "opportunities.sweep",
+    log: { supabase, userId },
     maxOutputTokens: 6000,
   })
 

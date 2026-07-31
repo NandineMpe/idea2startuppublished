@@ -271,6 +271,8 @@ export async function synthesiseStoriesForUser(
     schema: synthesisSchema,
     system: SYSTEM_PROMPT,
     prompt: `SIGNALS (last ${SIGNAL_WINDOW_HOURS}h, numbered):\n${signalList}\n\n${trajectoryBlock(trajectory)}\n\n${canonBlock}\n\n${corpusBlock}\n\nRECENT THESES (do not repeat):\n${recentTheses}\n\nProduce at most ${MAX_STORIES_PER_RUN} story dossiers.`,
+    agent: "research.synthesise",
+    log: { supabase, userId },
     maxOutputTokens: 8000,
   })
 

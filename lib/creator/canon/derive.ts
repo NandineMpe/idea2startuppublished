@@ -112,6 +112,8 @@ export async function deriveCanonForUser(
     schema: derivationSchema,
     system: SYSTEM_PROMPT,
     prompt: `THE CREATOR'S PUBLISHED POSTS (numbered, newest first):\n${postList}\n\nDerive the canon.`,
+    agent: "canon.derive",
+    log: { supabase, userId },
     maxOutputTokens: 8000,
   })
 

@@ -186,6 +186,8 @@ ${clientBlock}
 ${voiceBlock}
 
 Read the brief and draft the reply.`,
+      agent: "deals.brief-reply",
+      log: { supabase, userId },
       maxOutputTokens: 16000,
     })
 

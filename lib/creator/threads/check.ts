@@ -179,6 +179,8 @@ Has this moved?`,
       // which of forty keyword matches were false positives takes more words
       // than reporting a development. At 8000 the Moonshot check ran out
       // mid-object and surfaced as a schema mismatch rather than as truncation.
+      agent: "threads.check",
+      log: { supabase, userId },
       maxOutputTokens: 16000,
     })
 

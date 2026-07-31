@@ -89,6 +89,8 @@ export async function draftForUser(
     schema: draftSchema,
     system: SYSTEM_PROMPT,
     prompt: `${briefBlock}\n\n${canonBlock}\n\n${exemplarBlock}\n\nDraft the script.`,
+    agent: "writer.draft",
+    log: { supabase, userId },
     maxOutputTokens: 4000,
   })
 
