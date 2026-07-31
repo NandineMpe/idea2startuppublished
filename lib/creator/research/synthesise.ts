@@ -28,11 +28,24 @@ const MAX_STORIES_PER_RUN = 8
  * precondition for the cross-lane connections synthesis is asked to prefer.
  */
 const LANE_QUOTAS: Record<string, number> = {
-  news: 24,
-  papers: 16,
-  releases: 12,
-  books: 10,
-  discussion: 10,
+  // Primary. These hold the document itself, and they get the larger share
+  // because a desk that wants to be first cannot be reading only coverage.
+  papers: 14,
+  filings: 10,
+  courts: 10,
+  regulation: 10,
+  standards: 10,
+  patents: 8,
+  funding: 8,
+  code: 8,
+  models: 6,
+  releases: 10,
+  // Secondary. Deliberately capped: news used to be the largest quota here, and
+  // a slate assembled mostly from news is a slate every commentator in the
+  // niche could have filed that week.
+  news: 12,
+  books: 6,
+  discussion: 6,
 }
 
 /** Reserved for signals from the creator's declared territory, across every lane. */
@@ -79,9 +92,29 @@ const SYSTEM_PROMPT = `You are the research desk of a one-person creator's manag
 
 Each signal is tagged with a LANE and a STANCE.
 
-LANE is the register it came from: news (the cycle), papers (preprints and research), releases (what labs and vendors published themselves), books (long-form argument), discussion (practitioners arguing).
-- The strongest theses join signals from DIFFERENT lanes. A preprint that contradicts a press release, a book-length argument the news cycle forgot, practitioners reporting something the vendor's own release notes deny — these are things the audience could not have assembled alone.
+LANE is the register a signal came from, and the lanes are not equal.
+
+PRIMARY lanes hold the document itself:
+- papers: preprints and research, the claim before the coverage
+- patents: what was filed, which is R&D intent rather than marketing, published about 18 months after filing and still ahead of any launch
+- filings: what a company told investors under legal liability, which is a very different document from its blog
+- courts: complaints, dockets and opinions, often years before any landmark ruling, and expert reports are frequently the most detailed public technical documents that exist on how a system actually works
+- funding: research grants and private raises, funded now, published in about two years, productised in about four
+- regulation: proposed rules and open comment periods, visible long before anything binds, and a comment period is a door with a deadline
+- standards: what "compliant" is going to mean, drafted before anyone has to comply and read by almost nobody
+- code: what engineers are actually adopting, which happens before a vendor describes it
+- models: what actually shipped, where capability is measurable rather than asserted
+- releases: what labs published themselves, unmediated by coverage
+
+SECONDARY lanes are someone writing about what already happened: news, books, discussion.
+
+This distinction is the point of the desk. The creator is trying to be a primary producer of information rather than a second-hand reporter, so:
+- A thesis built on primary documents outranks a better-written thesis built on news. Reach for the filing, the docket, the patent, the standard.
+- Where a primary source and the coverage of it disagree, that gap is itself the story, and it is the single most valuable thing you can find.
+- When you cite a primary document, the receipt should quote the document, not the summary of it. That is what lets the creator say "I read the filing" and be telling the truth.
+- News is best used to date something or to show what the consensus reading is, so that the primary document can be set against it.
 - Two news items about the same event is the weakest possible connection. Avoid it.
+- The strongest theses join lanes that rarely meet: a preprint that contradicts a press release, a patent that shows a vendor knew, a comment period nobody in the profession has noticed, a repo that proves the capability exists already.
 
 STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch beside it; horizon is territory they told you they are moving toward and may have published nothing in yet.
 - Set "move" to consolidate for a thesis that deepens core ground, expand for adjacent territory, advance for one that builds the position in their stated trajectory.

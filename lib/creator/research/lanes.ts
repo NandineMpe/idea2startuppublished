@@ -1,5 +1,6 @@
 import { fetchRssLikeSource } from "@/lib/careeros/sources/feed-utils"
 import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
+import { PRIMARY_ADAPTERS, type PrimaryLane } from "./primary"
 
 /**
  * Where the Researcher looks.
@@ -15,7 +16,36 @@ import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
  * headlines about the same event.
  */
 
-export type ResearchLane = "news" | "papers" | "releases" | "books" | "discussion"
+export type ResearchLane =
+  // Secondary: someone writing about what happened.
+  | "news"
+  | "books"
+  | "discussion"
+  // Primary: the document itself.
+  | "papers"
+  | "releases"
+  | "patents"
+  | "filings"
+  | "courts"
+  | "funding"
+  | "regulation"
+  | "standards"
+  | "code"
+  | "models"
+
+/** The lanes that hold documents rather than coverage of documents. */
+export const PRIMARY_LANES: ResearchLane[] = [
+  "papers",
+  "releases",
+  "patents",
+  "filings",
+  "courts",
+  "funding",
+  "regulation",
+  "standards",
+  "code",
+  "models",
+]
 
 /** Where a topic sits relative to the creator: proven ground, or the stretch. */
 export type TopicStance = "core" | "adjacent" | "horizon"
@@ -35,7 +65,7 @@ const STOPWORDS = new Set([
   "research", "paper", "analysis", "based", "towards", "toward", "via",
 ])
 
-function meaningfulTokens(text: string): string[] {
+export function meaningfulTokens(text: string): string[] {
   return [
     ...new Set(
       text
@@ -60,7 +90,7 @@ function meaningfulTokens(text: string): string[] {
  * (one when the query itself is that short), which is strict enough to drop the
  * bird bones and loose enough to keep papers phrased differently to the query.
  */
-function filterByRelevance(items: RawFeedItem[], query: string): RawFeedItem[] {
+export function filterByRelevance(items: RawFeedItem[], query: string): RawFeedItem[] {
   const wanted = meaningfulTokens(query)
   if (!wanted.length) return items
   const required = wanted.length <= 2 ? 1 : 2
@@ -305,20 +335,44 @@ export async function sweepTopicAcrossLanes(
     return unique
   }
 
-  const [news, papers, books, discussion] = await Promise.all([
+  /**
+   * Primary adapters run once on the raw topic rather than across the derived
+   * queries. Each one already extracts its own key terms, because EDGAR, GitHub
+   * and the Federal Register all want different query shapes, so fanning the
+   * derived queries into them would be eight redundant calls per query for no
+   * extra coverage.
+   */
+  async function primary(name: PrimaryLane): Promise<LaneSignal[]> {
+    try {
+      const items = await PRIMARY_ADAPTERS[name](topic, hoursBack)
+      if (!items.length) errors.push(`${name}: 0 items`)
+      return tag(items, name, stance, topic)
+    } catch (e) {
+      errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`)
+      return []
+    }
+  }
+
+  const [news, papers, books, discussion, primaries] = await Promise.all([
     // News search already ranks by relevance; the others match too loosely.
     across("news", (q) => fetchNews(q, hoursBack)),
     across("papers", async (q) => filterByRelevance(await fetchPapers(q, hoursBack), q)),
     across("books", async (q) => filterByRelevance(await fetchBooks(q), q)),
     across("discussion", (q) => fetchDiscussion(q, hoursBack)),
+    Promise.all(
+      (Object.keys(PRIMARY_ADAPTERS) as PrimaryLane[]).map((name) => primary(name)),
+    ).then((groups) => groups.flat()),
   ])
 
   return {
     signals: [
-      ...tag(news.slice(0, 10), "news", stance, topic),
+      // Primary first: position in this list is a weighting, and the documents
+      // are the reason the desk exists.
+      ...primaries,
       ...tag(papers.slice(0, 6), "papers", stance, topic),
-      ...tag(books.slice(0, 4), "books", stance, topic),
-      ...tag(discussion.slice(0, 5), "discussion", stance, topic),
+      ...tag(news.slice(0, 8), "news", stance, topic),
+      ...tag(books.slice(0, 3), "books", stance, topic),
+      ...tag(discussion.slice(0, 4), "discussion", stance, topic),
     ],
     errors,
   }
