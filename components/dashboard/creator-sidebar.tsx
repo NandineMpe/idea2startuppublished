@@ -13,6 +13,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Radio,
   Sunrise,
   Layers,
   TrendingUp,
@@ -35,6 +36,9 @@ const navItems: NavItem[] = [
   // Above Canon deliberately: where you are going should be easier to reach
   // than where you have been.
   { title: "Trajectory", href: "/creator/dashboard/trajectory", icon: Compass },
+  // Above Stories: the raw documents are the larger and more useful thing, and
+  // the filed stories are a convenience on top of them.
+  { title: "The wire", href: "/creator/dashboard/feed", icon: Radio },
   { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper },
   // Next to Stories on purpose: today's signals and the things that never
   // finished are two halves of the same job.

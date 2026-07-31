@@ -276,6 +276,18 @@ export async function synthesiseStoriesForUser(
 
   const result: SynthesisResult = { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: usage.totalTokens }
 
+  // Everything that reached the prompt was read and judged, whether or not it
+  // was used. Recording that is what lets the feed show "considered but not
+  // filed", which is the most interesting slice in it: documents a machine
+  // looked at and passed on, where the creator might not have.
+  const consideredAt = new Date().toISOString()
+  await supabase
+    .schema("creator")
+    .from("creator_signals")
+    .update({ considered_at: consideredAt })
+    .eq("user_id", userId)
+    .in("id", signalRows.map((s) => s.id))
+
   for (const story of object.stories) {
     const referenced = [...new Set([...story.signal_indexes, ...story.receipts.map((r) => r.signal_index)])]
       .filter((i) => i >= 0 && i < signalRows.length)
@@ -358,6 +370,13 @@ export async function synthesiseStoriesForUser(
       .from("creator_stories")
       .update({ work_item_id: workRow.id })
       .eq("id", storyRow.id)
+
+    await supabase
+      .schema("creator")
+      .from("creator_signals")
+      .update({ used_at: consideredAt })
+      .eq("user_id", userId)
+      .in("id", signalIds)
 
     result.proposed++
   }
