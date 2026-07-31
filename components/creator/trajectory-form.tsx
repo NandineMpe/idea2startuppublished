@@ -71,11 +71,11 @@ export function TrajectoryForm({ trajectory }: { trajectory: CreatorTrajectory |
       <form action={onSubmit} className="grid gap-4 max-w-[720px]">
         <Field
           label="North star"
-          hint="The position you want to hold. One or two sentences, in your words."
+          hint="The position you want to hold, and how you intend to win it. Write as much as you want: strategy here overrides the desk's default assumptions."
         >
           <textarea
             name="north_star"
-            rows={3}
+            rows={8}
             required
             defaultValue={trajectory?.north_star ?? ""}
             placeholder="The person professionals go to for how AI is actually moving and how to get involved, starting from finance, audit and accounting."
@@ -107,6 +107,45 @@ export function TrajectoryForm({ trajectory }: { trajectory: CreatorTrajectory |
             />
           </Field>
         </div>
+
+        {/* Not optional, and not buried. Geography inferred from a corpus is
+            inferred from whoever the algorithm has been serving, which is
+            usually the audience the creator is trying to get away from. */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Based in" hint="Where you actually are. Affects travel, timezone and where you count as local.">
+            <input
+              name="based_in"
+              defaultValue={trajectory?.based_in ?? ""}
+              placeholder="Ireland"
+              className={FIELD}
+            />
+          </Field>
+
+          <Field
+            label="Markets you are going after"
+            hint="Comma separated, most important first. Decides which regulators, press and stages get hunted."
+          >
+            <input
+              name="target_markets"
+              defaultValue={(trajectory?.target_markets ?? []).join(", ")}
+              placeholder="United States, United Kingdom, European Union, Ireland"
+              className={FIELD}
+            />
+          </Field>
+        </div>
+
+        <Field
+          label="Where your audience actually is now"
+          hint="Say it plainly if it is not where you want it. Nothing in the TikTok data we import carries geography, so if you do not say it, no agent can know."
+        >
+          <textarea
+            name="audience_now"
+            rows={2}
+            defaultValue={trajectory?.audience_now ?? ""}
+            placeholder="The algorithm is serving me mostly African traffic, largely South Africa, and I need US, UK and European reach."
+            className={FIELD}
+          />
+        </Field>
 
         <Disclosure label="Sharpen it (optional)">
           <div className="grid gap-4">

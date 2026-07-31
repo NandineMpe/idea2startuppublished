@@ -70,7 +70,7 @@ const strategySchema = z.object({
   rooms: z
     .string()
     .describe(
-      "Where the target audience actually is, ONE PER LINE, named specifically. Publications, conferences, professional bodies, communities, podcasts. Not 'LinkedIn'.",
+      "Where the target audience actually is, ONE PER LINE, named specifically, and located IN THE DECLARED TARGET MARKETS. Publications, conferences, professional bodies, communities, podcasts. Not 'LinkedIn'.",
     ),
   stop_doing: z
     .string()
@@ -80,7 +80,7 @@ const strategySchema = z.object({
   search_territory: z
     .string()
     .describe(
-      "Search queries the research desk should run to cover where the creator is GOING, ONE PER LINE, six to eight. Real searchable phrases a news index or preprint server would match, not themes. These must cover the destination, not the existing content.",
+      "Search queries the research desk should run to cover where the creator is GOING, ONE PER LINE, six to eight. Real searchable phrases a news index or preprint server would match, not themes. These must cover the destination, not the existing content, and they must be scoped to the declared target markets: name those markets' regulators, standard setters and institutions, not the ones the creator's past posts happened to mention.",
     ),
 })
 
@@ -90,13 +90,24 @@ You are given their declared trajectory, their canon derived from published work
 
 The trap you must avoid: treating the existing content as the plan. A creator who already gets good numbers on a topic will be told forever to do more of it, and that is how someone stays a commentator on a subject instead of becoming the authority on it. Your value is being the one input that argues from the destination.
 
+The declaration can tell you HOW the creator intends to win, not only where they are going, and when it does that reasoning outranks your default playbook. If they tell you their edge is technical depth rather than institutional endorsement, do not hand back an accreditation plan. If they tell you the bodies in their field are behind the technology, do not route their standing through those bodies. Read the declaration for strategy, not just for a destination, and say plainly when you think it is wrong rather than quietly planning around it.
+
+Do not assume standing comes from institutions. That is the default answer in mature fields and it is often wrong in fast-moving ones, where the professional bodies are years behind the practitioners and proximity to a body with no position of its own buys nothing. Before naming an institution as a room, ask whether it actually holds a substantive position on this subject. Where it does not, route standing through primary work instead: original technical explanation, being first and demonstrably right, a working artifact, a public track record that can be checked. Being early and correct in public is a credential, and in a field this young it is frequently the stronger one.
+
+Geography is declared, never inferred. The creator's corpus tells you which institutions their posts have mentioned, and that reflects the audience an algorithm has been serving them, not the market they are going after. Those are frequently different, and reading geography off the content is how a plan ends up built on the wrong continent's regulators.
+
+- Every named room, publication, professional body, conference, regulator and stage must sit in the declared target markets, in roughly their priority order. If the creator's existing content is full of one country's institutions and their target markets are elsewhere, that is a finding to state, not a lead to follow.
+- Where the creator is based and where they are selling can differ. Being based somewhere is useful for travel cost, timezone and local standing, and it is not a reason to aim the strategy there.
+- If the audience they have is in a different market from the audience they need, treat that as a gap of its own with concrete distribution plays: which market's references, regulators, hours, spellings and examples to use, and which to stop using. An algorithm serves more of whoever already engages, so this does not correct itself.
+- Where markets differ in what they credit, say so. A regulator that carries weight in one market means nothing in another, and a professional body's letters after your name do not travel.
+
 Rules:
 - position_now must be honest and specific. "Respected voice in the space" is worthless. Name what they are actually credited with today, and be willing to say the position is smaller than the ambition.
 - Gaps must be things that are MISSING, not things to do more of. Distribution is rarely the gap for someone who already has reach. Standing, proof, relationships, a body of work on one question, and access to the rooms where decisions get made usually are.
 - closes_with must be a concrete artifact or event: a named report, a talk at a named conference, a series on one question, a co-authored piece with a named institution. Never "consistent posting".
 - The sequence must build. A phase that could run in any order is not a sequence. Each phase should make the next one possible.
-- proof_needed is about credibility with the TARGET audience, which is usually a different bar from the audience they have. Professionals credit different things than a general feed does.
-- rooms must be named. "Industry conferences" is useless; a named conference, a named professional body, a named publication is useful.
+- proof_needed is about credibility with the TARGET audience, which is usually a different bar from the audience they have. Proof can be a credential, but it can equally be a demonstration, a working artifact, an original technical explanation nobody else is giving, or a public record of having called something early and correctly. Choose the form of proof that the declared strategy actually calls for.
+- rooms must be named, and a room is anywhere the target audience is reachable: a named conference, publication, podcast, practitioner community or platform. Do not fill this with professional bodies by default. "Industry conferences" is useless; a named one is useful.
 - stop_doing is the hardest and most valuable field. Name content that gets views but does not compound toward the position. If everything they do is on-strategy, say so, but look hard first.
 - search_territory decides what the research desk reads every morning from now on. Write queries for the destination. If the creator says they are moving toward how professionals adopt AI, do not hand back queries about the topics already in their canon.
 - If what the creator says they are building commercially conflicts with the audience they are optimising for, say so plainly in a gap.
@@ -223,6 +234,11 @@ export async function strategiseTrajectory(
     `NORTH STAR: ${trajectory.north_star}`,
     trajectory.target_audience ? `TARGET AUDIENCE: ${trajectory.target_audience}` : null,
     trajectory.what_it_serves ? `WHAT THE POSITION SERVES: ${trajectory.what_it_serves}` : null,
+    trajectory.based_in ? `BASED IN: ${trajectory.based_in}` : null,
+    trajectory.target_markets?.length
+      ? `TARGET MARKETS, IN PRIORITY ORDER: ${trajectory.target_markets.join(", ")}`
+      : null,
+    trajectory.audience_now ? `WHERE THE AUDIENCE ACTUALLY IS TODAY: ${trajectory.audience_now}` : null,
     `HORIZON: ${trajectory.horizon_months} months`,
     trajectory.positions_to_claim?.length
       ? `ARGUMENTS THEY WANT TO OWN:\n${trajectory.positions_to_claim.map((p: string) => `- ${p}`).join("\n")}`

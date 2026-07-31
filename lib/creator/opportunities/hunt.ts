@@ -93,11 +93,17 @@ const NON_TIKTOK_SOURCES = [
  * campaign write-ups in the trade press. YouTube-dominated sources are excluded
  * outright rather than hoped away in the prompt.
  */
-export async function huntSponsors(topics: string[]): Promise<OpportunityCandidate[]> {
+export async function huntSponsors(
+  topics: string[],
+  markets: string[] = [],
+): Promise<OpportunityCandidate[]> {
   const exa = getExa()
   if (!exa) return []
   const year = new Date().getFullYear()
   const out: OpportunityCandidate[] = []
+  // Only the trade-press angle takes the market hint. The other two are pinned
+  // to tiktok.com domains where a geography term just suppresses results.
+  const where = markets.length ? ` ${markets.slice(0, 3).join(" OR ")}` : ""
 
   for (const topic of topics.slice(0, 3)) {
     // TikTok labels sponsored posts "Paid partnership with X" — searching the
@@ -128,7 +134,7 @@ export async function huntSponsors(topics: string[]): Promise<OpportunityCandida
       ...(await exaSearch(
         exa,
         "sponsors",
-        `${topic} brand TikTok campaign OR "creator campaign" case study ${year}`,
+        `${topic} brand TikTok campaign OR "creator campaign" case study${where} ${year}`,
         4,
         { excludeDomains: NON_TIKTOK_SOURCES, withinDays: 180 },
       )),
@@ -146,12 +152,20 @@ export async function huntSponsors(topics: string[]): Promise<OpportunityCandida
  * a past edition, and proposing a closed call wastes the creator's time and
  * costs trust in everything else on the screen.
  */
-export async function huntEvents(topics: string[]): Promise<OpportunityCandidate[]> {
+export async function huntEvents(
+  topics: string[],
+  markets: string[] = [],
+): Promise<OpportunityCandidate[]> {
   const exa = getExa()
   if (!exa) return []
   const now = new Date()
   const thisYear = now.getFullYear()
   const nextYear = thisYear + 1
+
+  // Unscoped, a conference query returns whichever edition ranks best, which
+  // correlates with nothing the creator cares about. A stage in the wrong market
+  // is a flight and a week for an audience that will never buy.
+  const where = markets.length ? ` in ${markets.slice(0, 4).join(" or ")}` : ""
 
   const out: OpportunityCandidate[] = []
   for (const topic of topics.slice(0, 3)) {
@@ -159,7 +173,7 @@ export async function huntEvents(topics: string[]): Promise<OpportunityCandidate
       ...(await exaSearch(
         exa,
         "events",
-        `${topic} conference ${thisYear} OR ${nextYear} "call for speakers" OR "call for proposals" OR "speaker applications open" OR "apply to speak"`,
+        `${topic} conference${where} ${thisYear} OR ${nextYear} "call for speakers" OR "call for proposals" OR "speaker applications open" OR "apply to speak"`,
         5,
         { withinDays: 90 },
       )),
@@ -168,7 +182,7 @@ export async function huntEvents(topics: string[]): Promise<OpportunityCandidate
       ...(await exaSearch(
         exa,
         "events",
-        `${topic} podcast "guest" submission OR "pitch a guest" ${thisYear}`,
+        `${topic} podcast${where} "guest" submission OR "pitch a guest" ${thisYear}`,
         3,
         { withinDays: 90 },
       )),
@@ -178,7 +192,10 @@ export async function huntEvents(topics: string[]): Promise<OpportunityCandidate
 }
 
 /** Companies in the topic space via Apollo.io REST. No-op until APOLLO_API_KEY is set. */
-export async function huntApolloCompanies(topics: string[]): Promise<OpportunityCandidate[]> {
+export async function huntApolloCompanies(
+  topics: string[],
+  markets: string[] = [],
+): Promise<OpportunityCandidate[]> {
   const key = process.env.APOLLO_API_KEY?.trim()
   if (!key) return []
 
@@ -188,6 +205,9 @@ export async function huntApolloCompanies(topics: string[]): Promise<Opportunity
       headers: { "Content-Type": "application/json", "X-Api-Key": key },
       body: JSON.stringify({
         q_organization_keyword_tags: topics.slice(0, 5),
+        // Apollo filters on this natively, so the market constraint is a real
+        // filter here rather than a hint the ranker may ignore.
+        ...(markets.length ? { organization_locations: markets.slice(0, 5) } : {}),
         per_page: 15,
       }),
     })

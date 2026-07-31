@@ -461,6 +461,12 @@ export type CreatorTrajectory = {
   north_star: string
   target_audience: string | null
   what_it_serves: string | null
+  /** Where the creator actually is. Drives travel, timezone, and local standing. */
+  based_in: string | null
+  /** Ordered, most important first. Drives which regulators, press and stages the desk hunts in. */
+  target_markets: string[]
+  /** Where the audience is today. Unmeasurable from the data we ingest, so it has to be declared. */
+  audience_now: string | null
   horizon_months: number
   positions_to_claim: string[]
   off_strategy: string[]

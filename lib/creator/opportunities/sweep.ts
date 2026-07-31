@@ -43,6 +43,7 @@ Rules:
 - When a trajectory is declared, weigh opportunities against the position the creator is building and the audience they need, not only against the topics of their published work. Absence of past precedent is not a disqualification.
 - If an opportunity is prestigious but off-trajectory, say that in why_fit rather than quietly ranking it first.
 - Warm beats cold: a brand already sponsoring creators in this niche outranks a keyword-matched company.
+- Respect the declared target markets. A stage or a brand outside them is usually a worse use of the creator's time than a smaller one inside them, because budgets, buyers and professional credibility do not cross borders evenly. If you propose something outside the target markets, justify it explicitly.
 - Marketplace listings: propose a platform only if the creator plausibly meets its entry bar and it is not in the already-proposed list.
 - Pitches are short (under 150 words), specific, and cite the creator's real numbers when a rate range is provided. Never invent metrics.
 - A pitch for a trajectory-building opportunity should lead with the argument the creator wants to be known for, not with their follower count.
@@ -70,12 +71,17 @@ export async function sweepOpportunitiesForUser(
   const eventTopics = [...horizonTopics, ...coreTopics]
   const dealTopics = [...coreTopics, ...horizonTopics]
 
-  const [sponsors, events, apollo, worthContext, trajectory, { data: existing }, { data: canon }] = await Promise.all([
-    huntSponsors(dealTopics),
-    huntEvents(eventTopics),
-    huntApolloCompanies(dealTopics),
+  // Markets are needed before the hunt, not just before the ranking, so this
+  // one load is awaited ahead of the rest. Ranking by market after searching
+  // the wrong one only narrows a list that was wrong to begin with.
+  const trajectory = await loadTrajectory(supabase, userId)
+  const markets = trajectory?.target_markets ?? []
+
+  const [sponsors, events, apollo, worthContext, { data: existing }, { data: canon }] = await Promise.all([
+    huntSponsors(dealTopics, markets),
+    huntEvents(eventTopics, markets),
+    huntApolloCompanies(dealTopics, markets),
     loadWorth(supabase, userId),
-    loadTrajectory(supabase, userId),
     supabase.schema("creator").from("creator_work")
       .select("title")
       .eq("user_id", userId)

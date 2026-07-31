@@ -3,7 +3,7 @@ import { safeRow } from "./query"
 import type { CreatorTrajectory } from "./types"
 
 const TRAJECTORY_COLUMNS =
-  "id,version,north_star,target_audience,what_it_serves,horizon_months,positions_to_claim,off_strategy,position_now,gaps,sequence,proof_needed,rooms,stop_doing,search_territory,strategy_derived_at"
+  "id,version,north_star,target_audience,what_it_serves,based_in,target_markets,audience_now,horizon_months,positions_to_claim,off_strategy,position_now,gaps,sequence,proof_needed,rooms,stop_doing,search_territory,strategy_derived_at"
 
 export async function loadTrajectory(
   supabase: SupabaseClient,
@@ -44,6 +44,14 @@ export function trajectoryBlock(trajectory: CreatorTrajectory | null): string {
     `North star: ${trajectory.north_star}`,
     trajectory.target_audience ? `Audience they need: ${trajectory.target_audience}` : null,
     trajectory.what_it_serves ? `What the position serves: ${trajectory.what_it_serves}` : null,
+    trajectory.based_in ? `Based in: ${trajectory.based_in}` : null,
+    // Named before the canon for a reason: a corpus reflects the audience the
+    // algorithm has been serving, not the one the creator is going after, so
+    // geography inferred from the content is systematically the wrong answer.
+    trajectory.target_markets?.length
+      ? `Markets they are going after, in priority order: ${trajectory.target_markets.join(", ")}. Institutions, publications, stages and brands must be in these markets. Do not default to the markets their existing content happens to mention.`
+      : null,
+    trajectory.audience_now ? `Where the audience actually is today: ${trajectory.audience_now}` : null,
     trajectory.positions_to_claim?.length
       ? `Arguments they want to own: ${trajectory.positions_to_claim.join("; ")}`
       : null,

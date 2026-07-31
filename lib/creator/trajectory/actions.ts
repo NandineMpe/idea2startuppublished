@@ -32,6 +32,16 @@ export async function saveTrajectory(formData: FormData): Promise<TrajectoryActi
 
   const target = String(formData.get("target_audience") ?? "").trim()
   const serves = String(formData.get("what_it_serves") ?? "").trim()
+  const basedIn = String(formData.get("based_in") ?? "").trim()
+  const audienceNow = String(formData.get("audience_now") ?? "").trim()
+
+  // Comma or newline: a list of countries is the one field people reliably type
+  // on one line, and rejecting that would be pedantry.
+  const marketsRaw = formData.get("target_markets")
+  const targetMarkets =
+    typeof marketsRaw === "string"
+      ? [...new Set(marketsRaw.split(/[,\n]/).map((m) => m.trim()).filter(Boolean))].slice(0, 8)
+      : []
 
   const { data: existing } = await supabase
     .schema("creator")
@@ -46,6 +56,9 @@ export async function saveTrajectory(formData: FormData): Promise<TrajectoryActi
     north_star: northStar,
     target_audience: target || null,
     what_it_serves: serves || null,
+    based_in: basedIn || null,
+    target_markets: targetMarkets,
+    audience_now: audienceNow || null,
     horizon_months: horizonMonths,
     positions_to_claim: toList(formData.get("positions_to_claim"), 8),
     off_strategy: toList(formData.get("off_strategy"), 8),
