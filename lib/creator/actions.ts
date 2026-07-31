@@ -35,6 +35,25 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
       ? [...new Set(topicsRaw.split(/[,\n]/).map((t) => t.trim()).filter(Boolean))].slice(0, 8)
       : []
 
+  // "Name — what it is good for", one per line. The visual planner routes every
+  // shot to one of these, so an undeclared tool means a plan full of things the
+  // creator cannot actually make.
+  const toolsRaw = formData.get("visual_tools")
+  const visualTools =
+    typeof toolsRaw === "string"
+      ? toolsRaw
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .slice(0, 20)
+          .map((line) => {
+            const [namePart, ...rest] = line.split(/\s+[—-]\s+/)
+            const name = namePart.trim()
+            const url = name.match(/\b([a-z0-9-]+\.[a-z]{2,}(?:\/\S*)?)/i)?.[1] ?? null
+            return { name, url: url ? (url.startsWith("http") ? url : `https://${url}`) : null, good_for: rest.join(" - ").trim() || null }
+          })
+      : []
+
   const { error } = await supabase
     .schema("creator")
     .from("creator_settings")
@@ -46,6 +65,7 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
         cpm_high: cpmHigh,
         tiktok_handle: handle,
         niche_topics: nicheTopics,
+        visual_tools: visualTools,
       },
       { onConflict: "user_id" },
     )

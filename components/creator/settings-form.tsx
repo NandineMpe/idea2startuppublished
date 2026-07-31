@@ -71,6 +71,24 @@ export function SettingsForm({
         />
       </Field>
 
+      <Field
+        label="Your visual toolkit"
+        hint="One per line, as 'Name — what it is good for'. The visual planner routes every shot to something on this list, so anything missing here produces shots you cannot build."
+      >
+        <textarea
+          name="visual_tools"
+          defaultValue={settings.visual_tools
+            .map((t) => (t.good_for ? `${t.name} — ${t.good_for}` : t.name))
+            .join("\n")}
+          placeholder={
+            "paperanimator.com — AI text on newspaper, good for recurring themes across decades\nElevenLabs — voice over, dubbing, sound design\nCapCut — editing, captions, transitions"
+          }
+          disabled={!persisted}
+          rows={5}
+          className="rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-violet-500/60 disabled:opacity-60 disabled:cursor-not-allowed"
+        />
+      </Field>
+
       <Field label="Currency" hint="What rates in Worth are quoted in.">
         <select
           name="currency"

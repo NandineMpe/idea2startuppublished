@@ -219,6 +219,25 @@ export type CreatorWorkItem = {
  * derived after the draft was written, and a snapshot would freeze the card at
  * whatever was known the moment the Writer ran.
  */
+/** Mirrors lib/creator/visuals/plan.ts, declared here so the UI contract stays in one file. */
+export type VisualPlanShape = {
+  cover_concept: string
+  cover_text: string
+  shots: Array<{
+    beat: string
+    seconds: number
+    on_screen_text: string
+    visual: string
+    asset_type: string
+    source_url: string
+    tool: string
+  }>
+  captures: Array<{ url: string; highlight: string }>
+  motif: string
+  sound: string
+  generated_at: string
+}
+
 export type DraftSource = {
   story_id: string
   thesis: string
@@ -237,6 +256,8 @@ export type CreatorDraft = CreatorWorkItem & {
   pillar_id: string | null
   /** What the piece argues, for the creator scanning their own queue. */
   premise: string | null
+  /** Shot list, planned against the receipts. Null until asked for. */
+  visual_plan: VisualPlanShape | null
   /** The opener, surfaced separately because it is what gets judged first. */
   hook: string | null
   estimated_duration_seconds: number | null
@@ -438,6 +459,8 @@ export const DEFAULT_CURRENCY: CreatorCurrency = "USD"
  * no basis in the creator's own data, so it is surfaced and tunable rather than
  * buried in a constant where it would read as fact.
  */
+export type VisualTool = { name: string; url?: string | null; good_for?: string | null }
+
 export type CreatorSettings = {
   currency: CreatorCurrency
   cpm_low: number
@@ -445,6 +468,8 @@ export type CreatorSettings = {
   tiktok_handle: string | null
   /** Declared niche topics — the agents' stopgap input until the canon is derived. */
   niche_topics: string[]
+  /** What the creator can actually build with. The visual planner routes every shot to one of these. */
+  visual_tools: VisualTool[]
 }
 
 export type CreatorSettingsContext = {

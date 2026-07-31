@@ -2,6 +2,7 @@ import { Clock, Link2, Quote } from "lucide-react"
 import { ItemActions } from "@/components/creator/item-actions"
 import { Disclosure } from "@/components/creator/disclosure"
 import { StoryLineagePanel } from "@/components/creator/story-lineage"
+import { VisualPlanPanel } from "@/components/creator/visual-plan"
 import { cn } from "@/lib/utils"
 import type { CreatorDraft, StoryMove } from "@/lib/creator/types"
 
@@ -143,6 +144,10 @@ export function DraftCard({ draft }: { draft: CreatorDraft }) {
           on demand. A second implementation here would have dropped the
           confidence badges, and an unmarked guess is a wrong date said on
           camera. */}
+      <div className="px-4 pb-3">
+        <VisualPlanPanel workId={draft.id} plan={draft.visual_plan} />
+      </div>
+
       {source && (
         <div className="px-4 pb-3">
           <StoryLineagePanel
