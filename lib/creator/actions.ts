@@ -65,7 +65,13 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
 
 export type StoryActionResult = { ok: true } | { ok: false; error: string }
 
-export type BinEntity = "story" | "work"
+export type BinEntity = "story" | "work" | "thread"
+
+const TABLE_FOR: Record<BinEntity, string> = {
+  story: "creator_stories",
+  work: "creator_work",
+  thread: "creator_threads",
+}
 
 /** Every screen a story or work item can appear on. Cheap, and none of them can go stale. */
 const CREATOR_PATHS = [
@@ -73,6 +79,7 @@ const CREATOR_PATHS = [
   "/creator/dashboard/stories",
   "/creator/dashboard/next",
   "/creator/dashboard/opportunities",
+  "/creator/dashboard/threads",
   "/creator/dashboard/settings",
 ]
 
@@ -91,7 +98,30 @@ async function linkedPair(
   userId: string,
   entity: BinEntity,
   id: string,
-): Promise<{ ok: true; storyIds: string[]; workIds: string[] } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; storyIds: string[]; workIds: string[]; threadIds: string[] } | { ok: false; error: string }
+> {
+  if (entity === "thread") {
+    // A thread's Desk item goes with it, same as a story's. Otherwise closing a
+    // file leaves an "Update: ..." card waiting for a decision on a story the
+    // creator has just said they are done with.
+    const { data, error } = await supabase
+      .schema("creator")
+      .from("creator_threads")
+      .select("work_item_id")
+      .eq("id", id)
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (error) return { ok: false, error: error.message }
+    if (!data) return { ok: false, error: "Thread not found." }
+    return {
+      ok: true,
+      storyIds: [],
+      workIds: data.work_item_id ? [data.work_item_id] : [],
+      threadIds: [id],
+    }
+  }
+
   if (entity === "story") {
     const { data, error } = await supabase
       .schema("creator")
@@ -102,7 +132,7 @@ async function linkedPair(
       .maybeSingle()
     if (error) return { ok: false, error: error.message }
     if (!data) return { ok: false, error: "Story not found." }
-    return { ok: true, storyIds: [id], workIds: data.work_item_id ? [data.work_item_id] : [] }
+    return { ok: true, storyIds: [id], workIds: data.work_item_id ? [data.work_item_id] : [], threadIds: [] }
   }
 
   const { data, error } = await supabase
@@ -112,7 +142,7 @@ async function linkedPair(
     .eq("work_item_id", id)
     .eq("user_id", userId)
   if (error) return { ok: false, error: error.message }
-  return { ok: true, storyIds: (data ?? []).map((row) => row.id as string), workIds: [id] }
+  return { ok: true, storyIds: (data ?? []).map((row) => row.id as string), workIds: [id], threadIds: [] }
 }
 
 async function applyToPair(
@@ -145,6 +175,22 @@ async function applyToPair(
     if (error) return { ok: false, error: error.message }
   }
 
+  if (pair.threadIds.length) {
+    // Threads have their own state vocabulary and no decided_at, so anything
+    // meant for the other two tables is stripped rather than sent and rejected.
+    const threadPatch = { ...patch }
+    delete threadPatch.decided_at
+    if (threadPatch.state === "archived") threadPatch.state = "closed"
+
+    const { error } = await supabase
+      .schema("creator")
+      .from("creator_threads")
+      .update(threadPatch)
+      .eq("user_id", userId)
+      .in("id", pair.threadIds)
+    if (error) return { ok: false, error: error.message }
+  }
+
   revalidateCreator()
   return { ok: true }
 }
@@ -155,7 +201,8 @@ async function applyToPair(
  * The thesis of an archived story still sits in the synthesis do-not-repeat
  * list and an archived move still counts against re-proposing the same idea, so
  * archiving is how the creator says "seen it" without inviting it back next
- * week. That is the whole difference from delete.
+ * week. For a thread it means closing the file: it stops being checked, and it
+ * stays readable. That is the whole difference from delete.
  */
 export async function archiveCreatorItem(entity: BinEntity, id: string): Promise<StoryActionResult> {
   return applyToPair(entity, id, { state: "archived", decided_at: new Date().toISOString() })
@@ -190,23 +237,20 @@ export async function deleteForever(entity: BinEntity, id: string): Promise<Stor
   const pair = await linkedPair(supabase, userId, entity, id)
   if (!pair.ok) return pair
 
-  if (pair.storyIds.length) {
+  // Threads before work: creator_threads.work_item_id is ON DELETE SET NULL,
+  // so removing the work row first severs the link before we can follow it.
+  for (const [table, ids] of [
+    ["creator_threads", pair.threadIds],
+    ["creator_stories", pair.storyIds],
+    ["creator_work", pair.workIds],
+  ] as const) {
+    if (!ids.length) continue
     const { error } = await supabase
       .schema("creator")
-      .from("creator_stories")
+      .from(table)
       .delete()
       .eq("user_id", userId)
-      .in("id", pair.storyIds)
-    if (error) return { ok: false, error: error.message }
-  }
-
-  if (pair.workIds.length) {
-    const { error } = await supabase
-      .schema("creator")
-      .from("creator_work")
-      .delete()
-      .eq("user_id", userId)
-      .in("id", pair.workIds)
+      .in("id", ids)
     if (error) return { ok: false, error: error.message }
   }
 
@@ -224,6 +268,14 @@ export async function emptyRecycleBin(): Promise<StoryActionResult> {
     .eq("user_id", userId)
     .not("deleted_at", "is", null)
   if (storyError) return { ok: false, error: storyError.message }
+
+  const { error: threadError } = await supabase
+    .schema("creator")
+    .from("creator_threads")
+    .delete()
+    .eq("user_id", userId)
+    .not("deleted_at", "is", null)
+  if (threadError) return { ok: false, error: threadError.message }
 
   const { error: workError } = await supabase
     .schema("creator")

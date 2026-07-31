@@ -17,12 +17,10 @@
 --   filings     what companies tell investors under legal liability, ahead of PR
 --   standards   what "compliant" will mean, before anyone has to comply
 
+-- The runner re-applies every migration on every run, so a migration that
+-- NARROWS a check constraint is a trap: once later data uses the wider set,
+-- re-running this file fails on rows that are perfectly valid. This one drops
+-- the constraint and leaves phase 12 to install the final list, so replaying
+-- the whole sequence is safe in any order of one.
 alter table creator.creator_signals
   drop constraint if exists creator_signals_lane_check;
-
-alter table creator.creator_signals
-  add constraint creator_signals_lane_check
-  check (lane in (
-    'news', 'papers', 'releases', 'books', 'discussion',
-    'patents', 'filings', 'courts', 'funding', 'regulation', 'standards', 'code', 'models'
-  ));

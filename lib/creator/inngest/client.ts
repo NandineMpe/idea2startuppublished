@@ -51,6 +51,11 @@ export type CreatorEvents = {
   "creator/writer.draft": {
     data: { user_id: string; story_id?: string; brief?: string }
   }
+
+  // Threads: go back to the stories that are not over and see what moved.
+  "creator/threads.check": {
+    data: { user_id?: string; limit?: number }
+  }
 }
 
 export const creatorInngest = new Inngest({

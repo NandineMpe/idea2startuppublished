@@ -11,6 +11,7 @@ import { creatorContentEnrich } from "@/lib/creator/inngest/functions/content-en
 import { creatorMetricsRefresh } from "@/lib/creator/inngest/functions/metrics-refresh"
 import { creatorCanonDerive } from "@/lib/creator/inngest/functions/canon-derive"
 import { creatorWriterDraft } from "@/lib/creator/inngest/functions/writer-draft"
+import { creatorThreadsCheck } from "@/lib/creator/inngest/functions/threads-check"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -29,5 +30,6 @@ export const { GET, POST, PUT } = serve({
     creatorContentTranscribe,
     creatorCanonDerive,
     creatorWriterDraft,
+    creatorThreadsCheck,
   ],
 })

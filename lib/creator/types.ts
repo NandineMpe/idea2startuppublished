@@ -487,6 +487,60 @@ export type StoryMove = "consolidate" | "expand" | "advance"
 /** Where a signal's topic came from. 'horizon' topics have no corpus behind them by design. */
 export type SignalStance = "core" | "adjacent" | "horizon"
 
+// ---------------------------------------------------------------------------
+// Threads — the things that have not finished happening.
+//
+// Every other unit on this desk is bounded by a window: what moved in 72 hours,
+// what was filed this quarter. That is the clock everyone else is on. A thread
+// is the opposite: something reported on a date that is not over, where the
+// interesting question is not what happened today but what happened to THAT.
+// ---------------------------------------------------------------------------
+
+export type ThreadState = "watching" | "moved" | "dormant" | "closed"
+
+export type ThreadSignificance = "major" | "notable" | "minor" | "none"
+
+export type ThreadReceipt = {
+  title: string
+  url: string | null
+  published_at: string
+  lane: string
+  quote: string
+}
+
+export type ThreadDevelopment = {
+  checked_at: string
+  moved: boolean
+  summary: string
+  significance: ThreadSignificance
+  receipts: ThreadReceipt[]
+  still_open: string[]
+  angle: string
+}
+
+export type CreatorThread = {
+  id: string
+  subject: string
+  query: string
+  origin: "corpus" | "story" | "signal" | "manual"
+  anchor_date: string
+  what_was_known: string
+  open_questions: string[]
+  state: ThreadState
+  developments: ThreadDevelopment[]
+  last_checked_at: string | null
+  next_check_at: string
+  check_count: number
+  work_item_id: string | null
+}
+
+export type ThreadsContext = {
+  moved: CreatorThread[]
+  watching: CreatorThread[]
+  dormant: CreatorThread[]
+  blocker: CreatorBlocker | null
+}
+
 export const NO_TRAJECTORY_BLOCKER: CreatorBlocker = {
   reason: "no_trajectory",
   action:

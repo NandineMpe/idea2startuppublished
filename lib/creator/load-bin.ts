@@ -14,7 +14,7 @@ import type { WorkKind } from "./types"
 export const RECYCLE_BIN_DAYS = 30
 
 export type BinnedItem = {
-  entity: "story" | "work"
+  entity: "story" | "work" | "thread"
   id: string
   title: string
   /** What it was, in the creator's words: "Story", "Draft", "Deal". */
@@ -71,7 +71,7 @@ export async function loadRecycleBin(
 ): Promise<BinnedItem[]> {
   await purgeExpired(supabase, userId)
 
-  const [stories, work] = await Promise.all([
+  const [stories, work, threads] = await Promise.all([
     safeRows<BinnedStoryRow>(
       supabase
         .schema("creator")
@@ -92,14 +92,34 @@ export async function loadRecycleBin(
         .order("deleted_at", { ascending: false })
         .limit(100),
     ),
+    safeRows<{ id: string; subject: string; deleted_at: string; work_item_id: string | null }>(
+      supabase
+        .schema("creator")
+        .from("creator_threads")
+        .select("id,subject,deleted_at,work_item_id")
+        .eq("user_id", userId)
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false })
+        .limit(100),
+    ),
   ])
 
   // A story and its Desk item are one thing to the creator, so the pair is
   // listed once, under the story. Listing both would offer a restore that only
   // half works.
-  const ridingAlong = new Set(stories.map((s) => s.work_item_id).filter(Boolean) as string[])
+  const ridingAlong = new Set(
+    [...stories, ...threads].map((row) => row.work_item_id).filter(Boolean) as string[],
+  )
 
   const items: BinnedItem[] = [
+    ...threads.map((t) => ({
+      entity: "thread" as const,
+      id: t.id,
+      title: t.subject,
+      label: "Thread",
+      deleted_at: t.deleted_at,
+      has_linked_work: Boolean(t.work_item_id),
+    })),
     ...stories.map((s) => ({
       entity: "story" as const,
       id: s.id,

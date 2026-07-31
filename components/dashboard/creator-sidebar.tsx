@@ -7,6 +7,7 @@ import {
   Fingerprint,
   FileVideo,
   Handshake,
+  History,
   Lightbulb,
   Newspaper,
   Settings,
@@ -35,6 +36,9 @@ const navItems: NavItem[] = [
   // than where you have been.
   { title: "Trajectory", href: "/creator/dashboard/trajectory", icon: Compass },
   { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper },
+  // Next to Stories on purpose: today's signals and the things that never
+  // finished are two halves of the same job.
+  { title: "Open files", href: "/creator/dashboard/threads", icon: History },
   { title: "Opportunities", href: "/creator/dashboard/opportunities", icon: Handshake },
   { title: "Next Five", href: "/creator/dashboard/next", icon: Lightbulb },
   { title: "Worth", href: "/creator/dashboard/worth", icon: DollarSign },
