@@ -121,7 +121,7 @@ function acronyms(topic: string): string[] {
     .filter((a) => a !== "ai" && a !== "the")
 }
 
-function domainTerms(topic: string): string[] {
+export function domainTerms(topic: string): string[] {
   const acr = acronyms(topic)
   const rest = meaningfulTokens(topic)
     .filter((t) => !GENERIC.has(t) && !/^\d{4}$/.test(t))
@@ -139,7 +139,7 @@ function domainTerms(topic: string): string[] {
  * domain words are the ones that decide whether a result is about this
  * creator's subject, so at least one of them has to appear.
  */
-function filterByDomainTerms(items: RawFeedItem[], topic: string, required = 1): RawFeedItem[] {
+export function filterByDomainTerms(items: RawFeedItem[], topic: string, required = 1): RawFeedItem[] {
   const domain = domainTerms(topic)
   if (!domain.length) return items
 

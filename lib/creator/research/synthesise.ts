@@ -40,6 +40,15 @@ const LANE_QUOTAS: Record<string, number> = {
   code: 8,
   models: 6,
   releases: 10,
+  inspections: 10,
+  consultations: 10,
+  supervisors: 10,
+  scholarship: 10,
+  jobs: 8,
+  syscards: 8,
+  conferences: 6,
+  procurement: 6,
+  retractions: 6,
   // Secondary. Deliberately capped: news used to be the largest quota here, and
   // a slate assembled mostly from news is a slate every commentator in the
   // niche could have filed that week.
@@ -105,6 +114,15 @@ PRIMARY lanes hold the document itself:
 - code: what engineers are actually adopting, which happens before a vendor describes it
 - models: what actually shipped, where capability is measurable rather than asserted
 - releases: what labs published themselves, unmediated by coverage
+- jobs: roles being hired. A firm creating a "Head of AI Assurance" has already decided, budgeted and got sign-off, months before it says anything publicly, and the job spec names the actual tools and frameworks
+- scholarship: the accounting, audit, law and finance literature, which is published almost entirely outside the preprint servers
+- inspections: what a regulator found when it actually looked, naming deficiencies rather than stating positions
+- consultations: open consultations and exposure drafts. These have deadlines, and responses are published under the respondent's name, which makes them the cheapest route from commentator to named participant
+- supervisors: central banks and financial stability bodies, who publish early and carefully
+- procurement: tenders and contract notices, where the specification and often the price are attached. A tender is a commitment; a press release is not
+- conferences: accepted papers and calls, roughly a year ahead of the trade press
+- retractions: the retraction notice itself
+- syscards: a lab's technical appendix, where the evaluations and known failure modes live, which is a different genre from the launch post everyone reads instead
 
 SECONDARY lanes are someone writing about what already happened: news, books, discussion.
 

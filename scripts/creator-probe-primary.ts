@@ -15,8 +15,12 @@ async function main() {
   const hoursBack = Number(process.argv[3] ?? 24 * 90)
 
   const { PRIMARY_ADAPTERS } = await import("../lib/creator/research/primary")
+  const { EXTENDED_ADAPTERS } = await import("../lib/creator/research/primary-extended")
+  const only = process.argv[4]
+  const all = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS }
+  const adapters = only ? { [only]: all[only as keyof typeof all] } : all
 
-  for (const [lane, fn] of Object.entries(PRIMARY_ADAPTERS)) {
+  for (const [lane, fn] of Object.entries(adapters)) {
     const started = Date.now()
     try {
       const items = await fn(topic, hoursBack)

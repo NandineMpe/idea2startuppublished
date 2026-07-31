@@ -1,6 +1,7 @@
 import { fetchRssLikeSource } from "@/lib/careeros/sources/feed-utils"
 import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
-import { PRIMARY_ADAPTERS, type PrimaryLane } from "./primary"
+import { PRIMARY_ADAPTERS } from "./primary"
+import { EXTENDED_ADAPTERS } from "./primary-extended"
 
 /**
  * Where the Researcher looks.
@@ -32,6 +33,15 @@ export type ResearchLane =
   | "standards"
   | "code"
   | "models"
+  | "jobs"
+  | "scholarship"
+  | "inspections"
+  | "consultations"
+  | "supervisors"
+  | "procurement"
+  | "conferences"
+  | "retractions"
+  | "syscards"
 
 /** The lanes that hold documents rather than coverage of documents. */
 export const PRIMARY_LANES: ResearchLane[] = [
@@ -45,6 +55,15 @@ export const PRIMARY_LANES: ResearchLane[] = [
   "standards",
   "code",
   "models",
+  "jobs",
+  "scholarship",
+  "inspections",
+  "consultations",
+  "supervisors",
+  "procurement",
+  "conferences",
+  "retractions",
+  "syscards",
 ]
 
 /** Where a topic sits relative to the creator: proven ground, or the stretch. */
@@ -342,11 +361,13 @@ export async function sweepTopicAcrossLanes(
    * derived queries into them would be eight redundant calls per query for no
    * extra coverage.
    */
-  async function primary(name: PrimaryLane): Promise<LaneSignal[]> {
+  const ALL_PRIMARY = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS }
+
+  async function primary(name: keyof typeof ALL_PRIMARY): Promise<LaneSignal[]> {
     try {
-      const items = await PRIMARY_ADAPTERS[name](topic, hoursBack)
+      const items = await ALL_PRIMARY[name](topic, hoursBack)
       if (!items.length) errors.push(`${name}: 0 items`)
-      return tag(items, name, stance, topic)
+      return tag(items, name as ResearchLane, stance, topic)
     } catch (e) {
       errors.push(`${name}: ${e instanceof Error ? e.message : String(e)}`)
       return []
@@ -360,7 +381,7 @@ export async function sweepTopicAcrossLanes(
     across("books", async (q) => filterByRelevance(await fetchBooks(q), q)),
     across("discussion", (q) => fetchDiscussion(q, hoursBack)),
     Promise.all(
-      (Object.keys(PRIMARY_ADAPTERS) as PrimaryLane[]).map((name) => primary(name)),
+      (Object.keys(ALL_PRIMARY) as Array<keyof typeof ALL_PRIMARY>).map((name) => primary(name)),
     ).then((groups) => groups.flat()),
   ])
 
