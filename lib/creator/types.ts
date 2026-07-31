@@ -211,14 +211,37 @@ export type CreatorWorkItem = {
   decided_at: string | null
 }
 
+/**
+ * The dossier a draft came from, carried through so the queue keeps the
+ * evidence.
+ *
+ * Joined at read time rather than copied onto the draft: lineage is often
+ * derived after the draft was written, and a snapshot would freeze the card at
+ * whatever was known the moment the Writer ran.
+ */
+export type DraftSource = {
+  story_id: string
+  thesis: string
+  why_now: string | null
+  why_you: string | null
+  move: StoryMove
+  receipts: StoryReceipt[]
+  lineage: StoryLineage | null
+  lineage_state: LineageState
+}
+
 /** A drafted piece in the Next Five queue. */
 export type CreatorDraft = CreatorWorkItem & {
   kind: "draft"
   format_id: string | null
   pillar_id: string | null
+  /** What the piece argues, for the creator scanning their own queue. */
+  premise: string | null
   /** The opener, surfaced separately because it is what gets judged first. */
   hook: string | null
   estimated_duration_seconds: number | null
+  /** Null for drafts written from a direct brief rather than an approved story. */
+  source: DraftSource | null
 }
 
 // ---------------------------------------------------------------------------

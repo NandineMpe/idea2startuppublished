@@ -30,7 +30,7 @@ export default async function NextFivePage() {
         <>
           {blocker && <BlockerNotice blocker={blocker} />}
           {drafts.length ? (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 max-w-[820px]">
               {drafts.map((draft) => (
                 <DraftCard key={draft.id} draft={draft} />
               ))}
