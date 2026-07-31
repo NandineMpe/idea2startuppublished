@@ -17,6 +17,37 @@ export function creatorClaudeModel() {
   return createAnthropic({ apiKey: key })(CREATOR_MODEL_NAME)
 }
 
+/**
+ * Recover an object the model buried one level down.
+ *
+ * Tries the parsed JSON as-is first, then any single-key wrapper. Only a lone
+ * key is unwrapped, so this cannot silently pick one branch out of a response
+ * that genuinely had several.
+ */
+function unwrapEnvelope<TSchema extends z.ZodType>(
+  rawText: string,
+  schema: TSchema,
+): z.infer<TSchema> | undefined {
+  if (!rawText.trim().startsWith("{")) return undefined
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(rawText)
+  } catch {
+    return undefined
+  }
+  if (!parsed || typeof parsed !== "object") return undefined
+
+  const direct = schema.safeParse(parsed)
+  if (direct.success) return direct.data
+
+  const keys = Object.keys(parsed as Record<string, unknown>)
+  if (keys.length !== 1) return undefined
+
+  const inner = schema.safeParse((parsed as Record<string, unknown>)[keys[0]])
+  return inner.success ? inner.data : undefined
+}
+
 export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
   schema: TSchema
   system: string
@@ -53,7 +84,13 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
     // Zod issue paths instead — that is the part that identifies the fix.
     const err = e as {
       message?: string
-      cause?: { message?: string; issues?: Array<{ path?: Array<string | number>; message?: string }> }
+      text?: string
+      finishReason?: string
+      cause?: {
+        message?: string
+        text?: string
+        issues?: Array<{ path?: Array<string | number>; message?: string }>
+      }
     }
 
     const issues = err.cause?.issues
@@ -63,6 +100,35 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
         .map((i) => `${(i.path ?? []).join(".") || "(root)"}: ${i.message ?? "invalid"}`)
         .join("; ")
       throw new Error(`Schema mismatch — ${summary}`)
+    }
+
+    const rawText = err.text ?? err.cause?.text ?? ""
+
+    // The model sometimes wraps the whole object in a single-key envelope. The
+    // key is not stable: the same prompt produced {"value": ...} on one attempt
+    // and {"response": ...} on the next, which is why this matches the SHAPE
+    // rather than a list of names. The content inside is complete and valid,
+    // the finish reason is "stop", and it fails only on the wrapper, so losing
+    // an entire generation to it would be pure waste.
+    const recovered = unwrapEnvelope(rawText, args.schema)
+    if (recovered !== undefined) {
+      return {
+        object: stripEmDashesDeep(recovered),
+        // Usage is not carried on the error, and inventing a number would be
+        // worse than reporting none.
+        usage: { totalTokens: 0 },
+      }
+    }
+
+    // No issues means nothing parseable came back at all, which is a different
+    // failure from a field being wrong: the model answered in prose, refused,
+    // or stopped early. The generic message hides which, and they need
+    // different fixes, so the raw beginning of the response goes in the error.
+    const raw = rawText.replace(/\s+/g, " ").trim()
+    if (raw) {
+      throw new Error(
+        `No object generated (finish: ${err.finishReason ?? "unknown"}) — model said: "${raw.slice(0, 400)}"`,
+      )
     }
 
     throw new Error(err.message ?? String(e))

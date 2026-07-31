@@ -175,7 +175,11 @@ PRIMARY SOURCES PUBLISHED SINCE (numbered):
 ${sourceList}
 
 Has this moved?`,
-      maxOutputTokens: 8000,
+      // Generous, because the honest-null answer is the LONG one: explaining
+      // which of forty keyword matches were false positives takes more words
+      // than reporting a development. At 8000 the Moonshot check ran out
+      // mid-object and surfaced as a schema mismatch rather than as truncation.
+      maxOutputTokens: 16000,
     })
 
     const indexes = toLines(object.receipt_indexes)
@@ -214,6 +218,17 @@ Has this moved?`,
       tokens: usage.totalTokens,
     }
   } catch (e) {
+    // Push the next check out even on failure. Leaving next_check_at in the
+    // past means a thread that fails deterministically is picked up first by
+    // every subsequent run and starves the rest of the queue behind it.
+    const retryAt = new Date(Date.now() + 3 * 86400000).toISOString()
+    await supabase
+      .schema("creator")
+      .from("creator_threads")
+      .update({ next_check_at: retryAt, last_checked_at: new Date().toISOString() })
+      .eq("id", thread.id)
+      .eq("user_id", userId)
+
     return { ok: false, error: e instanceof Error ? e.message : "Could not check the thread." }
   }
 }
