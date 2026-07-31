@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { safeRows } from "./query"
+import { NO_TRAJECTORY_BLOCKER } from "./types"
 import type {
   CreatorBlocker,
   CreatorMove,
@@ -10,7 +11,7 @@ import type {
 import type { CreatorWorkItem } from "./types"
 
 const STORY_COLUMNS =
-  "id,state,thesis,synthesis_kind,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state"
+  "id,state,thesis,synthesis_kind,move,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state"
 
 const WORK_COLUMNS =
   "id,kind,state,autonomy,title,body,rationale,provenance,created_at,decided_at"
@@ -27,7 +28,19 @@ export async function researchTopicsBlocker(
   ])
 
   const hasDeclared = Array.isArray(settings?.niche_topics) && settings.niche_topics.length > 0
-  if (hasDeclared || canon) return null
+  if (hasDeclared || canon) {
+    // Having something to search is the hard blocker. Not having said where you
+    // are going is a softer one, but it is the difference between a desk that
+    // deepens your archive and one that moves you, so it is worth saying.
+    const { data: trajectory } = await supabase
+      .schema("creator")
+      .from("creator_trajectory")
+      .select("north_star")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle()
+    return trajectory?.north_star ? null : NO_TRAJECTORY_BLOCKER
+  }
 
   return {
     reason: "no_topics",

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { loadWorth } from "@/lib/creator/load-worth"
 import { loadCreatorPosts } from "@/lib/creator/load-corpus"
+import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 import { engagementRate, type CreatorPost } from "@/lib/creator/types"
 
 /**
@@ -50,7 +51,9 @@ const movesSchema = z.object({
   moves: z.array(moveSchema).describe("4-6 moves, ordered by a blend of upside and how ready this creator is for it."),
 })
 
-const SYSTEM_PROMPT = `You advise a creator on what they should be building that they are not building yet. You are not looking for their next sponsored post — you are looking at an audience and a body of work and asking what is being left on the table.
+const SYSTEM_PROMPT = `You advise a creator on what they should be building that they are not building yet. You are not looking for their next sponsored post — you are looking at an audience, a body of work, and a stated destination, and asking what is being left on the table.
+
+When a trajectory is declared, it is the brief. The numbers tell you what this creator can pull off; the trajectory tells you what it should be aimed at. A move that monetises the current audience well but leaves them in the same position in a year is a weaker answer than one that builds the position, even at lower immediate revenue. Say which of the two a move is.
 
 Think across every register a creator can monetise or compound:
 - owned audience (newsletter, community, mailing list) — worth most when saves and comments are high, because that audience already treats the work as reference
@@ -63,6 +66,8 @@ Think across every register a creator can monetise or compound:
 
 Rules:
 - Every move must be justified with a figure from THIS creator's data. "You have an engaged audience" is not a justification; "31,817 saves across 33 posts means the audience is filing this as reference, which is what a paid brief sells" is.
+- A figure justifies that the creator CAN do a move. It does not justify that they SHOULD. Where a trajectory is declared, why_you must also say what the move builds toward the stated position, and at least half the moves should serve it directly.
+- If the creator is building a company or product that needs a particular audience, treat reaching that audience as an objective in its own right, not a side effect. Moves that put the right people on an owned list are worth more than moves that add reach.
 - Prefer moves the audience composition makes unusually available. A professional audience unlocks advisory and training that a consumer audience does not.
 - Be honest about effort and upside. A range with the assumption stated beats a number. Never promise income.
 - The script must be usable as written — a real subject line and body, not a template with blanks.
@@ -121,9 +126,10 @@ export async function suggestMovesForUser(
     return { ok: false, error: "Derive your canon first — moves are argued from it." }
   }
 
-  const [posts, worthContext, { data: existing }] = await Promise.all([
+  const [posts, worthContext, trajectory, { data: existing }] = await Promise.all([
     loadCreatorPosts(supabase, userId),
     loadWorth(supabase, userId),
+    loadTrajectory(supabase, userId),
     supabase
       .schema("creator")
       .from("creator_work")
@@ -146,7 +152,9 @@ export async function suggestMovesForUser(
     const { object, usage } = await creatorGenerateObject({
       schema: movesSchema,
       system: SYSTEM_PROMPT,
-      prompt: `CANON v${canon.version} (${canon.corpus_size} posts, confidence ${canon.confidence})
+      prompt: `${trajectoryBlock(trajectory)}
+
+CANON v${canon.version} (${canon.corpus_size} posts, confidence ${canon.confidence})
 
 POSITIONING (audience and brand-facing read):
 ${JSON.stringify(canon.positioning ?? "not written yet")}
@@ -165,7 +173,7 @@ ${rateLine}
 ALREADY PROPOSED IN THE LAST 60 DAYS — do not repeat:
 ${already}
 
-What should this creator be building that they are not?`,
+What should this creator be building that they are not, to hold the position they said they are moving toward?`,
       maxOutputTokens: 32000,
     })
 

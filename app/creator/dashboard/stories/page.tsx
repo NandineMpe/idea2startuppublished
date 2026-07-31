@@ -8,7 +8,7 @@ import { Disclosure } from "@/components/creator/disclosure"
 import { StoryActions } from "@/components/creator/story-actions"
 import { SeedStoryPanel } from "@/components/creator/seed-story"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
-import type { CreatorStory, StorySynthesisKind } from "@/lib/creator/types"
+import type { CreatorStory, StoryMove, StorySynthesisKind } from "@/lib/creator/types"
 
 export const dynamic = "force-dynamic"
 
@@ -20,14 +20,44 @@ const KIND_LABELS: Record<StorySynthesisKind, string> = {
   own_content: "Your content",
 }
 
+const MOVE_LABELS: Record<StoryMove, { label: string; hint: string; className: string }> = {
+  consolidate: {
+    label: "Deepens",
+    hint: "Ground you already own. Safe, and it does not move your position.",
+    className: "bg-muted text-muted-foreground",
+  },
+  expand: {
+    label: "Stretches",
+    hint: "Adjacent to what you have worked, still connected to your authority.",
+    className: "bg-sky-500/10 text-sky-700 dark:text-sky-400",
+  },
+  advance: {
+    label: "Advances",
+    hint: "Builds the position you said you are moving toward.",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+}
+
 function StoryCard({ story }: { story: CreatorStory }) {
+  const move = MOVE_LABELS[story.move] ?? MOVE_LABELS.consolidate
+
   return (
     <article className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <span className="inline-block text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-400 mb-2">
-            {KIND_LABELS[story.synthesis_kind]}
-          </span>
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+            <span className="inline-block text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-400">
+              {KIND_LABELS[story.synthesis_kind]}
+            </span>
+            {/* Whether a story moves the creator or just deepens the archive is
+                the thing they most need to see at a glance. */}
+            <span
+              title={move.hint}
+              className={`inline-block text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full ${move.className}`}
+            >
+              {move.label}
+            </span>
+          </div>
           <h3 className="text-[14px] font-semibold text-foreground leading-snug">{story.thesis}</h3>
         </div>
         <div className="flex items-center gap-2 shrink-0">

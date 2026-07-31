@@ -269,6 +269,8 @@ export type CreatorStory = {
   state: StoryState
   thesis: string
   synthesis_kind: StorySynthesisKind
+  /** Whether this deepens owned ground, stretches sideways, or builds the declared position. */
+  move: StoryMove
   receipts: StoryReceipt[]
   why_now: string | null
   why_you: string | null
@@ -347,7 +349,7 @@ export type WorthSummary = {
 
 /** Set when a screen cannot render because an upstream step has not happened yet. */
 export type CreatorBlocker = {
-  reason: "no_corpus" | "no_canon" | "no_metrics" | "insufficient_corpus" | "no_topics"
+  reason: "no_corpus" | "no_canon" | "no_metrics" | "insufficient_corpus" | "no_topics" | "no_trajectory"
   /** What the creator can do about it, in one line. */
   action: string
   href: string | null
@@ -426,6 +428,64 @@ export type CreatorSettingsContext = {
   settings: CreatorSettings
   /** False until the creator schema exists; the form renders read-only rather than lying about saving. */
   persisted: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Trajectory — where the creator is going.
+//
+// The canon describes the corpus. Read alone it makes every agent argue from
+// precedent, which is how a creator ends up being handed the same territory back
+// forever. This is the other pole: declared intent, plus a strategy derived
+// against it. Agents are asked to close the gap between the two.
+// ---------------------------------------------------------------------------
+
+/** What is missing between the position held today and the one declared. */
+export type TrajectoryGap = {
+  gap: string
+  why_it_matters: string
+  /** The concrete thing that closes it. */
+  closes_with: string
+}
+
+export type TrajectoryPhase = {
+  phase: string
+  months: string
+  objective: string
+  plays: string[]
+}
+
+export type CreatorTrajectory = {
+  id: string
+  version: number
+  // Declared. Never rewritten by an agent.
+  north_star: string
+  target_audience: string | null
+  what_it_serves: string | null
+  horizon_months: number
+  positions_to_claim: string[]
+  off_strategy: string[]
+  // Derived.
+  position_now: string | null
+  gaps: TrajectoryGap[]
+  sequence: TrajectoryPhase[]
+  proof_needed: string[]
+  rooms: string[]
+  stop_doing: string[]
+  search_territory: string[]
+  strategy_derived_at: string | null
+}
+
+/** Which pole a story serves: owned ground, the stretch beside it, or the stated destination. */
+export type StoryMove = "consolidate" | "expand" | "advance"
+
+/** Where a signal's topic came from. 'horizon' topics have no corpus behind them by design. */
+export type SignalStance = "core" | "adjacent" | "horizon"
+
+export const NO_TRAJECTORY_BLOCKER: CreatorBlocker = {
+  reason: "no_trajectory",
+  action:
+    "Your agents are working from what you have already published. Say where you are going and they will work toward it instead.",
+  href: "/creator/dashboard/trajectory",
 }
 
 export const EMPTY_CORPUS_SUMMARY: CorpusSummary = {

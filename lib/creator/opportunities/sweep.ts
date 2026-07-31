@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { loadWorth } from "@/lib/creator/load-worth"
+import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 import { CREATOR_MARKETPLACES } from "./marketplaces"
 import { huntApolloCompanies, huntEvents, huntSponsors, type OpportunityCandidate } from "./hunt"
 
@@ -31,11 +32,20 @@ const sweepSchema = z.object({
 
 const SYSTEM_PROMPT = `You are the partnerships desk of a one-person creator's management agency. You turn raw signals about brands, events and platforms into a small number of high-conviction opportunities, each with the pitch already drafted.
 
+An opportunity is worth proposing for one of two reasons, and you should be explicit in why_fit about which:
+  1. It pays well for what the creator already does.
+  2. It puts them in a room that builds the position they are moving toward, even if it pays little or nothing.
+
+The second kind is the one this desk has been under-supplying. Ranking every opportunity by fit with the existing archive means the creator gets offered more of the audience they already have, and the rooms where their target audience actually is never appear. A modest panel in front of the right professionals can be worth more than a paid post to the wrong crowd, and you should say so plainly when it is true.
+
 Rules:
 - Propose only opportunities with a concrete why-fit for THIS creator. Generic "brand X exists" is not an opportunity.
+- When a trajectory is declared, weigh opportunities against the position the creator is building and the audience they need, not only against the topics of their published work. Absence of past precedent is not a disqualification.
+- If an opportunity is prestigious but off-trajectory, say that in why_fit rather than quietly ranking it first.
 - Warm beats cold: a brand already sponsoring creators in this niche outranks a keyword-matched company.
 - Marketplace listings: propose a platform only if the creator plausibly meets its entry bar and it is not in the already-proposed list.
 - Pitches are short (under 150 words), specific, and cite the creator's real numbers when a rate range is provided. Never invent metrics.
+- A pitch for a trajectory-building opportunity should lead with the argument the creator wants to be known for, not with their follower count.
 - Never repeat anything in the already-proposed list.
 - Fewer, stronger opportunities beat volume. Zero is acceptable.`
 
@@ -48,13 +58,24 @@ export type OpportunitySweepResult = {
 export async function sweepOpportunitiesForUser(
   supabase: SupabaseClient,
   userId: string,
-  topics: string[],
+  coreTopics: string[],
+  horizonTopics: string[] = [],
 ): Promise<OpportunitySweepResult> {
-  const [sponsors, events, apollo, worthContext, { data: existing }, { data: canon }] = await Promise.all([
-    huntSponsors(topics),
-    huntEvents(topics),
-    huntApolloCompanies(topics),
+  // Sponsors are hunted on proven ground and events on declared ground, because
+  // the two answer different questions. A brand buys the audience the creator
+  // already has, so pitching it on territory with no published work behind it is
+  // a weak pitch. A stage is the opposite: speaking is how the position gets
+  // built, and the rooms worth being in are the ones the creator is moving
+  // toward rather than the ones their archive already fits.
+  const eventTopics = [...horizonTopics, ...coreTopics]
+  const dealTopics = [...coreTopics, ...horizonTopics]
+
+  const [sponsors, events, apollo, worthContext, trajectory, { data: existing }, { data: canon }] = await Promise.all([
+    huntSponsors(dealTopics),
+    huntEvents(eventTopics),
+    huntApolloCompanies(dealTopics),
     loadWorth(supabase, userId),
+    loadTrajectory(supabase, userId),
     supabase.schema("creator").from("creator_work")
       .select("title")
       .eq("user_id", userId)
@@ -92,14 +113,14 @@ export async function sweepOpportunitiesForUser(
 
   const canonBlock = canon
     ? `CREATOR CANON (v${canon.version}):\nTopics: ${JSON.stringify(canon.topics)}\nPillars: ${JSON.stringify(canon.pillars)}\nVoice: ${JSON.stringify(canon.voice)}`
-    : `CREATOR CANON: not derived yet. Declared topics: ${topics.join(", ")}`
+    : `CREATOR CANON: not derived yet. Declared topics: ${coreTopics.join(", ")}`
 
   const alreadyProposed = (existing ?? []).map((row) => `- ${row.title}`).join("\n") || "- none"
 
   const { object, usage } = await creatorGenerateObject({
     schema: sweepSchema,
     system: SYSTEM_PROMPT,
-    prompt: `CANDIDATES:\n${candidateList}\n\nMARKETPLACES THE CREATOR COULD LIST ON:\n${marketplaceList}\n\n${worthBlock}\n\n${canonBlock}\n\nALREADY PROPOSED (last 30 days — do not repeat):\n${alreadyProposed}\n\nPropose at most ${MAX_OPPORTUNITIES_PER_RUN} opportunities, each with a ready-to-send pitch.`,
+    prompt: `CANDIDATES:\n${candidateList}\n\nMARKETPLACES THE CREATOR COULD LIST ON:\n${marketplaceList}\n\n${worthBlock}\n\n${trajectoryBlock(trajectory)}\n\n${canonBlock}\n\nALREADY PROPOSED (last 30 days — do not repeat):\n${alreadyProposed}\n\nPropose at most ${MAX_OPPORTUNITIES_PER_RUN} opportunities, each with a ready-to-send pitch.`,
     maxOutputTokens: 6000,
   })
 

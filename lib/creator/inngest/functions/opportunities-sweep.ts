@@ -40,11 +40,12 @@ export const creatorOpportunitiesSweep = creatorInngest.createFunction(
     for (const userId of userIds) {
       const result = await step.run(`sweep-${userId}`, async () => {
         const topics = await loadResearchTopics(supabaseAdmin, userId)
-        // Brands buy the audience the creator already has, so deals are hunted
-        // against core topics only — adjacency is an editorial bet, not a
-        // credential to pitch on.
-        if (!topics.core.length) return null
-        return sweepOpportunitiesForUser(supabaseAdmin, userId, topics.core)
+        // Core and horizon, not adjacent. Adjacency is the canon's guess at a
+        // nearby topic and is an editorial bet rather than something to pitch
+        // on; the horizon is the creator's own declared destination, and the
+        // stages that build it are the ones this desk kept failing to find.
+        if (!topics.core.length && !topics.horizon.length) return null
+        return sweepOpportunitiesForUser(supabaseAdmin, userId, topics.core, topics.horizon)
       })
       if (result) results.push({ user_id: userId, candidates: result.candidates, proposed: result.proposed })
     }

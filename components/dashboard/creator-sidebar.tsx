@@ -2,6 +2,7 @@
 
 import type React from "react"
 import {
+  Compass,
   DollarSign,
   Fingerprint,
   FileVideo,
@@ -30,6 +31,9 @@ type NavItem = {
 // Every entry resolves to a real route. Nothing is listed here before it exists.
 const navItems: NavItem[] = [
   { title: "The Desk", href: "/creator/dashboard", icon: Sunrise, exact: true },
+  // Above Canon deliberately: where you are going should be easier to reach
+  // than where you have been.
+  { title: "Trajectory", href: "/creator/dashboard/trajectory", icon: Compass },
   { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper },
   { title: "Opportunities", href: "/creator/dashboard/opportunities", icon: Handshake },
   { title: "Next Five", href: "/creator/dashboard/next", icon: Lightbulb },

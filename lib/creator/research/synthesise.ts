@@ -1,6 +1,7 @@
 import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
+import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 
 /**
  * Synthesis — turn raw signals into story dossiers.
@@ -34,11 +35,14 @@ const LANE_QUOTAS: Record<string, number> = {
   discussion: 10,
 }
 
+/** Reserved for signals from the creator's declared territory, across every lane. */
+const HORIZON_QUOTA = 20
+
 const storySchema = z.object({
   thesis: z.string().describe("The unique claim, one or two sentences. Not a headline restated — a take that requires the cited signals together."),
   synthesis_kind: z.enum(["connection", "contradiction", "second_order", "trend_break", "own_content"]),
-  move: z.enum(["consolidate", "expand"]).describe(
-    "consolidate = deepens ground the creator already owns. expand = moves them into an adjacent topic they have not worked yet.",
+  move: z.enum(["consolidate", "expand", "advance"]).describe(
+    "consolidate = deepens ground the creator already owns. expand = moves them into an adjacent topic. advance = builds the position they said they are moving toward.",
   ),
   signal_indexes: z.array(z.number().int()).describe("Indexes into the numbered signal list that this thesis stands on."),
   receipts: z.array(z.object({
@@ -46,7 +50,11 @@ const storySchema = z.object({
     quote: z.string().describe("The specific fact/number/quote from that signal that supports the thesis."),
   })),
   why_now: z.string().describe("Why this week, not next month."),
-  why_you: z.string().describe("Why THIS creator's audience cares, referencing their pillars/topics where possible."),
+  why_you: z
+    .string()
+    .describe(
+      "Why this is worth THIS creator's time. For a consolidate story, why their audience cares. For expand or advance, what it builds toward the position they are moving to, and what earns them the standing to say it.",
+    ),
   angle: z.string().describe("A suggested opening angle written in the creator's voice."),
   suggested_pillar_id: z.string().nullish(),
 })
@@ -75,9 +83,11 @@ LANE is the register it came from: news (the cycle), papers (preprints and resea
 - The strongest theses join signals from DIFFERENT lanes. A preprint that contradicts a press release, a book-length argument the news cycle forgot, practitioners reporting something the vendor's own release notes deny — these are things the audience could not have assembled alone.
 - Two news items about the same event is the weakest possible connection. Avoid it.
 
-STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch surface they have not worked yet.
-- Set "move" to consolidate when the thesis deepens core ground, expand when it moves them into adjacent territory.
-- An expand story must still connect back to their existing authority — say in "why_you" what earns them the right to this topic. Do not propose a subject they have no standing in.
+STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch beside it; horizon is territory they told you they are moving toward and may have published nothing in yet.
+- Set "move" to consolidate for a thesis that deepens core ground, expand for adjacent territory, advance for one that builds the position in their stated trajectory.
+- An expand or advance story must say in "why_you" what earns them the standing to say it. Standing can come from adjacent expertise, not only from having covered the exact topic before. Do not refuse a horizon story merely because there is no precedent in the canon: the absence of precedent is the reason the creator declared it.
+
+The failure mode you are being corrected for: this desk keeps handing back deeper cuts of ground the creator has already worked to death. A creator with a strong archive on one subject will get proposed that subject forever, because it is what the evidence supports, and they will stay a commentator on it instead of becoming the authority they said they want to be. A thesis that only restates their existing position is low value to them even when it is well built.
 
 Rules:
 - A thesis must REQUIRE at least two of the provided signals together (or one signal connected to the creator's own published work for kind "own_content"). If a candidate idea rests on a single headline, do not propose it.
@@ -85,7 +95,8 @@ Rules:
 - Never repeat or lightly rephrase a thesis from the "recent theses" list.
 - Receipts must be concrete: a number, a quote, a named finding — not "sources say".
 - Write "angle" in the creator's voice profile if one is provided; otherwise plain and direct.
-- Aim for a mix: mostly consolidate, one or two expand. A slate that is all stretch leaves the creator sounding unmoored.
+- When a trajectory is declared, at least half the slate must be advance or expand, and the advance stories should be the ones you argue hardest for. A slate of eight consolidate stories is a failed run even if every thesis is sound.
+- Balance still matters in the other direction: a slate with nothing the creator can speak to from experience leaves them sounding unmoored. Keep one or two consolidate stories that put their existing authority behind the newer ground.
 - Fewer, stronger stories beat more, weaker ones. Zero stories is an acceptable output.`
 
 export type SynthesisResult = {
@@ -115,8 +126,32 @@ export async function synthesiseStoriesForUser(
     return (data ?? []) as SignalRow[]
   })
 
-  const [laneResults, { data: canon }, { data: recentPosts }, { data: recentStories }] = await Promise.all([
+  // Horizon signals get their own guaranteed slice, not just a place in the
+  // lane queues. Territory the creator has no corpus in is thin by definition,
+  // so a per-lane "newest N" would let this week's noisy core news crowd it out
+  // entirely and the sweep's whole point would be lost between retrieval and
+  // the prompt.
+  const horizonQuery = supabase
+    .schema("creator")
+    .from("creator_signals")
+    .select("id,source_key,title,url,published_at,snippet,topics,lane,stance")
+    .eq("user_id", userId)
+    .eq("stance", "horizon")
+    .gte("ingested_at", since)
+    .order("published_at", { ascending: false })
+    .limit(HORIZON_QUOTA)
+
+  const [
+    laneResults,
+    { data: horizonRows },
+    trajectory,
+    { data: canon },
+    { data: recentPosts },
+    { data: recentStories },
+  ] = await Promise.all([
     Promise.all(laneQueries),
+    horizonQuery,
+    loadTrajectory(supabase, userId),
     supabase.schema("creator").from("creator_canon")
       .select("version,pillars,voice,topics")
       .eq("user_id", userId)
@@ -141,12 +176,19 @@ export async function synthesiseStoriesForUser(
   // Interleave lanes so no single register dominates the head of the list —
   // ordering shapes what the model reaches for first.
   const byLane = laneResults.filter((rows) => rows.length > 0)
-  const signalRows: SignalRow[] = []
+  const interleaved: SignalRow[] = []
   for (let i = 0; byLane.some((rows) => i < rows.length); i++) {
     for (const rows of byLane) {
-      if (i < rows.length) signalRows.push(rows[i])
+      if (i < rows.length) interleaved.push(rows[i])
     }
   }
+
+  // Horizon signals lead, for the same reason they get their own quota: they are
+  // the ones the creator cannot already predict, and position in the list is
+  // itself a weighting.
+  const horizon = (horizonRows ?? []) as SignalRow[]
+  const seen = new Set(horizon.map((s) => s.id))
+  const signalRows: SignalRow[] = [...horizon, ...interleaved.filter((s) => !seen.has(s.id))]
 
   if (signalRows.length < 2) {
     return { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: 0 }
@@ -177,8 +219,8 @@ export async function synthesiseStoriesForUser(
   const { object, usage } = await creatorGenerateObject({
     schema: synthesisSchema,
     system: SYSTEM_PROMPT,
-    prompt: `SIGNALS (last ${SIGNAL_WINDOW_HOURS}h, numbered):\n${signalList}\n\n${canonBlock}\n\n${corpusBlock}\n\nRECENT THESES (do not repeat):\n${recentTheses}\n\nProduce at most ${MAX_STORIES_PER_RUN} story dossiers.`,
-    maxOutputTokens: 6000,
+    prompt: `SIGNALS (last ${SIGNAL_WINDOW_HOURS}h, numbered):\n${signalList}\n\n${trajectoryBlock(trajectory)}\n\n${canonBlock}\n\n${corpusBlock}\n\nRECENT THESES (do not repeat):\n${recentTheses}\n\nProduce at most ${MAX_STORIES_PER_RUN} story dossiers.`,
+    maxOutputTokens: 8000,
   })
 
   const result: SynthesisResult = { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: usage.totalTokens }

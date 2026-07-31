@@ -28,14 +28,27 @@ export const creatorResearchSweep = creatorInngest.createFunction(
 
     const userIds = await step.run("resolve-users", async () => {
       if (requestedUserId) return [requestedUserId]
-      const { data, error } = await supabaseAdmin
-        .schema("creator")
-        .from("creator_settings")
-        .select("user_id,niche_topics")
+
+      // Declared niche topics OR a declared trajectory. Either is enough to
+      // have something to search: once the trajectory drives the sweep, a
+      // creator who clears their old niche topics must not silently drop out
+      // of the cron.
+      const [{ data: settings, error }, { data: trajectories }] = await Promise.all([
+        supabaseAdmin.schema("creator").from("creator_settings").select("user_id,niche_topics"),
+        supabaseAdmin.schema("creator").from("creator_trajectory").select("user_id,search_territory"),
+      ])
       if (error) throw error
-      return (data ?? [])
-        .filter((row) => Array.isArray(row.niche_topics) && row.niche_topics.length > 0)
-        .map((row) => row.user_id as string)
+
+      const ids = new Set<string>()
+      for (const row of settings ?? []) {
+        if (Array.isArray(row.niche_topics) && row.niche_topics.length > 0) ids.add(row.user_id as string)
+      }
+      for (const row of trajectories ?? []) {
+        if (Array.isArray(row.search_territory) && row.search_territory.length > 0) {
+          ids.add(row.user_id as string)
+        }
+      }
+      return [...ids]
     })
 
     const summaries: Array<{ user_id: string; upserted: number; errors: string[] }> = []
@@ -45,7 +58,11 @@ export const creatorResearchSweep = creatorInngest.createFunction(
         return loadResearchTopics(supabaseAdmin, userId)
       })
 
+      // Horizon first. If a run is going to be cut short, the territory the
+      // creator is moving toward is the part worth protecting — core topics
+      // already have a corpus behind them and will be back tomorrow.
       const plan = [
+        ...topics.horizon.map((topic) => ({ topic, stance: "horizon" as const })),
         ...topics.core.map((topic) => ({ topic, stance: "core" as const })),
         ...topics.adjacent.map((topic) => ({ topic, stance: "adjacent" as const })),
       ]

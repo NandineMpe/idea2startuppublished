@@ -23,6 +23,10 @@ import { fetchReleases, sweepTopicAcrossLanes, type LaneSignal, type TopicStance
 // Counted in queries, not topics: one canon topic yields up to three.
 const MAX_CORE_TOPICS = 8
 const MAX_ADJACENT_TOPICS = 4
+// Horizon gets a bigger allowance than adjacent on purpose. The creator has no
+// published work in this territory, so there is no corpus weighting to lean on
+// and the sweep has to cover it broadly enough to find anything at all.
+const MAX_HORIZON_TOPICS = 6
 
 export type SweepResult = {
   topics_swept: number
@@ -128,6 +132,7 @@ export async function sweepSignalsForUser(
   const plan: Array<{ topic: string; stance: TopicStance }> = [
     ...topics.core.map((topic) => ({ topic, stance: "core" as const })),
     ...topics.adjacent.map((topic) => ({ topic, stance: "adjacent" as const })),
+    ...topics.horizon.map((topic) => ({ topic, stance: "horizon" as const })),
   ]
 
   for (const { topic, stance } of plan) {
@@ -167,28 +172,49 @@ export async function sweepSignalsForUser(
   return result
 }
 
-export type ResearchTopics = { core: string[]; adjacent: string[] }
+export type ResearchTopics = { core: string[]; adjacent: string[]; horizon: string[] }
 
 /**
  * What to search on.
  *
- * The derived canon wins when it exists: its topics are weighted by what the
- * creator actually publishes, and its `adjacent` lists are the stretch surface
- * the derivation identified. Declared settings topics are the stopgap before
- * a corpus exists, and have no adjacency of their own.
+ * Three registers, and the third is the one that stops this desk circling.
+ *
+ * Core and adjacent both come from the canon, which is derived from what the
+ * creator has already published. Sweeping only those two guarantees that every
+ * morning's research is a function of last year's content, and no amount of
+ * clever synthesis downstream can rescue a corpus of signals that were all
+ * retrieved by querying the past.
+ *
+ * Horizon topics come from the declared trajectory. The creator may have no
+ * published work in that territory at all, which is exactly why it has to enter
+ * here, at retrieval, rather than as a note in a prompt.
  */
 export async function loadResearchTopics(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ResearchTopics> {
-  const { data: canon } = await supabase
-    .schema("creator")
-    .from("creator_canon")
-    .select("topics")
-    .eq("user_id", userId)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const [{ data: canon }, { data: trajectory }] = await Promise.all([
+    supabase
+      .schema("creator")
+      .from("creator_canon")
+      .select("topics")
+      .eq("user_id", userId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .schema("creator")
+      .from("creator_trajectory")
+      .select("search_territory")
+      .eq("user_id", userId)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const horizon = (Array.isArray(trajectory?.search_territory) ? trajectory.search_territory : [])
+    .filter(Boolean)
+    .slice(0, MAX_HORIZON_TOPICS) as string[]
 
   const canonTopics = Array.isArray(canon?.topics)
     ? (canon.topics as Array<{
@@ -223,7 +249,7 @@ export async function loadResearchTopics(
       .filter((label) => label && !core.includes(label))
       .slice(0, MAX_ADJACENT_TOPICS)
 
-    return { core, adjacent }
+    return { core, adjacent, horizon }
   }
 
   const { data: settings } = await supabase
@@ -233,5 +259,5 @@ export async function loadResearchTopics(
     .eq("user_id", userId)
     .maybeSingle()
 
-  return { core: (settings?.niche_topics ?? []).slice(0, MAX_CORE_TOPICS), adjacent: [] }
+  return { core: (settings?.niche_topics ?? []).slice(0, MAX_CORE_TOPICS), adjacent: [], horizon }
 }

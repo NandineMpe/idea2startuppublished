@@ -18,7 +18,7 @@ import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
 export type ResearchLane = "news" | "papers" | "releases" | "books" | "discussion"
 
 /** Where a topic sits relative to the creator: proven ground, or the stretch. */
-export type TopicStance = "core" | "adjacent"
+export type TopicStance = "core" | "adjacent" | "horizon"
 
 export type LaneSignal = RawFeedItem & {
   lane: ResearchLane
