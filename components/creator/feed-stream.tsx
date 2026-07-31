@@ -43,6 +43,20 @@ const FILTERS: Array<{ key: FeedFilter; label: string; hint: string }> = [
   { key: "used", label: "Used", hint: "cited in a story" },
 ]
 
+/** Presets in days back; null means no lower bound. */
+const RANGES: Array<{ key: string; label: string; days: number | null }> = [
+  { key: "any", label: "Any time", days: null },
+  { key: "1", label: "Today", days: 0 },
+  { key: "7", label: "7 days", days: 7 },
+  { key: "30", label: "30 days", days: 30 },
+  { key: "90", label: "90 days", days: 90 },
+  { key: "365", label: "12 months", days: 365 },
+]
+
+function isoDaysAgo(days: number): string {
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+}
+
 function whenLabel(published: string | null, ingested: string): string {
   const iso = published ?? ingested
   const days = Math.round((Date.now() - new Date(iso).getTime()) / 86400000)
@@ -61,6 +75,10 @@ export function FeedStream({
 }) {
   const router = useRouter()
   const [filter, setFilter] = useState<FeedFilter>("all")
+  const [rangeKey, setRangeKey] = useState("any")
+  const [dateField, setDateField] = useState<"published" | "collected">("published")
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
   const [signals, setSignals] = useState(initial)
   const [cursor, setCursor] = useState(initialCursor)
   const [loading, setLoading] = useState(false)
@@ -69,10 +87,23 @@ export function FeedStream({
   const sentinel = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(
-    async (nextFilter: FeedFilter, nextCursor: string | null, replace: boolean) => {
+    async (
+      nextFilter: FeedFilter,
+      nextCursor: string | null,
+      replace: boolean,
+      dates: { key: string; field: string; from: string; to: string },
+    ) => {
       setLoading(true)
       try {
-        const params = new URLSearchParams({ filter: nextFilter })
+        const params = new URLSearchParams({ filter: nextFilter, dates: dates.field })
+        const preset = RANGES.find((r) => r.key === dates.key)
+        // A custom range wins over a preset, and either can be one-sided.
+        if (dates.from || dates.to) {
+          if (dates.from) params.set("from", dates.from)
+          if (dates.to) params.set("to", dates.to)
+        } else if (preset?.days !== null && preset?.days !== undefined) {
+          params.set("from", isoDaysAgo(preset.days))
+        }
         if (nextCursor) params.set("cursor", nextCursor)
         const res = await fetch(`/api/creator/feed?${params}`)
         const data = (await res.json()) as { signals?: FeedSignal[]; cursor?: string | null }
@@ -85,12 +116,31 @@ export function FeedStream({
     [],
   )
 
-  function changeFilter(next: FeedFilter) {
-    if (next === filter) return
-    setFilter(next)
-    setCursor(null)
-    void load(next, null, true)
-  }
+  /** Any control change restarts from the top: a cursor from the old query is meaningless. */
+  const reload = useCallback(
+    (next: {
+      filter?: FeedFilter
+      rangeKey?: string
+      field?: "published" | "collected"
+      from?: string
+      to?: string
+    }) => {
+      const f = next.filter ?? filter
+      const key = next.rangeKey ?? rangeKey
+      const field = next.field ?? dateField
+      const from = next.from ?? customFrom
+      const to = next.to ?? customTo
+
+      setFilter(f)
+      setRangeKey(key)
+      setDateField(field)
+      setCustomFrom(from)
+      setCustomTo(to)
+      setCursor(null)
+      void load(f, null, true, { key, field, from, to })
+    },
+    [filter, rangeKey, dateField, customFrom, customTo, load],
+  )
 
   // Fetch the next page when the sentinel comes into view. Observing an element
   // below the fold rather than listening to scroll means this keeps working
@@ -102,13 +152,20 @@ export function FeedStream({
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void load(filter, cursor, false)
+        if (entries[0]?.isIntersecting) {
+          void load(filter, cursor, false, {
+            key: rangeKey,
+            field: dateField,
+            from: customFrom,
+            to: customTo,
+          })
+        }
       },
       { rootMargin: "600px" },
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [cursor, loading, filter, load])
+  }, [cursor, loading, filter, rangeKey, dateField, customFrom, customTo, load])
 
   async function work(signal: FeedSignal) {
     setWorking(signal.id)
@@ -135,22 +192,84 @@ export function FeedStream({
 
   return (
     <>
-      <div className="flex items-center gap-1.5 flex-wrap mb-4 sticky top-0 z-10 bg-background/95 backdrop-blur py-2 -mx-1 px-1">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => changeFilter(f.key)}
-            title={f.hint}
-            className={cn(
-              "h-7 rounded-full px-3 text-[12px] font-medium transition-colors",
-              filter === f.key
-                ? "bg-violet-600 text-white"
-                : "border border-border text-muted-foreground hover:text-foreground hover:bg-accent",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 -mx-1 px-1 mb-4 grid gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => reload({ filter: f.key })}
+              title={f.hint}
+              className={cn(
+                "h-7 rounded-full px-3 text-[12px] font-medium transition-colors",
+                filter === f.key
+                  ? "bg-violet-600 text-white"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {RANGES.map((r) => (
+            <button
+              key={r.key}
+              onClick={() => reload({ rangeKey: r.key, from: "", to: "" })}
+              className={cn(
+                "h-7 rounded-full px-3 text-[12px] transition-colors",
+                rangeKey === r.key && !customFrom && !customTo
+                  ? "bg-foreground text-background"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:bg-accent",
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+
+          <span className="inline-flex items-center gap-1 ml-1">
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => reload({ from: e.target.value, rangeKey: "any" })}
+              aria-label="From date"
+              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
+            />
+            <span className="text-[12px] text-muted-foreground">to</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => reload({ to: e.target.value, rangeKey: "any" })}
+              aria-label="To date"
+              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
+            />
+          </span>
+
+          {/* Which date the range applies to. A patent published last year and
+              pulled this morning belongs in both answers, but to different
+              questions, so this has to be explicit rather than assumed. */}
+          <span className="inline-flex items-center rounded-md border border-border overflow-hidden ml-1">
+            {(["published", "collected"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => reload({ field: f })}
+                title={
+                  f === "published"
+                    ? "The document's own date"
+                    : "When your Researcher pulled it"
+                }
+                className={cn(
+                  "h-7 px-2.5 text-[12px] transition-colors",
+                  dateField === f
+                    ? "bg-accent text-foreground font-medium"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {f === "published" ? "Published" : "Collected"}
+              </button>
+            ))}
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-3">

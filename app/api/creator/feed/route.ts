@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { loadFeedPage, type FeedFilter } from "@/lib/creator/load-feed"
+import { loadFeedPage, type FeedDateField, type FeedFilter } from "@/lib/creator/load-feed"
 import { expandCreatorSeed } from "@/lib/creator/research/expand"
 
 export const runtime = "nodejs"
@@ -20,10 +20,21 @@ export async function GET(request: Request) {
   const filterRaw = url.searchParams.get("filter")
   const filter = FILTERS.includes(filterRaw as FeedFilter) ? (filterRaw as FeedFilter) : "all"
 
+  // Dates only, never timestamps: anything else is rejected rather than passed
+  // into a query string.
+  const isDate = (v: string | null): v is string => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v))
+  const from = url.searchParams.get("from")
+  const to = url.searchParams.get("to")
+  const field: FeedDateField = url.searchParams.get("dates") === "collected" ? "collected" : "published"
+
   const page = await loadFeedPage(supabase, user.id, {
     filter,
     lane: url.searchParams.get("lane") ?? undefined,
     cursor: url.searchParams.get("cursor"),
+    range:
+      isDate(from) || isDate(to)
+        ? { field, from: isDate(from) ? from : null, to: isDate(to) ? to : null }
+        : undefined,
   })
 
   return NextResponse.json(page)

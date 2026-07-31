@@ -15,6 +15,30 @@ export const FEED_PAGE_SIZE = 30
 
 export type FeedFilter = "all" | "primary" | "considered" | "unseen" | "used"
 
+/**
+ * Which date a range applies to.
+ *
+ * These answer different questions and both get asked. "published" is the
+ * document's own date and is what you want for "everything filed this quarter";
+ * a patent published in 2025 and collected today belongs in 2025. "collected"
+ * is when the desk pulled it, which is the daily review question: what came in
+ * this morning.
+ *
+ * published_at is trustworthy here, which is worth stating because it did not
+ * have to be: adapters fall back to the current time when a source carries no
+ * date, and that would silently pile undated documents into "today". Measured
+ * across the corpus it affects 5 rows in 529, all in the standards and
+ * supervisor lanes.
+ */
+export type FeedDateField = "published" | "collected"
+
+export type FeedDateRange = {
+  field: FeedDateField
+  /** Inclusive ISO date, or null for open-ended. */
+  from: string | null
+  to: string | null
+}
+
 export type FeedSignal = {
   id: string
   title: string
@@ -45,7 +69,12 @@ function encodeCursor(row: { ingested_at: string; id: string }): string {
 export async function loadFeedPage(
   supabase: SupabaseClient,
   userId: string,
-  options: { filter?: FeedFilter; lane?: string; cursor?: string | null } = {},
+  options: {
+    filter?: FeedFilter
+    lane?: string
+    cursor?: string | null
+    range?: FeedDateRange
+  } = {},
 ): Promise<FeedPage> {
   const filter = options.filter ?? "all"
 
@@ -74,6 +103,15 @@ export async function loadFeedPage(
     query = query.is("considered_at", null)
   } else if (filter === "used") {
     query = query.not("used_at", "is", null)
+  }
+
+  const range = options.range
+  if (range?.from || range?.to) {
+    const column = range.field === "collected" ? "ingested_at" : "published_at"
+    if (range.from) query = query.gte(column, `${range.from}T00:00:00.000Z`)
+    // Through the end of the named day, not up to its midnight, so a range
+    // ending today includes what arrived today.
+    if (range.to) query = query.lte(column, `${range.to}T23:59:59.999Z`)
   }
 
   if (options.cursor) {
