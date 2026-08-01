@@ -193,14 +193,14 @@ export function FeedStream({
   return (
     <>
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur py-2 -mx-1 px-1 mb-4 grid gap-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-auto-hide -mx-1 px-1 md:flex-wrap md:overflow-visible md:mx-0 md:px-0">
           {FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => reload({ filter: f.key })}
               title={f.hint}
               className={cn(
-                "h-7 rounded-full px-3 text-[12px] font-medium transition-colors",
+                "h-8 shrink-0 rounded-full px-3 text-[12px] font-medium transition-colors",
                 filter === f.key
                   ? "bg-violet-600 text-white"
                   : "border border-border text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -211,13 +211,13 @@ export function FeedStream({
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-auto-hide -mx-1 px-1 md:flex-wrap md:overflow-visible md:mx-0 md:px-0">
           {RANGES.map((r) => (
             <button
               key={r.key}
               onClick={() => reload({ rangeKey: r.key, from: "", to: "" })}
               className={cn(
-                "h-7 rounded-full px-3 text-[12px] transition-colors",
+                "h-8 shrink-0 rounded-full px-3 text-[12px] transition-colors",
                 rangeKey === r.key && !customFrom && !customTo
                   ? "bg-foreground text-background"
                   : "border border-border text-muted-foreground hover:text-foreground hover:bg-accent",
@@ -227,13 +227,13 @@ export function FeedStream({
             </button>
           ))}
 
-          <span className="inline-flex items-center gap-1 ml-1">
+          <span className="inline-flex items-center gap-1 ml-1 shrink-0">
             <input
               type="date"
               value={customFrom}
               onChange={(e) => reload({ from: e.target.value, rangeKey: "any" })}
               aria-label="From date"
-              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
+              className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
             />
             <span className="text-[12px] text-muted-foreground">to</span>
             <input
@@ -241,14 +241,14 @@ export function FeedStream({
               value={customTo}
               onChange={(e) => reload({ to: e.target.value, rangeKey: "any" })}
               aria-label="To date"
-              className="h-7 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
+              className="h-8 rounded-md border border-border bg-background px-2 text-[12px] text-foreground outline-none focus:border-violet-500/60"
             />
           </span>
 
           {/* Which date the range applies to. A patent published last year and
               pulled this morning belongs in both answers, but to different
               questions, so this has to be explicit rather than assumed. */}
-          <span className="inline-flex items-center rounded-md border border-border overflow-hidden ml-1">
+          <span className="inline-flex items-center rounded-md border border-border overflow-hidden ml-1 shrink-0">
             {(["published", "collected"] as const).map((f) => (
               <button
                 key={f}
@@ -259,7 +259,7 @@ export function FeedStream({
                     : "When your Researcher pulled it"
                 }
                 className={cn(
-                  "h-7 px-2.5 text-[12px] transition-colors",
+                  "h-8 px-2.5 text-[12px] transition-colors",
                   dateField === f
                     ? "bg-accent text-foreground font-medium"
                     : "text-muted-foreground hover:text-foreground",
@@ -321,7 +321,7 @@ export function FeedStream({
               <button
                 onClick={() => work(s)}
                 disabled={working !== null}
-                className="inline-flex items-center gap-1.5 h-7 rounded-md border border-border px-2.5 text-[12px] font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-9 md:h-7 rounded-md border border-border px-3 md:px-2.5 text-[12px] font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
               >
                 {working === s.id ? (
                   <Loader2 className="h-3 w-3 animate-spin" />

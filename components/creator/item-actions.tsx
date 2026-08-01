@@ -45,7 +45,7 @@ export function ItemActions({
         disabled={pending}
         title={archiveHint ?? `Archive — clears this ${noun} but keeps it from being suggested again`}
         aria-label={`Archive ${noun}`}
-        className="text-muted-foreground hover:text-foreground transition-colors p-1 disabled:opacity-40"
+        className="inline-flex items-center justify-center h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
       >
         <Archive className="h-3.5 w-3.5" />
       </button>
@@ -54,7 +54,7 @@ export function ItemActions({
         disabled={pending}
         title={`Delete — recoverable from Recently deleted for ${RECYCLE_BIN_DAYS} days`}
         aria-label={`Delete ${noun}`}
-        className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 disabled:opacity-40"
+        className="inline-flex items-center justify-center h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-40"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>

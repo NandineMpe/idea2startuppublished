@@ -56,8 +56,11 @@ export function CreatorTopNavbar() {
 
   return (
     <header className="sticky top-0 z-40 flex h-[52px] shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-md">
-      <div className="flex items-center gap-3">
-        <button className="flex w-64 items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">
+      <div className="flex items-center gap-3 min-w-0">
+        {/* The workspace name, which on a phone is otherwise only in the
+            hidden sidebar. */}
+        <span className="md:hidden text-[14px] font-semibold text-foreground">Juno</span>
+        <button className="hidden md:flex w-64 items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">
           <Search className="h-3.5 w-3.5" />
           <span>Search content...</span>
           <kbd className="ml-auto flex items-center gap-0.5 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground/60">

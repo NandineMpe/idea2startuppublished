@@ -1,54 +1,18 @@
 "use client"
 
-import type React from "react"
-import {
-  Compass,
-  DollarSign,
-  Fingerprint,
-  FileVideo,
-  Handshake,
-  History,
-  Lightbulb,
-  Newspaper,
-  Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Radio,
-  Sunrise,
-  Layers,
-  TrendingUp,
-} from "lucide-react"
+import { Layers, PanelLeftClose, PanelLeftOpen, Settings, TrendingUp } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { CREATOR_NAV, isNavActive } from "@/lib/creator/nav"
 
-type NavItem = {
-  title: string
-  href: string
-  icon: React.ElementType
-  exact?: boolean
-}
-
-// Every entry resolves to a real route. Nothing is listed here before it exists.
-const navItems: NavItem[] = [
-  { title: "The Desk", href: "/creator/dashboard", icon: Sunrise, exact: true },
-  // Above Canon deliberately: where you are going should be easier to reach
-  // than where you have been.
-  { title: "Trajectory", href: "/creator/dashboard/trajectory", icon: Compass },
-  // Above Stories: the raw documents are the larger and more useful thing, and
-  // the filed stories are a convenience on top of them.
-  { title: "The wire", href: "/creator/dashboard/feed", icon: Radio },
-  { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper },
-  // Next to Stories on purpose: today's signals and the things that never
-  // finished are two halves of the same job.
-  { title: "Open files", href: "/creator/dashboard/threads", icon: History },
-  { title: "Opportunities", href: "/creator/dashboard/opportunities", icon: Handshake },
-  { title: "Next Five", href: "/creator/dashboard/next", icon: Lightbulb },
-  { title: "Worth", href: "/creator/dashboard/worth", icon: DollarSign },
-  { title: "Canon", href: "/creator/dashboard/canon", icon: Fingerprint },
-  { title: "Content", href: "/creator/dashboard/content", icon: FileVideo },
-]
+/**
+ * The list is shared with the phone's bottom bar rather than repeated here.
+ * Two copies drift the first time a screen is added, and the symptom is a
+ * route that exists on a laptop and is unreachable on a phone.
+ */
+const navItems = CREATOR_NAV.filter((item) => item.href !== "/creator/dashboard/settings")
 
 export function CreatorSidebar() {
   const pathname = usePathname() ?? ""
@@ -57,7 +21,9 @@ export function CreatorSidebar() {
   return (
     <aside
       className={cn(
-        "h-full flex flex-col border-r border-border bg-card transition-all duration-200",
+        // Hidden on phones, where CreatorMobileNav takes over: 220px of a
+        // 375px screen is not a navigation bar, it is the screen.
+        "h-full hidden md:flex flex-col border-r border-border bg-card transition-all duration-200",
         expanded ? "w-[220px]" : "w-[52px]",
       )}
     >
@@ -86,9 +52,7 @@ export function CreatorSidebar() {
 
       <nav className={cn("flex-1 overflow-y-auto scrollbar-auto-hide py-2 space-y-px", expanded ? "px-2" : "px-1")}>
         {navItems.map((navItem) => {
-          const isActive = navItem.exact
-            ? pathname === navItem.href
-            : pathname === navItem.href || pathname.startsWith(navItem.href + "/")
+          const isActive = isNavActive(navItem, pathname)
 
           return (
             <Link

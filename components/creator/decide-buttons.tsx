@@ -20,14 +20,14 @@ export function DecideButtons({ workId }: { workId: string }) {
       <button
         onClick={() => decide("approved")}
         disabled={pending}
-        className="h-7 rounded-md bg-violet-600 px-3 text-[12px] font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
+        className="h-9 md:h-7 rounded-md bg-violet-600 px-3 text-[12px] font-medium text-white hover:bg-violet-700 transition-colors disabled:opacity-50"
       >
         Approve
       </button>
       <button
         onClick={() => decide("killed")}
         disabled={pending}
-        className="h-7 rounded-md border border-border px-3 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+        className="h-9 md:h-7 rounded-md border border-border px-3 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
       >
         Kill
       </button>

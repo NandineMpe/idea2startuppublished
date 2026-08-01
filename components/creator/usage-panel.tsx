@@ -45,7 +45,7 @@ export function UsagePanel({ summary }: { summary: UsageSummary }) {
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-[12px] min-w-[520px]">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="text-left font-medium px-4 py-2">Agent</th>

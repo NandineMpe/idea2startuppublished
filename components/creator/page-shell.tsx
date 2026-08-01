@@ -14,18 +14,22 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
+    // Stacked on a phone. Side by side, a two-word title and a "Run
+    // Researcher" button fight for 375px and both lose.
+    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4 mb-5 md:mb-6">
       <div className="min-w-0">
         <h1 className="text-[19px] font-semibold text-foreground tracking-tight">{title}</h1>
         {subtitle && <p className="text-[13px] text-muted-foreground mt-1">{subtitle}</p>}
       </div>
-      {actions && <div className="shrink-0 flex items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="shrink-0 flex items-center gap-2 flex-wrap">{actions}</div>
+      )}
     </div>
   )
 }
 
 export function PageBody({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("px-6 py-6 max-w-[1100px]", className)}>{children}</div>
+  return <div className={cn("px-4 py-5 md:px-6 md:py-6 max-w-[1100px]", className)}>{children}</div>
 }
 
 /**
