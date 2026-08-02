@@ -24,7 +24,6 @@ import { filterByDomainTerms } from "./primary"
  * has read it yet.
  */
 
-const UA = "Juno Creator OS Research (contact: nandini@augentik.com)"
 
 export type FrontierLane = "changelogs" | "ventures" | "grants" | "solicitations"
 
@@ -152,72 +151,31 @@ export async function fetchVentures(topic: string, hoursBack: number): Promise<R
 // Grants — funded research at the moment of award.
 //
 // A grant record carries an abstract, a budget and named participants roughly
-// two years before the paper and four before anything ships. UKRI publishes a
-// real API; CORDIS is read through its project pages.
+// two years before the paper and four before anything ships.
+//
+// CORDIS only. UKRI's Gateway to Research was built here first and then removed:
+// it is a real, reachable, well documented JSON API whose `q` parameter does not
+// rank by relevance. A query for "machine learning healthcare diagnosis"
+// returned mushroom substrate, vessel monitoring and hurricane damage, and of a
+// hundred paginated results only four were inside a year. Keeping it meant
+// either noise or nothing, and both are worse than the honest absence of a
+// second funder.
+//
+// It was verified as reachable rather than as useful, which is the actual
+// lesson. An endpoint answering 200 says nothing about whether its search works.
 // ---------------------------------------------------------------------------
-
-type GtrProject = {
-  id?: string
-  title?: string
-  abstractText?: string
-  grantCategory?: string
-  status?: string
-  fund?: { valuePounds?: number; start?: number; end?: number; funder?: { name?: string } }
-}
-
-async function fetchUkriGrants(topic: string, days: number): Promise<RawFeedItem[]> {
-  const res = await fetch(
-    `https://gtr.ukri.org/api/projects?q=${encodeURIComponent(topic)}&s=25`,
-    { headers: { "User-Agent": UA, Accept: "application/json" }, cache: "no-store" },
-  )
-  if (!res.ok) throw new Error(`gtr HTTP ${res.status}`)
-  const data = (await res.json()) as { projectsBean?: { projects?: GtrProject[] } }
-
-  const since = Date.now() - days * 86400000
-
-  return (data.projectsBean?.projects ?? [])
-    .filter((p) => p.id && p.title)
-    // The API returns by relevance, not date, and its archive reaches back
-    // fifteen years. Without this the lane reports a 2014 proof of concept as
-    // though it were news.
-    .filter((p) => typeof p.fund?.start === "number" && p.fund.start >= since)
-    .sort((a, b) => (b.fund?.start ?? 0) - (a.fund?.start ?? 0))
-    .slice(0, 6)
-    .map((p) => ({
-      source_key: "grants:ukri",
-      source_item_id: `gtr:${p.id}`,
-      title: `UKRI grant: ${(p.title ?? "").replace(/&amp;/g, "&")}`,
-      body: [
-        p.fund?.valuePounds ? `£${p.fund.valuePounds.toLocaleString()} awarded.` : "",
-        p.grantCategory ? `${p.grantCategory}.` : "",
-        p.status ? `Status: ${p.status}.` : "",
-        (p.abstractText ?? "").replace(/\s+/g, " ").slice(0, 800),
-      ]
-        .filter(Boolean)
-        .join(" "),
-      url: `https://gtr.ukri.org/projects?ref=${p.id}`,
-      published_at: p.fund?.start ? new Date(p.fund.start) : new Date(),
-      authors: p.fund?.funder?.name ? [p.fund.funder.name] : [],
-      raw_payload: { funder: "UKRI", value_gbp: p.fund?.valuePounds ?? null },
-    }))
-}
 
 export async function fetchGrants(topic: string, hoursBack: number): Promise<RawFeedItem[]> {
   const days = Math.max(hoursBack / 24, 365)
 
-  const [ukri, eu] = await Promise.all([
-    fetchUkriGrants(topic, days).catch(() => [] as RawFeedItem[]),
-    domainScoped(
-      "grants",
-      "grants:cordis",
-      `${topic} project funded objective`,
-      ["cordis.europa.eu"],
-      days,
-      5,
-    ).catch(() => [] as RawFeedItem[]),
-  ])
-
-  return [...filterByDomainTerms(ukri, topic), ...eu].slice(0, 8)
+  return domainScoped(
+    "grants",
+    "grants:cordis",
+    `${topic} project funded objective`,
+    ["cordis.europa.eu"],
+    days,
+    8,
+  )
 }
 
 // ---------------------------------------------------------------------------
