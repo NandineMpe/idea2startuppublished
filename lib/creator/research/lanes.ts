@@ -2,6 +2,7 @@ import { fetchRssLikeSource } from "@/lib/careeros/sources/feed-utils"
 import type { RawFeedItem } from "@/lib/careeros/sources/feed-types"
 import { PRIMARY_ADAPTERS } from "./primary"
 import { EXTENDED_ADAPTERS } from "./primary-extended"
+import { FRONTIER_ADAPTERS } from "./frontier"
 
 /**
  * Where the Researcher looks.
@@ -42,6 +43,10 @@ export type ResearchLane =
   | "conferences"
   | "retractions"
   | "syscards"
+  | "changelogs"
+  | "ventures"
+  | "grants"
+  | "solicitations"
 
 /** The lanes that hold documents rather than coverage of documents. */
 export const PRIMARY_LANES: ResearchLane[] = [
@@ -64,6 +69,10 @@ export const PRIMARY_LANES: ResearchLane[] = [
   "conferences",
   "retractions",
   "syscards",
+  "changelogs",
+  "ventures",
+  "grants",
+  "solicitations",
 ]
 
 /** Where a topic sits relative to the creator: proven ground, or the stretch. */
@@ -361,7 +370,7 @@ export async function sweepTopicAcrossLanes(
    * derived queries into them would be eight redundant calls per query for no
    * extra coverage.
    */
-  const ALL_PRIMARY = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS }
+  const ALL_PRIMARY = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS, ...FRONTIER_ADAPTERS }
 
   async function primary(name: keyof typeof ALL_PRIMARY): Promise<LaneSignal[]> {
     try {

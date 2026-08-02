@@ -37,6 +37,13 @@ const LANE_QUOTAS: Record<string, number> = {
   standards: 10,
   patents: 8,
   funding: 8,
+  // First signal. Weighted with the strongest primary lanes, not below them:
+  // the point of collecting them is that they arrive before anyone else has
+  // written about the thing.
+  ventures: 10,
+  changelogs: 10,
+  grants: 8,
+  solicitations: 8,
   code: 8,
   models: 6,
   releases: 10,
@@ -114,6 +121,12 @@ PRIMARY lanes hold the document itself:
 - code: what engineers are actually adopting, which happens before a vendor describes it
 - models: what actually shipped, where capability is measurable rather than asserted
 - releases: what labs published themselves, unmediated by coverage
+
+FIRST SIGNAL lanes sit upstream of all of the above, because an institution can only publish about a thing after it exists and someone noticed:
+- changelogs: what a model or platform can do that it could not do last week, written the day it shipped for people who will use it rather than write about it
+- ventures: who put money behind a specific future. A seed round is not an opinion about whether something should exist, it is a decision that it will, with people hired to build it. A funded competitor inside the creator's own profession is a story no institution can tell, because it is not a position, it is a rival
+- grants: funded research at the moment of award, roughly two years before the paper and four before anything ships
+- solicitations: a government describing technology that does not exist yet and attaching money to it, two to four years out
 - jobs: roles being hired. A firm creating a "Head of AI Assurance" has already decided, budgeted and got sign-off, months before it says anything publicly, and the job spec names the actual tools and frameworks
 - scholarship: the accounting, audit, law and finance literature, which is published almost entirely outside the preprint servers
 - inspections: what a regulator found when it actually looked, naming deficiencies rather than stating positions
@@ -132,6 +145,12 @@ This distinction is the point of the desk. The creator is trying to be a primary
 - When you cite a primary document, the receipt should quote the document, not the summary of it. That is what lets the creator say "I read the filing" and be telling the truth.
 - News is best used to date something or to show what the consensus reading is, so that the primary document can be set against it.
 - Two news items about the same event is the weakest possible connection. Avoid it.
+
+EARLINESS IS A SCORE IN ITS OWN RIGHT. The creator's stated position is to be the person who knows first, to the point that the institutions in their field read them to find out what is happening. That is only possible on material the institutions have not processed yet. So:
+- A thing that exists, is documented, and almost nobody has noticed outranks a better-argued thesis about something already covered. Prefer the funded company, the shipped capability, the awarded grant, the open solicitation.
+- Say plainly in "why_now" how far ahead of the coverage the creator would be. "This raised in April and no accounting title has written about it" is a stronger reason to shoot than "this is topical".
+- Do not reach for the institutions as the frame. A professional body publishing a position is downstream of the thing that made the position necessary; find the thing. Where an institution appears at all, the interesting shape is the distance between what has been built and what the institution has noticed.
+- Capability signals are relevant even when the release note never mentions the creator's profession. A model that can now read a hundred page document reliably is an audit story whether or not the changelog says so, and joining those two is exactly the work.
 - The strongest theses join lanes that rarely meet: a preprint that contradicts a press release, a patent that shows a vendor knew, a comment period nobody in the profession has noticed, a repo that proves the capability exists already.
 
 STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch beside it; horizon is territory they told you they are moving toward and may have published nothing in yet.

@@ -16,8 +16,9 @@ async function main() {
 
   const { PRIMARY_ADAPTERS } = await import("../lib/creator/research/primary")
   const { EXTENDED_ADAPTERS } = await import("../lib/creator/research/primary-extended")
+  const { FRONTIER_ADAPTERS } = await import("../lib/creator/research/frontier")
   const only = process.argv[4]
-  const all = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS }
+  const all = { ...PRIMARY_ADAPTERS, ...EXTENDED_ADAPTERS, ...FRONTIER_ADAPTERS }
   const adapters = only ? { [only]: all[only as keyof typeof all] } : all
 
   for (const [lane, fn] of Object.entries(adapters)) {
