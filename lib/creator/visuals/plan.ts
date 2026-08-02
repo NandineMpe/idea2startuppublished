@@ -82,7 +82,9 @@ Rules:
 - asset_type document_capture requires a source_url from the numbered receipts. Never invent a URL, never point a capture at a source that does not carry the claim.
 - Where a lineage is supplied, the recurring-theme beats are the ones to give the newspaper or archival treatment, because that is literally what the material is: the same story surfacing across decades.
 - The motif should be reusable and cheap. A creator who has to invent a new visual language every week stops making videos.
-- Match the shot count to the script. Do not pad to a round number.`
+- Match the shot count to the script. Do not pad to a round number.
+- The four sections want different rhythms. The point is one held frame with the claim on it, because it is the whole video for anyone who leaves. The trigger is the dated document, so it is a capture. The analysis carries the cuts. The loop returns to the point's framing.
+- The loop only works if it looks continuous as well as sounding continuous. Compose the final shot so it rhymes with the first: same framing, same on-screen treatment, the words changed. A viewer watching twice should not see a seam.`
 
 function toLines(value: string): string[] {
   return value
@@ -108,7 +110,7 @@ export async function planVisualsForDraft(
   const { data: draft } = await supabase
     .schema("creator")
     .from("creator_work")
-    .select("id,title,premise,hook,body,provenance,estimated_duration_seconds")
+    .select("id,title,premise,hook,body,script_sections,provenance,estimated_duration_seconds")
     .eq("id", workId)
     .eq("user_id", userId)
     .eq("kind", "draft")
@@ -177,10 +179,26 @@ ${draft.premise ? `Premise: ${draft.premise}` : ""}
 Hook: ${draft.hook ?? "—"}
 Target length: ${draft.estimated_duration_seconds ?? 60} seconds, vertical 9:16
 
-SCRIPT:
+${
+  draft.script_sections
+    ? `SCRIPT, in its four sections:
+
+[POINT — the conclusion, stated first]
+${(draft.script_sections as { point: string }).point}
+
+[TRIGGER — why today]
+${(draft.script_sections as { trigger: string }).trigger}
+
+[ANALYSIS — the evidence]
+${(draft.script_sections as { analysis: string }).analysis}
+
+[LOOP — the close, written to run back into the point]
+${(draft.script_sections as { loop: string }).loop}`
+    : `SCRIPT:
 """
 ${draft.body}
-"""
+"""`
+}
 
 ${receiptBlock}
 

@@ -219,6 +219,17 @@ export type CreatorWorkItem = {
  * derived after the draft was written, and a snapshot would freeze the card at
  * whatever was known the moment the Writer ran.
  */
+/**
+ * The house script structure: conclusion first, then why today, then the
+ * evidence, then a close written to run back into the opening on replay.
+ */
+export type ScriptSections = {
+  point: string
+  trigger: string
+  analysis: string
+  loop: string
+}
+
 /** Mirrors lib/creator/visuals/plan.ts, declared here so the UI contract stays in one file. */
 export type VisualPlanShape = {
   cover_concept: string
@@ -256,6 +267,8 @@ export type CreatorDraft = CreatorWorkItem & {
   pillar_id: string | null
   /** What the piece argues, for the creator scanning their own queue. */
   premise: string | null
+  /** The house structure. Null on drafts written before it existed. */
+  script_sections: ScriptSections | null
   /** Shot list, planned against the receipts. Null until asked for. */
   visual_plan: VisualPlanShape | null
   /** The opener, surfaced separately because it is what gets judged first. */

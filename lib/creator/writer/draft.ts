@@ -15,10 +15,30 @@ const draftSchema = z.object({
   premise: z
     .string()
     .describe(
-      "Two or three sentences saying what this piece argues and why it is worth the creator's time. Written for them reading their own queue cold, not for the audience. Never a restatement of the hook.",
+      "Two or three sentences saying what this piece argues and why it is worth the creator's time. Written for them reading their own queue cold, not for the audience. Never a restatement of the point.",
     ),
-  hook: z.string().describe("The opening line, in the creator's actual opener style. This is what gets judged first."),
-  script: z.string().describe("The full talk-track for a short-form video, written to be spoken. Include beat markers as plain lines like [beat: receipt]."),
+  // Four flat strings rather than an array of section objects: nested shapes in
+  // this schema make the model emit tool-call markup into the JSON.
+  point: z
+    .string()
+    .describe(
+      "THE CONCLUSION, FIRST. One to three spoken sentences stating the finding flat out. No question, no tease, no 'here is why'. The opening sentence is the hook and must be able to stand alone as a claim.",
+    ),
+  trigger: z
+    .string()
+    .describe(
+      "Why this is on screen today. Name the dated thing: the ruling, the filing, the consultation that closes, the report that was withdrawn. One to three sentences.",
+    ),
+  analysis: z
+    .string()
+    .describe(
+      "The unpack. Facts and evidence from the receipts, in the order that builds the argument. The longest section. Written to be spoken, no headings.",
+    ),
+  loop: z
+    .string()
+    .describe(
+      "The close. It restates the point in stronger terms now the evidence is in, and its final words must run straight into the first words of the point, so a replay sounds continuous. Two to four sentences.",
+    ),
   format_id: z.string().nullish().describe("The id of the derived format used, or null when none fits."),
   estimated_duration_seconds: z.number().int().min(10).max(600),
   title: z.string().describe("Working title for the queue."),
@@ -26,15 +46,56 @@ const draftSchema = z.object({
 
 const SYSTEM_PROMPT = `You are the staff writer of a one-person creator's management agency. You draft short-form video scripts in the creator's own voice — the exemplar posts are the ground truth of how they open, pace and phrase; the voice profile is your style guide; never_says is a hard blocklist.
 
+THE HOUSE STRUCTURE. Every script has four sections in this order, and it is not optional:
+
+1. POINT. The conclusion, stated first and stated flat. Not a question, not "here is what nobody is telling you", not a promise that the answer is coming. Give the finding away in the first four seconds. A viewer who leaves immediately should still have learned the thing; the ones who stay are staying for the reasoning, and that is a far better audience than one held by suspense.
+
+2. TRIGGER. Why this is on screen today rather than any other day. Name the dated event: the ruling, the filing, the comment period closing, the report withdrawn. Without this the piece is an essay and it will feel like one.
+
+3. ANALYSIS. The unpack. Facts and evidence in the order that builds the argument, drawn from the receipts. This is the longest section and it is where the creator earns the claim they already made.
+
+4. LOOP. The close. Restate the point, harder now the evidence is in, and land the final words so they run straight into the opening line. When the video replays, it should sound like one continuous sentence rather than a video ending and a video starting. That is the whole device: write the last line and the first line as a joined pair, and check they actually join.
+
+The loop is the part most writers get wrong. It is not a summary and it is not a call to action. It is the same claim arriving with weight, positioned so the seam is invisible.
+
 Rules:
 - Sound like the exemplars, not like a copywriter. If the exemplars are casual and clipped, the script is casual and clipped.
-- Build on the assigned format's structure when one is given.
+- The house structure wins over any format structure in the canon. A derived format tells you the creator's phrasing and pacing within a section; it does not reorder the four.
+- Never open the point with a throat-clear. No "let's talk about", no "so", no "here is something interesting". The first words are the claim.
 - Facts and numbers must come from the brief's receipts. Invent nothing.
 - Write for speech: short sentences, no headings, no hashtags in the talk-track.
 - Where the brief carries a lineage, use it. A piece that says what this is the latest instance of, rather than treating it as new, is the difference between reporting a thing and explaining it. Name the earlier moment in the script where it earns its place; do not tack a history lesson on the end.
 - The premise is for the creator, not the audience. They are scanning a queue of five and deciding what to shoot, so tell them what the piece argues and what makes it worth doing. Do not sell it to them.`
 
 export type WriterResult = { work_id: string; tokens: number }
+
+/**
+ * The hook is the first sentence of the point, taken rather than written.
+ *
+ * It used to be its own generated field alongside a separate script, and
+ * nothing tied them together: the card showed one opener while the talk track
+ * began with another. Deriving it means what the creator reads on the card is
+ * literally the first thing they will say.
+ */
+function openingLine(point: string): string {
+  const first = point.trim().split(/(?<=[.!?])\s+/)[0] ?? point.trim()
+  // A single unbroken sentence that runs long is still the opener; truncating
+  // it would invent a line that appears nowhere in the script.
+  return first.trim()
+}
+
+/** The spoken talk track. Blank lines between sections, no labels: this is read aloud. */
+function assembleScript(parts: {
+  point: string
+  trigger: string
+  analysis: string
+  loop: string
+}): string {
+  return [parts.point, parts.trigger, parts.analysis, parts.loop]
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join("\n\n")
+}
 
 export async function draftForUser(
   supabase: SupabaseClient,
@@ -125,7 +186,13 @@ export async function draftForUser(
       state: "proposed",
       autonomy: "approve",
       title: object.title,
-      body: object.script,
+      body: assembleScript(object),
+      script_sections: {
+        point: object.point.trim(),
+        trigger: object.trigger.trim(),
+        analysis: object.analysis.trim(),
+        loop: object.loop.trim(),
+      },
       premise: object.premise,
       rationale: story ? `Commissioned from approved story: ${story.thesis}` : "Commissioned from a direct brief.",
       provenance: {
@@ -138,7 +205,7 @@ export async function draftForUser(
       },
       format_id: object.format_id,
       pillar_id: story?.suggested_pillar_id ?? null,
-      hook: object.hook,
+      hook: openingLine(object.point),
       estimated_duration_seconds: object.estimated_duration_seconds,
     })
     .select("id")

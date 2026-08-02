@@ -17,6 +17,22 @@ function formatDuration(seconds: number | null): string | null {
   return `${seconds}s`
 }
 
+const SCRIPT_PARTS = [
+  { key: "point", label: "Point", note: "the conclusion, first" },
+  { key: "trigger", label: "Trigger", note: "why today" },
+  { key: "analysis", label: "Analysis", note: "the evidence" },
+  { key: "loop", label: "Loop", note: "back to the point" },
+] as const
+
+/** The last few words, for showing where the loop rejoins the opening. */
+function tail(text: string, words = 9): string {
+  return text.trim().split(/\s+/).slice(-words).join(" ")
+}
+
+function head(text: string, words = 9): string {
+  return text.trim().split(/\s+/).slice(0, words).join(" ")
+}
+
 /**
  * One drafted piece in the Next Five queue.
  *
@@ -96,13 +112,50 @@ export function DraftCard({ draft }: { draft: CreatorDraft }) {
       )}
 
       <div className="px-4 py-2.5 grid gap-1">
-        {draft.body && (
+        {draft.script_sections ? (
+          <Disclosure label="The script">
+            <div className="grid gap-3">
+              {SCRIPT_PARTS.map(({ key, label, note }) => {
+                const text = draft.script_sections![key]
+                if (!text) return null
+                return (
+                  <div key={key} className="border-l-2 border-violet-500/30 pl-3">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {label}
+                      <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+                        {note}
+                      </span>
+                    </p>
+                    <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap mt-1">
+                      {text}
+                    </p>
+                  </div>
+                )
+              })}
+
+              {/* The seam is the point of the structure, so it is shown joined
+                  rather than left for the creator to imagine. */}
+              <div className="rounded-lg border border-dashed border-border px-3 py-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                  On replay it reads
+                </p>
+                <p className="text-[12px] text-foreground/80 leading-relaxed">
+                  …{tail(draft.script_sections.loop)}{" "}
+                  <span className="text-violet-600 dark:text-violet-400">
+                    {head(draft.script_sections.point)}
+                  </span>
+                  …
+                </p>
+              </div>
+            </div>
+          </Disclosure>
+        ) : draft.body ? (
           <Disclosure label="The script">
             <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
               {draft.body}
             </p>
           </Disclosure>
-        )}
+        ) : null}
 
         {source?.receipts?.length ? (
           <Disclosure label="Receipts" count={source.receipts.length}>

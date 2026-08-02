@@ -204,8 +204,12 @@ export async function creatorGenerateObject<TSchema extends z.ZodType>(args: {
     // different fixes, so the raw beginning of the response goes in the error.
     const raw = rawText.replace(/\s+/g, " ").trim()
     if (raw) {
+      // Length and finish reason together separate the two causes that need
+      // different fixes: a complete-but-malformed object, versus one that ran
+      // out of budget mid-write. The message used to show neither, so a failure
+      // could only be guessed at.
       throw new Error(
-        `No object generated (finish: ${err.finishReason ?? "unknown"}) — model said: "${raw.slice(0, 400)}"`,
+        `No object generated (finish: ${err.finishReason ?? "unknown"}, ${raw.length} chars, cap ${args.maxOutputTokens ?? 16000}) — model said: "${raw.slice(0, 400)}"`,
       )
     }
 

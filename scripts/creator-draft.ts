@@ -64,6 +64,26 @@ async function main() {
   console.log("title:   ", draft.title)
   console.log("premise: ", draft.premise ?? "(none)")
   console.log("hook:    ", draft.hook ?? "(none)")
+
+  const sections = draft.script_sections
+  if (!sections) {
+    console.log("\nSECTIONS: NONE — the house structure did not survive")
+  } else {
+    for (const k of ["point", "trigger", "analysis", "loop"] as const) {
+      console.log(`\n--- ${k.toUpperCase()} ---`)
+      console.log(sections[k])
+    }
+
+    // The seam is the only part of the structure that can be checked by
+    // reading it: the loop either runs into the opening or it does not.
+    const seamOut = sections.loop.trim().split(/\s+/).slice(-14).join(" ")
+    const seamIn = sections.point.trim().split(/\s+/).slice(0, 14).join(" ")
+    console.log("\n=== THE SEAM (end of loop -> start of point) ===")
+    console.log(`...${seamOut}  ||  ${seamIn}...`)
+
+    const hookIsOpening = Boolean(draft.hook && sections.point.trim().startsWith(draft.hook.trim()))
+    console.log(`\nhook is the literal opening line: ${hookIsOpening ? "YES" : "NO"}`)
+  }
   console.log("\n=== CARRIED THROUGH ===")
   if (!draft.source) {
     console.log("source:   NONE — the link back to the story was lost")
