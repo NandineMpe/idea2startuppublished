@@ -24,6 +24,37 @@ const opportunitySchema = z.object({
   pitch: z.string().describe("The outreach message, ready to send, in the creator's voice. Include the rate range only when one was provided."),
   evidence_urls: z.array(z.string()).describe("URLs backing this opportunity, from the candidate list."),
   candidate_lane: z.enum(["sponsors", "events", "apollo", "marketplace"]),
+
+  // Flat, not a nested object: a bare nested object in this schema makes the
+  // model emit tool-call markup into the JSON and abandon the rest.
+  organisation: z
+    .string()
+    .describe("The organisation to approach, named exactly as it calls itself. Not a description, a name."),
+  contact_role: z
+    .string()
+    .describe(
+      "The desk or role to reach: 'commissioning editor', 'head of creator partnerships', 'programme committee'. Always answerable even when no individual is named.",
+    ),
+  contact_name: z
+    .string()
+    .describe(
+      "An individual's name ONLY if it appears in the supplied sources. Empty string otherwise. Never guess, never infer from a company's size or sector.",
+    ),
+  contact_route: z
+    .string()
+    .describe(
+      "The URL to go through: a contact page, submissions page, speaker form, or the listing itself. Must come from the numbered candidates. Empty string if none was supplied.",
+    ),
+  next_action: z
+    .string()
+    .describe(
+      "The single thing to do first, today, in one sentence starting with a verb. 'Email the pitch below to the editorial address on their contact page' beats 'reach out'.",
+    ),
+  contact_confidence: z
+    .enum(["named", "role_only", "unknown"])
+    .describe(
+      "named = an individual is named in the sources. role_only = the right desk is known but no individual. unknown = you cannot tell who handles this from what you were given.",
+    ),
 })
 
 const sweepSchema = z.object({
@@ -38,8 +69,14 @@ An opportunity is worth proposing for one of two reasons, and you should be expl
 
 The second kind is the one this desk has been under-supplying. Ranking every opportunity by fit with the existing archive means the creator gets offered more of the audience they already have, and the rooms where their target audience actually is never appear. A modest panel in front of the right professionals can be worth more than a paid post to the wrong crowd, and you should say so plainly when it is true.
 
+EVERY OPPORTUNITY MUST BE ACTIONABLE. A drafted pitch with nobody to send it to is not an opportunity, it is an observation, and it leaves the creator doing the part an agency exists to have already done. Before proposing anything, answer: who is the organisation, which desk handles this, how do you reach them, and what is the single first thing to do today.
+
+The one thing you must never do is invent a contact. A plausible name at a real company is worse than no name: it wastes the pitch and burns the introduction, and it is the outreach version of a fabricated citation. If no individual is named in the sources, give the role and set contact_confidence to role_only. If you cannot even tell which desk handles it, say unknown and make next_action the specific thing to look up.
+
 Rules:
 - Propose only opportunities with a concrete why-fit for THIS creator. Generic "brand X exists" is not an opportunity.
+- contact_route must be a URL from the numbered candidates. Do not construct one from a company name, and do not guess at an email address ever.
+- next_action starts with a verb and is doable today. "Submit through the speaker form, deadline 12 September" is an action; "consider reaching out" is not.
 - When a trajectory is declared, weigh opportunities against the position the creator is building and the audience they need, not only against the topics of their published work. Absence of past precedent is not a disqualification.
 - If an opportunity is prestigious but off-trajectory, say that in why_fit rather than quietly ranking it first.
 - Warm beats cold: a brand already sponsoring creators in this niche outranks a keyword-matched company.
@@ -132,8 +169,31 @@ export async function sweepOpportunitiesForUser(
     maxOutputTokens: 6000,
   })
 
+  // Every URL the model was actually shown. A contact route outside this set was
+  // constructed rather than found, and sending a pitch into a made-up address is
+  // the outreach version of citing a paper that does not exist.
+  const offeredUrls = new Set(
+    [...candidates.map((c) => c.url), ...CREATOR_MARKETPLACES.map((m) => m.url)].filter(
+      (u): u is string => Boolean(u),
+    ),
+  )
+
   let proposed = 0
   for (const opp of object.opportunities) {
+    const route = offeredUrls.has(opp.contact_route) ? opp.contact_route : ""
+    // A name the model produced without a route to corroborate it is the exact
+    // shape of an invented contact, so it is demoted rather than shown.
+    const named = Boolean(opp.contact_name.trim()) && opp.contact_confidence === "named" && Boolean(route)
+
+    const counterparty = {
+      organisation: opp.organisation.trim(),
+      contact_role: opp.contact_role.trim(),
+      contact_name: named ? opp.contact_name.trim() : "",
+      contact_route: route,
+      next_action: opp.next_action.trim(),
+      confidence: named ? "named" : opp.contact_role.trim() ? "role_only" : "unknown",
+    }
+
     const { error } = await supabase
       .schema("creator")
       .from("creator_work")
@@ -145,6 +205,7 @@ export async function sweepOpportunitiesForUser(
         title: opp.title,
         body: opp.pitch,
         rationale: opp.why_fit,
+        counterparty,
         provenance: {
           agent: "opportunities",
           canon_version: canon?.version ?? 0,

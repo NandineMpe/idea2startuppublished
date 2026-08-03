@@ -14,7 +14,7 @@ const STORY_COLUMNS =
   "id,state,thesis,synthesis_kind,move,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state"
 
 const WORK_COLUMNS =
-  "id,kind,state,autonomy,title,body,rationale,provenance,created_at,decided_at"
+  "id,kind,state,autonomy,title,body,rationale,counterparty,provenance,created_at,decided_at"
 
 /** Blocker shared by both agent screens: without topics, nothing hunts. */
 export async function researchTopicsBlocker(

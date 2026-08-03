@@ -1,5 +1,5 @@
 import type React from "react"
-import { CheckCircle2, Handshake, Inbox, Mic2 } from "lucide-react"
+import { CheckCircle2, ExternalLink, Handshake, Inbox, Mic2, Send } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadOpportunities } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
@@ -52,6 +52,53 @@ function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDe
           />
         </div>
       </div>
+
+      {/* Above the pitch, not inside it. The pitch is the easy half; knowing
+          who it goes to is the half that was missing, and burying it under a
+          disclosure is how the card stayed unactionable. */}
+      {item.counterparty && (
+        <div className="mt-3 rounded-lg border border-violet-500/30 bg-violet-500/[0.05] px-4 py-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Send className="h-3.5 w-3.5 text-violet-700 dark:text-violet-400" />
+            <p className="text-[11px] font-medium uppercase tracking-wide text-violet-700 dark:text-violet-400">
+              Who to contact
+            </p>
+            {item.counterparty.confidence !== "named" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                {item.counterparty.confidence === "role_only" ? "no name published" : "desk unknown"}
+              </span>
+            )}
+          </div>
+
+          <p className="text-[13px] text-foreground leading-snug">
+            <span className="font-medium">{item.counterparty.organisation}</span>
+            {item.counterparty.contact_role && (
+              <span className="text-muted-foreground"> · {item.counterparty.contact_role}</span>
+            )}
+          </p>
+          {item.counterparty.contact_name && (
+            <p className="text-[13px] text-foreground mt-0.5">{item.counterparty.contact_name}</p>
+          )}
+
+          {item.counterparty.next_action && (
+            <p className="text-[12px] text-foreground/85 mt-2 leading-relaxed">
+              <span className="font-medium">Do this first:</span> {item.counterparty.next_action}
+            </p>
+          )}
+
+          {item.counterparty.contact_route && (
+            <a
+              href={item.counterparty.contact_route}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] text-violet-600 dark:text-violet-400 hover:underline break-all mt-1.5"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              {item.counterparty.contact_route.replace(/^https?:\/\/(www\.)?/, "").slice(0, 70)}
+            </a>
+          )}
+        </div>
+      )}
 
       {(item.body || evidence.length > 0) && (
         <div className="mt-3">

@@ -197,6 +197,25 @@ export type WorkProvenance = {
   source_post_ids: string[]
 }
 
+/**
+ * Who to approach, and the first thing to do.
+ *
+ * `confidence` is carried rather than implied because the failure it guards is
+ * specific: a plausible invented name at a real organisation wastes the pitch
+ * and burns the introduction, where an honest "the commissioning editor, name
+ * not published" costs one search.
+ */
+export type Counterparty = {
+  organisation: string
+  contact_role: string
+  /** Empty unless an individual was named in a source that was actually supplied. */
+  contact_name: string
+  /** A URL the agent was shown, never one it constructed. */
+  contact_route: string
+  next_action: string
+  confidence: "named" | "role_only" | "unknown"
+}
+
 export type CreatorWorkItem = {
   id: string
   kind: WorkKind
@@ -207,6 +226,8 @@ export type CreatorWorkItem = {
   /** Why this was produced, in the creator's terms. Shown on the card. */
   rationale: string | null
   provenance: WorkProvenance
+  /** Null on drafts, moves, and opportunities proposed before this existed. */
+  counterparty: Counterparty | null
   created_at: string
   decided_at: string | null
 }
