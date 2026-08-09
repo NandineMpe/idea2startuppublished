@@ -57,8 +57,38 @@ function StoryCard({ story }: { story: CreatorStory }) {
             >
               {move.label}
             </span>
+            {/* Format before emotion: a story tagged 'written' will never be
+                drafted as a script, and finding that out at the shoot is the
+                error this badge exists to prevent. */}
+            {story.output_format !== "script" && (
+              <span
+                title={
+                  story.output_format === "written"
+                    ? "This is a byline, not a video. Approving it will not commission a script."
+                    : "This is a thing to build, not a thing to say. Approving it will not commission a script."
+                }
+                className="inline-block text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-700 dark:text-orange-400"
+              >
+                {story.output_format === "written" ? "Write it" : "Build it"}
+              </span>
+            )}
+            {story.primary_emotion && story.primary_emotion !== "knowledge" && (
+              <span
+                title="The primary emotion this piece is built to land. Knowledge is the home lane; anything else is seasoning."
+                className="inline-block text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+              >
+                {story.primary_emotion}
+              </span>
+            )}
           </div>
-          <h3 className="text-[14px] font-semibold text-foreground leading-snug">{story.thesis}</h3>
+          {/* The hook leads. It is the one line that can be judged in a second,
+              and the thesis is what gets read once the hook has earned it. */}
+          <h3 className="text-[14px] font-semibold text-foreground leading-snug">
+            {story.hook_line || story.thesis}
+          </h3>
+          {story.hook_line && (
+            <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{story.thesis}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {story.work_item_id && <DecideButtons workId={story.work_item_id} />}
@@ -72,18 +102,58 @@ function StoryCard({ story }: { story: CreatorStory }) {
         </p>
       )}
 
+      {/* Stakes sit above why-now and in their own box. It is the boredom gate,
+          the thing the writer builds the emotion from, and the field most
+          likely to be skimmed past if it is set as another grey line. */}
+      {story.stakes && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-1">
+            Stakes
+          </p>
+          <p className="text-[12.5px] text-foreground/90 leading-relaxed">{story.stakes}</p>
+        </div>
+      )}
+
       <div className="mt-3 grid gap-1.5">
         {story.why_now && (
           <p className="text-[12px] text-muted-foreground">
             <span className="font-medium text-foreground/80">Why now:</span> {story.why_now}
           </p>
         )}
-        {story.why_you && (
+        {story.named_actor && (
           <p className="text-[12px] text-muted-foreground">
-            <span className="font-medium text-foreground/80">Why you:</span> {story.why_you}
+            <span className="font-medium text-foreground/80">Who acted:</span> {story.named_actor}
+          </p>
+        )}
+        {story.open_question && (
+          <p className="text-[12px] text-muted-foreground">
+            <span className="font-medium text-foreground/80">Still open:</span> {story.open_question}
           </p>
         )}
       </div>
+
+      {/* What replaced why-you. Both are things a good editor says out loud, and
+          neither is an argument for the story, which is the point: the desk had
+          been justifying its own output rather than handing over its doubts. */}
+      {(story.unknowns || story.kill_reason) && (
+        <div className="mt-3">
+          <Disclosure label="What the desk does not know, and the case against">
+            <div className="grid gap-2">
+              {story.unknowns && (
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Not known yet:</span> {story.unknowns}
+                </p>
+              )}
+              {story.kill_reason && (
+                <p className="text-[12px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium text-foreground/80">Strongest reason to kill:</span>{" "}
+                  {story.kill_reason}
+                </p>
+              )}
+            </div>
+          </Disclosure>
+        </div>
+      )}
 
       <StoryLineagePanel storyId={story.id} lineage={story.lineage} state={story.lineage_state} />
 

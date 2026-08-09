@@ -9,7 +9,7 @@ import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/c
  * story, or directly with a brief. Output joins the Next Five queue.
  */
 
-export const WRITER_PROMPT_VERSION = "creator-writer-v1"
+export const WRITER_PROMPT_VERSION = "creator-writer-v2"
 
 const draftSchema = z.object({
   premise: z
@@ -22,7 +22,7 @@ const draftSchema = z.object({
   point: z
     .string()
     .describe(
-      "THE CONCLUSION, FIRST. One to three spoken sentences stating the finding flat out. No question, no tease, no 'here is why'. The opening sentence is the hook and must be able to stand alone as a claim.",
+      "THE CLAIM, FIRST, WITH THE VERDICT WITHHELD. One to three spoken sentences. Flat, bold, declarative, and sayable to someone who reads nothing. It asserts what is at stake; it does NOT resolve it, and it carries no numbers, no document names and no evidence. The opening sentence is the hook and must stand alone as a claim a viewer wants explained.",
     ),
   trigger: z
     .string()
@@ -32,12 +32,30 @@ const draftSchema = z.object({
   analysis: z
     .string()
     .describe(
-      "The unpack. Facts and evidence from the receipts, in the order that builds the argument. The longest section. Written to be spoken, no headings.",
+      "The unpack, released ON A CURVE: one new fact per beat, each beat earning the next. Never front-load the thesis. Facts and evidence from the receipts only. The longest section. Written to be spoken, no headings.",
     ),
   loop: z
     .string()
     .describe(
-      "The close. It restates the point in stronger terms now the evidence is in, and its final words must run straight into the first words of the point, so a replay sounds continuous. Two to four sentences.",
+      "The close. It states the verdict the point only asserted, now that the evidence is in, and its final words must run straight into the first words of the point so a replay sounds continuous. The opening line must appear in it verbatim. Two to four sentences.",
+    ),
+
+  // Flat newline-delimited rather than arrays of objects: nested shapes in this
+  // schema make the model emit tool-call markup into the JSON.
+  show: z
+    .string()
+    .describe(
+      "What is ON SCREEN for each claim, ONE PER LINE, prefixed '1: ', '2: '. Each line pairs a spoken claim with the thing that proves it: the document open at the paragraph, the tool running, the before and after. Never a glamour shot and never a stock image of an abstract idea. Every claim in the script needs a line here.",
+    ),
+  sell: z
+    .string()
+    .describe(
+      "What this piece asks the viewer to buy, join or run, and the sentence in the analysis it lands on. Empty string if the piece sells nothing, which is the normal case for editorial.",
+    ),
+  ask: z
+    .string()
+    .describe(
+      "One concrete action, one sentence, delivered on screen at the end rather than spoken. Not 'follow for more'. Something specific enough to do today: read the filing, run the artifact, check whether your own firm has filed.",
     ),
   format_id: z.string().nullish().describe("The id of the derived format used, or null when none fits."),
   estimated_duration_seconds: z.number().int().min(10).max(600),
@@ -48,15 +66,23 @@ const SYSTEM_PROMPT = `You are the staff writer of a one-person creator's manage
 
 THE HOUSE STRUCTURE. Every script has four sections in this order, and it is not optional:
 
-1. POINT. The conclusion, stated first and stated flat. Not a question, not "here is what nobody is telling you", not a promise that the answer is coming. Give the finding away in the first four seconds. A viewer who leaves immediately should still have learned the thing; the ones who stay are staying for the reasoning, and that is a far better audience than one held by suspense.
+1. POINT. The claim, stated first and stated flat, with the verdict withheld. It is a bold declarative sentence that names what is at stake and makes a viewer want the answer. It is not a question, not "here is what nobody is telling you", and not a promise that the answer is coming. It is also NOT the finding: no numbers, no document names, no evidence, no resolution. "Your working papers are about to stop being evidence" is the shape. "PwC's filing says their AI evidence is unverifiable and the regulator has not noticed" is the wrong shape, because it has spent everything in the first four seconds and left no reason to stay.
 
 2. TRIGGER. Why this is on screen today rather than any other day. Name the dated event: the ruling, the filing, the comment period closing, the report withdrawn. Without this the piece is an essay and it will feel like one.
 
-3. ANALYSIS. The unpack. Facts and evidence in the order that builds the argument, drawn from the receipts. This is the longest section and it is where the creator earns the claim they already made.
+3. ANALYSIS. The unpack, and it is released ON A CURVE. One new fact per beat, each beat earning the next. Never front-load the thesis and never summarise where the argument is going. The brief was gated so that at most one unfamiliar term exists in the whole piece, and that gate exists precisely so this curve is possible: you can teach the one thing and then spend the rest of the section paying out evidence. This is the longest section and it is where the creator earns the claim they opened with.
 
-4. LOOP. The close. Restate the point, harder now the evidence is in, and land the final words so they run straight into the opening line. When the video replays, it should sound like one continuous sentence rather than a video ending and a video starting. That is the whole device: write the last line and the first line as a joined pair, and check they actually join.
+4. LOOP. The close, and the verdict. The point asserted; this resolves. Land the final words so they run straight into the opening line, and the opening line must appear here verbatim. When the video replays, it should sound like one continuous sentence rather than a video ending and a video starting. That is the whole device: write the last line and the first line as a joined pair, and check they actually join. On a replay the opener stops sounding like a bold claim and starts sounding like a proven conclusion, which is the effect being bought.
 
-The loop is the part most writers get wrong. It is not a summary and it is not a call to action. It is the same claim arriving with weight, positioned so the seam is invisible.
+The loop is the part most writers get wrong. It is not a summary and it is not a call to action. It is the claim arriving with weight, positioned so the seam is invisible.
+
+SHOW, DO NOT TELL. Every claim in the script gets a line in "show" naming what is on screen while it is said: the document open at the paragraph, the tool running, the before and the after where the outcome is the proof. Hands on the thing. Ban any line that could belong to anyone; a sentence that would work in any video about AI is a sentence with nothing to show. Glamour shots are not use. This is the fix for a specific failure: this creator's two demo posts underperformed at 19,700 against 41,300 for news unpacks, and the cause was not that demos fail. Those two had no story earning the reveal and nothing at stake, so they were technique with nothing riding on it. A demo written against this structure is a different object.
+
+PLACEMENT OF ANYTHING BEING SOLD. If the piece sells something, and that includes the creator's own products, their runnable artifact and any brand deal equally, it lands at 60 to 70 per cent of the way through. Late enough to be earned, early enough to be remembered. Front-loading it costs roughly 44 per cent of view rate. If the piece sells nothing, "sell" is an empty string, and that is the normal case for editorial. Do not manufacture a sell.
+
+THE LANDING ASKS FOR SOMETHING. Peak and end are what get remembered and what decide what the viewer does next. The spoken track still ends on the verbatim callback, because the seam is worth more than a spoken CTA. The ask is delivered on screen after it. One sentence, concrete enough to do today. "Follow for more" is not an ask.
+
+REGISTER. Calm and certain, not urgent. This material is dense and the audience is professional; frantic pacing fights the content and puts the creator in the same register as every other AI account. Confidence reads as calm. Vary the visuals fast, keep the voice steady.
 
 Rules:
 - Sound like the exemplars, not like a copywriter. If the exemplars are casual and clipped, the script is casual and clipped.
@@ -65,6 +91,8 @@ Rules:
 - Facts and numbers must come from the brief's receipts. Invent nothing.
 - Write for speech: short sentences, no headings, no hashtags in the talk-track.
 - Where the brief carries a lineage, use it. A piece that says what this is the latest instance of, rather than treating it as new, is the difference between reporting a thing and explaining it. Name the earlier moment in the script where it earns its place; do not tack a history lesson on the end.
+- Write to a practitioner about their own work, never to or about the profession's governing bodies. These are banned outright: "nobody in the profession has", "the institutes should", "the industry is behind", "this is what we should be doing". Talking down to the viewer reads as distrust, and distrust loses the room faster than boredom does.
+- The brief carries a primary emotion. Serve that one and do not hedge across several. Where it is "knowledge", the reward you are writing toward is the viewer feeling they learned a specific thing they can repeat to a colleague, and that feeling is what earns the completion and the share.
 - The premise is for the creator, not the audience. They are scanning a queue of five and deciding what to shoot, so tell them what the piece argues and what makes it worth doing. Do not sell it to them.`
 
 export type WriterResult = { work_id: string; tokens: number }
@@ -107,7 +135,7 @@ export async function draftForUser(
       ? supabase.schema("creator").from("creator_stories")
           // lineage included: what a story is the latest instance of is the
           // most useful thing on the dossier and the writer was never shown it.
-          .select("id,thesis,angle,why_now,why_you,receipts,lineage,lineage_state,move,suggested_pillar_id,suggested_format_id,canon_version")
+          .select("id,thesis,angle,why_now,receipts,lineage,lineage_state,move,suggested_pillar_id,suggested_format_id,canon_version,stakes,open_question,hook_line,unknowns,primary_emotion,output_format")
           .eq("id", args.storyId).eq("user_id", userId).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.schema("creator").from("creator_canon")
@@ -165,7 +193,23 @@ export async function draftForUser(
     : ""
 
   const briefBlock = story
-    ? `BRIEF (approved story dossier):\nThesis: ${story.thesis}\nAngle: ${story.angle ?? "—"}\nWhy now: ${story.why_now ?? "—"}\nWhy this creator: ${story.why_you ?? "—"}\nReceipts: ${JSON.stringify(story.receipts)}${lineageBlock ? `\n\n${lineageBlock}` : ""}`
+    ? [
+        "BRIEF (approved story dossier):",
+        `Thesis: ${story.thesis}`,
+        `Angle: ${story.angle ?? "—"}`,
+        `Why now: ${story.why_now ?? "—"}`,
+        // Stakes replaced why_you deliberately. The writer used to be handed an
+        // argument for why the creator should bother, which is a note to the
+        // creator, not material. Who loses and by when is material.
+        `Stakes (who loses, who changes what, by when): ${story.stakes ?? "—"}`,
+        `Open question this cannot answer: ${story.open_question ?? "—"}`,
+        `Primary emotion to serve: ${story.primary_emotion ?? "knowledge"}`,
+        story.hook_line ? `Hook the desk proposed (improve it or keep it): ${story.hook_line}` : null,
+        `Receipts: ${JSON.stringify(story.receipts)}`,
+        lineageBlock ? `\n${lineageBlock}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
     : `BRIEF:\n${args.brief}`
 
   const { object, usage } = await creatorGenerateObject({
@@ -192,6 +236,12 @@ export async function draftForUser(
         trigger: object.trigger.trim(),
         analysis: object.analysis.trim(),
         loop: object.loop.trim(),
+        // Not part of the talk track. show feeds the visual planner, ask is
+        // delivered on screen after the callback so the spoken seam survives,
+        // and sell records where the pitch was placed so it can be checked.
+        show: object.show.trim(),
+        sell: object.sell.trim(),
+        ask: object.ask.trim(),
       },
       premise: object.premise,
       rationale: story ? `Commissioned from approved story: ${story.thesis}` : "Commissioned from a direct brief.",

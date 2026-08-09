@@ -18,10 +18,10 @@ function formatDuration(seconds: number | null): string | null {
 }
 
 const SCRIPT_PARTS = [
-  { key: "point", label: "Point", note: "the conclusion, first" },
+  { key: "point", label: "Point", note: "the claim, verdict withheld" },
   { key: "trigger", label: "Trigger", note: "why today" },
-  { key: "analysis", label: "Analysis", note: "the evidence" },
-  { key: "loop", label: "Loop", note: "back to the point" },
+  { key: "analysis", label: "Analysis", note: "one new fact per beat" },
+  { key: "loop", label: "Loop", note: "the verdict, back to the point" },
 ] as const
 
 /** The last few words, for showing where the loop rejoins the opening. */
@@ -147,6 +147,51 @@ export function DraftCard({ draft }: { draft: CreatorDraft }) {
                   …
                 </p>
               </div>
+
+              {/* Off the talk track, and marked as such. The ask sits after the
+                  callback as on-screen text rather than in the voice, because a
+                  spoken CTA breaks the seam the whole structure is built around. */}
+              {draft.script_sections.show && (
+                <div className="border-l-2 border-sky-500/40 pl-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Show
+                    <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+                      what is on screen for each claim, not spoken
+                    </span>
+                  </p>
+                  <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap mt-1">
+                    {draft.script_sections.show}
+                  </p>
+                </div>
+              )}
+
+              {draft.script_sections.sell && (
+                <div className="border-l-2 border-orange-500/40 pl-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Sell
+                    <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+                      lands at 60 to 70 per cent, never earlier
+                    </span>
+                  </p>
+                  <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap mt-1">
+                    {draft.script_sections.sell}
+                  </p>
+                </div>
+              )}
+
+              {draft.script_sections.ask && (
+                <div className="border-l-2 border-emerald-500/40 pl-3">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Ask
+                    <span className="ml-1.5 font-normal normal-case tracking-normal opacity-70">
+                      on screen after the last spoken line
+                    </span>
+                  </p>
+                  <p className="text-[13px] text-foreground/90 leading-relaxed whitespace-pre-wrap mt-1">
+                    {draft.script_sections.ask}
+                  </p>
+                </div>
+              )}
             </div>
           </Disclosure>
         ) : draft.body ? (
@@ -182,12 +227,25 @@ export function DraftCard({ draft }: { draft: CreatorDraft }) {
           </Disclosure>
         ) : null}
 
-        {(source?.why_you || draft.rationale) && (
-          <Disclosure label="Why you">
-            <p className="text-[12px] text-muted-foreground leading-relaxed">
-              {source?.why_you || draft.rationale}
+        {/* Stakes rather than a rationale. What is riding on this is what the
+            performance depends on, and it is the thing to reread just before
+            shooting; an argument for why the story was worth commissioning is
+            not. */}
+        {(source?.stakes || draft.rationale) && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-1">
+              Stakes
             </p>
-          </Disclosure>
+            <p className="text-[12.5px] text-foreground/90 leading-relaxed">
+              {source?.stakes || draft.rationale}
+            </p>
+          </div>
+        )}
+
+        {source?.open_question && (
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
+            <span className="font-medium text-foreground/80">Still open:</span> {source.open_question}
+          </p>
         )}
       </div>
 

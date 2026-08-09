@@ -11,7 +11,9 @@ import type {
 import type { CreatorWorkItem } from "./types"
 
 const STORY_COLUMNS =
-  "id,state,thesis,synthesis_kind,move,receipts,why_now,why_you,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state"
+  // One literal, never concatenated: PostgREST's typed client parses this string
+  // at the type level, and a `+` defeats it and collapses every row to unknown.
+  "id,state,thesis,synthesis_kind,move,receipts,why_now,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state,named_actor,stakes,open_question,hook_line,unknowns,kill_reason,primary_emotion,output_format,gate_failure"
 
 const WORK_COLUMNS =
   "id,kind,state,autonomy,title,body,rationale,counterparty,provenance,created_at,decided_at"

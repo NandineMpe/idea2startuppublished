@@ -3,7 +3,7 @@ import { safeRow } from "./query"
 import type { CreatorTrajectory } from "./types"
 
 const TRAJECTORY_COLUMNS =
-  "id,version,north_star,target_audience,what_it_serves,based_in,target_markets,audience_now,horizon_months,positions_to_claim,off_strategy,position_now,gaps,sequence,proof_needed,rooms,stop_doing,search_territory,strategy_derived_at"
+  "id,version,north_star,flagship_question,target_audience,what_it_serves,based_in,target_markets,audience_now,horizon_months,positions_to_claim,off_strategy,position_now,gaps,sequence,proof_needed,rooms,stop_doing,search_territory,strategy_derived_at"
 
 export async function loadTrajectory(
   supabase: SupabaseClient,
@@ -42,6 +42,13 @@ export function trajectoryBlock(trajectory: CreatorTrajectory | null): string {
   const parts = [
     `WHERE THIS CREATOR IS GOING (declared by them, and it outranks the canon):`,
     `North star: ${trajectory.north_star}`,
+    // Stated immediately after the north star and before anything about
+    // formats, because the ordering is the instruction. The desk had been
+    // ranking candidates against the format list, which is how it kept
+    // returning excellent examples of the wrong thing.
+    trajectory.flagship_question
+      ? `FLAGSHIP QUESTION, the named argument this creator is claiming: "${trajectory.flagship_question}"\nRank everything by how far it moves this question. The named argument outranks the named formats. A perfect instance of a favoured format that does not move this question ranks below a rougher candidate that does.`
+      : null,
     trajectory.target_audience ? `Audience they need: ${trajectory.target_audience}` : null,
     trajectory.what_it_serves ? `What the position serves: ${trajectory.what_it_serves}` : null,
     trajectory.based_in ? `Based in: ${trajectory.based_in}` : null,

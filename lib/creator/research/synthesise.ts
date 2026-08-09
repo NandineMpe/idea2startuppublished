@@ -6,14 +6,19 @@ import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 /**
  * Synthesis — turn raw signals into story dossiers.
  *
- * The uniqueness muscle lives here, in two enforced properties:
+ * The uniqueness muscle lives here, in three enforced properties:
  *  1. Every story must be a synthesis KIND (connection / contradiction /
  *     second-order / trend break / own-content), never a restated headline.
  *  2. The editor gate: a story citing fewer than two distinct signals stays in
  *     'watchlist' and never reaches the Desk. Enforced in code, not the prompt.
+ *  3. The candidate gate: named actor, stakes, one unknown, an open question, a
+ *     practitioner-facing stance and a sayable hook. Failing any one kills the
+ *     candidate outright rather than passing it on to be fixed downstream,
+ *     because none of those holes is one a writer can fill later. A card that
+ *     cannot fill them is a research brief, not a video.
  */
 
-export const SYNTHESIS_PROMPT_VERSION = "creator-synthesise-v1"
+export const SYNTHESIS_PROMPT_VERSION = "creator-synthesise-v2"
 
 const SIGNAL_WINDOW_HOURS = 72
 const MAX_STORIES_PER_RUN = 8
@@ -79,11 +84,59 @@ const storySchema = z.object({
     quote: z.string().describe("The specific fact/number/quote from that signal that supports the thesis."),
   })),
   why_now: z.string().describe("Why this week, not next month."),
-  why_you: z
+
+  // The candidate gate, carried as fields rather than checked in prose. A
+  // candidate that cannot fill these is a research brief, and nothing
+  // downstream rescues it: the writer cannot invent stakes that the receipts do
+  // not contain, and the visual planner cannot show a thing nobody did.
+  named_actor: z
     .string()
     .describe(
-      "Why this is worth THIS creator's time. For a consolidate story, why their audience cares. For expand or advance, what it builds toward the position they are moving to, and what earns them the standing to say it.",
+      "Who DID something. A named person, company, court or regulator that took an action. A document is not an actor: 'the FRC published a report' is weak, 'PwC filed', 'the court compelled', 'Anthropic shipped' is strong. Empty string if no actor acted.",
     ),
+  stakes: z
+    .string()
+    .describe(
+      "Who loses, who is embarrassed, who has to change what they do, and by when. Must come from the receipts, not from speculation. Empty string if the receipts do not support it.",
+    ),
+  unknown_terms: z
+    .string()
+    .describe(
+      "Every document, body, standard or concept in this thesis that a working professional outside the specialism would NOT already recognise, comma separated. Do not list things that are common knowledge. Empty string if none.",
+    ),
+  open_question: z
+    .string()
+    .describe(
+      "A question this card genuinely cannot answer from its own receipts, which curiosity can run on. Not rhetorical. If everything here is already resolved, return an empty string.",
+    ),
+  hook_line: z
+    .string()
+    .describe(
+      "One sentence, sayable out loud to someone who reads nothing. No acronyms, no document names, no dates, no jargon. If you cannot write it, return an empty string and this candidate dies here rather than downstream.",
+    ),
+
+  // Replaces why_you, which argued the story against the strategy after the
+  // fact. These two are the things a good editor actually says out loud.
+  unknowns: z
+    .string()
+    .describe("What you do not know yet. The hole in this story as it stands. Never 'nothing'."),
+  kill_reason: z
+    .string()
+    .describe(
+      "The strongest honest argument for killing this candidate. Argue it properly, as its opponent would. A weak kill_reason is itself a reason to distrust the story.",
+    ),
+
+  primary_emotion: z
+    .enum(["knowledge", "amusement", "jolt", "admiration", "inspiration", "craving", "calm"])
+    .describe(
+      "One only. 'knowledge' is the home lane: knowing something and feeling you learned it. The others are seasoning and should be the minority of any slate.",
+    ),
+  output_format: z
+    .enum(["script", "written", "artifact"])
+    .describe(
+      "What this material actually wants to be. Some strong material is a byline and a bad video; some is a thing to build rather than say. Be honest, a mis-route wastes the shoot.",
+    ),
+
   angle: z.string().describe("A suggested opening angle written in the creator's voice."),
   suggested_pillar_id: z.string().nullish(),
 })
@@ -102,6 +155,103 @@ type SignalRow = {
   topics: string[]
   lane: string
   stance: string
+}
+
+/**
+ * Constructions that talk down to the viewer, or that only stand up by
+ * comparison to what an institution failed to do.
+ *
+ * Enforced in code because a prompt rule against a phrasing habit decays: the
+ * model complies for a run or two and then finds a synonym. These are the exact
+ * forms named in the spec plus their nearest neighbours, and a candidate hitting
+ * one is killed rather than rewritten, because the phrasing is a symptom. A
+ * thesis that reaches for "nobody in the profession has" is usually a thesis
+ * whose only claim to novelty is somebody else's absence.
+ */
+const BANNED_STANCE = [
+  /nobody in the (?:profession|industry|field)/i,
+  /no one in the (?:profession|industry|field)/i,
+  /the institutes? (?:should|need to|must|have failed)/i,
+  /the (?:profession|industry) is (?:behind|lagging|asleep|not ready)/i,
+  /this is what we should be doing/i,
+  /the (?:profession|industry) has(?:n't| not) (?:yet )?(?:caught|woken|realised|realized)/i,
+]
+
+/**
+ * Acronyms a working professional reads without decoding. Everything else in a
+ * hook is a term the viewer has to be taught, and teaching in the hook is what
+ * makes the first sentence unsayable.
+ */
+const HOOK_SAFE_ACRONYMS = new Set(["AI", "US", "UK", "EU", "IT", "CEO", "CFO", "CV", "OK", "TV"])
+
+const DATE_IN_HOOK = /\b(?:19|20)\d{2}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b/i
+
+/**
+ * The candidate gate. Fail any one, kill the candidate.
+ *
+ * Deliberately not "downgrade to watchlist". Watchlist means the thesis is
+ * sound but under-evidenced and may pass tomorrow when a second signal lands. A
+ * gate failure is structural: no actor, no stakes, two unknowns, no open
+ * question. Tomorrow's signals do not fix any of those, so leaving it in a queue
+ * to be reconsidered is just a slower kill with a worse feed.
+ */
+export function gateFailure(story: {
+  named_actor: string
+  stakes: string
+  unknown_terms: string
+  open_question: string
+  hook_line: string
+  thesis: string
+  angle: string
+}): string | null {
+  const actor = story.named_actor.trim()
+  if (actor.length < 3) {
+    return "No named actor: nothing happened, something was merely published."
+  }
+  // named_actor should be names, semicolon separated, and nothing else. A verb
+  // in it means the model wrote a sentence, and the sentence is almost always
+  // "X published Y", which is precisely the thing the gate exists to reject: a
+  // body expressing a view is not somebody doing something. Checked on the verb
+  // rather than on the noun because "the FRC" is a perfectly good actor on the
+  // day it fines someone.
+  const publishingVerb = actor.match(
+    /\b(?:published|issued|released|stated|said|announced|noted|warned|reported|wrote|commented|proposed)\b/i,
+  )
+  if (publishingVerb) {
+    return `Not an action: "${publishingVerb[0]}" is something a document does, not something an actor did. Name the party, or find the thing that made the publication necessary.`
+  }
+  if (actor.length > 120) {
+    return "named_actor is a sentence rather than a name, which means no single party actually acted."
+  }
+  if (story.stakes.trim().length < 20) {
+    return "No stakes the receipts support: nobody visibly loses, changes or is embarrassed."
+  }
+
+  const unknowns = story.unknown_terms
+    .split(/[,;\n]/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+  if (unknowns.length > 1) {
+    return `Two or more unknowns (${unknowns.join(", ")}): the payoff cannot arrive before both are taught. Split into separate candidates.`
+  }
+
+  if (story.open_question.trim().length < 10) {
+    return "Nothing unresolved: this is a news unpack rather than primary work."
+  }
+
+  const stance = `${story.thesis} ${story.angle} ${story.hook_line}`
+  const banned = BANNED_STANCE.find((re) => re.test(stance))
+  if (banned) {
+    return `Stance is written about the profession rather than to a practitioner (matched ${banned}).`
+  }
+
+  const hook = story.hook_line.trim()
+  if (hook.length < 10) return "No hook line: it could not be said out loud to someone who reads nothing."
+  const acronym = hook.match(/\b[A-Z]{2,}\b/g)?.find((a) => !HOOK_SAFE_ACRONYMS.has(a))
+  if (acronym) return `Hook line needs decoding: "${acronym}" is an acronym the viewer has to be taught.`
+  if (DATE_IN_HOOK.test(hook)) return "Hook line carries a date, which is trigger material rather than hook material."
+
+  return null
 }
 
 const SYSTEM_PROMPT = `You are the research desk of a one-person creator's management agency. You are an investigative researcher, not an aggregator: your job is to connect dots across signals and produce theses the creator could not get from any single headline.
@@ -155,7 +305,24 @@ EARLINESS IS A SCORE IN ITS OWN RIGHT. The creator's stated position is to be th
 
 STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch beside it; horizon is territory they told you they are moving toward and may have published nothing in yet.
 - Set "move" to consolidate for a thesis that deepens core ground, expand for adjacent territory, advance for one that builds the position in their stated trajectory.
-- An expand or advance story must say in "why_you" what earns them the standing to say it. Standing can come from adjacent expertise, not only from having covered the exact topic before. Do not refuse a horizon story merely because there is no precedent in the canon: the absence of precedent is the reason the creator declared it.
+- Do not refuse a horizon story merely because there is no precedent in the canon: the absence of precedent is the reason the creator declared it. Standing can come from adjacent expertise, not only from having covered the exact topic before.
+
+THE CANDIDATE GATE. Every candidate must survive all six of these. They are checked in code after you answer, and a candidate that fails one is killed outright rather than passed on to be fixed. Do not soften a field to get a candidate through: an honest empty string kills it here, which is cheap, while a plausible one kills it after a shoot, which is not.
+
+1. NAMED ACTOR. Someone did something. A document is not an actor. "The FRC published" is weak. "PwC filed", "the court compelled", "this firm was sanctioned" is strong. If the only thing that happened is that a body expressed a view, there is no actor.
+2. STAKES. Who loses, who is embarrassed, who has to change what they do, and by when. This is the boredom gate and the most important field you will fill. If it cannot be filled from the receipts, there is no emotion available downstream and the piece will be inert no matter how well it is written.
+3. ONE UNKNOWN. At most one document, body or concept the audience has never heard of. Two unknowns means teaching both before the payoff arrives, which makes releasing information gradually impossible. If a thesis needs two, split it into two candidates rather than joining them.
+4. OPEN QUESTION. Something this card genuinely cannot answer. If everything is resolved, this is a news unpack, not primary work.
+5. STANCE. Write to a practitioner about their own work. Never to or about the profession's governing bodies. Kill any thesis that only stands up by comparison to what an institute failed to do. These constructions are banned outright: "nobody in the profession has", "the institutes should", "the industry is behind", "this is what we should be doing". Talking down to the viewer reads as distrust, and distrust loses the room faster than boredom does.
+6. HOOK LINE. One sentence, sayable out loud to someone who reads nothing. No acronyms, no document names, no dates. If you cannot write it, return an empty string and kill the candidate yourself rather than passing the problem up.
+
+WHAT REPLACES SELF-JUSTIFICATION. You are no longer asked why a story is worth the creator's time. That field became a compliance check written after the decision. Instead:
+- "unknowns": what you do not know yet. The hole in the story as it stands. "Nothing" is never the answer.
+- "kill_reason": the strongest honest argument against running it, argued as its opponent would argue it. A weak kill_reason is itself evidence the story has not been tested.
+
+EMOTION. Pick exactly one primary_emotion. "knowledge" is the home lane, because knowing something and feeling you learned it is what earns a completion and a send-to-a-friend. The rest are seasoning: a slate that is mostly jolt is a tabloid, and a slate that is mostly inspiration is a LinkedIn feed.
+
+OUTPUT FORMAT. Some strong material is a byline and a bad video, and some is a thing to build rather than a thing to say. Tag it honestly as script, written or artifact. A mis-route wastes a shoot and then reads to the creator as their own failure, which is the expensive part.
 
 The failure mode you are being corrected for: this desk keeps handing back deeper cuts of ground the creator has already worked to death. A creator with a strong archive on one subject will get proposed that subject forever, because it is what the evidence supports, and they will stay a commentator on it instead of becoming the authority they said they want to be. A thesis that only restates their existing position is low value to them even when it is well built.
 
@@ -167,11 +334,15 @@ Rules:
 - Write "angle" in the creator's voice profile if one is provided; otherwise plain and direct.
 - When a trajectory is declared, at least half the slate must be advance or expand, and the advance stories should be the ones you argue hardest for. A slate of eight consolidate stories is a failed run even if every thesis is sound.
 - Balance still matters in the other direction: a slate with nothing the creator can speak to from experience leaves them sounding unmoored. Keep one or two consolidate stories that put their existing authority behind the newer ground.
-- Fewer, stronger stories beat more, weaker ones. Zero stories is an acceptable output.`
+- Fewer, stronger stories beat more, weaker ones. Zero stories is an acceptable output. A slate of two candidates that pass the gate is a better run than eight that were nursed through it.
+
+SCORING. Where a flagship question is given below, rank candidates by how directly they advance THAT ARGUMENT, and by nothing else. The named argument outranks the named formats. The strategy listed formats as a means of making the argument, and this desk has been fetching instances of the formats instead, which is how a plan becomes a checklist. If a candidate is a perfect example of a favoured format and does not move the flagship question, it ranks below a rougher candidate that does.`
 
 export type SynthesisResult = {
   proposed: number
   watchlisted: number
+  /** Killed by the candidate gate: structurally unshootable, not merely thin. */
+  gated: number
   skipped_bad_refs: number
   tokens: number
 }
@@ -261,7 +432,7 @@ export async function synthesiseStoriesForUser(
   const signalRows: SignalRow[] = [...horizon, ...interleaved.filter((s) => !seen.has(s.id))]
 
   if (signalRows.length < 2) {
-    return { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: 0 }
+    return { proposed: 0, watchlisted: 0, gated: 0, skipped_bad_refs: 0, tokens: 0 }
   }
 
   const signalList = signalRows
@@ -295,7 +466,13 @@ export async function synthesiseStoriesForUser(
     maxOutputTokens: 8000,
   })
 
-  const result: SynthesisResult = { proposed: 0, watchlisted: 0, skipped_bad_refs: 0, tokens: usage.totalTokens }
+  const result: SynthesisResult = {
+    proposed: 0,
+    watchlisted: 0,
+    gated: 0,
+    skipped_bad_refs: 0,
+    tokens: usage.totalTokens,
+  }
 
   // Everything that reached the prompt was read and judged, whether or not it
   // was used. Recording that is what lets the feed show "considered but not
@@ -327,11 +504,20 @@ export async function synthesiseStoriesForUser(
         quote: r.quote,
       }))
 
+    // Two separate gates, and the order matters. The candidate gate is
+    // structural and terminal: no actor, no stakes, two unknowns. The evidence
+    // gate is about weight of sourcing and is survivable, because a second
+    // signal can land tomorrow. Running the terminal one first stops a
+    // structurally dead candidate from sitting in the watchlist looking like it
+    // is waiting for something.
+    const failure = gateFailure(story)
+
     // The editor gate. own_content stories may stand on one signal + the corpus;
     // everything else needs at least two independent signals or it stays on watch.
     const distinctSignals = new Set(signalIds).size
-    const passesGate = story.synthesis_kind === "own_content" ? distinctSignals >= 1 : distinctSignals >= 2
-    const state = passesGate ? "proposed" : "watchlist"
+    const hasEvidence = story.synthesis_kind === "own_content" ? distinctSignals >= 1 : distinctSignals >= 2
+
+    const state = failure ? "killed" : hasEvidence ? "proposed" : "watchlist"
 
     const { data: storyRow, error: storyError } = await supabase
       .schema("creator")
@@ -345,7 +531,15 @@ export async function synthesiseStoriesForUser(
         receipts,
         signal_ids: signalIds,
         why_now: story.why_now,
-        why_you: story.why_you,
+        named_actor: story.named_actor,
+        stakes: story.stakes,
+        open_question: story.open_question,
+        hook_line: story.hook_line,
+        unknowns: story.unknowns,
+        kill_reason: story.kill_reason,
+        primary_emotion: story.primary_emotion,
+        output_format: story.output_format,
+        gate_failure: failure,
         angle: story.angle,
         canon_version: canon?.version ?? null,
         suggested_pillar_id: story.suggested_pillar_id,
@@ -356,6 +550,10 @@ export async function synthesiseStoriesForUser(
       .single()
     if (storyError) throw storyError
 
+    if (state === "killed") {
+      result.gated++
+      continue
+    }
     if (state === "watchlist") {
       result.watchlisted++
       continue
@@ -370,9 +568,13 @@ export async function synthesiseStoriesForUser(
         kind: "insight",
         state: "proposed",
         autonomy: "approve",
-        title: story.thesis,
-        body: `${story.angle}\n\nWhy now: ${story.why_now}`,
-        rationale: story.why_you,
+        // The hook leads. It is the one line the creator can judge in a second,
+        // and the thesis is what they read once the hook has earned the second
+        // second. Stakes carry the rationale, because "who loses and by when" is
+        // the actual reason to shoot a thing.
+        title: story.hook_line,
+        body: `${story.thesis}\n\nWhy now: ${story.why_now}\n\nOpen question: ${story.open_question}`,
+        rationale: story.stakes,
         provenance: {
           agent: "researcher",
           canon_version: canon?.version ?? 0,

@@ -392,8 +392,27 @@ export async function decideCreatorWork(
   if (storyError) return { ok: false, error: storyError.message }
 
   // The swarm hook: approving a Researcher story commissions the Writer.
+  //
+  // Gated on output_format. A story the desk tagged as a byline or an artifact
+  // is not a video, and auto-drafting a script for it produces a piece that
+  // reads as weak when the material was fine and the routing was wrong. That
+  // misattribution is the expensive part: it teaches the creator to distrust
+  // good material.
   const storyId = (workRow.provenance as { story_id?: string } | null)?.story_id
+  let wantsScript = true
   if (decision === "approved" && workRow.kind === "insight" && storyId) {
+    const { data: storyRow } = await supabase
+      .schema("creator")
+      .from("creator_stories")
+      .select("output_format")
+      .eq("id", storyId)
+      .eq("user_id", userId)
+      .maybeSingle()
+    // Absent means a story filed before the spec existed, and those were all
+    // written as scripts, so the default stays true.
+    wantsScript = (storyRow?.output_format ?? "script") === "script"
+  }
+  if (decision === "approved" && workRow.kind === "insight" && storyId && wantsScript) {
     try {
       await sendCreatorEvent({
         name: "creator/writer.draft",

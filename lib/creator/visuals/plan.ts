@@ -183,7 +183,7 @@ ${
   draft.script_sections
     ? `SCRIPT, in its four sections:
 
-[POINT — the conclusion, stated first]
+[POINT — the claim, stated first, verdict withheld]
 ${(draft.script_sections as { point: string }).point}
 
 [TRIGGER — why today]
@@ -192,8 +192,17 @@ ${(draft.script_sections as { trigger: string }).trigger}
 [ANALYSIS — the evidence]
 ${(draft.script_sections as { analysis: string }).analysis}
 
-[LOOP — the close, written to run back into the point]
-${(draft.script_sections as { loop: string }).loop}`
+[LOOP — the close and the verdict, written to run back into the point]
+${(draft.script_sections as { loop: string }).loop}
+${
+  (draft.script_sections as { show?: string | null }).show
+    ? `\n[SHOW — what the writer says must be on screen for each claim. Treat this as the brief, not a suggestion. Every claim needs something on screen: the document open at the paragraph, the tool running, the before and after. A glamour shot is not use, and a stock image of an abstract idea is worse than nothing.]\n${(draft.script_sections as { show?: string | null }).show}`
+    : ""
+}${
+  (draft.script_sections as { ask?: string | null }).ask
+    ? `\n[ASK — delivered as on-screen text after the final spoken line. It must not cover the callback, and it must be readable in under two seconds.]\n${(draft.script_sections as { ask?: string | null }).ask}`
+    : ""
+}`
     : `SCRIPT:
 """
 ${draft.body}

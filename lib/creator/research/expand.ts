@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { sweepTopicAcrossLanes, type LaneSignal } from "./lanes"
+import { gateFailure } from "./synthesise"
 
 /**
  * Expand a creator's own idea into a dossier.
@@ -34,7 +35,18 @@ const expandedSchema = z.object({
     .string()
     .describe("The specific fact, number or quote taken from each cited source, ONE PER LINE, in the same order as receipt_indexes."),
   why_now: z.string(),
-  why_you: z.string(),
+  named_actor: z.string().describe("Who DID something. A document is not an actor. Empty string if nobody acted."),
+  stakes: z
+    .string()
+    .describe("Who loses, who is embarrassed, who has to change what, and by when. From the sources, not speculation."),
+  open_question: z.string().describe("What this genuinely cannot answer from its own sources."),
+  hook_line: z
+    .string()
+    .describe("One sentence, sayable to someone who reads nothing. No acronyms, no document names, no dates."),
+  unknowns: z.string().describe("What you do not know yet. The hole in this as it stands."),
+  kill_reason: z.string().describe("The strongest honest argument for dropping this, argued as its opponent would."),
+  primary_emotion: z.enum(["knowledge", "amusement", "jolt", "admiration", "inspiration", "craving", "calm"]),
+  output_format: z.enum(["script", "written", "artifact"]),
   angle: z.string().describe("A suggested opening in the creator's voice."),
   evidence_verdict: z
     .enum(["well_supported", "thin", "not_supported"])
@@ -150,7 +162,28 @@ export async function expandCreatorSeed(
         receipts,
         signal_ids: [],
         why_now: object.why_now,
-        why_you: object.why_you,
+        named_actor: object.named_actor,
+        stakes: object.stakes,
+        open_question: object.open_question,
+        hook_line: object.hook_line,
+        unknowns: object.unknowns,
+        kill_reason: object.kill_reason,
+        primary_emotion: object.primary_emotion,
+        output_format: object.output_format,
+        // Recorded, never enforced. The candidate gate kills automated
+        // candidates because nobody asked for them; this lead exists because the
+        // creator asked for it, and silently binning what they asked to have
+        // investigated would make the desk feel broken. Say what is weak and let
+        // them decide.
+        gate_failure: gateFailure({
+          named_actor: object.named_actor,
+          stakes: object.stakes,
+          unknown_terms: "",
+          open_question: object.open_question,
+          hook_line: object.hook_line,
+          thesis: object.thesis,
+          angle: object.angle,
+        }),
         angle: object.angle,
         canon_version: canon?.version ?? null,
         model_version: CREATOR_MODEL_VERSION,
@@ -171,12 +204,12 @@ export async function expandCreatorSeed(
           kind: "insight",
           state: "proposed",
           autonomy: "approve",
-          title: object.thesis,
-          body: `${object.angle}\n\nWhy now: ${object.why_now}`,
+          title: object.hook_line || object.thesis,
+          body: `${object.thesis}\n\nWhy now: ${object.why_now}\n\nOpen question: ${object.open_question}`,
           rationale:
             object.evidence_verdict === "thin"
               ? `Evidence is thin. ${object.what_is_missing}`
-              : object.why_you,
+              : object.stakes,
           provenance: {
             agent: "researcher (your lead)",
             canon_version: canon?.version ?? 0,

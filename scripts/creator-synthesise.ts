@@ -31,13 +31,25 @@ async function main() {
   const { data } = await supabase
     .schema("creator")
     .from("creator_stories")
-    .select("thesis,move,synthesis_kind,state,why_you")
+    .select(
+      "thesis,move,synthesis_kind,state,hook_line,named_actor,stakes,open_question,unknowns,kill_reason,primary_emotion,output_format,gate_failure",
+    )
     .eq("user_id", userId)
     .gte("created_at", before)
     .order("created_at", { ascending: false })
 
   for (const s of data ?? []) {
-    console.log(`[${s.move}/${s.synthesis_kind}/${s.state}] ${s.thesis}\n    why you: ${s.why_you}\n`)
+    console.log(
+      `[${s.move}/${s.synthesis_kind}/${s.state}/${s.primary_emotion}/${s.output_format}] ${s.thesis}`,
+    )
+    console.log(`    hook:   ${s.hook_line}`)
+    console.log(`    actor:  ${s.named_actor}`)
+    console.log(`    stakes: ${s.stakes}`)
+    console.log(`    open:   ${s.open_question}`)
+    console.log(`    unknown:${s.unknowns}`)
+    console.log(`    kill:   ${s.kill_reason}`)
+    if (s.gate_failure) console.log(`    GATED:  ${s.gate_failure}`)
+    console.log()
   }
 
   const counts = (data ?? []).reduce<Record<string, number>>((acc, s) => {

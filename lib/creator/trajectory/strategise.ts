@@ -26,7 +26,7 @@ import { engagementRate, type CreatorPost } from "@/lib/creator/types"
  *    existing pillars.
  */
 
-export const STRATEGY_PROMPT_VERSION = "creator-strategise-v1"
+export const STRATEGY_PROMPT_VERSION = "creator-strategise-v2"
 
 const strategySchema = z.object({
   position_now: z
@@ -77,6 +77,11 @@ const strategySchema = z.object({
     .describe(
       "Content or activity that performs but does not build the declared position, ONE PER LINE. Be willing to name something that does numbers. Two to four.",
     ),
+  flagship_question: z
+    .string()
+    .describe(
+      "The single named question this creator should become the deepest public source on, phrased as a question and written to be said out loud. It must be one the institutions in their field cannot currently answer and they can. This is the argument every other agent ranks against, so it must be specific enough to exclude things: 'how will AI change accounting' excludes nothing and is a failure.",
+    ),
   search_territory: z
     .string()
     .describe(
@@ -109,6 +114,7 @@ Rules:
 - proof_needed is about credibility with the TARGET audience, which is usually a different bar from the audience they have. Proof can be a credential, but it can equally be a demonstration, a working artifact, an original technical explanation nobody else is giving, or a public record of having called something early and correctly. Choose the form of proof that the declared strategy actually calls for.
 - rooms must be named, and a room is anywhere the target audience is reachable: a named conference, publication, podcast, practitioner community or platform. Do not fill this with professional bodies by default. "Industry conferences" is useless; a named one is useful.
 - stop_doing is the hardest and most valuable field. Name content that gets views but does not compound toward the position. If everything they do is on-strategy, say so, but look hard first.
+- flagship_question is the highest-leverage field in this document. A creator can own a beat and a refrain and still have no thesis, and a beat is reactive to whatever the news hands them. Pick the one question they can be the deepest source on, name it, and make sure every gap and phase below serves it. Everything downstream ranks candidates against this question rather than against a list of formats, so a vague one quietly disables the whole desk.
 - search_territory decides what the research desk reads every morning from now on. Write queries for the destination. If the creator says they are moving toward how professionals adopt AI, do not hand back queries about the topics already in their canon.
 - If what the creator says they are building commercially conflicts with the audience they are optimising for, say so plainly in a gap.
 - Never flatter. This document is only useful if it tells them something their own analytics cannot.`
@@ -291,6 +297,7 @@ export async function strategiseTrajectory(
       .from("creator_trajectory")
       .update({
         position_now: object.position_now,
+        flagship_question: object.flagship_question.trim() || null,
         gaps,
         sequence,
         proof_needed: toLines(object.proof_needed, 8),

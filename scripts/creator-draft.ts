@@ -83,6 +83,23 @@ async function main() {
 
     const hookIsOpening = Boolean(draft.hook && sections.point.trim().startsWith(draft.hook.trim()))
     console.log(`\nhook is the literal opening line: ${hookIsOpening ? "YES" : "NO"}`)
+
+    // The callback has to be verbatim or the replay is just a similar sentence,
+    // which the viewer hears as a video ending rather than a loop closing.
+    const opener = sections.point.trim().split(/(?<=[.!?])\s+/)[0] ?? ""
+    const verbatim = opener.length > 0 && sections.loop.toLowerCase().includes(opener.toLowerCase().replace(/[.!?]+$/, ""))
+    console.log(`opening line appears verbatim in the loop: ${verbatim ? "YES" : "NO"}`)
+
+    // The point is supposed to withhold the verdict now. Numbers and dates in
+    // it are the tell that it has spent the evidence in the first four seconds.
+    const leaked = sections.point.match(/\b\d[\d.,]*\s*(?:per cent|%|million|billion|dollars?|pounds?)?\b|\b(?:19|20)\d{2}\b/g)
+    console.log(`point withholds the verdict (no figures): ${leaked ? `NO — leaked ${leaked.join(", ")}` : "YES"}`)
+
+    for (const k of ["show", "sell", "ask"] as const) {
+      const v = sections[k]
+      console.log(`\n--- ${k.toUpperCase()} ---`)
+      console.log(v ? v : "(empty)")
+    }
   }
   console.log("\n=== CARRIED THROUGH ===")
   if (!draft.source) {

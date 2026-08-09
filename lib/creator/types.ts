@@ -249,6 +249,16 @@ export type ScriptSections = {
   trigger: string
   analysis: string
   loop: string
+  /**
+   * Everything below is off the talk track, and null on scripts written before
+   * the spec existed.
+   */
+  /** Claim-by-claim shot notes, newline delimited. Feeds the visual planner. */
+  show?: string | null
+  /** What the piece sells and where it lands. Empty for editorial, which is most of it. */
+  sell?: string | null
+  /** One concrete action, on screen after the callback so the spoken seam survives. */
+  ask?: string | null
 }
 
 /** Mirrors lib/creator/visuals/plan.ts, declared here so the UI contract stays in one file. */
@@ -274,7 +284,11 @@ export type DraftSource = {
   story_id: string
   thesis: string
   why_now: string | null
-  why_you: string | null
+  /** Carried through so the queue card can say who loses without opening the dossier. */
+  stakes: string | null
+  open_question: string | null
+  primary_emotion: StoryEmotion | null
+  output_format: StoryOutputFormat
   move: StoryMove
   receipts: StoryReceipt[]
   lineage: StoryLineage | null
@@ -351,14 +365,50 @@ export type CreatorStory = {
   move: StoryMove
   receipts: StoryReceipt[]
   why_now: string | null
-  why_you: string | null
   angle: string | null
   suggested_pillar_id: string | null
   work_item_id: string | null
   created_at: string
   lineage: StoryLineage | null
   lineage_state: LineageState
+
+  // The candidate gate, stored as filled. A story only exists because it could
+  // fill these, so they are the truest short description of it.
+  /** Who did something. A document is not an actor. */
+  named_actor: string | null
+  /** Who loses, who is embarrassed, who changes what, by when. The boredom gate. */
+  stakes: string | null
+  /** What this card genuinely cannot answer. Curiosity runs on it. */
+  open_question: string | null
+  /** One sentence, sayable to someone who reads nothing. */
+  hook_line: string | null
+
+  /** Replaces why_you: the hole in the story, and the case against it. */
+  unknowns: string | null
+  kill_reason: string | null
+
+  primary_emotion: StoryEmotion | null
+  output_format: StoryOutputFormat
+  /** Set only on killed candidates: which gate it failed and why. */
+  gate_failure: string | null
 }
+
+/**
+ * One only, per story. 'knowledge' is the home lane: knowing a thing and
+ * feeling you learned it is what earns a completion and a share. The rest are
+ * seasoning.
+ */
+export type StoryEmotion =
+  | "knowledge"
+  | "amusement"
+  | "jolt"
+  | "admiration"
+  | "inspiration"
+  | "craving"
+  | "calm"
+
+/** Some good material is a byline and a bad video. Tagged so a routing error is not read as a personal failure. */
+export type StoryOutputFormat = "script" | "written" | "artifact"
 
 export type StoriesContext = {
   proposed: CreatorStory[]
@@ -541,6 +591,12 @@ export type CreatorTrajectory = {
   version: number
   // Declared. Never rewritten by an agent.
   north_star: string
+  /**
+   * The one named argument the creator is claiming, phrased as a question they
+   * are visibly the deepest source on. Every agent ranks against this, and it
+   * outranks the format list.
+   */
+  flagship_question: string | null
   target_audience: string | null
   what_it_serves: string | null
   /** Where the creator actually is. Drives travel, timezone, and local standing. */

@@ -73,7 +73,7 @@ async function attachSources(
     supabase
       .schema("creator")
       .from("creator_stories")
-      .select("id,thesis,why_now,why_you,move,receipts,lineage,lineage_state")
+      .select("id,thesis,why_now,stakes,open_question,primary_emotion,output_format,move,receipts,lineage,lineage_state")
       .eq("user_id", userId)
       .in("id", storyIds),
   )
