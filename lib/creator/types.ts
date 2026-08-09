@@ -410,6 +410,38 @@ export type StoryEmotion =
 /** Some good material is a byline and a bad video. Tagged so a routing error is not read as a personal failure. */
 export type StoryOutputFormat = "script" | "written" | "artifact"
 
+/**
+ * Why something was killed.
+ *
+ * Six, and no more. The taxonomy is small on purpose: a kill has to cost one
+ * tap or it will not be labelled, and an unlabelled kill teaches the desk
+ * nothing. The labels are also written from the creator's side of the desk
+ * ("not me", "too heavy") rather than as an editorial verdict, because that is
+ * the judgement actually being made at eleven at night in a queue of five.
+ */
+export const KILL_REASONS = [
+  { id: "boring", label: "Boring", hint: "No stakes. Nothing is at risk for anyone." },
+  { id: "too_heavy", label: "Too heavy", hint: "Needs research I do not have time for." },
+  { id: "off_brand", label: "Off brand", hint: "Institutional gaze, wrong stance." },
+  { id: "not_me", label: "Not me", hint: "True and useful, but not my voice." },
+  { id: "done_before", label: "Done before", hint: "Repeats something I have already posted." },
+  { id: "wrong_format", label: "Wrong format", hint: "Good material, wrong output type." },
+  { id: "weak_receipts", label: "Weak receipts", hint: "I cannot stand this up." },
+] as const
+
+export type CreatorKillReason = (typeof KILL_REASONS)[number]["id"]
+
+/** The rolled-up read of every decision, rewritten weekly. Never raw rows in a prompt. */
+export type CreatorTaste = {
+  window_start: string | null
+  window_end: string | null
+  approve_count: number
+  kill_count: number
+  kill_counts: Partial<Record<CreatorKillReason, number>>
+  exemplars: Partial<Record<CreatorKillReason, Array<{ subject: string; note: string | null }>>>
+  rebuilt_at: string | null
+}
+
 export type StoriesContext = {
   proposed: CreatorStory[]
   watchlist: CreatorStory[]

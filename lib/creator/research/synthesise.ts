@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
+import { loadTaste, tasteBlock, PRECEDENCE_RULE } from "@/lib/creator/load-taste"
 
 /**
  * Synthesis — turn raw signals into story dossiers.
@@ -21,7 +22,17 @@ import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 export const SYNTHESIS_PROMPT_VERSION = "creator-synthesise-v2"
 
 const SIGNAL_WINDOW_HOURS = 72
-const MAX_STORIES_PER_RUN = 8
+
+/**
+ * Halved from four a day.
+ *
+ * Four was a volume target, and a volume target is filled: the fourth story on
+ * any given morning was the best of a bad set rather than something worth
+ * shooting, and it still cost a full extraction and a full read. Two also
+ * roughly funds the extraction pass, since extraction is the expensive step and
+ * now runs on half as many items.
+ */
+const MAX_STORIES_PER_RUN = 2
 
 /**
  * Per-lane quotas rather than one "newest N" query.
@@ -219,6 +230,18 @@ const DATE_IN_HOOK = /\b(?:19|20)\d{2}\b|\b(?:january|february|march|april|may|j
  * question. Tomorrow's signals do not fix any of those, so leaving it in a queue
  * to be reconsidered is just a slower kill with a worse feed.
  */
+export type GateField = "actor" | "stakes" | "unknowns" | "open_question" | "stance" | "hook"
+
+/**
+ * Structured rather than a sentence, so the distribution is countable.
+ *
+ * "Why did this one die" is answerable from prose. "Which check kills the most
+ * candidates this month" is not, and that is the question that tells you which
+ * lanes to reweight. Storing the field separately is the difference between a
+ * log and a measurement.
+ */
+export type GateVerdict = { field: GateField; why: string } | null
+
 export function gateFailure(story: {
   named_actor: string
   stakes: string
@@ -229,10 +252,10 @@ export function gateFailure(story: {
   angle: string
   /** Checked too: the old prompt asked for the coverage brag here by name. */
   why_now?: string
-}): string | null {
+}): GateVerdict {
   const actor = story.named_actor.trim()
   if (actor.length < 3) {
-    return "No named actor: nothing happened, something was merely published."
+    return { field: "actor", why: "Nothing happened, something was merely published." }
   }
   // named_actor should be names, semicolon separated, and nothing else. A verb
   // in it means the model wrote a sentence, and the sentence is almost always
@@ -244,13 +267,19 @@ export function gateFailure(story: {
     /\b(?:published|issued|released|stated|said|announced|noted|warned|reported|wrote|commented|proposed)\b/i,
   )
   if (publishingVerb) {
-    return `Not an action: "${publishingVerb[0]}" is something a document does, not something an actor did. Name the party, or find the thing that made the publication necessary.`
+    return {
+      field: "actor",
+      why: `"${publishingVerb[0]}" is something a document does, not something an actor did. Name the party, or find the thing that made the publication necessary.`,
+    }
   }
   if (actor.length > 120) {
-    return "named_actor is a sentence rather than a name, which means no single party actually acted."
+    return { field: "actor", why: "A sentence rather than a name, so no single party actually acted." }
   }
   if (story.stakes.trim().length < 20) {
-    return "No stakes the receipts support: nobody visibly loses, changes or is embarrassed."
+    return {
+      field: "stakes",
+      why: "Nothing the receipts support: nobody visibly loses, changes or is embarrassed.",
+    }
   }
 
   const unknowns = story.unknown_terms
@@ -258,24 +287,36 @@ export function gateFailure(story: {
     .map((t) => t.trim())
     .filter(Boolean)
   if (unknowns.length > 1) {
-    return `Two or more unknowns (${unknowns.join(", ")}): the payoff cannot arrive before both are taught. Split into separate candidates.`
+    return {
+      field: "unknowns",
+      why: `Two or more unknowns (${unknowns.join(", ")}): the payoff cannot arrive before both are taught. Split into separate candidates.`,
+    }
   }
 
   if (story.open_question.trim().length < 10) {
-    return "Nothing unresolved: this is a news unpack rather than primary work."
+    return { field: "open_question", why: "Nothing unresolved: a news unpack rather than primary work." }
   }
 
   const stance = `${story.thesis} ${story.angle} ${story.hook_line} ${story.why_now ?? ""}`
   const banned = BANNED_STANCE.find((re) => re.test(stance))
   if (banned) {
-    return `Stance rests on somebody else's absence rather than on the story (matched ${banned}). Write it about the thing, not about who has or has not covered it.`
+    return {
+      field: "stance",
+      why: `Rests on somebody else's absence rather than on the story (matched ${banned}). Write it about the thing, not about who has or has not covered it.`,
+    }
   }
 
   const hook = story.hook_line.trim()
-  if (hook.length < 10) return "No hook line: it could not be said out loud to someone who reads nothing."
+  if (hook.length < 10) {
+    return { field: "hook", why: "Could not be said out loud to someone who reads nothing." }
+  }
   const acronym = hook.match(/\b[A-Z]{2,}\b/g)?.find((a) => !HOOK_SAFE_ACRONYMS.has(a))
-  if (acronym) return `Hook line needs decoding: "${acronym}" is an acronym the viewer has to be taught.`
-  if (DATE_IN_HOOK.test(hook)) return "Hook line carries a date, which is trigger material rather than hook material."
+  if (acronym) {
+    return { field: "hook", why: `"${acronym}" is an acronym the viewer has to be taught.` }
+  }
+  if (DATE_IN_HOOK.test(hook)) {
+    return { field: "hook", why: "Carries a date, which is trigger material rather than hook material." }
+  }
 
   return null
 }
@@ -411,14 +452,14 @@ export async function synthesiseStoriesForUser(
   const [
     laneResults,
     { data: horizonRows },
-    trajectory,
+    [trajectory, taste],
     { data: canon },
     { data: recentPosts },
     { data: recentStories },
   ] = await Promise.all([
     Promise.all(laneQueries),
     horizonQuery,
-    loadTrajectory(supabase, userId),
+    Promise.all([loadTrajectory(supabase, userId), loadTaste(supabase, userId)]),
     supabase.schema("creator").from("creator_canon")
       .select("version,pillars,voice,topics")
       .eq("user_id", userId)
@@ -486,7 +527,18 @@ export async function synthesiseStoriesForUser(
   const { object, usage } = await creatorGenerateObject({
     schema: synthesisSchema,
     system: SYSTEM_PROMPT,
-    prompt: `SIGNALS (last ${SIGNAL_WINDOW_HOURS}h, numbered):\n${signalList}\n\n${trajectoryBlock(trajectory)}\n\n${canonBlock}\n\n${corpusBlock}\n\nRECENT THESES (do not repeat):\n${recentTheses}\n\nProduce at most ${MAX_STORIES_PER_RUN} story dossiers.`,
+    prompt: [
+      `SIGNALS (last ${SIGNAL_WINDOW_HOURS}h, numbered):\n${signalList}`,
+      PRECEDENCE_RULE,
+      trajectoryBlock(trajectory),
+      tasteBlock(taste),
+      canonBlock,
+      corpusBlock,
+      `RECENT THESES (do not repeat):\n${recentTheses}`,
+      `Produce at most ${MAX_STORIES_PER_RUN} story dossiers. Two that pass the gate is a good run; zero is an acceptable one.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     agent: "research.synthesise",
     log: { supabase, userId },
     maxOutputTokens: 8000,
@@ -565,7 +617,19 @@ export async function synthesiseStoriesForUser(
         kill_reason: story.kill_reason,
         primary_emotion: story.primary_emotion,
         output_format: story.output_format,
-        gate_failure: failure,
+        // Written on passes too, so the denominator exists. Counting failures
+        // without counting attempts tells you which check fires most, not which
+        // check is hardest to clear.
+        gate: {
+          actor: story.named_actor,
+          stakes: story.stakes,
+          unknown_count: story.unknown_terms.split(/[,;\n]/).map((t) => t.trim()).filter(Boolean).length,
+          open_question: story.open_question,
+          stance_ok: !failure || failure.field !== "stance",
+          hook_line: story.hook_line,
+        },
+        gate_field: failure?.field ?? null,
+        gate_failure: failure ? `${failure.field}: ${failure.why}` : null,
         angle: story.angle,
         canon_version: canon?.version ?? null,
         suggested_pillar_id: story.suggested_pillar_id,

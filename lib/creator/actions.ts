@@ -5,6 +5,7 @@ import { requireCreatorUser } from "./auth"
 import { sendCreatorEvent } from "./inngest/client"
 import { isMissingRelation } from "./query"
 import { DEFAULT_CREATOR_SETTINGS, isSupportedCurrency } from "./load-settings"
+import type { CreatorKillReason } from "./types"
 
 export type SettingsActionResult = { ok: true } | { ok: false; error: string }
 
@@ -362,13 +363,25 @@ export async function deleteCreatorContent(contentIds: string[]): Promise<Delete
 export async function decideCreatorWork(
   workId: string,
   decision: "approved" | "killed",
+  /**
+   * Required on a kill. The database enforces it too, but failing here gives a
+   * usable message instead of a constraint violation, and it makes the rule
+   * visible to anyone reading the action rather than only to anyone reading the
+   * schema.
+   */
+  reason?: CreatorKillReason,
+  note?: string,
 ): Promise<SettingsActionResult> {
   const { supabase, userId } = await requireCreatorUser()
+
+  if (decision === "killed" && !reason) {
+    return { ok: false, error: "A kill needs a reason. That is the only thing the desk learns from." }
+  }
 
   const { data: workRow, error: loadError } = await supabase
     .schema("creator")
     .from("creator_work")
-    .select("kind,provenance")
+    .select("kind,provenance,title")
     .eq("id", workId)
     .eq("user_id", userId)
     .maybeSingle()
@@ -399,18 +412,45 @@ export async function decideCreatorWork(
   // misattribution is the expensive part: it teaches the creator to distrust
   // good material.
   const storyId = (workRow.provenance as { story_id?: string } | null)?.story_id
-  let wantsScript = true
-  if (decision === "approved" && workRow.kind === "insight" && storyId) {
+  // Loaded on every decision, not just approvals: a kill needs these too, so
+  // the taste profile can say "she kills advance stories tagged artifact"
+  // rather than only counting reasons.
+  let storyMove: string | null = null
+  let storyFormat: string | null = null
+  if (storyId) {
     const { data: storyRow } = await supabase
       .schema("creator")
       .from("creator_stories")
-      .select("output_format")
+      .select("output_format,move")
       .eq("id", storyId)
       .eq("user_id", userId)
       .maybeSingle()
-    // Absent means a story filed before the spec existed, and those were all
-    // written as scripts, so the default stays true.
-    wantsScript = (storyRow?.output_format ?? "script") === "script"
+    storyMove = storyRow?.move ?? null
+    storyFormat = storyRow?.output_format ?? null
+  }
+  // Absent means a story filed before the spec existed, and those were all
+  // written as scripts, so the default stays true.
+  const wantsScript = (storyFormat ?? "script") === "script"
+
+  // Written after the state change and before the swarm hook, so a failure to
+  // record taste can never block the decision itself. The decision is the
+  // creator's; the bookkeeping is ours.
+  const { error: decisionError } = await supabase
+    .schema("creator")
+    .from("creator_decisions")
+    .insert({
+      user_id: userId,
+      work_id: workId,
+      story_id: storyId ?? null,
+      decision: decision === "approved" ? "approve" : "kill",
+      reason: decision === "killed" ? reason : null,
+      note: note?.trim() || null,
+      subject: workRow.title,
+      move: storyMove,
+      output_format: storyFormat,
+    })
+  if (decisionError) {
+    console.warn("[creator-actions] decision not recorded:", decisionError.message)
   }
   if (decision === "approved" && workRow.kind === "insight" && storyId && wantsScript) {
     try {

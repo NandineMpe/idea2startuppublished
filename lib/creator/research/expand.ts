@@ -150,6 +150,19 @@ export async function expandCreatorSeed(
     // weak lead is visible as weak rather than sitting alongside verified work.
     const state = object.evidence_verdict === "not_supported" ? "watchlist" : "proposed"
 
+    // Recorded, never enforced, for a lead the creator asked for. See the note
+    // at the insert below.
+    const leadGate = gateFailure({
+      named_actor: object.named_actor,
+      stakes: object.stakes,
+      unknown_terms: "",
+      open_question: object.open_question,
+      hook_line: object.hook_line,
+      thesis: object.thesis,
+      angle: object.angle,
+      why_now: object.why_now,
+    })
+
     const { data: storyRow, error } = await supabase
       .schema("creator")
       .from("creator_stories")
@@ -175,16 +188,8 @@ export async function expandCreatorSeed(
         // creator asked for it, and silently binning what they asked to have
         // investigated would make the desk feel broken. Say what is weak and let
         // them decide.
-        gate_failure: gateFailure({
-          named_actor: object.named_actor,
-          stakes: object.stakes,
-          unknown_terms: "",
-          open_question: object.open_question,
-          hook_line: object.hook_line,
-          thesis: object.thesis,
-          angle: object.angle,
-          why_now: object.why_now,
-        }),
+        gate_field: leadGate?.field ?? null,
+        gate_failure: leadGate ? `${leadGate.field}: ${leadGate.why}` : null,
         angle: object.angle,
         canon_version: canon?.version ?? null,
         model_version: CREATOR_MODEL_VERSION,

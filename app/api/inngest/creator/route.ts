@@ -12,6 +12,7 @@ import { creatorMetricsRefresh } from "@/lib/creator/inngest/functions/metrics-r
 import { creatorCanonDerive } from "@/lib/creator/inngest/functions/canon-derive"
 import { creatorWriterDraft } from "@/lib/creator/inngest/functions/writer-draft"
 import { creatorThreadsCheck } from "@/lib/creator/inngest/functions/threads-check"
+import { creatorTasteRebuild } from "@/lib/creator/inngest/functions/taste-rebuild"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -31,5 +32,6 @@ export const { GET, POST, PUT } = serve({
     creatorCanonDerive,
     creatorWriterDraft,
     creatorThreadsCheck,
+    creatorTasteRebuild,
   ],
 })
