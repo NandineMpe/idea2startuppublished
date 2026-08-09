@@ -76,7 +76,7 @@ Rules:
 - Distinguish a procedural step from an outcome. A scheduling order is minor. A ruling, a sanction, a final rule, a withdrawal, a settlement or a reversal is major.
 - Receipts must be concrete and drawn from the numbered sources: a date, a holding, a figure, a named party, a docket number. Never invent one.
 - If the sources suggest the original reporting was WRONG, or that it turned out smaller or larger than it looked, that is the most valuable finding available. Say it explicitly.
-- The angle should lead on the creator having been there first, because that is the thing nobody else covering this can say. Only write one if it genuinely moved.`
+- The angle should lead on WHAT CHANGED and what it now means, not on the creator having been early. Having covered it before is why they can explain the shape of it, and that is worth using: what they said then, what actually happened, and what that tells you. It is not worth claiming. Never write an angle whose point is that other people did not go back. Only write one if it genuinely moved.`
 
 function toLines(value: string): string[] {
   return value
@@ -288,7 +288,7 @@ async function recordCheck(
         autonomy: "approve",
         title: `Update: ${thread.subject}`,
         body: `${dev.angle}\n\nWhat changed: ${dev.summary}`,
-        rationale: `You covered this on ${new Date(thread.anchor_date).toISOString().slice(0, 10)}. It has moved, and almost nobody who covered it then has gone back.`,
+        rationale: `You covered this on ${new Date(thread.anchor_date).toISOString().slice(0, 10)}, so you can say what you expected and what actually happened.`,
         provenance: {
           agent: "researcher (resurfaced)",
           canon_version: 0,

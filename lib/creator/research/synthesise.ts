@@ -175,6 +175,30 @@ const BANNED_STANCE = [
   /the (?:profession|industry) is (?:behind|lagging|asleep|not ready)/i,
   /this is what we should be doing/i,
   /the (?:profession|industry) has(?:n't| not) (?:yet )?(?:caught|woken|realised|realized)/i,
+
+  // The scarcity flex. Same defect as the institution comparison above: the
+  // claim to attention is somebody else's absence rather than anything in the
+  // story. It is also the single most common tell of a channel with nothing to
+  // say, it dates instantly the moment anyone else files, and it asks the viewer
+  // to be impressed by the creator rather than interested in the subject.
+  //
+  // Anchored on nobody / no one / everyone / no outlet on purpose. "The
+  // regulator has not noticed" is a real finding about a real gap and must
+  // still pass; "nobody has noticed" is a boast about the competition.
+  /\b(?:nobody|no ?one) (?:else )?(?:is|has|seems|appears|was|had)?\s*(?:been )?(?:talking|writing|reporting|covering|noticed|noticing|spotted|picked up|saying)/i,
+  /\b(?:nobody|no ?one) (?:else )?(?:has|have)? ?(?:made|drawn|connected|joined)/i,
+  /\beveryone (?:else )?(?:is |has )?(?:missing|missed|overlooking|overlooked|ignoring|ignored)/i,
+  /\b(?:gone|going|flying|slipped|passed) (?:largely |completely |entirely |almost )?(?:by )?unnoticed/i,
+  /\bunder the radar\b/i,
+  // Up to three words of qualifier between the determiner and the noun, because
+  // the natural phrasing is "no accounting title has" rather than "no title
+  // has". "paper" is deliberately NOT in the noun list: a working paper is core
+  // vocabulary in this creator's field and "no working paper has a trace" is a
+  // real finding, not a boast about the trade press.
+  /\b(?:no|not a single) (?:\w+\s+){0,3}(?:outlet|publication|title|journalist|commentator|newsroom)s? (?:has|have)/i,
+  /\bwhat (?:nobody|no ?one) is telling you/i,
+  /\bthe story (?:nobody|no ?one) is (?:covering|telling|writing)/i,
+  /\byou (?:probably )?(?:have ?n[o']t|did ?n[o']t|will ?n[o']t) (?:heard|hear|have heard) (?:about|of) this/i,
 ]
 
 /**
@@ -203,6 +227,8 @@ export function gateFailure(story: {
   hook_line: string
   thesis: string
   angle: string
+  /** Checked too: the old prompt asked for the coverage brag here by name. */
+  why_now?: string
 }): string | null {
   const actor = story.named_actor.trim()
   if (actor.length < 3) {
@@ -239,10 +265,10 @@ export function gateFailure(story: {
     return "Nothing unresolved: this is a news unpack rather than primary work."
   }
 
-  const stance = `${story.thesis} ${story.angle} ${story.hook_line}`
+  const stance = `${story.thesis} ${story.angle} ${story.hook_line} ${story.why_now ?? ""}`
   const banned = BANNED_STANCE.find((re) => re.test(stance))
   if (banned) {
-    return `Stance is written about the profession rather than to a practitioner (matched ${banned}).`
+    return `Stance rests on somebody else's absence rather than on the story (matched ${banned}). Write it about the thing, not about who has or has not covered it.`
   }
 
   const hook = story.hook_line.trim()
@@ -267,7 +293,7 @@ PRIMARY lanes hold the document itself:
 - courts: complaints, dockets and opinions, often years before any landmark ruling, and expert reports are frequently the most detailed public technical documents that exist on how a system actually works
 - funding: research grants and private raises, funded now, published in about two years, productised in about four
 - regulation: proposed rules and open comment periods, visible long before anything binds, and a comment period is a door with a deadline
-- standards: what "compliant" is going to mean, drafted before anyone has to comply and read by almost nobody
+- standards: what "compliant" is going to mean, drafted before anyone has to comply
 - code: what engineers are actually adopting, which happens before a vendor describes it
 - models: what actually shipped, where capability is measurable rather than asserted
 - releases: what labs published themselves, unmediated by coverage
@@ -296,12 +322,12 @@ This distinction is the point of the desk. The creator is trying to be a primary
 - News is best used to date something or to show what the consensus reading is, so that the primary document can be set against it.
 - Two news items about the same event is the weakest possible connection. Avoid it.
 
-EARLINESS IS A SCORE IN ITS OWN RIGHT. The creator's stated position is to be the person who knows first, to the point that the institutions in their field read them to find out what is happening. That is only possible on material the institutions have not processed yet. So:
-- A thing that exists, is documented, and almost nobody has noticed outranks a better-argued thesis about something already covered. Prefer the funded company, the shipped capability, the awarded grant, the open solicitation.
-- Say plainly in "why_now" how far ahead of the coverage the creator would be. "This raised in April and no accounting title has written about it" is a stronger reason to shoot than "this is topical".
+EARLINESS IS A SCORE IN ITS OWN RIGHT, AND IT IS NEVER A BOAST. The creator's stated position is to be the person who knows first. Being early is worth something because the mechanism can still be explained before a consensus reading hardens around it, and because the primary document is still the only account of the thing. It is worth nothing as a status claim. Never frame a story around who has or has not covered it, and never let the value of a candidate rest on somebody else's absence. So:
+- Prefer the funded company, the shipped capability, the awarded grant, the open solicitation: things that exist and are documented but whose consequences are not settled yet. Early means the meaning is still open, not that the story is unclaimed.
+- "why_now" is about the thing, never about the competition. Write what changed and what it forces: "this shipped in April and it is already in three audit workflows" is a reason to shoot. How much or how little anyone else has written about it is not a reason, is not interesting, and must never appear.
 - Do not reach for the institutions as the frame. A professional body publishing a position is downstream of the thing that made the position necessary; find the thing. Where an institution appears at all, the interesting shape is the distance between what has been built and what the institution has noticed.
 - Capability signals are relevant even when the release note never mentions the creator's profession. A model that can now read a hundred page document reliably is an audit story whether or not the changelog says so, and joining those two is exactly the work.
-- The strongest theses join lanes that rarely meet: a preprint that contradicts a press release, a patent that shows a vendor knew, a comment period nobody in the profession has noticed, a repo that proves the capability exists already.
+- The strongest theses join lanes that rarely meet: a preprint that contradicts a press release, a patent that shows a vendor knew, a comment period with a deadline attached, a repo that proves the capability exists already.
 
 STANCE is where the topic sits relative to this creator: core is ground they already own; adjacent is the stretch beside it; horizon is territory they told you they are moving toward and may have published nothing in yet.
 - Set "move" to consolidate for a thesis that deepens core ground, expand for adjacent territory, advance for one that builds the position in their stated trajectory.
@@ -313,7 +339,7 @@ THE CANDIDATE GATE. Every candidate must survive all six of these. They are chec
 2. STAKES. Who loses, who is embarrassed, who has to change what they do, and by when. This is the boredom gate and the most important field you will fill. If it cannot be filled from the receipts, there is no emotion available downstream and the piece will be inert no matter how well it is written.
 3. ONE UNKNOWN. At most one document, body or concept the audience has never heard of. Two unknowns means teaching both before the payoff arrives, which makes releasing information gradually impossible. If a thesis needs two, split it into two candidates rather than joining them.
 4. OPEN QUESTION. Something this card genuinely cannot answer. If everything is resolved, this is a news unpack, not primary work.
-5. STANCE. Write to a practitioner about their own work. Never to or about the profession's governing bodies. Kill any thesis that only stands up by comparison to what an institute failed to do. These constructions are banned outright: "nobody in the profession has", "the institutes should", "the industry is behind", "this is what we should be doing". Talking down to the viewer reads as distrust, and distrust loses the room faster than boredom does.
+5. STANCE. Write to a practitioner about their own work. Never to or about the profession's governing bodies, and never about the rest of the commentary. Kill any thesis that only stands up by comparison to what an institute failed to do, or to what other people have not covered. Both are the same defect: novelty claimed out of somebody else's absence rather than out of the thing itself. These constructions are banned outright: "nobody in the profession has", "the institutes should", "the industry is behind", "this is what we should be doing", "nobody is talking about this", "everyone is missing this", "this has gone unnoticed", "under the radar", "no outlet has covered this". A story has to be interesting because of what is in it. If the only thing making it worth attention is that other people have not got to it, it is not a story, it is a scoop, and a scoop stops being one the moment somebody else files. Talking down to the viewer reads as distrust, and distrust loses the room faster than boredom does.
 6. HOOK LINE. One sentence, sayable out loud to someone who reads nothing. No acronyms, no document names, no dates. If you cannot write it, return an empty string and kill the candidate yourself rather than passing the problem up.
 
 WHAT REPLACES SELF-JUSTIFICATION. You are no longer asked why a story is worth the creator's time. That field became a compliance check written after the decision. Instead:
@@ -510,7 +536,7 @@ export async function synthesiseStoriesForUser(
     // signal can land tomorrow. Running the terminal one first stops a
     // structurally dead candidate from sitting in the watchlist looking like it
     // is waiting for something.
-    const failure = gateFailure(story)
+    const failure = gateFailure({ ...story, why_now: story.why_now })
 
     // The editor gate. own_content stories may stand on one signal + the corpus;
     // everything else needs at least two independent signals or it stays on watch.

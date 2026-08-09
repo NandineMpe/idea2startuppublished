@@ -183,6 +183,7 @@ export async function expandCreatorSeed(
           hook_line: object.hook_line,
           thesis: object.thesis,
           angle: object.angle,
+          why_now: object.why_now,
         }),
         angle: object.angle,
         canon_version: canon?.version ?? null,
