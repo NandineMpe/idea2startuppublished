@@ -391,6 +391,26 @@ export type CreatorStory = {
   output_format: StoryOutputFormat
   /** Set only on killed candidates: which gate it failed and why. */
   gate_failure: string | null
+  /** The signals this thesis stands on. Used to join the read documents. */
+  signal_ids: string[] | null
+  /**
+   * Documents the desk actually fetched and read, verified only. Attached by
+   * loadStories rather than stored on the row, because an extract belongs to a
+   * source and several stories can cite the same one.
+   */
+  extracts?: StoryExtract[]
+}
+
+/** A source read in full, with quotes checked character for character against it. */
+export type StoryExtract = {
+  signal_id: string
+  source_url: string
+  key_claims: Array<{ quote: string; locator: string; why_it_matters: string }>
+  silences: string[]
+  verified: boolean
+  claims_offered: number
+  claims_verified: number
+  content_chars: number
 }
 
 /**

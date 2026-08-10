@@ -1,6 +1,7 @@
 import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
+import { extractsBlock, loadExtractsForSignals } from "@/lib/creator/load-extracts"
 
 /**
  * The Writer: drafts a piece against a derived format in the creator's derived
@@ -88,7 +89,8 @@ Rules:
 - Sound like the exemplars, not like a copywriter. If the exemplars are casual and clipped, the script is casual and clipped.
 - The house structure wins over any format structure in the canon. A derived format tells you the creator's phrasing and pacing within a section; it does not reorder the four.
 - Never open the point with a throat-clear. No "let's talk about", no "so", no "here is something interesting". The first words are the claim.
-- Facts and numbers must come from the brief's receipts. Invent nothing.
+- Facts and numbers must come from the brief's receipts or the read documents. Invent nothing.
+- Where a read document is supplied, quote it. Its quotes were verified against the source text character for character, which means the creator can say "this is what the filing says" and be telling the truth. That sentence is the entire product. A paraphrase of a verified quote throws away the only thing that separates this from commentary, so use the words.
 - Write for speech: short sentences, no headings, no hashtags in the talk-track.
 - Where the brief carries a lineage, use it. A piece that says what this is the latest instance of, rather than treating it as new, is the difference between reporting a thing and explaining it. Name the earlier moment in the script where it earns its place; do not tack a history lesson on the end.
 - Write to a practitioner about their own work, never to or about the profession's governing bodies, and never about the rest of the commentary. These are banned outright: "nobody in the profession has", "the institutes should", "the industry is behind", "this is what we should be doing", "nobody is talking about this", "everyone is missing this", "this has gone unnoticed", "under the radar", "no outlet has covered this", "you probably have not heard about this". Never write a line whose point is that the creator got there before anyone else. The piece has to be interesting because of what is in it, not because of who has not said it, and a viewer who is told they are lucky to be hearing this hears an advert for the creator rather than an explanation of the thing. Being early buys the right to explain the mechanism first. It is not the subject.
@@ -136,7 +138,7 @@ export async function draftForUser(
       ? supabase.schema("creator").from("creator_stories")
           // lineage included: what a story is the latest instance of is the
           // most useful thing on the dossier and the writer was never shown it.
-          .select("id,thesis,angle,why_now,receipts,lineage,lineage_state,move,suggested_pillar_id,suggested_format_id,canon_version,stakes,open_question,hook_line,unknowns,primary_emotion,output_format")
+          .select("id,thesis,angle,why_now,receipts,lineage,lineage_state,move,suggested_pillar_id,suggested_format_id,canon_version,stakes,open_question,hook_line,unknowns,primary_emotion,output_format,signal_ids")
           .eq("id", args.storyId).eq("user_id", userId).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.schema("creator").from("creator_canon")
@@ -193,6 +195,14 @@ export async function draftForUser(
       }${lineage.recurring_question ? `\nRecurring question: ${lineage.recurring_question}` : ""}`
     : ""
 
+  // The documents the research desk actually read, with verified quotes. This
+  // is the difference between a script that says "the filing reportedly says"
+  // and one that quotes the paragraph.
+  const extracts = story
+    ? [...(await loadExtractsForSignals(supabase, userId, (story.signal_ids as string[]) ?? [])).values()]
+    : []
+  const readBlock = extractsBlock(extracts)
+
   const briefBlock = story
     ? [
         "BRIEF (approved story dossier):",
@@ -216,7 +226,9 @@ export async function draftForUser(
   const { object, usage } = await creatorGenerateObject({
     schema: draftSchema,
     system: SYSTEM_PROMPT,
-    prompt: `${briefBlock}\n\n${canonBlock}\n\n${exemplarBlock}\n\nDraft the script.`,
+    prompt: [briefBlock, readBlock, canonBlock, exemplarBlock, "Draft the script."]
+      .filter(Boolean)
+      .join("\n\n"),
     agent: "writer.draft",
     log: { supabase, userId },
     maxOutputTokens: 4000,

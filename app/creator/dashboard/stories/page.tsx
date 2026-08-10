@@ -1,4 +1,4 @@
-import { Eye, Link2, Newspaper } from "lucide-react"
+import { Eye, FileText, Link2, Newspaper } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadStories } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
@@ -150,6 +150,72 @@ function StoryCard({ story }: { story: CreatorStory }) {
                   {story.kill_reason}
                 </p>
               )}
+            </div>
+          </Disclosure>
+        </div>
+      )}
+
+      {/* What the desk read, rather than what it found. The silences are given
+          their own treatment because they are the part that cannot be got from
+          a summary and, in practice, where most of the angles come from. */}
+      {story.extracts && story.extracts.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <Disclosure
+            label="Read in full"
+            count={story.extracts.length}
+          >
+            <div className="grid gap-4">
+              {story.extracts.map((extract) => (
+                <div key={extract.signal_id}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <FileText className="h-3 w-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <a
+                      href={extract.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline break-all"
+                    >
+                      {extract.source_url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}
+                    </a>
+                    <span className="text-[10px] text-muted-foreground shrink-0 tabular-nums">
+                      {Math.round(extract.content_chars / 1000)}k chars
+                    </span>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {extract.key_claims.map((claim, i) => (
+                      <div key={i} className="border-l-2 border-emerald-500/40 pl-3">
+                        <p className="text-[12.5px] text-foreground/90 leading-relaxed">
+                          “{claim.quote}”
+                          {claim.locator && (
+                            <span className="text-muted-foreground text-[11px]"> — {claim.locator}</span>
+                          )}
+                        </p>
+                        {claim.why_it_matters && (
+                          <p className="text-[11.5px] text-muted-foreground mt-0.5 leading-relaxed">
+                            {claim.why_it_matters}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {extract.silences.length > 0 && (
+                    <div className="mt-2 rounded-lg bg-muted/40 border border-border px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
+                        What it does not say
+                      </p>
+                      <ul className="grid gap-1">
+                        {extract.silences.map((silence, i) => (
+                          <li key={i} className="text-[12px] text-foreground/85 leading-relaxed">
+                            {silence}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </Disclosure>
         </div>

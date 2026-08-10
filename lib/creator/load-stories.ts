@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { safeRows } from "./query"
+import { loadExtractsForSignals, type CreatorExtract } from "./load-extracts"
 import { NO_TRAJECTORY_BLOCKER } from "./types"
 import type {
   CreatorBlocker,
@@ -13,7 +14,7 @@ import type { CreatorWorkItem } from "./types"
 const STORY_COLUMNS =
   // One literal, never concatenated: PostgREST's typed client parses this string
   // at the type level, and a `+` defeats it and collapses every row to unknown.
-  "id,state,thesis,synthesis_kind,move,receipts,why_now,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state,named_actor,stakes,open_question,hook_line,unknowns,kill_reason,primary_emotion,output_format,gate_failure"
+  "id,state,thesis,synthesis_kind,move,receipts,why_now,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state,named_actor,stakes,open_question,hook_line,unknowns,kill_reason,primary_emotion,output_format,gate_failure,signal_ids"
 
 const WORK_COLUMNS =
   "id,kind,state,autonomy,title,body,rationale,counterparty,provenance,created_at,decided_at"
@@ -67,9 +68,24 @@ export async function loadStories(supabase: SupabaseClient, userId: string): Pro
     researchTopicsBlocker(supabase, userId),
   ])
 
+  // One query for every story's extracts rather than one per story. The screen
+  // shows up to forty cards and the alternative is forty round trips.
+  const extracts = await loadExtractsForSignals(
+    supabase,
+    userId,
+    [...new Set(stories.flatMap((s) => s.signal_ids ?? []))],
+  )
+
+  const withExtracts = stories.map((story) => ({
+    ...story,
+    extracts: (story.signal_ids ?? [])
+      .map((id) => extracts.get(id))
+      .filter((e): e is CreatorExtract => Boolean(e?.verified)),
+  }))
+
   return {
-    proposed: stories.filter((s) => s.state === "proposed"),
-    watchlist: stories.filter((s) => s.state === "watchlist"),
+    proposed: withExtracts.filter((s) => s.state === "proposed"),
+    watchlist: withExtracts.filter((s) => s.state === "watchlist"),
     blocker,
   }
 }
