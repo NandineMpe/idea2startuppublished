@@ -4,7 +4,15 @@ import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/c
 import { loadWorth } from "@/lib/creator/load-worth"
 import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
 import { CREATOR_MARKETPLACES } from "./marketplaces"
-import { huntApolloCompanies, huntEvents, huntSponsors, type OpportunityCandidate } from "./hunt"
+import {
+  huntApolloCompanies,
+  huntEvents,
+  huntGrantsEU,
+  huntGrantsUS,
+  huntSponsors,
+  huntUsMedia,
+  type OpportunityCandidate,
+} from "./hunt"
 
 /**
  * Opportunities sweep: hunt → one Claude pass (rank, dedupe, draft the pitch)
@@ -18,12 +26,21 @@ export const OPPORTUNITIES_PROMPT_VERSION = "creator-opportunities-v1"
 const MAX_OPPORTUNITIES_PER_RUN = 6
 
 const opportunitySchema = z.object({
-  kind: z.enum(["deal", "event"]),
-  title: z.string().describe("Brand, event or platform name plus the one-line opportunity."),
+  kind: z
+    .enum(["deal", "event", "grant"])
+    .describe(
+      "grant = money for the work, applied for against a deadline. deal = money for the audience. event = a stage or a microphone.",
+    ),
+  title: z.string().describe("Brand, event, funder or platform name plus the one-line opportunity."),
+  deadline: z
+    .string()
+    .describe(
+      "The closing date as YYYY-MM-DD, taken from the candidate evidence. Empty string when the evidence does not state one. NEVER estimate a deadline: an invented date either wastes the application or loses it.",
+    ),
   why_fit: z.string().describe("Why this creator specifically, referencing their topics/pillars and any evidence."),
   pitch: z.string().describe("The outreach message, ready to send, in the creator's voice. Include the rate range only when one was provided."),
   evidence_urls: z.array(z.string()).describe("URLs backing this opportunity, from the candidate list."),
-  candidate_lane: z.enum(["sponsors", "events", "apollo", "marketplace"]),
+  candidate_lane: z.enum(["sponsors", "events", "apollo", "marketplace", "grants", "media"]),
 
   // Flat, not a nested object: a bare nested object in this schema makes the
   // model emit tool-call markup into the JSON and abandon the rest.
@@ -63,11 +80,19 @@ const sweepSchema = z.object({
 
 const SYSTEM_PROMPT = `You are the partnerships desk of a one-person creator's management agency. You turn raw signals about brands, events and platforms into a small number of high-conviction opportunities, each with the pitch already drafted.
 
-An opportunity is worth proposing for one of two reasons, and you should be explicit in why_fit about which:
+An opportunity is worth proposing for one of three reasons, and you should be explicit in why_fit about which:
   1. It pays well for what the creator already does.
   2. It puts them in a room that builds the position they are moving toward, even if it pays little or nothing.
+  3. It funds work they want to do anyway, against a deadline.
 
-The second kind is the one this desk has been under-supplying. Ranking every opportunity by fit with the existing archive means the creator gets offered more of the audience they already have, and the rooms where their target audience actually is never appear. A modest panel in front of the right professionals can be worth more than a paid post to the wrong crowd, and you should say so plainly when it is true.
+GRANTS ARE A DIFFERENT MARKET AND YOU MUST JUDGE THEM DIFFERENTLY. A deal buys the audience; a grant buys the work. That changes almost everything about how you read one:
+- Eligibility is the first question, not the last. Check nationality, residence, organisation type and career stage against what the creator actually is: an individual creator and founder based in Ireland, working across the United States, United Kingdom, Ireland and the EU. A call restricted to consortia of three universities is not an opportunity for them, however well the subject matches, and proposing it costs an evening of reading to find out.
+- The deadline is the opportunity. A grant with a passed deadline is not a weaker version of the same thing, it is nothing. Put the closing date in "deadline" as YYYY-MM-DD when the evidence states one, and leave it empty when it does not. Never estimate one. An invented date either sends the creator scrambling or reassures them that a closed call is open, and the second is worse.
+- Money for work the creator was going to do regardless is the strongest form of this. A fund that pays for the runnable artifact or the technical explainer series is worth far more than its face value, because it converts an unpaid credibility project into a funded one.
+- Prestige counts as payment. A named fellowship is a line in a bio that outlasts any sponsored post.
+- US federal calls are the largest source of grant volume and the least likely to fit. Most restrict applicants to US institutions, and a few to US citizens. Propose one only when the announcement genuinely leaves room for a foreign individual or a small company, and say in why_fit which part of it does. Where you cannot tell, say so in why_fit rather than proposing it as though it were settled.
+
+The second and third kinds are the ones this desk has been under-supplying. Ranking every opportunity by fit with the existing archive means the creator gets offered more of the audience they already have, and the rooms where their target audience actually is never appear. A modest panel in front of the right professionals can be worth more than a paid post to the wrong crowd, and you should say so plainly when it is true.
 
 EVERY OPPORTUNITY MUST BE ACTIONABLE. A drafted pitch with nobody to send it to is not an opportunity, it is an observation, and it leaves the creator doing the part an agency exists to have already done. Before proposing anything, answer: who is the organisation, which desk handles this, how do you reach them, and what is the single first thing to do today.
 
@@ -114,10 +139,16 @@ export async function sweepOpportunitiesForUser(
   const trajectory = await loadTrajectory(supabase, userId)
   const markets = trajectory?.target_markets ?? []
 
-  const [sponsors, events, apollo, worthContext, { data: existing }, { data: canon }] = await Promise.all([
+  const [sponsors, events, apollo, grantsUs, grantsEu, media, worthContext, { data: existing }, { data: canon }] = await Promise.all([
     huntSponsors(dealTopics, markets),
     huntEvents(eventTopics, markets),
     huntApolloCompanies(dealTopics, markets),
+    // Grants take the research topics rather than the deal topics: funders buy
+    // the subject, not the audience, and a body funding work on machine-produced
+    // audit evidence does not care what a sponsored post costs.
+    huntGrantsUS(eventTopics),
+    huntGrantsEU(eventTopics),
+    huntUsMedia(eventTopics),
     loadWorth(supabase, userId),
     supabase.schema("creator").from("creator_work")
       .select("title")
@@ -125,7 +156,7 @@ export async function sweepOpportunitiesForUser(
       // Archived opportunities still suppress a repeat; deleted ones do not,
       // because deleting says the item should never have been proposed.
       .is("deleted_at", null)
-      .in("kind", ["deal", "event"])
+      .in("kind", ["deal", "event", "grant"])
       .gte("created_at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString())
       .limit(60),
     supabase.schema("creator").from("creator_canon")
@@ -136,7 +167,17 @@ export async function sweepOpportunitiesForUser(
       .maybeSingle(),
   ])
 
-  const candidates: OpportunityCandidate[] = [...sponsors, ...events, ...apollo]
+  // Grants lead the list. Position is weighting, and a grant is the only lane
+  // here that pays for the work rather than for the audience, which is the one
+  // the creator was structurally missing.
+  const candidates: OpportunityCandidate[] = [
+    ...grantsUs,
+    ...grantsEu,
+    ...media,
+    ...sponsors,
+    ...events,
+    ...apollo,
+  ]
   if (!candidates.length && !CREATOR_MARKETPLACES.length) {
     return { candidates: 0, proposed: 0, tokens: 0 }
   }
@@ -194,6 +235,16 @@ export async function sweepOpportunitiesForUser(
       confidence: named ? "named" : opp.contact_role.trim() ? "role_only" : "unknown",
     }
 
+    // Same guard as the contact route, for the same reason. A deadline the
+    // model produced from nothing is worse than no deadline: it either sends
+    // the creator scrambling at an invented date or, far worse, reassures them
+    // that a call which closed last week is still open. Only a real ISO date
+    // that is actually in the future survives.
+    const claimed = opp.deadline.trim()
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(claimed) ? new Date(`${claimed}T00:00:00Z`) : null
+    const deadline =
+      parsed && !Number.isNaN(parsed.getTime()) && parsed.getTime() > Date.now() ? claimed : null
+
     const { error } = await supabase
       .schema("creator")
       .from("creator_work")
@@ -206,6 +257,7 @@ export async function sweepOpportunitiesForUser(
         body: opp.pitch,
         rationale: opp.why_fit,
         counterparty,
+        deadline,
         provenance: {
           agent: "opportunities",
           canon_version: canon?.version ?? 0,

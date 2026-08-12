@@ -9,7 +9,7 @@ import {
 } from "./types"
 
 const WORK_COLUMNS =
-  "id,kind,state,autonomy,title,body,rationale,counterparty,provenance,created_at,decided_at"
+  "id,kind,state,autonomy,title,body,rationale,counterparty,deadline,provenance,created_at,decided_at"
 
 /** Work touched in the last day — the overnight shift, which is what The Desk reports on. */
 const DESK_WINDOW_HOURS = 36

@@ -12,7 +12,7 @@ import {
 export const NEXT_FIVE_SIZE = 5
 
 const DRAFT_COLUMNS =
-  "id,kind,state,autonomy,title,body,premise,script_sections,visual_plan,rationale,counterparty,provenance,created_at,decided_at,format_id,pillar_id,hook,estimated_duration_seconds"
+  "id,kind,state,autonomy,title,body,premise,script_sections,visual_plan,rationale,counterparty,deadline,provenance,created_at,decided_at,format_id,pillar_id,hook,estimated_duration_seconds"
 
 /** Undecided drafts only — approved and killed items leave the queue. */
 export async function loadCreatorDrafts(

@@ -17,7 +17,7 @@ const STORY_COLUMNS =
   "id,state,thesis,synthesis_kind,move,receipts,why_now,angle,suggested_pillar_id,work_item_id,created_at,lineage,lineage_state,named_actor,stakes,open_question,hook_line,unknowns,kill_reason,primary_emotion,output_format,gate_failure,signal_ids"
 
 const WORK_COLUMNS =
-  "id,kind,state,autonomy,title,body,rationale,counterparty,provenance,created_at,decided_at"
+  "id,kind,state,autonomy,title,body,rationale,counterparty,deadline,provenance,created_at,decided_at"
 
 /** Blocker shared by both agent screens: without topics, nothing hunts. */
 export async function researchTopicsBlocker(
@@ -103,7 +103,11 @@ export async function loadOpportunities(
         .eq("user_id", userId)
         .is("deleted_at", null)
         .neq("state", "archived")
-        .in("kind", ["deal", "event"])
+        .in("kind", ["deal", "event", "grant"])
+        // Deadline first, nulls last: what closes soonest is what needs
+        // deciding soonest, and a marketplace listing with no date can wait
+        // behind a call that shuts on Friday.
+        .order("deadline", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(80),
     ),

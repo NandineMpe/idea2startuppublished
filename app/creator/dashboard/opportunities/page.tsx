@@ -1,5 +1,14 @@
 import type React from "react"
-import { CheckCircle2, ExternalLink, Handshake, Inbox, Mic2, Send } from "lucide-react"
+import {
+  CalendarClock,
+  CheckCircle2,
+  ExternalLink,
+  Handshake,
+  Inbox,
+  Landmark,
+  Mic2,
+  Send,
+} from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadOpportunities } from "@/lib/creator/load-stories"
 import { DecideButtons } from "@/components/creator/decide-buttons"
@@ -9,7 +18,7 @@ import { BriefReplyPanel } from "@/components/creator/brief-reply"
 import { MovesPanel } from "@/components/creator/moves-panel"
 import { Disclosure } from "@/components/creator/disclosure"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
-import type { CreatorWorkItem } from "@/lib/creator/types"
+import { daysUntil, type CreatorWorkItem } from "@/lib/creator/types"
 
 export const dynamic = "force-dynamic"
 
@@ -21,21 +30,42 @@ type OpportunityProvenance = {
 function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDecision: boolean }) {
   const provenance = item.provenance as OpportunityProvenance
   const evidence = provenance.evidence_urls ?? []
+  const days = daysUntil(item.deadline)
 
   return (
     <article className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             {item.kind === "event" ? (
               <Mic2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+            ) : item.kind === "grant" ? (
+              <Landmark className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             ) : (
               <Handshake className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
             )}
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-              {item.kind === "event" ? "Event" : "Deal"}
+              {item.kind === "event" ? "Event" : item.kind === "grant" ? "Grant" : "Deal"}
               {provenance.lane ? ` · ${provenance.lane}` : ""}
             </span>
+            {/* The deadline is the opportunity on a grant, so it sits in the
+                header rather than in the body. Colour escalates because a
+                fortnight and four months are different decisions. */}
+            {days !== null && (
+              <span
+                title={`Closes ${item.deadline}`}
+                className={`inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                  days <= 14
+                    ? "bg-red-500/10 text-red-700 dark:text-red-400"
+                    : days <= 45
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <CalendarClock className="h-3 w-3" />
+                {days === 0 ? "closes today" : days === 1 ? "1 day left" : `${days} days left`}
+              </span>
+            )}
           </div>
           <h3 className="text-[14px] font-semibold text-foreground leading-snug">{item.title}</h3>
           {item.rationale && (
@@ -47,7 +77,7 @@ function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDe
           <ItemActions
             entity="work"
             id={item.id}
-            noun={item.kind === "event" ? "event" : "deal"}
+            noun={item.kind === "event" ? "event" : item.kind === "grant" ? "grant" : "deal"}
             archiveHint="Archive — clears it and stops the hunt re-surfacing the same one"
           />
         </div>
@@ -178,7 +208,7 @@ export default async function OpportunitiesPage() {
     <PageBody>
       <PageHeader
         title="Opportunities"
-        subtitle="Deals, events and platform listings your partnerships desk surfaced — each with the pitch already drafted."
+        subtitle="Grants, deals, events and platform listings your partnerships desk surfaced — each with the pitch already drafted and the deadline attached."
         actions={<RunAgentButton kind="opportunities" label="Hunt now" variant="primary" />}
       />
 

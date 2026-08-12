@@ -173,7 +173,7 @@ export type CreatorCanon = {
 // Work — what the agents produced. Always traceable to corpus and canon.
 // ---------------------------------------------------------------------------
 
-export type WorkKind = "draft" | "insight" | "deal" | "event" | "move"
+export type WorkKind = "draft" | "insight" | "deal" | "event" | "move" | "grant"
 
 /** The plan attached to a strategic move — what to do, and what could go wrong. */
 export type MoveOutline = {
@@ -228,6 +228,12 @@ export type CreatorWorkItem = {
   provenance: WorkProvenance
   /** Null on drafts, moves, and opportunities proposed before this existed. */
   counterparty: Counterparty | null
+  /**
+   * The date the opportunity stops existing, YYYY-MM-DD. Null unless a source
+   * actually stated one: an estimated deadline is worse than none, because it
+   * can reassure the creator that a closed call is still open.
+   */
+  deadline: string | null
   created_at: string
   decided_at: string | null
 }
@@ -429,6 +435,14 @@ export type StoryEmotion =
 
 /** Some good material is a byline and a bad video. Tagged so a routing error is not read as a personal failure. */
 export type StoryOutputFormat = "script" | "written" | "artifact"
+
+/** Days from now until a deadline, negative once it has passed. Null when there is no date. */
+export function daysUntil(deadline: string | null | undefined): number | null {
+  if (!deadline) return null
+  const then = new Date(`${deadline}T00:00:00Z`).getTime()
+  if (Number.isNaN(then)) return null
+  return Math.ceil((then - Date.now()) / (24 * 3600 * 1000))
+}
 
 /**
  * Why something was killed.
