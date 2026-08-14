@@ -36,6 +36,19 @@ export type OpportunityCandidate = {
   evidence: string
   /** Set by lanes that carry a real closing date. A grant is only an opportunity until then. */
   deadline?: string | null
+  /**
+   * Where the application is actually made or started.
+   *
+   * Always taken from the register, never constructed and never chosen by the
+   * model. A guessed apply link is the same class of failure as a guessed
+   * contact: it looks right, it is clickable, and it sends the creator to a
+   * 404 on the morning of a deadline.
+   */
+  apply_url?: string | null
+  /** Who may apply, quoted from the announcement. The first thing that decides a grant. */
+  eligibility?: string | null
+  /** Published contact for the call. Free, and better than an inferred one. */
+  contact_email?: string | null
 }
 
 /**
@@ -90,6 +103,60 @@ function parseUsDate(value: string | undefined): Date | null {
   if (!m) return null
   const d = new Date(`${m[3]}-${m[1]}-${m[2]}T00:00:00Z`)
   return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * The fields the Grants.gov search endpoint leaves out.
+ *
+ * Eligibility is the important one. Most US federal calls restrict applicants
+ * to organisations located in the United States, and the search endpoint says
+ * nothing about it, so the desk was surfacing a dozen calls a day that an
+ * Ireland-based individual is simply barred from. Reading the real text means
+ * the model can rule them out on evidence rather than on a guess, and means the
+ * few that genuinely are open show up as such.
+ */
+async function fetchGrantDetail(opportunityId: string): Promise<{
+  eligibility: string | null
+  applyUrl: string | null
+  contactEmail: string | null
+}> {
+  const empty = { eligibility: null, applyUrl: null, contactEmail: null }
+  try {
+    const res = await fetch("https://api.grants.gov/v1/api/fetchOpportunity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opportunityId: Number(opportunityId) }),
+    })
+    if (!res.ok) return empty
+    const data = (await res.json()) as {
+      data?: {
+        synopsis?: {
+          applicantEligibilityDesc?: string
+          fundingDescLinkUrl?: string
+          agencyContactEmail?: string
+        }
+      }
+    }
+    const syn = data.data?.synopsis
+    if (!syn) return empty
+
+    // The eligibility text is HTML with escaped entities inside it, so it needs
+    // both stripped before it can be read aloud or reasoned over.
+    const eligibility = syn.applicantEligibilityDesc
+      ? decodeEntities(decodeEntities(syn.applicantEligibilityDesc).replace(/<[^>]+>/g, " "))
+          .replace(/\s+/g, " ")
+          .slice(0, 700)
+      : null
+
+    const link = syn.fundingDescLinkUrl?.trim()
+    return {
+      eligibility,
+      applyUrl: link && /^https?:\/\//i.test(link) ? link : null,
+      contactEmail: syn.agencyContactEmail?.trim() || null,
+    }
+  } catch {
+    return empty
+  }
 }
 
 /**
@@ -149,14 +216,29 @@ export async function huntGrantsUS(topics: string[]): Promise<OpportunityCandida
         // date in the past is not.
         const close = parseUsDate(hit.closeDate)
         if (close && close.getTime() < now) continue
+
+        // Second call per surviving hit, for the three fields the search
+        // endpoint does not return and that decide everything: who may apply,
+        // where the agency's own announcement lives, and who to write to. All
+        // keyless. Twelve extra requests a day is a cheap price for not
+        // proposing grants the creator is barred from.
+        const detail = await fetchGrantDetail(hit.id)
+
         out.push({
           lane: "grants",
           title: `${clean} (${hit.agency ?? hit.agencyCode ?? "US federal"})`,
           url: `https://www.grants.gov/search-results-detail/${hit.id}`,
           evidence: `US federal funding opportunity ${hit.number ?? ""} from ${hit.agency ?? hit.agencyCode ?? "a federal agency"}. ${
             close ? `Applications close ${close.toISOString().slice(0, 10)}.` : "No published closing date; treat as a standing announcement."
-          } Matched on "${topic}".`,
+          } Matched on "${topic}".${detail.eligibility ? ` WHO MAY APPLY: ${detail.eligibility}` : ""}`,
           deadline: close ? close.toISOString().slice(0, 10) : null,
+          // The agency's own announcement is the better landing page when it
+          // exists: it carries the full instructions and the submission route.
+          // The Grants.gov detail page is the fallback and carries the Apply
+          // button either way.
+          apply_url: detail.applyUrl ?? `https://www.grants.gov/search-results-detail/${hit.id}`,
+          eligibility: detail.eligibility,
+          contact_email: detail.contactEmail,
         })
       }
     } catch (e) {

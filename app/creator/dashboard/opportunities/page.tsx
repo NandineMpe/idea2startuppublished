@@ -83,6 +83,33 @@ function OpportunityCard({ item, showDecision }: { item: CreatorWorkItem; showDe
         </div>
       </div>
 
+      {/* The apply link leads, above everything including who to contact.
+          On a grant the submission page IS the opportunity: it carries the call
+          document, the eligibility and the start-application button, and every
+          click between the creator and it is a click taken on a deadline.
+          The href comes from the register, never from the model. */}
+      {item.apply_url && (
+        <a
+          href={item.apply_url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-[13px] font-medium text-white hover:bg-emerald-700 transition-colors"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          {item.kind === "grant" ? "Open the application" : "Open the submission page"}
+        </a>
+      )}
+
+      {item.eligibility && (
+        <div className="mt-3">
+          <Disclosure label="Who may apply">
+            <p className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+              {item.eligibility}
+            </p>
+          </Disclosure>
+        </div>
+      )}
+
       {/* Above the pitch, not inside it. The pitch is the easy half; knowing
           who it goes to is the half that was missing, and burying it under a
           disclosure is how the card stayed unactionable. */}

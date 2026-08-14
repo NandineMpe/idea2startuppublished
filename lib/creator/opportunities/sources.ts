@@ -154,10 +154,21 @@ export async function fetchEuCalls(topics: string[]): Promise<OpportunityCandida
         if (deadline && deadline.getTime() < now) continue
         seen.add(identifier || title)
 
+        // The register hands back the topic-details page, which is the page
+        // carrying the Start Submission button, the full call document and the
+        // partner search. It is the apply link, so it is used as one rather
+        // than a URL being constructed from the identifier.
+        const topicUrl =
+          row.url ??
+          (identifier
+            ? `https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/${identifier.toLowerCase()}`
+            : "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home")
+
         out.push({
           lane: "grants",
           title: `${title}${identifier ? ` (${identifier})` : ""}`,
-          url: row.url ?? "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/home",
+          url: topicUrl,
+          apply_url: topicUrl,
           evidence: `European Union funding call${identifier ? ` ${identifier}` : ""}, published on the Funding and Tenders portal and currently ${
             m.status?.[0] === "31094501" ? "forthcoming" : "open"
           }. ${deadline ? `Closes ${deadline.toISOString().slice(0, 10)}.` : "No deadline published yet."} Programme: ${
@@ -209,6 +220,10 @@ export async function fetchFunderFeeds(topics: string[]): Promise<OpportunityCan
           lane: "grants",
           title: `${item.title} (${feed.label})`,
           url: item.url,
+          // The funder's own opportunity page carries the eligibility, the
+          // closing date and the start-application route. There is nothing
+          // better to point at and nothing to construct.
+          apply_url: item.url,
           evidence: `${feed.label} funding opportunity, announced ${item.published_at.toISOString().slice(0, 10)}. ${item.body.slice(0, 400)}`,
           deadline: null,
         })
@@ -286,6 +301,9 @@ export async function fetchConferenceCalls(markets: string[]): Promise<Opportuni
             lane: "events",
             title: `${entry.name} — call for speakers`,
             url: entry.cfpUrl,
+            // cfpUrl IS the submission form. That is the whole value of this
+            // dataset over a search result about the same conference.
+            apply_url: entry.cfpUrl,
             evidence: `Conference on ${entry.startDate ?? "a date not yet stated"}, ${where}. The call for speakers closes ${entry.cfpEndDate}. Conference site: ${entry.url ?? "not listed"}.`,
             deadline: entry.cfpEndDate,
           })

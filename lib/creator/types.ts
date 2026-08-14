@@ -234,6 +234,14 @@ export type CreatorWorkItem = {
    * can reassure the creator that a closed call is still open.
    */
   deadline: string | null
+  /**
+   * Where the application is made. Carried straight off the register that
+   * published the call, never model-written and never constructed, because a
+   * wrong apply link is discovered at the deadline rather than before it.
+   */
+  apply_url: string | null
+  /** Who may apply, quoted from the announcement. The first thing that decides a grant. */
+  eligibility: string | null
   created_at: string
   decided_at: string | null
 }

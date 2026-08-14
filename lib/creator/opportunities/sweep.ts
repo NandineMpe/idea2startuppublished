@@ -183,7 +183,12 @@ export async function sweepOpportunitiesForUser(
   }
 
   const candidateList = candidates
-    .map((c, i) => `[${i}] (${c.lane}) ${c.title}${c.url ? ` <${c.url}>` : ""} — ${c.evidence.slice(0, 300)}`)
+    .map(
+      (c, i) =>
+        `[${i}] (${c.lane}) ${c.title}${c.url ? ` <${c.url}>` : ""}${
+          c.apply_url && c.apply_url !== c.url ? ` APPLY: <${c.apply_url}>` : ""
+        }${c.deadline ? ` CLOSES: ${c.deadline}` : ""} — ${c.evidence.slice(0, 400)}`,
+    )
     .join("\n") || "none found this run"
 
   const marketplaceList = CREATOR_MARKETPLACES
@@ -214,13 +219,24 @@ export async function sweepOpportunitiesForUser(
   // constructed rather than found, and sending a pitch into a made-up address is
   // the outreach version of citing a paper that does not exist.
   const offeredUrls = new Set(
-    [...candidates.map((c) => c.url), ...CREATOR_MARKETPLACES.map((m) => m.url)].filter(
-      (u): u is string => Boolean(u),
-    ),
+    [
+      ...candidates.map((c) => c.url),
+      // Apply routes are shown to the model too, so it may legitimately choose
+      // one as the contact route. They came off the register, so they are
+      // exactly as trustworthy as the listing itself.
+      ...candidates.map((c) => c.apply_url ?? null),
+      ...CREATOR_MARKETPLACES.map((m) => m.url),
+    ].filter((u): u is string => Boolean(u)),
   )
 
   let proposed = 0
   for (const opp of object.opportunities) {
+    // The candidate this opportunity was built from, matched on a URL the model
+    // cited. Everything factual about the route — where to apply, when it
+    // closes, who to write to — is read off here rather than out of the
+    // model's answer, so none of it can be invented.
+    const source = candidates.find((c) => c.url && opp.evidence_urls.some((u) => u === c.url))
+
     const route = offeredUrls.has(opp.contact_route) ? opp.contact_route : ""
     // A name the model produced without a route to corroborate it is the exact
     // shape of an invented contact, so it is demoted rather than shown.
@@ -230,7 +246,11 @@ export async function sweepOpportunitiesForUser(
       organisation: opp.organisation.trim(),
       contact_role: opp.contact_role.trim(),
       contact_name: named ? opp.contact_name.trim() : "",
-      contact_route: route,
+      // A published contact address beats an inferred route every time, and it
+      // costs nothing: the register hands it over. Used only when the model did
+      // not find a named individual, since a person is still better than a
+      // shared mailbox.
+      contact_route: route || (source?.contact_email ? `mailto:${source.contact_email}` : ""),
       next_action: opp.next_action.trim(),
       confidence: named ? "named" : opp.contact_role.trim() ? "role_only" : "unknown",
     }
@@ -257,7 +277,9 @@ export async function sweepOpportunitiesForUser(
         body: opp.pitch,
         rationale: opp.why_fit,
         counterparty,
-        deadline,
+        deadline: deadline ?? source?.deadline ?? null,
+        apply_url: source?.apply_url ?? null,
+        eligibility: source?.eligibility ?? null,
         provenance: {
           agent: "opportunities",
           canon_version: canon?.version ?? 0,
