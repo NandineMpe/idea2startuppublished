@@ -5,6 +5,7 @@ import { loadWorth } from "@/lib/creator/load-worth"
 import { loadCreatorCanon } from "@/lib/creator/load-canon"
 import { loadCreatorPosts } from "@/lib/creator/load-corpus"
 import { loadCreatorSettings } from "@/lib/creator/load-settings"
+import { withoutDashes } from "@/lib/creator/no-dashes"
 import { lineItemsBlock, priceLineItems } from "@/lib/creator/worth/line-items"
 import { engagementRate, type CreatorPost } from "@/lib/creator/types"
 
@@ -42,7 +43,7 @@ const replySchema = z.object({
   priced_asks: z
     .string()
     .describe(
-      "One line per thing the brief asks for beyond a single organic post, each as 'Label — CURRENCY amount', taken verbatim from the supplied rate card. Empty string if the brief asks for nothing beyond the base. Never invent a line or a figure.",
+      "One line per thing the brief asks for beyond a single organic post, each as 'Label: CURRENCY amount', taken verbatim from the supplied rate card. Empty string if the brief asks for nothing beyond the base. Never invent a line or a figure. No dashes of any kind as separators.",
     ),
   quoted_total: z
     .number()
@@ -101,7 +102,8 @@ Rules:
 - Recommend a format from the creator's proven formats and say what it does — cite the real median views or engagement supplied.
 - Keep the reply under 220 words. Brands skim. Warm, direct, specific; no hype, no gratitude-stacking, no "I'd love the opportunity".
 - watch_outs are for the creator's eyes only and must not appear in the reply text.
-- Write in the creator's voice where a voice profile is given, but a business email is more formal than their content — match register, not slang.`
+- Write in the creator's voice where a voice profile is given, but a business email is more formal than their content — match register, not slang.
+- Never use an em dash or an en dash anywhere in the reply text or in any field that reaches the creator. Use a full stop, a comma, a colon or a new sentence. This is absolute: the creator will not send an email containing one, so a reply with one in it is a reply she has to rewrite by hand.`
 
 function formatPerformanceLines(canon: unknown, posts: CreatorPost[]): string {
   const c = canon as { formats?: Array<{ id: string; label: string; median_views: number | null }> } | null
@@ -251,10 +253,13 @@ Read the brief and draft the reply.`,
       },
       priced_asks: (object.priced_asks ?? "")
         .split(/\r?\n/)
-        .map((line) => line.replace(/^[-*\d.\s]+/, "").trim())
+        .map((line) => withoutDashes(line.replace(/^[-*\d.\s]+/, "").trim()))
         .filter(Boolean),
       quoted_total: object.quoted_total,
-      reply: object.reply,
+      // The prompt asks for no dashes and this makes it true. The reply is the
+      // one field here that gets sent rather than read, so it is the one field
+      // where a stray em dash costs a rewrite instead of a shrug.
+      reply: withoutDashes(object.reply),
     }
 
     return { ok: true, reply, tokens: usage.totalTokens }

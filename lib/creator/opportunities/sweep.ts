@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { loadWorth } from "@/lib/creator/load-worth"
 import { loadTrajectory, trajectoryBlock } from "@/lib/creator/load-trajectory"
+import { withoutDashes } from "@/lib/creator/no-dashes"
 import { CREATOR_MARKETPLACES } from "./marketplaces"
 import {
   huntApolloCompanies,
@@ -278,7 +279,10 @@ export async function sweepOpportunitiesForUser(
         state: "proposed",
         autonomy: "approve",
         title: opp.title,
-        body: opp.pitch,
+        // The pitch is sent verbatim, so it gets the same dash strip the brief
+        // reply gets. A drafted message she has to reread for punctuation is a
+        // message she rewrites, which defeats the point of drafting it.
+        body: withoutDashes(opp.pitch),
         rationale: opp.why_fit,
         counterparty,
         deadline: deadline ?? source?.deadline ?? null,
