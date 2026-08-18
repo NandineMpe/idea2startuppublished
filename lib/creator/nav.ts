@@ -2,6 +2,7 @@ import type React from "react"
 import {
   Compass,
   DollarSign,
+  Factory,
   Fingerprint,
   FileVideo,
   Handshake,
@@ -36,6 +37,9 @@ export const CREATOR_NAV: CreatorNavItem[] = [
   { title: "Trajectory", href: "/creator/dashboard/trajectory", icon: Compass },
   { title: "The wire", short: "Wire", href: "/creator/dashboard/feed", icon: Radio, primary: true },
   { title: "Stories", href: "/creator/dashboard/stories", icon: Newspaper, primary: true },
+  // Next to Stories rather than near Canon: a story is one thing that happened,
+  // and this is the arc the story sits on. They get read together or not at all.
+  { title: "In industry", short: "Industry", href: "/creator/dashboard/industry", icon: Factory },
   { title: "Open files", short: "Files", href: "/creator/dashboard/threads", icon: History },
   { title: "Opportunities", short: "Deals", href: "/creator/dashboard/opportunities", icon: Handshake },
   { title: "Next Five", short: "Next", href: "/creator/dashboard/next", icon: Lightbulb, primary: true },
