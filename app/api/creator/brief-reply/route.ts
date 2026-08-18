@@ -24,5 +24,5 @@ export async function POST(request: Request) {
   const result = await draftBriefReply(supabase, user.id, body.email ?? "")
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
-  return NextResponse.json({ reply: result.reply })
+  return NextResponse.json({ reply: result.reply, conversation_id: result.conversation_id })
 }

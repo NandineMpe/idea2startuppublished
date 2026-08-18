@@ -15,6 +15,8 @@ import { DecideButtons } from "@/components/creator/decide-buttons"
 import { ItemActions } from "@/components/creator/item-actions"
 import { RunAgentButton } from "@/components/creator/run-agent-button"
 import { BriefReplyPanel } from "@/components/creator/brief-reply"
+import { ConversationsPanel } from "@/components/creator/conversations-panel"
+import { loadConversations } from "@/lib/creator/deals/conversations"
 import { MovesPanel } from "@/components/creator/moves-panel"
 import { Disclosure } from "@/components/creator/disclosure"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
@@ -227,7 +229,10 @@ function Column({
 
 export default async function OpportunitiesPage() {
   const { supabase, userId } = await requireCreatorUser()
-  const context = await loadOpportunities(supabase, userId)
+  const [context, conversations] = await Promise.all([
+    loadOpportunities(supabase, userId),
+    loadConversations(supabase, userId),
+  ])
 
   const empty = !context.proposed.length && !context.active.length && !context.done.length
 
@@ -244,6 +249,12 @@ export default async function OpportunitiesPage() {
       {/* Inbound briefs arrive whether or not the hunting agents have run, so
           this sits above the pipeline rather than inside its empty state. */}
       <BriefReplyPanel />
+
+      {/* Above the moves and the pipeline: a brand that has already written is
+          worth more than any candidate the desk found this morning, and the
+          thread going cold is the failure mode nothing else on this page
+          catches. */}
+      <ConversationsPanel conversations={conversations} />
 
       {/* Above the deal pipeline on purpose: what to build compounds, whereas a
           single sponsored post does not, and the pipeline is the noisier list. */}

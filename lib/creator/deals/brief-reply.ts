@@ -6,6 +6,7 @@ import { loadCreatorCanon } from "@/lib/creator/load-canon"
 import { loadCreatorPosts } from "@/lib/creator/load-corpus"
 import { loadCreatorSettings } from "@/lib/creator/load-settings"
 import { withoutDashes } from "@/lib/creator/no-dashes"
+import { openConversation } from "./conversations"
 import { lineItemsBlock, priceLineItems } from "@/lib/creator/worth/line-items"
 import { engagementRate, type CreatorPost } from "@/lib/creator/types"
 
@@ -126,7 +127,7 @@ function formatPerformanceLines(canon: unknown, posts: CreatorPost[]): string {
 }
 
 export type BriefReplyResult =
-  | { ok: true; reply: BriefReply; tokens: number }
+  | { ok: true; reply: BriefReply; conversation_id: string | null; tokens: number }
   | { ok: false; error: string }
 
 export async function draftBriefReply(
@@ -262,7 +263,21 @@ Read the brief and draft the reply.`,
       reply: withoutDashes(object.reply),
     }
 
-    return { ok: true, reply, tokens: usage.totalTokens }
+    // Persisted here rather than left in the browser, because a follow-up is
+    // written days later against a conversation nothing would otherwise
+    // remember. A failed insert must not lose her the reply she is looking at,
+    // so it degrades to a null id and the drafting flow carries on.
+    const conversationId = await openConversation(supabase, userId, {
+      brand: reply.brand ?? null,
+      inbound: trimmed,
+      what_they_want: reply.what_they_want,
+      deliverables: reply.deliverables,
+      quoted_total: reply.quoted_total,
+      currency: reply.quoted_rate.currency,
+      reply: reply.reply,
+    })
+
+    return { ok: true, reply, conversation_id: conversationId, tokens: usage.totalTokens }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not draft a reply." }
   }

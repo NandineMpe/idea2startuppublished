@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { AlertTriangle, Check, Copy, Mail } from "lucide-react"
 import type { BriefReply } from "@/lib/creator/deals/brief-reply"
 
@@ -15,20 +16,34 @@ export function BriefReplyPanel() {
   const [result, setResult] = useState<BriefReply | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const router = useRouter()
 
   async function draft() {
     setPending(true)
     setError(null)
     setResult(null)
+    setSaved(false)
     try {
       const res = await fetch("/api/creator/brief-reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       })
-      const data = (await res.json()) as { reply?: BriefReply; error?: string }
+      const data = (await res.json()) as {
+        reply?: BriefReply
+        conversation_id?: string | null
+        error?: string
+      }
       if (!res.ok) setError(data.error ?? `Failed (HTTP ${res.status})`)
-      else setResult(data.reply ?? null)
+      else {
+        setResult(data.reply ?? null)
+        setSaved(Boolean(data.conversation_id))
+        // The conversation was created server-side, so the panel below only
+        // learns about it on a refresh. Without this she has to reload the page
+        // to find the thread she just started.
+        if (data.conversation_id) router.refresh()
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.")
     } finally {
@@ -152,6 +167,14 @@ export function BriefReplyPanel() {
               {result.reply}
             </pre>
           </div>
+
+          {/* Says where the thread went, because the follow-up depends on it and
+              a silent save is a save she will not know to look for. */}
+          <p className="text-[11px] text-muted-foreground">
+            {saved
+              ? "Saved to Brand conversations below. Mark it sent once the email actually goes out, and the follow-ups start from there."
+              : "Could not save this to your conversations, so there will be nothing to follow up against. Copy the reply now."}
+          </p>
         </div>
       )}
     </section>
