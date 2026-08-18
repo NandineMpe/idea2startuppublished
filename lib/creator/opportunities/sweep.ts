@@ -197,7 +197,11 @@ export async function sweepOpportunitiesForUser(
 
   const headline = worthContext.worth?.headline
   const worthBlock = headline
-    ? `RATE CARD (derived from ${headline.sample_size} posts with metrics): median ${headline.views_median.toLocaleString()} views/post; defensible range ${headline.currency} ${headline.rate_low}–${headline.rate_high} per sponsored post.`
+    ? `RATE CARD (derived from ${headline.sample_size} posts with metrics): median ${headline.views_median.toLocaleString()} views/post; defensible range ${headline.currency} ${headline.rate_low}–${headline.rate_high} per sponsored post, standard quote ${headline.currency} ${headline.rate_target}.${
+        headline.rate_floor
+          ? ` Hard floor ${headline.currency} ${headline.rate_floor} — already paid by a brand, so no pitch may open below it.`
+          : ""
+      } The fee buys one organic post on her own handle; paid amplification, exclusivity, brand-handle posting and buyout are priced separately and must never be implied as included.`
     : "RATE CARD: not yet derivable — draft pitches without specific numbers."
 
   const canonBlock = canon

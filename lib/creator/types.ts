@@ -527,7 +527,19 @@ export type RateBand = {
   views_median: number
   views_p75: number
   rate_low: number
+  /** The standard single-video quote: median views at the midpoint of the CPM band. */
+  rate_target: number
   rate_high: number
+  /**
+   * The highest fee actually received, when one is on record.
+   *
+   * The only number here that is a receipt rather than an estimate, and the
+   * reason the band cannot open below it: a card whose lowest figure sits under
+   * what a brand has already paid hands the next brand its opening offer.
+   */
+  rate_floor: number | null
+  /** True when the floor lifted the low end — meaning the distribution alone was underpricing her. */
+  floor_applied: boolean
   currency: string
   confidence: Confidence
   /** Posts backing the number. This is what makes the rate arguable in a negotiation. */
@@ -540,6 +552,13 @@ export type WorthSummary = {
   headline: RateBand | null
   by_pillar: RateBand[]
   by_format: RateBand[]
+  /**
+   * The fee every line item is a percentage of.
+   *
+   * The proven floor when there is one, so the card prices up from a number that
+   * has actually cleared rather than from a percentile.
+   */
+  base_fee: number
   computed_at: string | null
   /** Metrics snapshot age — a rate built on stale metrics is a stale rate. */
   metrics_captured_at: string | null
@@ -607,8 +626,18 @@ export type CreatorCurrency = (typeof SUPPORTED_CURRENCIES)[number]
  * derived from the creator's own data. Overridable in Settings, and worth replacing
  * once real closed-deal figures exist to calibrate against.
  */
-export const DEFAULT_CPM_LOW = 20
-export const DEFAULT_CPM_HIGH = 40
+/**
+ * Marked to the market for a B2B audience, August 2026.
+ *
+ * The old 20-40 band was a consumer-creator default and it was pricing a
+ * finance, audit and legal audience as though it were lifestyle. Published
+ * brand-deal CPMs run 15-80 across the board, with finance and fintech carrying
+ * a 30-60% premium on the platform default and specialist finance channels
+ * quoted well above that. 35-70 sits inside the published band and reflects the
+ * niche rather than the platform.
+ */
+export const DEFAULT_CPM_LOW = 35
+export const DEFAULT_CPM_HIGH = 70
 export const DEFAULT_CURRENCY: CreatorCurrency = "USD"
 
 /**
@@ -623,6 +652,16 @@ export type CreatorSettings = {
   currency: CreatorCurrency
   cpm_low: number
   cpm_high: number
+  /**
+   * The highest fee actually paid for one sponsored video.
+   *
+   * Not an estimate and not a target: a receipt. It clamps the low end of every
+   * band, because the distribution alone was quoting under a figure that had
+   * already cleared, and every line item on the card is a percentage of it.
+   */
+  rate_floor: number | null
+  /** Per-line-item multiple overrides, keyed by line item key. */
+  rate_overrides: Record<string, number>
   tiktok_handle: string | null
   /** Declared niche topics — the agents' stopgap input until the canon is derived. */
   niche_topics: string[]

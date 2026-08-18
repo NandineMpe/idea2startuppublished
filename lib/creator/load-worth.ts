@@ -40,7 +40,20 @@ function viewsOf(posts: CreatorPost[]): number[] {
     .sort((a, b) => a - b)
 }
 
-/** A rate band for one scope, or null when no post in scope carries metrics. */
+/** Quotes round to the nearest 25 — a fee reading 791 says it came out of a spreadsheet. */
+function quotable(n: number): number {
+  return Math.round(n / 25) * 25
+}
+
+/**
+ * A rate band for one scope, or null when no post in scope carries metrics.
+ *
+ * The band is clamped to the proven floor. Without that clamp this creator's
+ * p25 at the old CPM produced a low end of 452 against a fee of 950 that a
+ * brand had already paid, and the lowest number on a rate card is the number
+ * the next brand opens at. The floor never moves the high end down: if the
+ * distribution justifies more, the distribution wins.
+ */
 export function buildRateBand(
   scope: RateBand["scope"],
   scopeLabel: string,
@@ -54,6 +67,14 @@ export function buildRateBand(
   const median = percentile(views, 0.5)
   const p75 = percentile(views, 0.75)
 
+  const floor = settings.rate_floor
+  const derivedLow = quotable((p25 * settings.cpm_low) / 1000)
+  const cpmMid = (settings.cpm_low + settings.cpm_high) / 2
+
+  const rateLow = floor ? Math.max(derivedLow, floor) : derivedLow
+  const rateTarget = Math.max(rateLow, quotable((median * cpmMid) / 1000))
+  const rateHigh = Math.max(rateTarget, quotable((p75 * settings.cpm_high) / 1000))
+
   return {
     scope,
     scope_label: scopeLabel,
@@ -61,8 +82,11 @@ export function buildRateBand(
     views_p25: Math.round(p25),
     views_median: Math.round(median),
     views_p75: Math.round(p75),
-    rate_low: Math.round((p25 * settings.cpm_low) / 1000),
-    rate_high: Math.round((p75 * settings.cpm_high) / 1000),
+    rate_low: rateLow,
+    rate_target: rateTarget,
+    rate_high: rateHigh,
+    rate_floor: floor,
+    floor_applied: Boolean(floor && floor > derivedLow),
     currency: settings.currency,
     confidence: confidenceForSample(views.length),
     comparable_post_ids: posts
@@ -104,6 +128,10 @@ export function buildWorthSummary(
     headline,
     by_pillar: byPillar.sort((a, b) => b.views_median - a.views_median),
     by_format: byFormat.sort((a, b) => b.views_median - a.views_median),
+    // Line items price off the proven fee where there is one, so the card builds
+    // up from a number that has cleared rather than from a percentile she has
+    // never actually been paid.
+    base_fee: settings.rate_floor ?? headline.rate_target,
     computed_at: new Date().toISOString(),
     metrics_captured_at: capturedAt,
   }

@@ -1,14 +1,19 @@
 import { DollarSign } from "lucide-react"
 import { requireCreatorUser } from "@/lib/creator/auth"
 import { loadWorth } from "@/lib/creator/load-worth"
+import { loadCreatorSettings } from "@/lib/creator/load-settings"
 import { RateBandCard } from "@/components/creator/rate-band-card"
+import { RateLineItems } from "@/components/creator/rate-line-items"
 import { BlockerNotice, EmptyState, PageBody, PageHeader } from "@/components/creator/page-shell"
 
 export const dynamic = "force-dynamic"
 
 export default async function WorthPage() {
   const { supabase, userId } = await requireCreatorUser()
-  const { worth, blocker } = await loadWorth(supabase, userId)
+  const [{ worth, blocker }, { settings }] = await Promise.all([
+    loadWorth(supabase, userId),
+    loadCreatorSettings(supabase, userId),
+  ])
 
   if (!worth?.headline) {
     return (
@@ -33,6 +38,28 @@ export default async function WorthPage() {
       <div className="mb-7">
         <RateBandCard band={worth.headline} emphasis />
       </div>
+
+      {/* The line items sit directly under the base fee rather than on their own
+          screen. A brand deal is a licence, not a post, and the rights the brand
+          walks away with are worth more than the shoot — pricing them somewhere
+          else is how they end up inside the base fee for free. */}
+      <section className="mb-8">
+        <div className="mb-4">
+          <h2 className="text-[15px] font-semibold text-foreground">Rate card</h2>
+          <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed max-w-2xl">
+            Everything below is a percentage of a base of{" "}
+            <span className="font-medium text-foreground tabular-nums">
+              {new Intl.NumberFormat("en", {
+                style: "currency",
+                currency: worth.currency,
+                maximumFractionDigits: 0,
+              }).format(worth.base_fee)}
+            </span>{" "}
+            for one video, organic, on your own handle. Raise the base and the whole card reprices.
+          </p>
+        </div>
+        <RateLineItems base={worth.base_fee} currency={worth.currency} overrides={settings.rate_overrides} />
+      </section>
 
       {worth.by_pillar.length > 0 && (
         <section className="mb-7">

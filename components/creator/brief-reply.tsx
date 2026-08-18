@@ -97,6 +97,28 @@ export function BriefReplyPanel() {
             />
           </div>
 
+          {/* The itemisation, above the watch-outs, because this is the part that
+              goes into the reply. A brief that quietly assumes six months of paid
+              amplification is not a warning to be careful — it is another line on
+              the invoice, and seeing it broken out is what stops it being free. */}
+          {result.priced_asks.length > 0 && (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mb-2">
+                What this brief asks for beyond one organic post
+              </p>
+              <ul className="grid gap-1">
+                {result.priced_asks.map((ask, i) => (
+                  <li key={i} className="text-[12px] text-foreground/90 leading-relaxed">
+                    • {ask}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] font-medium text-foreground mt-2 pt-2 border-t border-emerald-500/20 tabular-nums">
+                Total: {result.quoted_rate.currency} {result.quoted_total.toLocaleString()}
+              </p>
+            </div>
+          )}
+
           {result.watch_outs.length > 0 && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3">
               <p className="text-[11px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400 mb-1.5 inline-flex items-center gap-1.5">

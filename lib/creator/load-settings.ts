@@ -15,6 +15,8 @@ export const DEFAULT_CREATOR_SETTINGS: CreatorSettings = {
   currency: DEFAULT_CURRENCY,
   cpm_low: DEFAULT_CPM_LOW,
   cpm_high: DEFAULT_CPM_HIGH,
+  rate_floor: null,
+  rate_overrides: {},
   tiktok_handle: null,
   niche_topics: [],
   visual_tools: [],
@@ -33,6 +35,17 @@ function normalise(row: Partial<CreatorSettings> | null): CreatorSettings {
     cpm_low: typeof row.cpm_low === "number" && row.cpm_low > 0 ? row.cpm_low : DEFAULT_CREATOR_SETTINGS.cpm_low,
     cpm_high:
       typeof row.cpm_high === "number" && row.cpm_high > 0 ? row.cpm_high : DEFAULT_CREATOR_SETTINGS.cpm_high,
+    // Coerced through Number because numeric(10,2) comes back as a string over
+    // PostgREST, and a string floor silently loses every Math.max against it.
+    rate_floor: Number(row.rate_floor) > 0 ? Number(row.rate_floor) : null,
+    rate_overrides:
+      row.rate_overrides && typeof row.rate_overrides === "object" && !Array.isArray(row.rate_overrides)
+        ? Object.fromEntries(
+            Object.entries(row.rate_overrides as Record<string, unknown>)
+              .map(([k, v]) => [k, Number(v)] as const)
+              .filter(([, v]) => Number.isFinite(v) && v >= 0),
+          )
+        : {},
     tiktok_handle: typeof row.tiktok_handle === "string" && row.tiktok_handle.trim() ? row.tiktok_handle.trim() : null,
     visual_tools: Array.isArray(row.visual_tools)
       ? (row.visual_tools as VisualTool[]).filter((t) => t && typeof t.name === "string" && t.name.trim())
@@ -50,7 +63,7 @@ export async function loadCreatorSettings(
   const { data, error } = await supabase
     .schema("creator")
     .from("creator_settings")
-    .select("currency,cpm_low,cpm_high,tiktok_handle,niche_topics,visual_tools")
+    .select("currency,cpm_low,cpm_high,rate_floor,rate_overrides,tiktok_handle,niche_topics,visual_tools")
     .eq("user_id", userId)
     .maybeSingle()
 

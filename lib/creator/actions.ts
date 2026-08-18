@@ -27,6 +27,15 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
     return { ok: false, error: "The upper CPM must be at or above the lower CPM." }
   }
 
+  // Blank clears it rather than defaulting: an unknown floor and a floor of zero
+  // are different claims, and only one of them should clamp a rate band.
+  const floorRaw = formData.get("rate_floor")
+  const floorParsed = Number(floorRaw)
+  const rateFloor =
+    typeof floorRaw === "string" && floorRaw.trim() && Number.isFinite(floorParsed) && floorParsed > 0
+      ? floorParsed
+      : null
+
   const handleRaw = formData.get("tiktok_handle")
   const handle = typeof handleRaw === "string" && handleRaw.trim() ? handleRaw.trim().replace(/^@/, "") : null
 
@@ -64,6 +73,7 @@ export async function updateCreatorSettings(formData: FormData): Promise<Setting
         currency,
         cpm_low: cpmLow,
         cpm_high: cpmHigh,
+        rate_floor: rateFloor,
         tiktok_handle: handle,
         niche_topics: nicheTopics,
         visual_tools: visualTools,

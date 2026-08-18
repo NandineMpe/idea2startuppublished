@@ -104,6 +104,28 @@ export function SettingsForm({
         </select>
       </Field>
 
+      {/* Above the CPM band on purpose. The CPM is an estimate about the market;
+          this is a fact about a bank transfer, and it outranks the estimate
+          everywhere the two disagree. */}
+      <div className="grid gap-1.5">
+        <label className="text-[12px] font-medium text-foreground">Highest fee actually paid</label>
+        <input
+          name="rate_floor"
+          type="number"
+          min={1}
+          step={25}
+          defaultValue={settings.rate_floor ?? ""}
+          placeholder="e.g. 950"
+          disabled={!persisted}
+          className={inputClass}
+          aria-label="Highest fee actually paid for one sponsored video"
+        />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          What a brand has really paid you for a single video. No band ever quotes below it, and every
+          line item on your rate card is a percentage of it. Leave blank if nothing has closed yet.
+        </p>
+      </div>
+
       <div className="grid gap-1.5">
         <label className="text-[12px] font-medium text-foreground">CPM band</label>
         <div className="grid grid-cols-2 gap-3">

@@ -4,6 +4,8 @@ import { CREATOR_MODEL_VERSION, creatorGenerateObject } from "@/lib/creator/ai/c
 import { loadWorth } from "@/lib/creator/load-worth"
 import { loadCreatorCanon } from "@/lib/creator/load-canon"
 import { loadCreatorPosts } from "@/lib/creator/load-corpus"
+import { loadCreatorSettings } from "@/lib/creator/load-settings"
+import { lineItemsBlock, priceLineItems } from "@/lib/creator/worth/line-items"
 import { engagementRate, type CreatorPost } from "@/lib/creator/types"
 
 /**
@@ -28,8 +30,23 @@ const replySchema = z.object({
   watch_outs: z
     .array(z.string())
     .describe(
-      "Terms that cost money or freedom and are easy to agree to by accident: perpetual or broad usage rights, exclusivity windows, paid-media whitelisting, unlimited revisions, approval chains, tight turnarounds, undisclosed-ad requests.",
+      "Terms that cost money or freedom and are easy to agree to by accident: perpetual or broad usage rights, exclusivity windows, paid-media whitelisting, unlimited revisions, approval chains, tight turnarounds, undisclosed-ad requests. Where the rate card prices one, name the figure inside the watch-out.",
     ),
+  /**
+   * Newline-delimited rather than an array of objects.
+   *
+   * Same failure mode as the nested format object below: give this schema a list
+   * of {label, amount} and the model emits its tool-call parameter markup into
+   * the JSON and abandons every field after it. One line per ask, split in code.
+   */
+  priced_asks: z
+    .string()
+    .describe(
+      "One line per thing the brief asks for beyond a single organic post, each as 'Label — CURRENCY amount', taken verbatim from the supplied rate card. Empty string if the brief asks for nothing beyond the base. Never invent a line or a figure.",
+    ),
+  quoted_total: z
+    .number()
+    .describe("Base fee plus every priced ask above. Equals the base fee when there are no extras."),
   /**
    * Flat scalars rather than nested objects.
    *
@@ -64,6 +81,9 @@ export type BriefReply = {
   watch_outs: string[]
   recommended_format: { label: string; why: string }
   quoted_rate: { low: number; high: number; currency: string; basis: string }
+  /** The rights and extras this brief is asking for, each with its price attached. */
+  priced_asks: string[]
+  quoted_total: number
   reply: string
 }
 
@@ -74,6 +94,9 @@ You are given the creator's real performance figures and rate bands. Treat them 
 Rules:
 - Never invent a metric, a rate, or a past client. If the prior-clients list is empty, the reply must not imply any past brand work — write it as a creator with strong audience numbers instead.
 - Quote the supplied rate band. If the brief names a budget below it, do not simply accept: state the band and what justifies it, and offer a scope that fits their number rather than discounting the rate.
+- A fee buys one organic post on the creator's own handle and nothing else. Read the brief for what it quietly assumes on top — paid amplification, whitelisting or Spark Ads, posting from the brand's own account, use on their site or in email, category exclusivity, extra platforms, extra cuts, raw files, a rushed turnaround. Each of those is on the supplied rate card. Price every one it asks for, using the card's figures exactly, and put them in the reply as a short itemised list under the base fee.
+- Itemise rather than bundle. A single larger number reads as expensive; the same number broken into a base fee plus the rights they asked for reads as a quote, and it shows them which line to drop if they want to spend less.
+- If the brief is silent on usage, do not price it and do not assume it is organic-only. Say what the fee covers and ask what they intend to run behind it.
 - Lead the reply with interest and a concrete point of view on their product or campaign, not with price. Price comes after you have shown you understood the brief.
 - Recommend a format from the creator's proven formats and say what it does — cite the real median views or engagement supplied.
 - Keep the reply under 220 words. Brands skim. Warm, direct, specific; no hype, no gratitude-stacking, no "I'd love the opportunity".
@@ -114,10 +137,11 @@ export async function draftBriefReply(
     return { ok: false, error: "Paste the full email — there is not enough here to read a brief from." }
   }
 
-  const [worthContext, canon, posts, { data: pastDeals }] = await Promise.all([
+  const [worthContext, canon, posts, { settings }, { data: pastDeals }] = await Promise.all([
     loadWorth(supabase, userId),
     loadCreatorCanon(supabase, userId),
     loadCreatorPosts(supabase, userId),
+    loadCreatorSettings(supabase, userId),
     supabase
       .schema("creator")
       .from("creator_work")
@@ -132,13 +156,29 @@ export async function draftBriefReply(
   ])
 
   const headline = worthContext.worth?.headline
+  const worth = worthContext.worth
   const rateBlock = headline
     ? `RATE BAND (from ${headline.sample_size} posts carrying metrics)
 Median views per post: ${headline.views_median.toLocaleString()}
 Typical range: ${headline.views_p25.toLocaleString()}-${headline.views_p75.toLocaleString()}
 Defensible rate: ${headline.currency} ${headline.rate_low.toLocaleString()}-${headline.rate_high.toLocaleString()} per sponsored post
+Standard quote for a single video: ${headline.currency} ${headline.rate_target.toLocaleString()}
+${
+  headline.rate_floor
+    ? `Hard floor: ${headline.currency} ${headline.rate_floor.toLocaleString()} — a brand has already paid this for one video. Never quote under it, at any scope, for any reason.`
+    : "Hard floor: none on record."
+}
 Confidence: ${headline.confidence}`
     : "RATE BAND: not derivable yet — do not quote a specific figure. Ask for their budget instead and say a rate follows the scope."
+
+  // The rate card is what turns a watch-out into a counter-offer. Flagging that a
+  // brief wants perpetual usage is half a warning; flagging that perpetual usage
+  // is another 1,900 on top is a negotiating position.
+  const cardBlock = worth
+    ? `RATE CARD — base fee ${worth.currency} ${worth.base_fee.toLocaleString()} for one video, organic, one platform, creator's own handle. Every figure below is on top of the base and is the only permissible price for that right:
+
+${lineItemsBlock(priceLineItems(worth.base_fee, settings.rate_overrides), worth.currency)}`
+    : "RATE CARD: not derivable yet."
 
   const perfBlock = formatPerformanceLines(canon, posts)
 
@@ -175,6 +215,8 @@ ${trimmed.slice(0, 6000)}
 
 ${rateBlock}
 
+${cardBlock}
+
 AUDIENCE: ${audienceBlock}
 
 FORMAT PERFORMANCE (the creator's proven formats):
@@ -207,6 +249,11 @@ Read the brief and draft the reply.`,
         currency: object.quoted_rate_currency,
         basis: object.quoted_rate_basis,
       },
+      priced_asks: (object.priced_asks ?? "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^[-*\d.\s]+/, "").trim())
+        .filter(Boolean),
+      quoted_total: object.quoted_total,
       reply: object.reply,
     }
 

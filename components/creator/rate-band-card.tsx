@@ -35,7 +35,19 @@ export function RateBandCard({ band, emphasis = false }: { band: RateBand; empha
           >
             {money(band.rate_low, band.currency)} – {money(band.rate_high, band.currency)}
           </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">per sponsored post</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            per sponsored post · quote {money(band.rate_target, band.currency)} as standard
+          </p>
+          {/* Only shown when the floor actually bit. Saying "floored at your
+              proven rate" on a band the distribution already cleared would be
+              noise; saying it when the distribution was underpricing her is the
+              whole point of storing the number. */}
+          {band.floor_applied && band.rate_floor !== null && (
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+              Floored at {money(band.rate_floor, band.currency)} — what you have actually been paid, which is
+              above what this distribution alone would have quoted.
+            </p>
+          )}
         </div>
         <ConfidenceBadge confidence={band.confidence} sampleSize={band.sample_size} />
       </div>
