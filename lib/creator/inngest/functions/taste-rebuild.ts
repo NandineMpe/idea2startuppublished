@@ -3,23 +3,26 @@ import { supabaseAdmin } from "@/lib/supabase"
 import { rebuildTasteForUser } from "@/lib/creator/taste/rebuild"
 
 /**
- * Roll decisions into a taste profile, weekly.
+ * Roll decisions into a taste profile.
  *
- * Weekly rather than on every decision, even though this is only counting. A
- * profile that moves after each kill makes the desk twitchy: one irritated
- * evening spent binning five stories would rewrite what the researcher believes
- * about the creator, and it would take another five to argue it back. A week is
- * long enough that a bad night averages out and short enough that a genuine
- * change of direction is picked up before the next fortnight's slate.
+ * Batched rather than recomputed on every decision, even though this is only
+ * counting. A profile that moves after each kill makes the desk twitchy: one
+ * irritated evening spent binning five stories would rewrite what the
+ * researcher believes about the creator, and it would take another five to
+ * argue it back.
  *
- * Sunday night, so Monday's sweep is the first to read it.
+ * It ran Sunday nights so that Monday's sweep read a current profile. With the
+ * sweep on request that ordering has to be made by hand instead, so the
+ * researcher rebuilds taste before it sweeps rather than trusting a schedule to
+ * have done it. This function is still separately triggerable because a rebuild
+ * is cheap, local, and the one thing here that never calls a model.
  */
 export const creatorTasteRebuild = creatorInngest.createFunction(
   {
     id: "creator-taste-rebuild",
     name: "Creator OS: rebuild taste profiles",
     retries: 1,
-    triggers: [{ cron: "0 22 * * 0" }, { event: "creator/taste.rebuild" }],
+    triggers: [{ event: "creator/taste.rebuild" }],
   },
   async ({ event, step }) => {
     const manual =

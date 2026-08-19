@@ -275,7 +275,7 @@ export default async function StoriesPage() {
         <EmptyState
           icon={Newspaper}
           title="No dossiers yet"
-          description="The Researcher sweeps your niche every morning and files a dossier only when at least two independent signals stand a thesis up."
+          description="The Researcher sweeps your niche when you send it out and files a dossier only when at least two independent signals stand a thesis up. It reads back to your last sweep, so a long gap is covered rather than skipped."
           blocker={context.blocker}
         />
       ) : (

@@ -4,9 +4,13 @@ import { loadResearchTopics } from "@/lib/creator/research/sweep"
 import { sweepOpportunitiesForUser } from "@/lib/creator/opportunities/sweep"
 
 /**
- * The partnerships desk's standing remit: hunt for deals, events and
- * marketplace listings every morning, pitches pre-drafted, everything gated
- * behind the creator's approval on the Desk.
+ * The partnerships desk: hunt for deals, events and marketplace listings,
+ * pitches pre-drafted, everything gated behind the creator's approval.
+ *
+ * On request rather than on a schedule. This one has a deadline problem the
+ * others do not: a speaking call that closed while nobody was looking is worse
+ * than no result, so the pitch drafts state their own age and the sweep is run
+ * when there is someone available to act on what it finds.
  */
 export const creatorOpportunitiesSweep = creatorInngest.createFunction(
   {
@@ -14,10 +18,7 @@ export const creatorOpportunitiesSweep = creatorInngest.createFunction(
     name: "Creator OS: opportunities sweep",
     retries: 1,
     concurrency: { key: "event.data.user_id", limit: 1 },
-    triggers: [
-      { cron: "30 6 * * *" },
-      { event: "creator/opportunities.sweep" },
-    ],
+    triggers: [{ event: "creator/opportunities.sweep" }],
   },
   async ({ event, step }) => {
     const manual = event.name === "creator/opportunities.sweep"

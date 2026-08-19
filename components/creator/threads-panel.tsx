@@ -8,9 +8,11 @@ import { History } from "lucide-react"
  * The two ways a creator starts using threads: open files from what they have
  * already published, and check the ones that are due.
  *
- * Both are also on a cron. The buttons exist because the first run is the one
- * that has to happen while the creator is watching, and because "check this
- * now" is the natural reaction to remembering something.
+ * These buttons are now the only way either happens. Nothing here is on a
+ * schedule, which suits threads better than anything else in the product: each
+ * one carries its own next_check_at, so a run after three weeks away picks up
+ * exactly the files that came due while nobody was looking rather than the
+ * arbitrary four that a given morning would have taken.
  */
 export function ThreadsPanel({ counts }: { counts: { total: number; due: number } }) {
   const router = useRouter()

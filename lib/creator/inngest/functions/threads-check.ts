@@ -5,16 +5,16 @@ import { checkThread, loadDueThreads } from "@/lib/creator/threads/check"
 /**
  * Go back to the open files.
  *
- * Runs after the morning sweep rather than alongside it, because the two answer
- * different questions and the answers should not compete for the same slot on
- * the Desk. The sweep asks what moved today. This asks what happened to the
- * things everyone stopped covering, which is the only one of the two that
- * nobody else is running.
+ * The sweep asks what moved today. This asks what happened to the things
+ * everyone stopped covering, which is the only one of the two that nobody else
+ * is running. Of everything here it is the least harmed by running on request:
+ * a story unresolved for eight months does not care whether it was looked at on
+ * Tuesday, and each thread carries its own next_check_at, so a run after a long
+ * gap picks up exactly the ones that came due while nobody was looking.
  *
- * A small batch per day on purpose. Each check searches eleven primary lanes
+ * The batch is small on purpose. Each check searches eleven primary lanes
  * across the whole span since the thread was opened, so this is far heavier per
- * item than a sweep, and threads are not urgent by definition: something that
- * has been unresolved for eight months does not need looking at twice a week.
+ * item than a sweep.
  */
 const THREADS_PER_USER_PER_RUN = 4
 
@@ -23,7 +23,7 @@ export const creatorThreadsCheck = creatorInngest.createFunction(
     id: "creator-threads-check",
     name: "Creator OS: check open threads",
     retries: 2,
-    triggers: [{ cron: "0 8 * * *" }, { event: "creator/threads.check" }],
+    triggers: [{ event: "creator/threads.check" }],
   },
   async ({ event, step }) => {
     const manual =

@@ -82,11 +82,11 @@ export default async function CreatorDeskPage() {
   if (desk.blocker) {
     return (
       <PageBody>
-        <PageHeader title="The Desk" subtitle="What happened overnight, and what needs you." />
+        <PageHeader title="The Desk" subtitle="What your last run turned up, and what needs you." />
         <EmptyState
           icon={Sunrise}
           title="Nothing has run yet"
-          description="The Desk reports on work your agents did while you were away. They need a corpus to work from before there is anything to report."
+          description="The Desk reports on the last time you sent the agents out. They need a corpus to work from before there is anything to report."
           blocker={desk.blocker}
         />
       </PageBody>
@@ -97,11 +97,13 @@ export default async function CreatorDeskPage() {
     <PageBody>
       <PageHeader
         title="The Desk"
-        subtitle="What happened overnight, and what needs you."
+        subtitle="What your last run turned up, and what needs you. Nothing runs on a schedule, so this changes when you send the agents out and not before."
         actions={
           <div className="flex items-center gap-2">
-            <RunAgentButton kind="research" label="Run Researcher" />
-            <RunAgentButton kind="opportunities" label="Hunt deals" />
+            {/* The whole point of manual runs: one button for someone who has
+                been away, so catching up is a decision rather than a checklist. */}
+            <RunAgentButton kind="everything" label="Run everything" variant="primary" />
+            <RunAgentButton kind="research" label="Researcher only" />
             {desk.canon ? (
               <ConfidenceBadge confidence={desk.canon.confidence} sampleSize={desk.canon.corpus_size} />
             ) : null}
@@ -121,9 +123,15 @@ export default async function CreatorDeskPage() {
           value={desk.canon ? `v${desk.canon.version}` : "—"}
           hint={desk.canon ? relative(desk.canon.derived_at) : "not derived"}
         />
-        <StatTile label="Last run" value={relative(desk.last_run_at)} hint="agent activity" />
+        <StatTile
+          label="Last run"
+          value={relative(desk.last_run_at)}
+          hint={desk.last_run_at ? "nothing runs unless you say so" : "never run"}
+        />
       </div>
 
+      {/* Escalations and approvals are a queue and are never aged out, however
+          long the gap between runs. The report below them is one run's worth. */}
       <Section
         title="Escalations"
         icon={AlertTriangle}
@@ -135,15 +143,15 @@ export default async function CreatorDeskPage() {
         title="Awaiting you"
         icon={Inbox}
         items={desk.awaiting}
-        emptyLine="No decisions queued. Anything leaving your account waits here for approval."
+        emptyLine="No decisions queued. Anything leaving your account waits here for approval, and it waits as long as it takes."
         decidable
       />
 
       <Section
-        title="Done overnight"
+        title="From your last run"
         icon={CheckCircle2}
         items={desk.completed}
-        emptyLine="No completed work in the last 36 hours."
+        emptyLine="No completed work yet. Run everything above and it lands here."
       />
     </PageBody>
   )

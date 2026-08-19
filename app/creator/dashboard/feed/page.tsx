@@ -26,7 +26,7 @@ export default async function FeedPage() {
         <EmptyState
           icon={Radio}
           title="Nothing collected yet"
-          description="The Researcher sweeps twenty-two sources every morning: dockets, filings, patents, consultations, inspection reports, standards drafts and the rest. Everything it finds lands here."
+          description="The Researcher sweeps twenty-two sources when you send it out: dockets, filings, patents, consultations, inspection reports, standards drafts and the rest. Everything it finds lands here. Sweep now to fill this."
         />
       ) : (
         <>

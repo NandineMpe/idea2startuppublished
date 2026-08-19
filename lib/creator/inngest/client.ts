@@ -4,8 +4,12 @@ import { Inngest } from "inngest"
  * Creator OS event-type contract. Every event name must start with "creator/".
  *
  * The events mirror the agency: corpus and canon are the shared ground truth,
- * research and opportunities are the two standing-remit agents, and each agent
- * both runs on a cron sweep and can be triggered on demand for one user.
+ * research and opportunities are the two hunting agents. Every one of them is
+ * triggered on demand for one user; nothing in Creator OS is on a schedule.
+ *
+ * The events still carry user_id optionally because the functions retain their
+ * all-users path for backfills, and because putting a schedule back on any of
+ * them is a one-line change in that function rather than a rewrite here.
  */
 export type CreatorEvents = {
   "creator/system.ping": {

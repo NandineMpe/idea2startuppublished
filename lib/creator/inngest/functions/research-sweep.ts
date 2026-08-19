@@ -1,10 +1,20 @@
 import { creatorInngest } from "../client"
 import { supabaseAdmin } from "@/lib/supabase"
 import { loadResearchTopics, sweepOneTopic, sweepReleases } from "@/lib/creator/research/sweep"
+import { rebuildTasteForUser } from "@/lib/creator/taste/rebuild"
 
 /**
- * The Researcher's standing remit: sweep every register each morning whether or
- * not anyone asked, then hand the fresh signals to synthesis.
+ * The Researcher: sweep every register, then hand the fresh signals to synthesis.
+ *
+ * Runs on request rather than on a schedule. It swept every morning until the
+ * creator pointed out that she does not work here daily, and a desk that files
+ * a fresh slate every morning to someone who visits fortnightly is not being
+ * diligent, it is burying the good run under thirteen stale ones. Sweeping when
+ * asked also means the corpus is fresh at the moment she is actually reading it.
+ *
+ * The all-users resolution below is kept deliberately. Nothing schedules it
+ * today, but it is what an admin backfill or a restored schedule would use, and
+ * a manual run always carries a user_id and takes the short path.
  *
  * Each topic gets its own step, and therefore its own execution window. The
  * first version swept all nine topics inside one step, which meant a single
@@ -16,7 +26,7 @@ export const creatorResearchSweep = creatorInngest.createFunction(
     id: "creator-research-sweep",
     name: "Creator OS: research sweep",
     retries: 2,
-    triggers: [{ cron: "0 6 * * *" }, { event: "creator/research.sweep" }],
+    triggers: [{ event: "creator/research.sweep" }],
   },
   async ({ event, step }) => {
     const manual =
@@ -32,7 +42,7 @@ export const creatorResearchSweep = creatorInngest.createFunction(
       // Declared niche topics OR a declared trajectory. Either is enough to
       // have something to search: once the trajectory drives the sweep, a
       // creator who clears their old niche topics must not silently drop out
-      // of the cron.
+      // of an all-users run.
       const [{ data: settings, error }, { data: trajectories }] = await Promise.all([
         supabaseAdmin.schema("creator").from("creator_settings").select("user_id,niche_topics"),
         supabaseAdmin.schema("creator").from("creator_trajectory").select("user_id,search_territory"),
@@ -54,6 +64,19 @@ export const creatorResearchSweep = creatorInngest.createFunction(
     const summaries: Array<{ user_id: string; upserted: number; errors: string[] }> = []
 
     for (const userId of userIds) {
+      // Taste first, and inline rather than as a separate event.
+      //
+      // The Sunday-night rebuild used to guarantee that Monday's synthesis read
+      // a current profile. With nothing scheduled, that ordering has to be made
+      // here or it does not exist: every kill since the last sweep would be
+      // invisible to the pass that decides what survives this one, and the desk
+      // would keep proposing the thing she just binned. It is a count over one
+      // table, so it costs nothing to do it in the right order.
+      await step.run(`taste-${userId}`, async () => {
+        const r = await rebuildTasteForUser(supabaseAdmin, userId)
+        return { approvals: r.approve_count, kills: r.kill_count }
+      })
+
       const topics = await step.run(`topics-${userId}`, async () => {
         return loadResearchTopics(supabaseAdmin, userId)
       })

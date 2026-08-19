@@ -15,7 +15,16 @@ import { supabaseAdmin } from "@/lib/supabase"
  * corpus is exactly the traffic pattern that gets an IP challenged.
  */
 
-const MAX_POSTS_PER_USER_PER_RUN = 25
+/**
+ * The cap was 25, sized for a nightly run: seven nights covered 175 posts.
+ *
+ * Nothing runs nightly now, so 25 would mean a corpus larger than 25 posts is
+ * never fully current no matter how often the button is pressed, and Worth
+ * would keep quoting a rate off numbers from whenever the schedule was
+ * switched off. 60 covers her whole corpus in one press and is still a long
+ * way from the burst that gets an unofficial fetch challenged.
+ */
+const MAX_POSTS_PER_USER_PER_RUN = 60
 /** Below this age a re-read is unlikely to have moved enough to be worth a request. */
 const MIN_HOURS_BETWEEN_REFRESH = 18
 
@@ -24,10 +33,7 @@ export const creatorMetricsRefresh = creatorInngest.createFunction(
     id: "creator-metrics-refresh",
     name: "Creator OS: refresh post metrics",
     retries: 1,
-    triggers: [
-      { cron: "0 5 * * *" },
-      { event: "creator/metrics.refresh" },
-    ],
+    triggers: [{ event: "creator/metrics.refresh" }],
   },
   async ({ event, step }) => {
     const manual = event.name === "creator/metrics.refresh"

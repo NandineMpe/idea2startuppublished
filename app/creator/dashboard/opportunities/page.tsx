@@ -264,7 +264,7 @@ export default async function OpportunitiesPage() {
         <EmptyState
           icon={Handshake}
           title="Nothing surfaced yet"
-          description="The partnerships desk hunts every morning across brands already sponsoring your niche, events looking for speakers, and marketplaces you should be listed on."
+          description="The partnerships desk hunts across brands already sponsoring your niche, events looking for speakers, and marketplaces you should be listed on. It runs when you press Hunt now, so deadlines are worth checking against the date on each card."
           blocker={context.blocker}
         />
       ) : (

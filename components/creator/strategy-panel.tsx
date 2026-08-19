@@ -46,7 +46,7 @@ export function StrategyPanel({ trajectory }: { trajectory: CreatorTrajectory })
           </div>
           <p className="text-[12px] text-muted-foreground mt-1 max-w-[640px] leading-relaxed">
             Worked backwards from where you said you are going, against what you have actually
-            published. The search territory it produces is what your Researcher reads every morning
+            published. The search territory it produces is what your Researcher reads on every sweep
             from then on.
           </p>
         </div>
@@ -208,7 +208,7 @@ export function StrategyPanel({ trajectory }: { trajectory: CreatorTrajectory })
             <div className="rounded-xl border border-border bg-card p-5">
               <Disclosure label="What your Researcher now reads for" count={trajectory.search_territory.length}>
                 <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed">
-                  These run every morning alongside your canon topics, under their own stance, and
+                  These run on every sweep alongside your canon topics, under their own stance, and
                   they lead the list your Researcher synthesises from.
                 </p>
                 <div className="flex flex-wrap gap-1.5">

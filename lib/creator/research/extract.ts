@@ -20,7 +20,7 @@ import { fetchSource, normalise } from "./fetch-source"
  *     check a human would think to run.
  *
  *  2. Nothing is re-extracted when the content hash is unchanged. Regulators
- *     get re-fetched constantly by the threads cron and almost never change.
+ *     get re-fetched constantly by the threads check and almost never change.
  */
 
 export const EXTRACT_PROMPT_VERSION = "creator-extract-v1"
