@@ -56,12 +56,14 @@ create index if not exists creator_trajectory_user_version_idx
 -- next to it, and both are derived from the corpus. 'horizon' is territory the
 -- creator named in their trajectory and may have no published work in at all,
 -- which is the entire point of it.
+--
+-- The re-add that used to live here has moved to phase30, which added a fourth
+-- stance. Every migration reapplies in filename order on every deploy, so this
+-- one would run first and reject the industry rows phase30 permits, and the
+-- whole deploy would fail on the second run rather than the first. Only the
+-- last migration to touch a constraint may add it.
 alter table creator.creator_signals
   drop constraint if exists creator_signals_stance_check;
-
-alter table creator.creator_signals
-  add constraint creator_signals_stance_check
-  check (stance in ('core', 'adjacent', 'horizon'));
 
 -- And a third move. consolidate deepens owned ground, expand stretches sideways,
 -- advance moves the creator toward the position they said they want to hold.

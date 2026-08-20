@@ -19,7 +19,7 @@ export default async function IndustryPage() {
     <PageBody>
       <PageHeader
         title="In industry"
-        subtitle="What has happened to each industry, where it stands, and what the registers say is coming. Every line carries the register it came from and how far ahead that register sits."
+        subtitle="What has happened to each industry, where it stands, and what the registers say is coming. Every line carries the register it came from and how far ahead that register sits. Each research sweep collects for four of these in rotation, so the thin ones fill up as you keep running the Researcher."
       />
 
       {blocker && <BlockerNotice blocker={blocker} />}

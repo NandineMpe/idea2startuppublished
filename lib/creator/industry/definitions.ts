@@ -96,16 +96,42 @@ export function horizonLabel(lane: string): string {
 }
 
 /**
- * The industries this creator actually covers.
+ * The industries this screen covers, in two tiers.
  *
- * Seeded from where her signals already cluster rather than from a taxonomy:
- * every one of these has real volume in her corpus today, and an industry with
- * no evidence behind it would produce a dossier that reads as speculation.
+ * The first four are her home ground: audit, reporting, law and insurance, all
+ * dense in the corpus today because the research sweep has been reading for
+ * them since it was switched on.
+ *
+ * The rest are industries AI is unmistakably rewriting where her actual subject
+ * (who is accountable when the system decides) is the live question, and where
+ * the registers are rich enough to forecast from. They are listed with their
+ * own search queries, so the sweep collects for them rather than the screen
+ * hoping the corpus already knows about them. Until it has, they show as thin
+ * and refuse to build, which is the honest state rather than a hidden one.
+ *
+ * Chosen for register coverage as much as for subject. Hiring has EEOC actions,
+ * a New York City audit law and an EU high-risk classification. Public
+ * administration has procurement and ombudsman findings. Both forecast well.
+ * Something like advertising, where the change is real but the registers are
+ * thin, is left out for the same reason investment banking was cut.
  *
  * match_terms are the deterministic selector. Selection is not a model decision,
  * because a dossier is only worth reading if the evidence under it was chosen by
  * a rule the creator can inspect and correct.
  */
+/**
+ * Below this a build refuses.
+ *
+ * A dossier standing on seven signals renders identically to one standing on
+ * forty, which makes the thin one actively dangerous: it is a guess wearing
+ * citations. Refusing is the only honest option, and the card states the count
+ * so the refusal is never a surprise.
+ */
+export const MIN_SIGNALS_TO_BUILD = 8
+
+/** Below this the arc can be written but the forecast is guesswork. */
+export const MIN_LEADING_TO_FORECAST = 5
+
 export type IndustryDefinition = {
   slug: string
   label: string
@@ -113,7 +139,37 @@ export type IndustryDefinition = {
   audience: string
   /** The practice as it stood before any of this, so the arc has a baseline. */
   baseline: string
+  /** Selects evidence already in the corpus. Deterministic, inspectable. */
   match_terms: string[]
+  /**
+   * Match terms too generic to qualify a document on their own.
+   *
+   * The mirror of WEAK_TECH_TERMS, and it exists for the same reason. Requiring
+   * the industry in the title fixed most of the noise and left a specific
+   * residue: single words that are ordinary English in every field. "Assurance"
+   * put an unsupervised anomaly detection paper on breast MRI into the audit
+   * dossier. "Disclosure" put a paper on PII in database connectors into
+   * financial reporting. "Assessment" put a breast cancer prognosis study into
+   * education.
+   *
+   * These still count toward the score, because alongside a real term they are
+   * genuine evidence of depth. They just cannot be the reason a document was
+   * selected.
+   */
+  weak_terms?: string[]
+  /**
+   * Goes out and gets evidence that is not in the corpus yet.
+   *
+   * The distinction matters more than it looks. The first version of this
+   * screen had match terms only, which silently assumed the research sweep was
+   * already collecting for every industry it listed. It was not: the sweep
+   * reads her canon and her trajectory, both of which are about audit, finance
+   * and law. Measured across seven candidate industries, the corpus held real
+   * evidence for one of them. Adding an industry without adding collection
+   * produces a dossier-shaped hole, or worse, a dossier built on whatever
+   * happened to share a word with it.
+   */
+  search_queries: string[]
 }
 
 export const INDUSTRY_SEEDS: IndustryDefinition[] = [
@@ -128,6 +184,8 @@ export const INDUSTRY_SEEDS: IndustryDefinition[] = [
       "Big Four", "PwC", "KPMG", "EY", "Deloitte", "inspection finding", "audit quality",
       "working paper", "sampling", "materiality", "AICPA", "IESBA", "engagement quality",
     ],
+    weak_terms: ["assurance", "sampling", "working paper"],
+    search_queries: ["AI audit evidence", "audit automation regulator", "PCAOB artificial intelligence"],
   },
   {
     slug: "financial-reporting",
@@ -143,6 +201,8 @@ export const INDUSTRY_SEEDS: IndustryDefinition[] = [
       "AI washing", "material weakness", "restatement", "IFRS", "FASB", "earnings management",
       "investor relations", "securities", "enforcement action", "annual report", "audit committee",
     ],
+    weak_terms: ["disclosure", "annual report"],
+    search_queries: ["AI washing disclosure enforcement", "internal control over financial reporting AI", "SEC artificial intelligence disclosure"],
   },
   {
     slug: "legal",
@@ -155,6 +215,8 @@ export const INDUSTRY_SEEDS: IndustryDefinition[] = [
       "copyright", "fair use", "sanction", "hallucinated citation", "fake citation",
       "discovery", "privilege", "bar association", "settlement", "class action", "damages",
     ],
+    weak_terms: ["discovery", "privilege", "settlement", "damages", "counsel", "ruling"],
+    search_queries: ["AI hallucinated citation sanction", "law firm artificial intelligence court", "generative AI copyright litigation"],
   },
   {
     slug: "insurance",
@@ -166,7 +228,153 @@ export const INDUSTRY_SEEDS: IndustryDefinition[] = [
       "insurance", "insurer", "underwriting", "actuarial", "claims", "premium", "reinsurance",
       "loss ratio", "policyholder", "solvency", "EIOPA", "NAIC", "risk pricing", "adverse selection",
     ],
+    weak_terms: ["claims", "premium"],
+    search_queries: ["AI underwriting regulation", "insurance claims automation denial", "algorithmic risk pricing insurer"],
   },
+  // ---------------------------------------------------------------------
+  // Beyond her home ground. Same test applied: is AI genuinely rewriting the
+  // practice, is accountability the live question, and do the registers run
+  // deep enough to forecast from rather than only to narrate.
+  // ---------------------------------------------------------------------
+  {
+    slug: "tax",
+    label: "Tax administration and advisory",
+    audience: "tax advisers, in-house tax leads, and the revenue authorities auditing them",
+    baseline:
+      "A tax position was a judgement a named person signed, defended with a file of reasoning. Authorities selected cases for enquiry from risk rules a taxpayer could broadly anticipate.",
+    match_terms: [
+      "tax", "HMRC", "IRS", "transfer pricing", "VAT", "tax authority", "tax return",
+      "BEPS", "Pillar Two", "tax compliance", "revenue authority", "tax enquiry", "tax avoidance",
+    ],
+    search_queries: ["tax authority artificial intelligence enquiry", "HMRC IRS machine learning compliance", "transfer pricing AI documentation"],
+  },
+  {
+    slug: "financial-crime",
+    label: "Financial crime, AML and sanctions",
+    audience: "financial crime officers, compliance leads, and the supervisors who fine them",
+    baseline:
+      "Alerts came from written rules, and every escalation was a human decision with a name against it. A closed alert could be explained by the analyst who closed it.",
+    match_terms: [
+      "anti-money laundering", "money laundering", "sanctions", "financial crime",
+      "know your customer", "suspicious activity", "FinCEN", "FATF", "fraud detection",
+      "transaction monitoring", "beneficial ownership", "terrorist financing", "de-risking",
+    ],
+    weak_terms: ["sanctions"],
+    search_queries: ["AML transaction monitoring machine learning", "financial crime AI regulator guidance", "sanctions screening automation enforcement"],
+  },
+  {
+    slug: "banking-credit",
+    label: "Banking, credit and lending",
+    audience: "credit risk teams, model risk validators, and bank supervisors",
+    baseline:
+      "A declined loan traced back to a scorecard someone could read, and model risk management assumed a model was a documented artefact a validator could open and re-derive.",
+    match_terms: [
+      "bank", "banking", "central bank", "Federal Reserve", "prudential", "Basel",
+      "capital requirement", "stress test", "credit risk", "model risk", "SR 11-7",
+      "credit scoring", "lending", "loan", "creditworthiness", "fair lending",
+    ],
+    weak_terms: ["bank", "stress test"],
+    search_queries: ["model risk management machine learning supervisor", "credit scoring AI fair lending", "bank supervisor artificial intelligence guidance"],
+  },
+  {
+    slug: "healthcare",
+    label: "Healthcare and clinical practice",
+    audience: "clinicians, hospital risk leads, and the regulators clearing the tools",
+    baseline:
+      "A diagnosis carried the name of the clinician who made it, and liability followed that name. Devices were cleared once against a fixed specification and did not change after approval.",
+    match_terms: [
+      "clinical", "hospital", "patient", "physician", "diagnosis", "diagnostic",
+      "medical", "healthcare", "FDA", "NHS", "radiology", "triage", "clinician",
+      "electronic health record", "medical device", "prescribing", "malpractice",
+    ],
+    search_queries: ["FDA clearance AI clinical decision support", "clinical AI liability malpractice", "hospital artificial intelligence deployment regulation"],
+  },
+  {
+    slug: "hiring",
+    label: "Hiring and the workplace",
+    audience: "HR leaders, employment counsel, and the candidates on the other side of the screen",
+    baseline:
+      "A rejection came from a person who read the application. Discrimination was proved by showing what a decision-maker knew and did, and there was a decision-maker.",
+    match_terms: [
+      "hiring", "recruitment", "candidate screening", "employment", "human resources",
+      "workforce", "applicant", "EEOC", "employment law", "performance review",
+      "employee monitoring", "worker", "job applicant", "resume screening", "bias audit",
+    ],
+    weak_terms: ["employment", "workforce", "worker"],
+    search_queries: ["automated employment decision tool bias audit", "AI hiring discrimination enforcement", "workplace algorithmic management regulation"],
+  },
+  {
+    slug: "public-sector",
+    label: "Government and public administration",
+    audience: "civil servants, public-law practitioners, and the people on the receiving end of a decision",
+    baseline:
+      "An administrative decision came with a duty to give reasons and a route to appeal, and the reasons were written by whoever decided.",
+    match_terms: [
+      "government", "public sector", "welfare", "benefits", "citizen", "council",
+      "municipality", "public service", "immigration", "visa", "social security",
+      "eligibility", "civil service", "ombudsman", "administrative decision", "public body",
+    ],
+    weak_terms: ["government", "public service", "benefits", "citizen", "council", "eligibility"],
+    search_queries: ["government algorithm benefits decision review", "public sector AI procurement transparency", "automated decision making administrative law"],
+  },
+  {
+    slug: "education",
+    label: "Education and assessment",
+    audience: "academics, examiners, and the accreditation bodies behind them",
+    baseline:
+      "A qualification certified that a named person had demonstrated something under observed conditions, and assessment design assumed the work was theirs.",
+    match_terms: [
+      "university", "student", "education", "school", "teaching", "assessment", "exam",
+      "academic integrity", "plagiarism", "curriculum", "classroom", "grading",
+      "higher education", "accreditation", "learner", "coursework", "degree",
+    ],
+    weak_terms: ["assessment", "school", "learner", "grading", "curriculum", "exam", "student", "teaching", "education"],
+    search_queries: ["academic integrity generative AI assessment", "university AI policy accreditation", "AI grading education regulation"],
+  },
+  {
+    slug: "journalism",
+    label: "Journalism and publishing",
+    audience: "editors, publishers, and the lawyers advising them on rights",
+    baseline:
+      "Copy carried a byline, corrections were owed to a named author, and the right to reuse text was something you bought.",
+    match_terms: [
+      "journalism", "journalist", "newsroom", "publisher", "publishing", "editorial",
+      "media", "fact check", "misinformation", "press", "byline", "news outlet",
+      "syndication", "licensing deal", "defamation",
+    ],
+    weak_terms: ["media", "press", "publishing", "editorial"],
+    search_queries: ["publisher AI copyright licensing lawsuit", "newsroom generative AI policy", "AI training data news publisher"],
+  },
+  {
+    slug: "software",
+    label: "Software engineering",
+    audience: "engineering leads, security teams, and everyone whose tooling this changes first",
+    baseline:
+      "Code was written and reviewed by people who could explain it, provenance was the commit history, and a junior engineer was how a senior one got made.",
+    match_terms: [
+      "software engineer", "developer", "programming", "code review", "codebase",
+      "open source", "repository", "pull request", "engineering team",
+      "technical debt", "software development", "junior developer", "code generation",
+      "software supply chain", "licence compliance", "license compliance",
+    ],
+    weak_terms: ["programming", "repository", "open source"],
+    search_queries: ["AI generated code liability provenance", "software supply chain AI security", "developer productivity AI evidence"],
+  },
+  {
+    slug: "cybersecurity",
+    label: "Cybersecurity and information security",
+    audience: "CISOs, assurance teams, and the auditors who sign off their controls",
+    baseline:
+      "A control was something you could describe, test once a year, and evidence in a file. Attackers were constrained by how much bespoke effort a target was worth.",
+    match_terms: [
+      "cybersecurity", "information security", "breach", "ransomware", "phishing",
+      "threat actor", "vulnerability", "CISO", "penetration test", "incident response",
+      "malware", "attack surface", "zero day", "security operations", "deepfake fraud",
+    ],
+    weak_terms: ["vulnerability", "breach", "cyber"],
+    search_queries: ["AI enabled attack incident regulator", "security operations artificial intelligence controls", "deepfake fraud enterprise breach"],
+  },
+
   // Investment banking is deliberately absent.
   //
   // It was seeded, measured, and cut: after the relevance fixes the corpus held

@@ -27,7 +27,7 @@ async function main() {
   let weak = 0
 
   for (const seed of INDUSTRY_SEEDS) {
-    const signals = await selectIndustrySignals(supabase, USER_ID, seed.match_terms)
+    const signals = await selectIndustrySignals(supabase, USER_ID, seed.match_terms, seed.weak_terms ?? [])
     const counts = countByBand(signals)
     const lanes = [...new Set(signals.map((s) => s.lane))]
 

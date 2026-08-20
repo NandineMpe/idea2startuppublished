@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { creatorGenerateObject } from "@/lib/creator/ai/claude"
 import { loadTrajectory } from "@/lib/creator/load-trajectory"
 import { withoutDashes } from "@/lib/creator/no-dashes"
-import { INDUSTRY_SEED_BY_SLUG } from "./definitions"
+import { INDUSTRY_SEED_BY_SLUG, MIN_SIGNALS_TO_BUILD } from "./definitions"
 import { countByBand, evidenceBlock, selectIndustrySignals, type SelectedSignal } from "./select"
 
 /**
@@ -170,14 +170,14 @@ export async function buildIndustryDossier(
   if (!definition) return { ok: false, error: `No industry called ${slug}.` }
 
   const matchTerms: string[] = (row?.match_terms?.length ? row.match_terms : seed?.match_terms) ?? []
-  const signals = await selectIndustrySignals(supabase, userId, matchTerms)
+  const signals = await selectIndustrySignals(supabase, userId, matchTerms, seed?.weak_terms ?? [])
 
   // A dossier built on a handful of signals is a guess with citations. Refused
   // rather than produced, because the failure would be invisible on screen.
-  if (signals.length < 8) {
+  if (signals.length < MIN_SIGNALS_TO_BUILD) {
     return {
       ok: false,
-      error: `Only ${signals.length} signals in the corpus match this industry. Widen the match terms or let the research sweep run a few more days before building.`,
+      error: `Only ${signals.length} signals in the corpus match this industry, and a dossier needs ${MIN_SIGNALS_TO_BUILD}. Run the Researcher a few more times: each sweep collects for four industries in rotation, so this one fills up as you go. Widening the match terms also works if the evidence is there under different words.`,
     }
   }
 
@@ -276,6 +276,7 @@ export async function refreshIndustry(
           audience: seed.audience,
           baseline: seed.baseline,
           match_terms: seed.match_terms,
+          search_queries: seed.search_queries,
         },
         { onConflict: "user_id,slug", ignoreDuplicates: true },
       )

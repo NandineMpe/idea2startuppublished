@@ -75,8 +75,17 @@ export const PRIMARY_LANES: ResearchLane[] = [
   "solicitations",
 ]
 
-/** Where a topic sits relative to the creator: proven ground, or the stretch. */
-export type TopicStance = "core" | "adjacent" | "horizon"
+/**
+ * Where a topic sits relative to the creator: proven ground, or the stretch.
+ *
+ * "industry" is the odd one out and deliberately so. The other three are about
+ * her: what she owns, what is next to it, where she said she is going. An
+ * industry sweep is about somebody else's trade, collected so a dossier can be
+ * built on evidence rather than on whatever shared a word with it. Keeping it
+ * separate means a reading built on stance cannot mistake a hospital procurement
+ * notice for a sign that her own niche moved.
+ */
+export type TopicStance = "core" | "adjacent" | "horizon" | "industry"
 
 export type LaneSignal = RawFeedItem & {
   lane: ResearchLane

@@ -27,7 +27,7 @@ export type SelectedSignal = {
   score: number
 }
 
-type SignalRow = {
+export type SignalRow = {
   id: string
   source_key: string
   title: string
@@ -112,19 +112,32 @@ const STRONG_TECH_TERMS = TECH_TERMS.filter((t) => !WEAK_TECH_TERMS.has(t.toLowe
  */
 export const MIN_SCORE = 3
 
+/**
+ * Distinct industry terms a body needs when the title does not name the
+ * industry. Two was measurably looser without adding anything worth having.
+ */
+export const MIN_SNIPPET_DEPTH = 3
+
 /** Signals per lane, so eighty filings cannot drown four patents. */
 export const MAX_PER_LANE = 6
+/** Mirrors the build's refusal threshold, so the cap cannot cause a refusal. */
+const MIN_BUILDABLE = 8
 /** Total handed to the model. Enough for an arc, small enough to afford weekly. */
 export const MAX_SIGNALS = 60
 
-export async function selectIndustrySignals(
+/**
+ * Every signal available to score, fetched once.
+ *
+ * Split out because the screen needs a count for fourteen industries at a time.
+ * Calling the whole selection per industry meant fourteen three-thousand-row
+ * reads on a single page render, which is the sort of thing that is invisible
+ * in development and doubles the load time in production.
+ */
+export async function loadScorableSignals(
   supabase: SupabaseClient,
   userId: string,
-  matchTerms: string[],
-): Promise<SelectedSignal[]> {
-  if (!matchTerms.length) return []
-
-  const rows = await safeRows<SignalRow>(
+): Promise<SignalRow[]> {
+  return safeRows<SignalRow>(
     supabase
       .schema("creator")
       .from("creator_signals")
@@ -133,6 +146,30 @@ export async function selectIndustrySignals(
       .order("published_at", { ascending: false })
       .limit(3000),
   )
+}
+
+export async function selectIndustrySignals(
+  supabase: SupabaseClient,
+  userId: string,
+  matchTerms: string[],
+  weakTerms: string[] = [],
+): Promise<SelectedSignal[]> {
+  if (!matchTerms.length) return []
+  return selectFromRows(await loadScorableSignals(supabase, userId), matchTerms, weakTerms)
+}
+
+/** The selection itself, over rows already in hand. */
+export function selectFromRows(
+  rows: SignalRow[],
+  matchTerms: string[],
+  weakTerms: string[] = [],
+): SelectedSignal[] {
+  if (!matchTerms.length) return []
+
+  // Terms strong enough to be the reason a document was selected. The weak ones
+  // still score, they just cannot carry the title on their own.
+  const weak = new Set(weakTerms.map((t) => t.toLowerCase()))
+  const qualifyingTerms = matchTerms.filter((t) => !weak.has(t.toLowerCase()))
 
   const scored: SelectedSignal[] = []
   // Same paper syndicated across two feeds is one piece of evidence, and a
@@ -147,8 +184,44 @@ export async function selectIndustrySignals(
     // snippet is the document's own words and is fair game; the topic is ours.
     const haystack = [row.title, row.snippet ?? ""].join(" ")
 
+    // The industry has to be in the TITLE, not merely somewhere in the text.
+    //
+    // This is the rule that lets the screen cover industries beyond the four
+    // her corpus is dense in. Scoring over title and snippet was tuned on audit
+    // and legal, where almost everything matching is genuinely about them, and
+    // it collapses the moment it is pointed at a sparse industry: measured
+    // across seven candidates it ranked a cognitive-impairment paper as leading
+    // evidence for energy, an accounting paper as leading evidence for
+    // cybersecurity, and returned eleven confident signals for public
+    // administration when the true answer was zero. A snippet is 260 characters
+    // of context in which any word can appear in passing. A title is what the
+    // document says it is about.
+    //
+    // Her existing four all still clear the bar under this rule, with visibly
+    // better top-ranked evidence, so it is a straight improvement rather than a
+    // trade. The sparse ones now honestly report as thin, which is the point:
+    // thin is a real state and it is fixable by collecting, whereas confident
+    // and wrong is neither.
+    //
+    // The qualifying set excludes the industry's own generic words, for the
+    // same reason the technology axis excludes "model" and "system". Measured:
+    // "assurance" alone was putting an anomaly-detection paper on breast MRI
+    // into the audit dossier, and "curriculum" would put every curriculum
+    // learning paper into education.
+    //
+    // The second clause is the escape hatch, and it earns its place. A title
+    // rule alone dropped financial reporting below the buildable threshold, and
+    // the document it was excluding was an SEC Chief Accountant's speech on
+    // trust in the capital markets: unmistakably the right evidence, with a
+    // title that names none of it. Requiring three DISTINCT industry terms in
+    // the body is the difference between a document that keeps returning to the
+    // industry in its own vocabulary and one that mentions it once in passing.
+    // Measured against the whole corpus, it restored the speech and admitted
+    // nothing at all to the industries that genuinely have no evidence yet.
+    const titleNamesIt = countMatches(row.title, qualifyingTerms) > 0
+    if (!titleNamesIt && countMatches(row.snippet ?? "", qualifyingTerms) < MIN_SNIPPET_DEPTH) continue
+
     const industryHits = countMatches(haystack, matchTerms)
-    if (industryHits === 0) continue
 
     // The conjunction. Relevance to her is the intersection, never either half.
     const techHits = countMatches(haystack, STRONG_TECH_TERMS)
@@ -186,9 +259,25 @@ export async function selectIndustrySignals(
   }
 
   const capped: SelectedSignal[] = []
+  const cut: SelectedSignal[] = []
   for (const [, list] of byLane) {
     list.sort((a, b) => b.score - a.score || (b.published_at ?? "").localeCompare(a.published_at ?? ""))
     capped.push(...list.slice(0, MAX_PER_LANE))
+    cut.push(...list.slice(MAX_PER_LANE))
+  }
+
+  // The per-lane cap must not be what makes an industry unbuildable.
+  //
+  // It exists so eighty filings cannot drown four patents, which is a rule
+  // about proportion in a rich industry. Applied to a thin one it does
+  // something it was never meant to: financial reporting had eight qualifying
+  // signals and the cap returned seven, one short of the threshold, so the
+  // dossier refused on a truncation rather than on the evidence. Whatever the
+  // cap removed comes back, best-scoring first, only until the industry is
+  // buildable and never beyond it.
+  if (capped.length < MIN_BUILDABLE && cut.length) {
+    cut.sort((a, b) => b.score - a.score || (b.published_at ?? "").localeCompare(a.published_at ?? ""))
+    capped.push(...cut.slice(0, MIN_BUILDABLE - capped.length))
   }
 
   // Leading registers first in what reaches the model. They are the scarce and

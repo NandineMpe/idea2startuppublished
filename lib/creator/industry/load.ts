@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { safeRows } from "../query"
 import { researchTopicsBlocker } from "../load-stories"
 import type { CreatorBlocker } from "../types"
-import { INDUSTRY_SEEDS } from "./definitions"
+import { INDUSTRY_SEEDS, MIN_LEADING_TO_FORECAST, MIN_SIGNALS_TO_BUILD } from "./definitions"
+import { countByBand, loadScorableSignals, selectFromRows } from "./select"
 import type { IndustryArcPoint, IndustryIndicator, IndustryShift } from "./build"
 
 export type CreatorIndustry = {
@@ -19,12 +20,33 @@ export type CreatorIndustry = {
   open_questions: string[]
   built_from: Record<string, number>
   built_at: string | null
+  /**
+   * What is in the corpus for this industry right now, whether or not it has
+   * ever been built.
+   *
+   * On the card rather than in the build, because "there is not enough evidence
+   * yet" has to be visible before she spends a model pass finding out. An
+   * industry the sweep has never collected for looks identical to a rich one
+   * until you press the button, and that is the whole reason the first version
+   * of this screen was half a feature.
+   */
+  available: number
+  available_leading: number
+  last_swept_at: string | null
 }
+
+// Re-exported so the card can import its thresholds alongside its type. They
+// live in definitions because build.ts needs them too, and importing them from
+// here would put a cycle between load and build.
+export { MIN_LEADING_TO_FORECAST, MIN_SIGNALS_TO_BUILD }
+
+/** The stored columns, without the counts computed on read. */
+type IndustryRow = Omit<CreatorIndustry, "available" | "available_leading"> & { id: string }
 
 const INDUSTRY_COLUMNS =
   // One literal, never concatenated: PostgREST parses this at the type level and
   // a `+` collapses every row to unknown.
-  "id,slug,label,audience,baseline,match_terms,headline,arc,indicators,shifts,open_questions,built_from,built_at"
+  "id,slug,label,audience,baseline,match_terms,headline,arc,indicators,shifts,open_questions,built_from,built_at,last_swept_at"
 
 export type IndustryContext = {
   industries: CreatorIndustry[]
@@ -42,8 +64,10 @@ export async function loadIndustries(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<IndustryContext> {
-  const [rows, blocker] = await Promise.all([
-    safeRows<CreatorIndustry & { id: string }>(
+  // The signal corpus is read once and scored fourteen times in memory rather
+  // than re-queried per industry.
+  const [rows, blocker, signalRows] = await Promise.all([
+    safeRows<IndustryRow>(
       supabase
         .schema("creator")
         .from("creator_industries")
@@ -52,12 +76,22 @@ export async function loadIndustries(
         .is("deleted_at", null),
     ),
     researchTopicsBlocker(supabase, userId),
+    loadScorableSignals(supabase, userId),
   ])
+
+  function evidence(matchTerms: string[], weakTerms: string[]): { available: number; available_leading: number } {
+    const selected = selectFromRows(signalRows, matchTerms, weakTerms)
+    return {
+      available: selected.length,
+      available_leading: countByBand(selected).ahead,
+    }
+  }
 
   const bySlug = new Map(rows.map((r) => [r.slug, r]))
 
   const industries: CreatorIndustry[] = INDUSTRY_SEEDS.map((seed) => {
     const row = bySlug.get(seed.slug)
+    const terms = row?.match_terms?.length ? row.match_terms : seed.match_terms
     if (!row) {
       return {
         id: null,
@@ -73,6 +107,8 @@ export async function loadIndustries(
         open_questions: [],
         built_from: {},
         built_at: null,
+        last_swept_at: null,
+        ...evidence(terms, seed.weak_terms ?? []),
       }
     }
     return {
@@ -82,6 +118,7 @@ export async function loadIndustries(
       shifts: Array.isArray(row.shifts) ? row.shifts : [],
       open_questions: Array.isArray(row.open_questions) ? row.open_questions : [],
       built_from: row.built_from ?? {},
+      ...evidence(terms, seed.weak_terms ?? []),
     }
   })
 
@@ -95,12 +132,21 @@ export async function loadIndustries(
         shifts: Array.isArray(row.shifts) ? row.shifts : [],
         open_questions: Array.isArray(row.open_questions) ? row.open_questions : [],
         built_from: row.built_from ?? {},
+        ...evidence(row.match_terms ?? [], []),
       })
     }
   }
 
-  // Built first, most recent first. An unbuilt industry is a to-do, not a result.
-  industries.sort((a, b) => (b.built_at ?? "").localeCompare(a.built_at ?? ""))
+  // Built first and most recent first, then the ones that could be built now,
+  // then the ones still collecting. An unbuilt industry is a to-do, and a to-do
+  // she cannot action yet belongs below the ones she can.
+  industries.sort((a, b) => {
+    if (a.built_at || b.built_at) return (b.built_at ?? "").localeCompare(a.built_at ?? "")
+    const aReady = a.available >= MIN_SIGNALS_TO_BUILD
+    const bReady = b.available >= MIN_SIGNALS_TO_BUILD
+    if (aReady !== bReady) return aReady ? -1 : 1
+    return b.available - a.available
+  })
 
   return { industries, blocker }
 }

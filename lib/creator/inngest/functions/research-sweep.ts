@@ -2,6 +2,7 @@ import { creatorInngest } from "../client"
 import { supabaseAdmin } from "@/lib/supabase"
 import { loadResearchTopics, sweepOneTopic, sweepReleases } from "@/lib/creator/research/sweep"
 import { rebuildTasteForUser } from "@/lib/creator/taste/rebuild"
+import { markIndustrySwept, planIndustrySweep } from "@/lib/creator/industry/sweep-plan"
 
 /**
  * The Researcher: sweep every register, then hand the fresh signals to synthesis.
@@ -107,6 +108,35 @@ export const creatorResearchSweep = creatorInngest.createFunction(
       })
       upserted += releases.upserted
       for (const err of releases.errors) errors.push(`releases / ${err}`)
+
+      // Industries collect for themselves, a few per run.
+      //
+      // Without this the In industry screen is a list of headings: the sweep
+      // reads her canon and her trajectory, both of which are about audit,
+      // finance and law, so an industry outside that was being asked to build a
+      // dossier from a corpus that had never looked for it. Rotated rather than
+      // swept in full, because fourteen industries across twenty-two lanes is
+      // not one execution window.
+      const industries = await step.run(`industry-plan-${userId}`, async () =>
+        planIndustrySweep(supabaseAdmin, userId),
+      )
+
+      for (const [i, industry] of industries.entries()) {
+        for (const [j, query] of industry.queries.entries()) {
+          const outcome = await step.run(`industry-${userId}-${i}-${j}`, async () =>
+            sweepOneTopic(supabaseAdmin, userId, query, "industry", hoursBack),
+          )
+          upserted += outcome.upserted
+          for (const err of outcome.errors) errors.push(`${industry.slug} / ${err}`)
+        }
+        // Marked after its queries have run, so a run that dies halfway leaves
+        // the unfinished industry at the front of the rotation rather than
+        // sending it to the back having collected nothing.
+        await step.run(`industry-mark-${userId}-${i}`, async () => {
+          await markIndustrySwept(supabaseAdmin, userId, industry.slug)
+          return { slug: industry.slug }
+        })
+      }
 
       summaries.push({ user_id: userId, upserted, errors })
     }

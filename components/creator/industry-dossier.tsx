@@ -4,7 +4,11 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, RefreshCw, Telescope } from "lucide-react"
 import { horizonLabel } from "@/lib/creator/industry/definitions"
-import type { CreatorIndustry } from "@/lib/creator/industry/load"
+import {
+  MIN_LEADING_TO_FORECAST,
+  MIN_SIGNALS_TO_BUILD,
+  type CreatorIndustry,
+} from "@/lib/creator/industry/load"
 import type { IndustryEvidence } from "@/lib/creator/industry/build"
 
 const ERA_LABEL: Record<string, string> = {
@@ -49,6 +53,10 @@ export function IndustryDossier({ industry }: { industry: CreatorIndustry }) {
   const byEra = (era: string) => industry.arc.filter((p) => p.era === era)
   const ahead = byEra("ahead")
 
+  // What the corpus can actually support, stated before she spends a pass.
+  const buildable = industry.available >= MIN_SIGNALS_TO_BUILD
+  const forecastable = industry.available_leading >= MIN_LEADING_TO_FORECAST
+
   return (
     <article className="rounded-xl border border-border bg-card p-5 mb-5">
       <div className="flex items-start justify-between gap-4">
@@ -63,10 +71,14 @@ export function IndustryDossier({ industry }: { industry: CreatorIndustry }) {
             </p>
           )}
         </div>
+        {/* Disabled rather than allowed-to-fail. The build refuses under eight
+            signals anyway, and a button that queues a refusal is a worse way to
+            learn that than a button that says why it is off. */}
         <button
           onClick={build}
-          disabled={pending}
-          className="shrink-0 inline-flex items-center gap-1.5 h-8 rounded-md border border-border px-3 text-[12px] font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+          disabled={pending || !buildable}
+          title={buildable ? undefined : `Needs ${MIN_SIGNALS_TO_BUILD} matching signals, has ${industry.available}.`}
+          className="shrink-0 inline-flex items-center gap-1.5 h-8 rounded-md border border-border px-3 text-[12px] font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:hover:bg-transparent"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} />
           {pending ? "Reading…" : industry.built_at ? "Rebuild" : "Build"}
@@ -75,8 +87,45 @@ export function IndustryDossier({ industry }: { industry: CreatorIndustry }) {
 
       {error && <p className="text-[12px] text-amber-700 dark:text-amber-400 mt-2">{error}</p>}
 
-      {!industry.built_at && !error && (
-        <p className="text-[12px] text-muted-foreground mt-3 leading-relaxed">
+      {/* The evidence line, on every card whether built or not. An industry the
+          sweep has never collected for is indistinguishable from a rich one
+          until you press Build, and that gap is what made the first version of
+          this screen look finished when it was half a feature. */}
+      <p className="text-[11px] text-muted-foreground mt-2 tabular-nums">
+        <span className={buildable ? "text-foreground/70" : "text-amber-700 dark:text-amber-500"}>
+          {industry.available} matching signals
+        </span>
+        {" · "}
+        <span className={forecastable ? "text-foreground/70" : "text-amber-700 dark:text-amber-500"}>
+          {industry.available_leading} from leading registers
+        </span>
+        {industry.last_swept_at && (
+          <>
+            {" · "}
+            <span>collected {new Date(industry.last_swept_at).toLocaleDateString()}</span>
+          </>
+        )}
+      </p>
+
+      {!buildable && !error && (
+        <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed max-w-3xl">
+          Not enough evidence yet. Your research sweep reads for your own topics first and collects
+          for a few industries each run, so this one fills up as you keep sweeping. It needs{" "}
+          {MIN_SIGNALS_TO_BUILD} matching signals before a dossier is worth anything, and a dossier
+          built on fewer would read exactly as confident as a real one.
+        </p>
+      )}
+
+      {buildable && !forecastable && !industry.built_at && !error && (
+        <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed max-w-3xl">
+          Enough to describe the arc, thin on the registers that see ahead. Build it if you want the
+          history, but treat the forecast as directional until the patents, tenders and consultations
+          come through.
+        </p>
+      )}
+
+      {buildable && !industry.built_at && !error && (
+        <p className="text-[12px] text-muted-foreground mt-2 leading-relaxed max-w-3xl">
           Not built yet. This reads your corpus for {industry.label.toLowerCase()}, sorts it by how far
           ahead each register sits, and turns it into an arc with a dated future.
         </p>
