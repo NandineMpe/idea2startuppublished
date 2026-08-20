@@ -11,6 +11,7 @@ import {
   Newspaper,
   Radio,
   Settings,
+  Sparkles,
   Sunrise,
 } from "lucide-react"
 
@@ -44,6 +45,9 @@ export const CREATOR_NAV: CreatorNavItem[] = [
   { title: "Opportunities", short: "Deals", href: "/creator/dashboard/opportunities", icon: Handshake },
   { title: "Next Five", short: "Next", href: "/creator/dashboard/next", icon: Lightbulb, primary: true },
   { title: "Worth", href: "/creator/dashboard/worth", icon: DollarSign },
+  // Next to Worth rather than near Content: both are about what the business
+  // spends and earns on her being the product, and they get read together.
+  { title: "Brand maxing", short: "Brand", href: "/creator/dashboard/brand", icon: Sparkles },
   { title: "Canon", href: "/creator/dashboard/canon", icon: Fingerprint },
   { title: "Content", href: "/creator/dashboard/content", icon: FileVideo },
   { title: "Settings", href: "/creator/dashboard/settings", icon: Settings },
